@@ -1,0 +1,6 @@
+tkcalendar
+dash
+plotly
+pandas
+pyodbc
+ifcopenshell
