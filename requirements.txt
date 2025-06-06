@@ -1,0 +1,9 @@
+tkcalendar
+pywebview
+pyodbc
+pandas
+dash
+plotly
+sqlparse
+python-dateutil
+ifcopenshell
