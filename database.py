@@ -470,3 +470,69 @@ def log_acc_import(project_id, folder_name, summary):
     conn.commit()
     conn.close()
 
+ 
+# Control file management ===========================================
+
+def get_project_health_files(project_name):
+    """Return distinct Revit file names from tblRvtProjHealth for a project."""
+    conn = connect_to_db("RevitHealthCheckDB")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT DISTINCT strRvtFileName FROM tblRvtProjHealth WHERE strProjectName = ?",
+            (project_name,),
+        )
+        return [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching health files: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_control_file(project_id):
+    """Retrieve the saved control file for the given project."""
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT file_name FROM ProjectControlModels WHERE project_id = ?",
+            (project_id,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"❌ Error fetching control file: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def set_control_file(project_id, file_name):
+    """Save the selected control file for the project."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            MERGE ProjectControlModels AS target
+            USING (SELECT ? AS project_id, ? AS file_name) AS src
+            ON target.project_id = src.project_id
+            WHEN MATCHED THEN UPDATE SET file_name = src.file_name
+            WHEN NOT MATCHED THEN INSERT (project_id, file_name) VALUES (src.project_id, src.file_name);
+            """,
+            (project_id, file_name),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error saving control file: {e}")
+        return False
+    finally:
+        conn.close()
