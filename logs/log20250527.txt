@@ -1,0 +1,67 @@
+2025-05-27 16:04:10.882 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:04:10.953 +10:00 [ERR] Fatal error starting the application.
+System.IO.FileNotFoundException: The configuration file 'appsettings.json' was not found and is not optional. The expected physical path was 'C:\Users\RicoStrinati\Documents\research\BIMProjMngmt\appsettings.json'.
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.HandleException(ExceptionDispatchInfo info)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load()
+   at Microsoft.Extensions.Configuration.ConfigurationRoot..ctor(IList`1 providers)
+   at Microsoft.Extensions.Configuration.ConfigurationBuilder.Build()
+   at Program.LoadConfiguration()
+   at Program.Main()
+2025-05-27 16:06:10.458 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:06:10.519 +10:00 [ERR] Fatal error starting the application.
+System.IO.FileNotFoundException: The configuration file 'appsettings.json' was not found and is not optional. The expected physical path was 'C:\Users\RicoStrinati\Documents\research\BIMProjMngmt\appsettings.json'.
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.HandleException(ExceptionDispatchInfo info)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load()
+   at Microsoft.Extensions.Configuration.ConfigurationRoot..ctor(IList`1 providers)
+   at Microsoft.Extensions.Configuration.ConfigurationBuilder.Build()
+   at Program.LoadConfiguration()
+   at Program.Main()
+2025-05-27 16:49:28.727 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:49:28.795 +10:00 [ERR] Fatal error starting the application.
+System.IO.FileNotFoundException: The configuration file 'appsettings.json' was not found and is not optional. The expected physical path was 'C:\Users\RicoStrinati\Documents\research\BIMProjMngmt\appsettings.json'.
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.HandleException(ExceptionDispatchInfo info)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load()
+   at Microsoft.Extensions.Configuration.ConfigurationRoot..ctor(IList`1 providers)
+   at Microsoft.Extensions.Configuration.ConfigurationBuilder.Build()
+   at Program.LoadConfiguration()
+   at Program.Main()
+2025-05-27 16:53:04.237 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:53:04.302 +10:00 [ERR] Fatal error starting the application.
+System.IO.FileNotFoundException: The configuration file 'appsettings.json' was not found and is not optional. The expected physical path was 'C:\Users\RicoStrinati\Documents\research\BIMProjMngmt\tools\appsettings.json'.
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.HandleException(ExceptionDispatchInfo info)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load()
+   at Microsoft.Extensions.Configuration.ConfigurationRoot..ctor(IList`1 providers)
+   at Microsoft.Extensions.Configuration.ConfigurationBuilder.Build()
+   at Program.LoadConfiguration()
+   at Program.Main()
+2025-05-27 16:53:48.288 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:53:48.371 +10:00 [ERR] Fatal error starting the application.
+System.IO.FileNotFoundException: Configuration file not found: appsettings.json
+   at ReviztoTokenRefresher..ctor()
+   at ReviztoDataExporter.ReviztoApiClient..ctor(String baseUrl, String accessToken, String refreshToken)
+   at Program.Main()
+2025-05-27 16:57:32.614 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:57:32.738 +10:00 [INF] Database initialized.
+2025-05-27 16:57:32.827 +10:00 [ERR] Fatal error starting the application.
+System.DllNotFoundException: Dll was not found.
+   at System.Data.SqlClient.SNINativeMethodWrapper.UnmanagedIsTokenRestricted(IntPtr token, Boolean& isRestricted)
+   at System.Data.Win32NativeMethods.IsTokenRestrictedWrapper(IntPtr token)
+   at System.Data.ProviderBase.DbConnectionPoolIdentity.GetCurrentNative()
+   at System.Data.ProviderBase.DbConnectionPoolIdentity.GetCurrent()
+   at System.Data.ProviderBase.DbConnectionPoolGroup.GetConnectionPool(DbConnectionFactory connectionFactory)
+   at System.Data.ProviderBase.DbConnectionFactory.GetConnectionPool(DbConnection owningObject, DbConnectionPoolGroup connectionPoolGroup)
+   at System.Data.ProviderBase.DbConnectionFactory.TryGetConnection(DbConnection owningConnection, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal oldConnection, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at ExportForm.LoadProjects()
+   at ExportForm.InitializeForm()
+   at ExportForm..ctor(UserLicenceService exportService, String connectionString)
+   at Program.Main()
+2025-05-27 16:58:39.396 +10:00 [INF] Starting Revizto Export UI...
+2025-05-27 16:58:39.510 +10:00 [INF] Database initialized.
