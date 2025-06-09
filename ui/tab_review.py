@@ -6,7 +6,11 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 
-from ui.ui_helpers import create_labeled_entry, create_horizontal_button_group
+from ui.ui_helpers import (
+    create_labeled_entry,
+    create_labeled_combobox,
+    create_horizontal_button_group,
+)
 from ui.status_bar import update_status
 from ui.tooltips import CreateToolTip
 
