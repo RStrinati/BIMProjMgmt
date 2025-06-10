@@ -39,9 +39,11 @@ def open_revizto_csharp_app():
         messagebox.showerror("Error", f"EXE not found at: {exe_path}")
 
 def build_review_tab(tab, status_var):
+    global cmb_projects_ref
     # --- Project & Cycle Selection ---
     projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
     _, cmb_projects = create_labeled_combobox(tab, "Project:", projects)
+    cmb_projects_ref = cmb_projects
     _, cmb_cycles = create_labeled_combobox(tab, "Cycle:", [])
 
     def load_cycles(event=None):

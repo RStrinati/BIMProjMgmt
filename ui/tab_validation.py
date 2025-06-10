@@ -103,7 +103,7 @@ def build_validation_tab(tab, status_var):
             messagebox.showerror("Error", "Select a valid naming_conventions.json file")
             return
 
-        project_files = get_project_health_files(project_name)
+        project_files = get_project_health_files(project_id)
         if not project_files:
             messagebox.showinfo("No Files", "No project files found")
             return

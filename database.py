@@ -505,10 +505,11 @@ def get_control_file(project_id):
             SELECT p.project_name, cm.control_file_name
             FROM ProjectManagement.dbo.tblControlModels cm
             JOIN ProjectManagement.dbo.projects p ON cm.project_id = p.project_id
-        """)
+            WHERE cm.project_id = ?
+        """, (project_id,))
 
         row = cursor.fetchone()
-        return row[0] if row else None
+        return row[1] if row else None
     except Exception as e:
         print(f"❌ Error fetching control file: {e}")
         return None
