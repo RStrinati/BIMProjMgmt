@@ -4,7 +4,7 @@ import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from ideate_health_exporter import export_health_checks_to_sql
-from database import log_acc_import
+from database import log_acc_import, get_project_health_files, set_control_file
 
 
 
@@ -52,6 +52,44 @@ def build_data_imports_tab(tab, status_var):
     ttk.Label(tab, text="Revit Health Check JSON Import", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
     _, entry_json_path = create_labeled_entry(tab, "Audit JSON Folder:")
     CreateToolTip(entry_json_path, "Folder where exported Revit audit JSONs are saved")
+
+    # --- Control Model Selection ---
+    ttk.Label(tab, text="Set Control Model File", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    control_file_var = tk.StringVar()
+    cmb_control_file = ttk.Combobox(tab, textvariable=control_file_var, width=60)
+    cmb_control_file.pack(padx=10, pady=5, anchor="w")
+    CreateToolTip(cmb_control_file, "Select the .rvt file to be used as the control model")
+
+    def load_control_files(event=None):
+        if " - " not in cmb_projects.get():
+            return
+        project_id = int(cmb_projects.get().split(" - ")[0])
+        files = get_project_health_files(project_id)
+        cmb_control_file["values"] = files
+        if files:
+            cmb_control_file.current(0)
+
+    def save_control_file():
+        if " - " not in cmb_projects.get():
+            messagebox.showerror("Error", "Select a project first")
+            return
+        project_id = int(cmb_projects.get().split(" - ")[0])
+        selected_file = control_file_var.get()
+        if not selected_file:
+            messagebox.showerror("Error", "Select a control model file")
+            return
+        success = set_control_file(project_id, selected_file)
+        if success:
+            update_status(status_var, f"✅ Control model saved: {selected_file}")
+        else:
+            messagebox.showerror("Error", "Failed to save control model")
+
+    # Link dropdown refresh to project change
+    cmb_projects.bind("<<ComboboxSelected>>", lambda e: [load_project_details(), load_control_files()])
+
+    create_horizontal_button_group(tab, [
+        ("Save Control Model", save_control_file),
+    ])
 
     def browse_audit_folder():
         path = filedialog.askdirectory()

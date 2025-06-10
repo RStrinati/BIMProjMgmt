@@ -3,6 +3,8 @@
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from tools.naming_validator import validate_files_against_naming
+
 
 from ui.ui_helpers import (
     create_labeled_entry,
@@ -33,7 +35,7 @@ def build_validation_tab(tab, status_var):
         if " - " not in cmb_projects.get():
             return
         pid, name = cmb_projects.get().split(" - ", 1)
-        files = get_project_health_files(name)
+        files = get_project_health_files(int(pid))
         cmb_control['values'] = files if files else ["No files"]
         current = get_control_file(pid)
         if files:
@@ -76,14 +78,52 @@ def build_validation_tab(tab, status_var):
 
     # --- Naming Convention Check Section ---
     ttk.Label(tab, text="Check Naming Conventions", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_naming_standards_path = create_labeled_entry(tab, "Standards Reference Folder:")
-    CreateToolTip(entry_naming_standards_path, "Folder containing naming convention rules")
+
+    # Entry for Regex JSON file
+    _, entry_naming_json = create_labeled_entry(tab, "Regex JSON File:")
+    CreateToolTip(entry_naming_json, "Select the JSON file containing regex naming rules")
+
+    def browse_naming_json():
+        path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
+        if path:
+            entry_naming_json.delete(0, tk.END)
+            entry_naming_json.insert(0, path)
 
     def check_naming_conventions():
-        update_status(status_var, "Checking naming conventions...")
-        # Placeholder for logic
+        if " - " not in cmb_projects.get():
+            messagebox.showerror("Error", "Select a project first")
+            return
 
-    create_horizontal_button_group(tab, [("Check Naming", check_naming_conventions)])
+        project_id_str, project_name = cmb_projects.get().split(" - ", 1)
+        project_id = int(project_id_str)
+
+        json_path = entry_naming_json.get().strip()
+
+        if not os.path.isfile(json_path):
+            messagebox.showerror("Error", "Select a valid naming_conventions.json file")
+            return
+
+        project_files = get_project_health_files(project_name)
+        if not project_files:
+            messagebox.showinfo("No Files", "No project files found")
+            return
+
+        # Corrected location and use of project_name
+        results = validate_files_against_naming(project_id, json_path, project_files, project_name)
+
+        if results:
+            result_msg = "\n".join([f"{file}: {reason}" for file, reason in results])
+            messagebox.showwarning("Naming Issues Found", result_msg)
+        else:
+            messagebox.showinfo("Success", "All files follow the naming convention!")
+
+        update_status(status_var, "Naming convention check complete.")
+
+
+    create_horizontal_button_group(tab, [
+        ("Browse JSON", browse_naming_json),
+        ("Check Naming", check_naming_conventions),
+    ])
 
     # --- Asset Data Validation Section ---
     ttk.Label(tab, text="Asset Data Validation", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)

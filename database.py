@@ -62,7 +62,7 @@ def get_projects():
 
 def get_project_details(project_id):
     """Fetch project details from the database (excluding folder paths)."""
-    conn = connect_to_db("ProjectManagement")  # ✅ Ensure it queries the correct DB
+    conn = connect_to_db("ProjectManagement")  
     if conn is None:
         return None
 
@@ -473,17 +473,19 @@ def log_acc_import(project_id, folder_name, summary):
  
 # Control file management ===========================================
 
-def get_project_health_files(project_name):
-    """Return distinct Revit file names from tblRvtProjHealth for a project."""
+def get_project_health_files(project_id):
+    """Return distinct Revit file names from vw_LatestRvtFiles for a project."""
     conn = connect_to_db("RevitHealthCheckDB")
     if conn is None:
         return []
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT DISTINCT strRvtFileName FROM tblRvtProjHealth WHERE strProjectName = ?",
-            (project_name,),
-        )
+        cursor.execute("""
+            SELECT DISTINCT strRvtFileName
+            FROM dbo.vw_LatestRvtFiles
+            WHERE project_id = ?
+            ORDER BY strRvtFileName;
+        """, (project_id,))
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"❌ Error fetching health files: {e}")
@@ -499,10 +501,12 @@ def get_control_file(project_id):
         return None
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT file_name FROM ProjectControlModels WHERE project_id = ?",
-            (project_id,),
-        )
+        cursor.execute("""
+            SELECT p.project_name, cm.control_file_name
+            FROM ProjectManagement.dbo.tblControlModels cm
+            JOIN ProjectManagement.dbo.projects p ON cm.project_id = p.project_id
+        """)
+
         row = cursor.fetchone()
         return row[0] if row else None
     except Exception as e:
@@ -513,22 +517,22 @@ def get_control_file(project_id):
 
 
 def set_control_file(project_id, file_name):
-    """Save the selected control file for the project."""
+    """Save or update the selected control file for the project."""
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            MERGE ProjectControlModels AS target
-            USING (SELECT ? AS project_id, ? AS file_name) AS src
+        cursor.execute("""
+            MERGE dbo.tblControlModels AS target
+            USING (SELECT ? AS project_id, ? AS control_file_name) AS src
             ON target.project_id = src.project_id
-            WHEN MATCHED THEN UPDATE SET file_name = src.file_name
-            WHEN NOT MATCHED THEN INSERT (project_id, file_name) VALUES (src.project_id, src.file_name);
-            """,
-            (project_id, file_name),
-        )
+            WHEN MATCHED THEN 
+                UPDATE SET control_file_name = src.control_file_name, updated_at = GETDATE()
+            WHEN NOT MATCHED THEN 
+                INSERT (project_id, control_file_name)
+                VALUES (src.project_id, src.control_file_name);
+        """, (project_id, file_name))
         conn.commit()
         return True
     except Exception as e:
@@ -536,3 +540,27 @@ def set_control_file(project_id, file_name):
         return False
     finally:
         conn.close()
+
+def update_file_validation_status(file_name, status, reason, regex_used):
+    """
+    Updates validation status for a given Revit file in tblRvtProjHealth.
+    """
+    conn_str = os.getenv("DB_CONNECTION_STRING")  # or use your hardcoded string if not using env vars
+
+    query = """
+    UPDATE RevitHealthCheckDB.dbo.tblRvtProjHealth
+    SET
+        validation_status = ?,
+        validation_reason = ?,
+        compiled_regex = ?,
+        validated_date = ?
+    WHERE strRvtFileName = ?
+    """
+
+    try:
+        with pyodbc.connect(conn_str) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, status, reason, regex_used, datetime.now(), file_name)
+            conn.commit()
+    except Exception as e:
+        print(f"❌ Failed to update validation for {file_name}: {e}")
