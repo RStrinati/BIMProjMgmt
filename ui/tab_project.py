@@ -14,6 +14,7 @@ from ui.ui_helpers import (
 )
 from ui.status_bar import update_status
 from ui.tooltips import CreateToolTip
+from ui import tab_review
 
 from database import (
     get_projects,
@@ -125,6 +126,7 @@ def build_project_tab(tab, status_var):
             return
         if insert_project(name, "", None):
             refresh_projects()
+            tab_review.refresh_review_projects()
             update_status(status_var, f"Created new project: {name}")
 
     create_horizontal_button_group(

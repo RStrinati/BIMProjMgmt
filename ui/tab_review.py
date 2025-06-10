@@ -18,7 +18,19 @@ from review_handler import submit_review_schedule
 from gantt_chart import launch_gantt_chart
 from database import get_projects, get_cycle_ids
 
+# Global reference to the project dropdown so other tabs can refresh it
+cmb_projects_ref = None
 
+def refresh_review_projects():
+    """Reload the project list for the review tab combobox."""
+    if cmb_projects_ref is None:
+        return
+    projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
+    cmb_projects_ref['values'] = projects
+    if projects:
+        cmb_projects_ref.current(0)
+        cmb_projects_ref.event_generate('<<ComboboxSelected>>')
+        
 def open_revizto_csharp_app():
     exe_path = os.path.abspath("tools/ReviztoDataExporter.exe")
     if os.path.exists(exe_path):
