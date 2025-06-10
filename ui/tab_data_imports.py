@@ -3,6 +3,10 @@
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from ideate_health_exporter import export_health_checks_to_sql
+from database import log_acc_import
+
+
 
 from ui.ui_helpers import (
     create_labeled_entry,
@@ -137,3 +141,43 @@ def build_data_imports_tab(tab, status_var):
         update_status(status_var, "Clash CSV import started")
 
     create_horizontal_button_group(tab, [("Import Clash CSVs", import_clash_csv)])
+
+
+    # --- Ideate Health Check Excel Import Section ---
+    ttk.Label(tab, text="Ideate Health Check Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_ideate_folder = create_labeled_entry(tab, "Ideate Excel Folder:")
+    CreateToolTip(entry_ideate_folder, "Select the folder containing Ideate Health Check Excel files")
+
+    def browse_ideate_folder():
+        path = filedialog.askdirectory()
+        if path:
+            entry_ideate_folder.delete(0, tk.END)
+            entry_ideate_folder.insert(0, path)
+
+    def import_ideate_health_checks():
+        folder = entry_ideate_folder.get().strip()
+        if not os.path.isdir(folder):
+            messagebox.showerror("Error", "Select a valid folder")
+            return
+
+        if " - " not in cmb_projects.get():
+            messagebox.showerror("Error", "Select a project first")
+            return
+
+        try:
+            project_id = int(cmb_projects.get().split(" - ")[0])
+            df_result = export_health_checks_to_sql(
+                folder_path=folder,
+                project_id=project_id,
+                table_name="dbo.IdeateHealthCheckSummary"
+            )
+
+            log_acc_import(project_id, os.path.basename(folder), "Ideate Health Check import complete")
+            update_status(status_var, f"Ideate Health Check import complete ({len(df_result)} files processed)")
+        except Exception as exc:
+            messagebox.showerror("Error", str(exc))
+
+    create_horizontal_button_group(tab, [
+        ("Browse", browse_ideate_folder),
+        ("Import Ideate Excel", import_ideate_health_checks),
+    ])
