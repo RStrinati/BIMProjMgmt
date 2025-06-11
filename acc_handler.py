@@ -8,7 +8,11 @@ import sqlparse
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox
+import zipfile
+import tempfile
+import shutil
 from database import get_acc_folder_path, log_acc_import
+
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
@@ -179,7 +183,19 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
 
 def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
     summary = []
-    with open(LOG_FILE, "w"): pass  # clear log file
+    with open(LOG_FILE, "w"):  # clear log file
+        pass
+
+    temp_dir = None
+    if folder_path.lower().endswith(".zip") and os.path.isfile(folder_path):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            with zipfile.ZipFile(folder_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
+            folder_path = temp_dir
+        except Exception as exc:
+            shutil.rmtree(temp_dir)
+            raise exc
 
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
@@ -209,6 +225,8 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
 
     cursor.close()
     conn.close()
+    if temp_dir:
+        shutil.rmtree(temp_dir)
     return summary
 
 
@@ -222,6 +240,12 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
 
     if not os.path.exists(folder_path):
         return False, "Folder path is invalid."
+
+    if os.path.isfile(folder_path):
+        if not folder_path.lower().endswith(".zip"):
+            return False, "Selected file must be a .zip archive."
+    elif not os.path.isdir(folder_path):
+        return False, "Select a valid folder or ZIP file."
 
     folder_name = os.path.basename(folder_path.rstrip(os.sep))
     confirm = messagebox.askyesno(
@@ -255,6 +279,7 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
     progress_win.update()
     time.sleep(0.5)
     progress_win.destroy()
+
 
     if not summary:
         return False, "ACC import failed or found no data."
