@@ -3,8 +3,13 @@ import pandas as pd
 import pyodbc
 
 def assess_health_check(file_path, control_model_name=None):
-    # Insert function from earlier here (same logic as shared)
-    ...
+    """Analyze a single Ideate Health Check Excel file.
+
+    This repository does not yet provide the implementation for parsing the
+    exported workbook, so this function raises ``NotImplementedError`` to make
+    the missing logic explicit at runtime.
+    """
+    raise NotImplementedError("Ideate Health Check parsing not implemented")
 
 def export_health_checks_to_sql(folder_path, project_id, table_name, control_model_table="ProjectControlModels"):
     from database import connect_to_db, get_control_file
