@@ -11,8 +11,9 @@ from tkinter import ttk, messagebox
 import zipfile
 import tempfile
 import shutil
-from database import get_acc_folder_path, log_acc_import
+from database import get_acc_folder_path, log_acc_import, connect_to_db
 
+from config import ACC_DB
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
@@ -22,8 +23,6 @@ DRY_RUN = False  # Set to True for testing without SQL execution
 def timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def connect_to_db(server, db, user, pwd, driver="ODBC Driver 17 for SQL Server"):
-    return pyodbc.connect(f"DRIVER={{{driver}}};SERVER={server};DATABASE={db};UID={user};PWD={pwd}")
 
 def truncate_table(cursor, table_name):
     try:
@@ -202,7 +201,7 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
     if not DRY_RUN:
         conn.commit()
 
-def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_skip_summary=True):
+def import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=True):
     """Import ACC CSV data and merge into SQL tables."""
     summary = []
     skipped = []
@@ -238,7 +237,11 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
                 zf.extractall(temp_dir)
             folder_path = temp_dir
 
-    conn = connect_to_db(server, db, user, pwd)
+    # Use default DB from config if not provided
+    if db is None:
+        db = ACC_DB
+
+    conn = connect_to_db(db)
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
@@ -257,7 +260,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
         table_name = f"staging.{base}"
 
         csv_exists = os.path.exists(csv_file)
-        merge_exists = os.path.exists(os.path.join(merge_dir, merge_sql_file))
+        merge_exists = os.path.exists(merge_sql_path)
 
         if csv_exists and merge_exists:
             start = time.time()
@@ -275,7 +278,6 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             reason = " and ".join(missing)
             log(f"[SKIP] {base}: missing {reason}")
             skipped.append((base, reason))
-
 
     if show_skip_summary and skipped:
         log("Skipped table summary:")
@@ -327,13 +329,7 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
     pb.start()
     progress_win.update()
 
-    summary = import_acc_data(
-        folder_path,
-        "P-NB-USER-028\\SQLEXPRESS",
-        "acc_data_schema",
-        "admin02",
-        "1234",
-    )
+    summary = import_acc_data(folder_path)
 
     pb.stop()
     lbl_status.config(text="Import complete")

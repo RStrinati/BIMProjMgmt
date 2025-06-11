@@ -103,7 +103,7 @@ def build_data_imports_tab(tab, status_var):
             messagebox.showerror("Error", "Select a valid folder")
             return
         try:
-            import_health_data(folder, "localhost\\SQLEXPRESS", "RevitHealthCheckDB", "admin02", "1234")
+            import_health_data(folder)
             update_status(status_var, "Revit audit import finished")
         except Exception as exc:
             messagebox.showerror("Error", str(exc))

@@ -3,15 +3,16 @@ import json
 import pyodbc
 import shutil
 
-def import_health_data(json_folder, server, database, username, password):
+from config import REVIT_HEALTH_DB
+
+from database import connect_to_db
+def import_health_data(json_folder, db_name=None):
     processed_folder = os.path.join(json_folder, "processed")
     os.makedirs(processed_folder, exist_ok=True)
 
-    conn_str = (
-        f"DRIVER={{SQL Server}};"
-        f"SERVER={server};DATABASE={database};UID={username};PWD={password}"
-    )
-    conn = pyodbc.connect(conn_str)
+    if db_name is None:
+        db_name = REVIT_HEALTH_DB
+    conn = connect_to_db(db_name)
     cursor = conn.cursor()
 
     print("🧠 Connected to DB:", cursor.execute("SELECT DB_NAME()").fetchone()[0])

@@ -3,19 +3,24 @@ import os
 import pandas as pd 
 from datetime import datetime, timedelta
 
-def connect_to_db(db_name="ProjectManagement"):
-    """Connect to the specified SQL Server database."""
+from config import (DB_DRIVER, DB_SERVER, DB_USER, DB_PASSWORD, PROJECT_MGMT_DB)
+def connect_to_db(db_name=None):
+    """Connect to the specified SQL Server database using environment settings."""
+    if not db_name:
+        db_name = PROJECT_MGMT_DB
     try:
         connection = pyodbc.connect(
-            f"Driver={{SQL Server}};"
-            f"Server=P-NB-USER-028\\SQLEXPRESS;"
+            f"Driver={{{DB_DRIVER}}};"
+            f"Server={DB_SERVER};"
             f"Database={db_name};"
-            f"Trusted_Connection=yes;"
+            f"UID={DB_USER};"
+            f"PWD={DB_PASSWORD}"
         )
         return connection
     except pyodbc.Error as e:
         print(f"❌ Database connection error ({db_name}): {e}")
         return None
+
     
 def insert_project(project_name, folder_path, ifc_folder_path=None):
     """Insert a new project into the database with an optional IFC folder path."""
