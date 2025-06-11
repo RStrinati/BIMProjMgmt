@@ -173,23 +173,7 @@ def build_data_imports_tab(tab, status_var):
             update_status(status_var, msg)
         else:
             messagebox.showerror("Error", msg)
-
             return
-        success, msg = run_acc_import(cmb_projects, entry_data_export, log_list)
-        if success:
-            update_status(status_var, msg)
-        else:
-            messagebox.showerror("Error", msg)
-
-    create_horizontal_button_group(tab, [
-        ("Browse", browse_data_export),
-        ("Save Path", save_data_export),
-        ("Import ACC CSVs", import_acc_csv),
-    ])
-
-    log_list = tk.Listbox(tab, width=80, height=5)
-    log_list.pack(padx=10, pady=5, anchor="w")
-
 
     # --- Clash CSV Import Section ---
     ttk.Label(tab, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)

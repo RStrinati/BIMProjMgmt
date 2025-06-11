@@ -203,8 +203,7 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
         conn.commit()
 
 def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_skip_summary=True):
-    """Import ACC CSV data and merge it into SQL tables."""
-
+    """Import ACC CSV data and merge into SQL tables."""
     summary = []
     skipped = []
 
@@ -218,12 +217,13 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
     if os.path.isfile(folder_path) and folder_path.lower().endswith(".zip"):
         temp_dir = tempfile.mkdtemp()
         try:
-            with zipfile.ZipFile(folder_path, "r") as zip_ref:
-                zip_ref.extractall(temp_dir)
+            with zipfile.ZipFile(folder_path, "r") as zf:
+                zf.extractall(temp_dir)
             folder_path = temp_dir
-        except Exception as exc:
+        except Exception:
             shutil.rmtree(temp_dir)
-            raise exc
+            raise
+
     elif os.path.isdir(folder_path):
         zip_files = [
             os.path.join(folder_path, f)
@@ -250,15 +250,10 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
     }
     all_bases = sorted(csv_bases | sql_bases)
 
-    processed = set()
-
     for base in all_bases:
-        if base in processed:
-            continue
-        processed.add(base)
-
         csv_file = os.path.join(folder_path, f"{base}.csv")
         merge_sql_file = f"merge_{base}.sql"
+        merge_sql_path = os.path.join(merge_dir, merge_sql_file)
         table_name = f"staging.{base}"
 
         csv_exists = os.path.exists(csv_file)
@@ -280,6 +275,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             reason = " and ".join(missing)
             log(f"[SKIP] {base}: missing {reason}")
             skipped.append((base, reason))
+
 
     if show_skip_summary and skipped:
         log("Skipped table summary:")
