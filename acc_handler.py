@@ -177,6 +177,7 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
 
 def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
     summary = []
+    skipped = []
     with open(LOG_FILE, "w"): pass  # clear log file
 
     conn = connect_to_db(server, db, user, pwd)
@@ -195,7 +196,11 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
         merge_sql_file = f"merge_{base}.sql"
         table_name = f"staging.{base}"
 
-        if os.path.exists(csv_file) and os.path.exists(os.path.join(merge_dir, merge_sql_file)):
+        merge_sql_path = os.path.join(merge_dir, merge_sql_file)
+        csv_exists = os.path.exists(csv_file)
+        merge_exists = os.path.exists(merge_sql_path)
+
+        if csv_exists and merge_exists:
             start = time.time()
             result = import_csv_to_sql(cursor, conn, csv_file, table_name)
             if result:
@@ -203,7 +208,19 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
                 run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
             log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
         else:
-            log(f"[SKIP] {base}: missing CSV or merge SQL")
+            missing_parts = []
+            if not csv_exists:
+                missing_parts.append("CSV")
+            if not merge_exists:
+                missing_parts.append("merge SQL")
+            log(f"[SKIP] {base}: missing {' and '.join(missing_parts)}")
+            skipped.append(base)
+
+    if skipped:
+        log("")
+        log("Summary of skipped tables:")
+        for t in skipped:
+            log(f"- {t}")
 
     cursor.close()
     conn.close()
