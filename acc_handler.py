@@ -73,7 +73,7 @@ def convert_to_sql_compatible(val, col=None):
         try:
             return datetime.datetime.strptime(v, "%d/%m/%Y %H:%M")
         except ValueError:
-            log(f"[WARN] Could not parse datetime '{v}' in column {col}")
+            log(f"[WARN] Invalid datetime format '{v}' in column {col}. Using fallback.")
             return None
 
     if col and col.lower() == "last_sign_in" and v.endswith(" UTC"):
@@ -146,7 +146,7 @@ def import_csv_to_sql(cursor, conn, file_path, table_name, truncate=True):
                 for col in df.columns:
                     val = convert_to_sql_compatible(row[col], col)
                     max_len = col_sizes.get(col)
-                    if isinstance(val, str) and max_len and len(val) > max_len:
+                    if isinstance(val, str) and max_len and max_len > 0 and len(val) > max_len:
                         log(f"[WARN] Truncating {table_name}.{col} to {max_len} chars")
                         val = val[:max_len]
                     converted_row.append(val)

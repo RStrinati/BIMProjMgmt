@@ -134,7 +134,22 @@ def build_data_imports_tab(tab, status_var):
             return
         save_acc_folder_path(pid, path)
         update_status(status_var, "ACC data export path saved")
-
+        
+    def import_acc_csv():
+        folder = entry_acc_folder.get().strip()
+        if not folder or not (
+            os.path.isdir(folder)
+            or (os.path.isfile(folder) and folder.lower().endswith(".zip"))
+        ):
+            messagebox.showerror("Error", "Select a valid folder or ZIP file")
+            return
+        success, msg = run_acc_import(cmb_projects, entry_data_export, log_list)
+        if success:
+            update_status(status_var, msg)
+        else:
+            messagebox.showerror("Error", msg)
+            return
+        
     create_horizontal_button_group(tab, [
         ("Browse", browse_data_export),
         ("Save Path", save_data_export),
@@ -159,21 +174,6 @@ def build_data_imports_tab(tab, status_var):
             if path:
                 entry_acc_folder.delete(0, tk.END)
                 entry_acc_folder.insert(0, path)
-
-    def import_acc_csv():
-        folder = entry_acc_folder.get().strip()
-        if not folder or not (
-            os.path.isdir(folder)
-            or (os.path.isfile(folder) and folder.lower().endswith(".zip"))
-        ):
-            messagebox.showerror("Error", "Select a valid folder or ZIP file")
-            return
-        success, msg = run_acc_import(cmb_projects, entry_data_export, log_list)
-        if success:
-            update_status(status_var, msg)
-        else:
-            messagebox.showerror("Error", msg)
-            return
 
     # --- Clash CSV Import Section ---
     ttk.Label(tab, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
