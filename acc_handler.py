@@ -6,10 +6,13 @@ import datetime
 import re
 import sqlparse
 import time
+import tkinter as tk
+from tkinter import ttk, messagebox
 import zipfile
 import tempfile
 import shutil
 from database import get_acc_folder_path, log_acc_import
+
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
@@ -178,13 +181,29 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
     if not DRY_RUN:
         conn.commit()
 
-def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
+def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_skip_summary=True):
     summary = []
+    skipped = []
+
+    # Clear previous log file contents
     with open(LOG_FILE, "w"):
-        pass  # clear log file
+        pass
 
     temp_dir = None
-    if os.path.isdir(folder_path):
+
+    if os.path.isfile(folder_path) and folder_path.lower().endswith(".zip"):
+        # If a ZIP file was passed directly
+        temp_dir = tempfile.mkdtemp()
+        try:
+            with zipfile.ZipFile(folder_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
+            folder_path = temp_dir
+        except Exception as exc:
+            shutil.rmtree(temp_dir)
+            raise exc
+
+    elif os.path.isdir(folder_path):
+        # If a folder was passed, check for ZIP files inside
         zip_files = [
             os.path.join(folder_path, f)
             for f in os.listdir(folder_path)
@@ -198,16 +217,24 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
                 zf.extractall(temp_dir)
             folder_path = temp_dir
 
+
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
+
     all_files = sorted(
         f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")
     )
+=======
+    csv_bases = {f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")}
+    sql_bases = {f.replace("merge_", "").replace(".sql", "") for f in os.listdir(merge_dir) if f.startswith("merge_") and f.endswith(".sql")}
+    all_bases = sorted(csv_bases | sql_bases)
+
+
     processed = set()
 
-    for base in all_files:
+    for base in all_bases:
         if base in processed:
             continue
         processed.add(base)
@@ -216,7 +243,10 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
         merge_sql_file = f"merge_{base}.sql"
         table_name = f"staging.{base}"
 
-        if os.path.exists(csv_file) and os.path.exists(os.path.join(merge_dir, merge_sql_file)):
+        csv_exists = os.path.exists(csv_file)
+        sql_exists = os.path.exists(os.path.join(merge_dir, merge_sql_file))
+
+        if csv_exists and sql_exists:
             start = time.time()
             result = import_csv_to_sql(cursor, conn, csv_file, table_name)
             if result:
@@ -224,12 +254,30 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
                 run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
             log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
         else:
-            log(f"[SKIP] {base}: missing CSV or merge SQL")
+            missing = []
+            if not csv_exists:
+                missing.append("CSV")
+            if not sql_exists:
+                missing.append("merge SQL")
+            reason = " and ".join(missing)
+            log(f"[SKIP] {base}: missing {reason}")
+            skipped.append((base, reason))
 
     cursor.close()
     conn.close()
+
     if temp_dir:
         shutil.rmtree(temp_dir)
+=======
+    if show_skip_summary and skipped:
+        log("Skipped table summary:")
+        for base, reason in skipped:
+            log(f" - {base}: missing {reason}")
+
+    if temp_dir:
+        shutil.rmtree(temp_dir)
+
+
     return summary
 
 
@@ -244,7 +292,45 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
     if not folder_path or not os.path.isdir(folder_path):
         return False, "Saved export folder path is invalid."
 
-    summary = import_acc_data(folder_path, "P-NB-USER-028\\SQLEXPRESS", "acc_data_schema", "admin02", "1234")
+    if os.path.isfile(folder_path):
+        if not folder_path.lower().endswith(".zip"):
+            return False, "Selected file must be a .zip archive."
+    elif not os.path.isdir(folder_path):
+        return False, "Select a valid folder or ZIP file."
+
+    folder_name = os.path.basename(folder_path.rstrip(os.sep))
+    confirm = messagebox.askyesno(
+        "Confirm Import",
+        f"Import ACC data from '{folder_name}'?",
+    )
+    if not confirm:
+        return False, "Import canceled."
+
+    progress_win = tk.Toplevel()
+    progress_win.title("Importing ACC Data")
+    progress_win.transient(acc_folder_entry.winfo_toplevel())
+    progress_win.grab_set()
+    lbl_status = ttk.Label(progress_win, text=f"Importing '{folder_name}'...")
+    lbl_status.pack(padx=20, pady=(20, 10))
+    pb = ttk.Progressbar(progress_win, mode="indeterminate")
+    pb.pack(padx=20, pady=(0, 20))
+    pb.start()
+    progress_win.update()
+
+    summary = import_acc_data(
+        folder_path,
+        "P-NB-USER-028\\SQLEXPRESS",
+        "acc_data_schema",
+        "admin02",
+        "1234",
+    )
+
+    pb.stop()
+    lbl_status.config(text="Import complete")
+    progress_win.update()
+    time.sleep(0.5)
+    progress_win.destroy()
+
 
     if not summary:
         return False, "ACC import failed or found no data."
