@@ -189,9 +189,10 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
     with open(LOG_FILE, "w"):
         pass
 
-    # If ZIP file, extract contents to a temp folder
     temp_dir = None
-    if folder_path.lower().endswith(".zip") and os.path.isfile(folder_path):
+
+    if os.path.isfile(folder_path) and folder_path.lower().endswith(".zip"):
+        # If a ZIP file was passed directly
         temp_dir = tempfile.mkdtemp()
         try:
             with zipfile.ZipFile(folder_path, "r") as zip_ref:
@@ -201,14 +202,35 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             shutil.rmtree(temp_dir)
             raise exc
 
+    elif os.path.isdir(folder_path):
+        # If a folder was passed, check for ZIP files inside
+        zip_files = [
+            os.path.join(folder_path, f)
+            for f in os.listdir(folder_path)
+            if f.lower().endswith(".zip")
+        ]
+        if zip_files:
+            latest_zip = max(zip_files, key=os.path.getmtime)
+            log(f"[INFO] Extracting {os.path.basename(latest_zip)}")
+            temp_dir = tempfile.mkdtemp(prefix="acc_")
+            with zipfile.ZipFile(latest_zip, "r") as zf:
+                zf.extractall(temp_dir)
+            folder_path = temp_dir
+
 
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
+
+    all_files = sorted(
+        f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")
+    )
+=======
     csv_bases = {f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")}
     sql_bases = {f.replace("merge_", "").replace(".sql", "") for f in os.listdir(merge_dir) if f.startswith("merge_") and f.endswith(".sql")}
     all_bases = sorted(csv_bases | sql_bases)
+
 
     processed = set()
 
@@ -243,6 +265,10 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
 
     cursor.close()
     conn.close()
+
+    if temp_dir:
+        shutil.rmtree(temp_dir)
+=======
     if show_skip_summary and skipped:
         log("Skipped table summary:")
         for base, reason in skipped:
@@ -250,6 +276,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
 
     if temp_dir:
         shutil.rmtree(temp_dir)
+
 
     return summary
 
@@ -260,10 +287,10 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
         return False, "Select a valid project."
 
     project_id = selected.split(" - ")[0]
-    folder_path = acc_folder_entry.get().strip()
+    folder_path = get_acc_folder_path(project_id)
 
-    if not os.path.exists(folder_path):
-        return False, "Folder path is invalid."
+    if not folder_path or not os.path.isdir(folder_path):
+        return False, "Saved export folder path is invalid."
 
     if os.path.isfile(folder_path):
         if not folder_path.lower().endswith(".zip"):
