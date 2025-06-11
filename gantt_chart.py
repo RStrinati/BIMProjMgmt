@@ -22,11 +22,24 @@ def load_review_schedule(project_id, cycle_id):
         print(f"⚠️ No review schedule data found for Project {project_id}, Cycle {cycle_id}")
         return pd.DataFrame(columns=["schedule_id", "cycle_id", "review_date", "task_name", "end_date"]), [], "", ""
 
-    # ✅ Ensure 'review_date' is correctly converted
-    df['review_date'] = pd.to_datetime(df['review_date'], errors='coerce')
+    # ✅ Ensure dates are correctly converted
+    date_cols = [
+        'review_date',
+        'planned_start_date',
+        'planned_completion_date',
+        'actual_start_date',
+        'actual_completion_date',
+        'hold_date',
+        'resume_date',
+    ]
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
 
     # ✅ Print converted dates
-    print(f"🔍 Converted Dates:\n{df[['schedule_id', 'review_date']].head()}")
+    print(
+        f"🔍 Converted Dates:\n{df[['schedule_id', 'review_date', 'planned_start_date', 'actual_start_date']].head()}"
+    )
 
     # ✅ Generate meaningful task names
     df['task_name'] = [f"Review {review_option}-{i+1}" for i in range(len(df))]
@@ -34,7 +47,9 @@ def load_review_schedule(project_id, cycle_id):
     # ✅ Add an end date for each task
     df['end_date'] = df['review_date'] + pd.Timedelta(days=1)
 
-    print(f"✅ Processed Data for Gantt Chart:\n{df[['task_name', 'review_date', 'end_date']]}")  
+    print(
+        f"✅ Processed Data for Gantt Chart:\n{df[['task_name', 'review_date', 'end_date', 'planned_start_date', 'planned_completion_date']]}"
+    )
 
     # ✅ Ensure dropdown options for deletion
     dropdown_options = [{"label": task, "value": schedule_id} for task, schedule_id in zip(df['task_name'], df['schedule_id'])]
