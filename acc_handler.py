@@ -6,6 +6,9 @@ import datetime
 import re
 import sqlparse
 import time
+import zipfile
+import tempfile
+import shutil
 from database import get_acc_folder_path, log_acc_import
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
@@ -177,13 +180,31 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
 
 def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
     summary = []
-    with open(LOG_FILE, "w"): pass  # clear log file
+    with open(LOG_FILE, "w"):
+        pass  # clear log file
+
+    temp_dir = None
+    if os.path.isdir(folder_path):
+        zip_files = [
+            os.path.join(folder_path, f)
+            for f in os.listdir(folder_path)
+            if f.lower().endswith(".zip")
+        ]
+        if zip_files:
+            latest_zip = max(zip_files, key=os.path.getmtime)
+            log(f"[INFO] Extracting {os.path.basename(latest_zip)}")
+            temp_dir = tempfile.mkdtemp(prefix="acc_")
+            with zipfile.ZipFile(latest_zip, "r") as zf:
+                zf.extractall(temp_dir)
+            folder_path = temp_dir
 
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
-    all_files = sorted(f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv"))
+    all_files = sorted(
+        f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")
+    )
     processed = set()
 
     for base in all_files:
@@ -207,6 +228,8 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
 
     cursor.close()
     conn.close()
+    if temp_dir:
+        shutil.rmtree(temp_dir)
     return summary
 
 
@@ -216,10 +239,10 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
         return False, "Select a valid project."
 
     project_id = selected.split(" - ")[0]
-    folder_path = acc_folder_entry.get().strip()
+    folder_path = get_acc_folder_path(project_id)
 
-    if not os.path.exists(folder_path):
-        return False, "Folder path is invalid."
+    if not folder_path or not os.path.isdir(folder_path):
+        return False, "Saved export folder path is invalid."
 
     summary = import_acc_data(folder_path, "P-NB-USER-028\\SQLEXPRESS", "acc_data_schema", "admin02", "1234")
 
