@@ -204,15 +204,16 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
 
 def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_skip_summary=True):
     """Import ACC CSV data and merge into SQL tables."""
-    summary: list[dict] = []
-    skipped: list[tuple[str, str]] = []
+    summary = []
+    skipped = []
 
-    # clear previous log contents
+    # Clear previous log file contents
     with open(LOG_FILE, "w"):
         pass
 
     temp_dir = None
 
+    # Handle zipped exports
     if os.path.isfile(folder_path) and folder_path.lower().endswith(".zip"):
         temp_dir = tempfile.mkdtemp()
         try:
@@ -222,6 +223,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
         except Exception:
             shutil.rmtree(temp_dir)
             raise
+
     elif os.path.isdir(folder_path):
         zip_files = [
             os.path.join(folder_path, f)
@@ -255,7 +257,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
         table_name = f"staging.{base}"
 
         csv_exists = os.path.exists(csv_file)
-        merge_exists = os.path.exists(merge_sql_path)
+        merge_exists = os.path.exists(os.path.join(merge_dir, merge_sql_file))
 
         if csv_exists and merge_exists:
             start = time.time()
@@ -274,13 +276,14 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             log(f"[SKIP] {base}: missing {reason}")
             skipped.append((base, reason))
 
-    cursor.close()
-    conn.close()
 
     if show_skip_summary and skipped:
         log("Skipped table summary:")
         for base, reason in skipped:
             log(f" - {base}: missing {reason}")
+
+    cursor.close()
+    conn.close()
 
     if temp_dir:
         shutil.rmtree(temp_dir)
