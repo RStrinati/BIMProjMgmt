@@ -43,6 +43,16 @@ def get_primary_keys(cursor, table_name):
     """, schema, tbl)
     return [row[0] for row in cursor.fetchall()]
 
+def get_column_sizes(cursor, table_name):
+    """Return a dict mapping column names to CHARACTER_MAXIMUM_LENGTH."""
+    schema, tbl = table_name.split('.', 1)
+    cursor.execute("""
+        SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+    """, schema, tbl)
+    return {row[0]: row[1] for row in cursor.fetchall()}
+
 def log(message):
     timestamped = f"[{timestamp()}] {message}"
     print(timestamped)
@@ -113,6 +123,8 @@ def import_csv_to_sql(cursor, conn, file_path, table_name, truncate=True):
         if truncate and not DRY_RUN:
             truncate_table(cursor, table_name)
 
+        col_sizes = get_column_sizes(cursor, table_name)
+
         cols = ", ".join(f"[{col}]" for col in df.columns)
         placeholders = ", ".join("?" for _ in df.columns)
         sql = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})"
@@ -124,8 +136,17 @@ def import_csv_to_sql(cursor, conn, file_path, table_name, truncate=True):
                 if 'status' in row and row['status'].strip().lower() == 'deleted':
                     skipped_rows += 1
                     continue
-                converted = tuple(convert_to_sql_compatible(row[col], col) for col in df.columns)
-                params.append(converted)
+
+                converted_row = []
+                for col in df.columns:
+                    val = convert_to_sql_compatible(row[col], col)
+                    max_len = col_sizes.get(col)
+                    if isinstance(val, str) and max_len and len(val) > max_len:
+                        log(f"[WARN] Truncating {table_name}.{col} to {max_len} chars")
+                        val = val[:max_len]
+                    converted_row.append(val)
+
+                params.append(tuple(converted_row))
                 valid_rows += 1
             except Exception as e:
                 log(f"[ROW ERROR] Row {index} in {table_name}: {e}")
