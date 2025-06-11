@@ -3,7 +3,6 @@ from dash import dcc, html, Input, Output, State
 import plotly.express as px
 import pandas as pd
 import threading
-import webview  # ✅ Opens a separate pop-up
 from database import get_review_schedule
 from review_handler import update_review_date, adjust_future_tasks, delete_review_task
 
