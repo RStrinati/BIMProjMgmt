@@ -175,18 +175,23 @@ def run_merge_script(cursor, conn, script_filename, merge_dir="sql"):
     if not DRY_RUN:
         conn.commit()
 
-def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
+def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_skip_summary=True):
     summary = []
-    with open(LOG_FILE, "w"): pass  # clear log file
+    skipped = []
+    with open(LOG_FILE, "w"):
+        pass  # clear log file
 
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
-    all_files = sorted(f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv"))
+    csv_bases = {f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")}
+    sql_bases = {f.replace("merge_", "").replace(".sql", "") for f in os.listdir(merge_dir) if f.startswith("merge_") and f.endswith(".sql")}
+    all_bases = sorted(csv_bases | sql_bases)
+
     processed = set()
 
-    for base in all_files:
+    for base in all_bases:
         if base in processed:
             continue
         processed.add(base)
@@ -195,7 +200,10 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
         merge_sql_file = f"merge_{base}.sql"
         table_name = f"staging.{base}"
 
-        if os.path.exists(csv_file) and os.path.exists(os.path.join(merge_dir, merge_sql_file)):
+        csv_exists = os.path.exists(csv_file)
+        sql_exists = os.path.exists(os.path.join(merge_dir, merge_sql_file))
+
+        if csv_exists and sql_exists:
             start = time.time()
             result = import_csv_to_sql(cursor, conn, csv_file, table_name)
             if result:
@@ -203,10 +211,23 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql"):
                 run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
             log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
         else:
-            log(f"[SKIP] {base}: missing CSV or merge SQL")
+            missing = []
+            if not csv_exists:
+                missing.append("CSV")
+            if not sql_exists:
+                missing.append("merge SQL")
+            reason = " and ".join(missing)
+            log(f"[SKIP] {base}: missing {reason}")
+            skipped.append((base, reason))
 
     cursor.close()
     conn.close()
+
+    if show_skip_summary and skipped:
+        log("Skipped table summary:")
+        for base, reason in skipped:
+            log(f" - {base}: missing {reason}")
+
     return summary
 
 
