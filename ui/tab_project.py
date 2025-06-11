@@ -78,7 +78,12 @@ def build_project_tab(tab, status_var):
             messagebox.showerror("Error", "Select a project first")
             return
         pid = cmb_projects.get().split(" - ")[0]
-        update_project_folders(pid, entry_model_path.get().strip() or None, entry_ifc_path.get().strip() or None)
+        update_project_folders(
+            pid,
+            models_path=entry_model_path.get().strip() or None,
+            data_path=None,
+            ifc_path=entry_ifc_path.get().strip() or None,
+        )
         update_status(status_var, "Folder paths saved")
 
     create_horizontal_button_group(
