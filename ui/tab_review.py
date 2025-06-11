@@ -73,8 +73,23 @@ def build_review_tab(tab, status_var):
     freq_entry = ttk.Entry(tab, width=10)
     freq_entry.pack(padx=10, pady=2, anchor="w")
 
+    ttk.Label(tab, text="License Start Date:").pack(padx=10, anchor="w")
+    license_start_date = DateEntry(tab, width=12)
+    license_start_date.pack(padx=10, pady=2, anchor="w")
+    ttk.Label(tab, text="License Duration (months):").pack(padx=10, anchor="w")
+    license_duration_entry = ttk.Entry(tab, width=10)
+    license_duration_entry.pack(padx=10, pady=2, anchor="w")
+
     def submit_schedule():
-        submit_review_schedule(start_date.get_date(), num_reviews_entry.get(), freq_entry.get())
+        submit_review_schedule(
+            cmb_projects,
+            cmb_cycles,
+            start_date,
+            num_reviews_entry,
+            freq_entry,
+            license_start_date,
+            license_duration_entry,
+        )
         update_status(status_var, "Review schedule submitted")
 
     create_horizontal_button_group(
