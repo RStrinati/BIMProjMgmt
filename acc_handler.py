@@ -185,6 +185,9 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
     summary = []
     skipped = []
 
+    with open(LOG_FILE, "w"): pass  # clear log file
+=======
+
     # Clear previous log file contents
     with open(LOG_FILE, "w"):
         pass
@@ -218,6 +221,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             folder_path = temp_dir
 
 
+
     conn = connect_to_db(server, db, user, pwd)
     cursor = conn.cursor()
     cursor.fast_executemany = True
@@ -243,10 +247,18 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
         merge_sql_file = f"merge_{base}.sql"
         table_name = f"staging.{base}"
 
+
+        merge_sql_path = os.path.join(merge_dir, merge_sql_file)
+        csv_exists = os.path.exists(csv_file)
+        merge_exists = os.path.exists(merge_sql_path)
+
+        if csv_exists and merge_exists:
+=======
         csv_exists = os.path.exists(csv_file)
         sql_exists = os.path.exists(os.path.join(merge_dir, merge_sql_file))
 
         if csv_exists and sql_exists:
+
             start = time.time()
             result = import_csv_to_sql(cursor, conn, csv_file, table_name)
             if result:
@@ -254,6 +266,21 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
                 run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
             log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
         else:
+
+            missing_parts = []
+            if not csv_exists:
+                missing_parts.append("CSV")
+            if not merge_exists:
+                missing_parts.append("merge SQL")
+            log(f"[SKIP] {base}: missing {' and '.join(missing_parts)}")
+            skipped.append(base)
+
+    if skipped:
+        log("")
+        log("Summary of skipped tables:")
+        for t in skipped:
+            log(f"- {t}")
+=======
             missing = []
             if not csv_exists:
                 missing.append("CSV")
@@ -262,6 +289,7 @@ def import_acc_data(folder_path, server, db, user, pwd, merge_dir="sql", show_sk
             reason = " and ".join(missing)
             log(f"[SKIP] {base}: missing {reason}")
             skipped.append((base, reason))
+
 
     cursor.close()
     conn.close()
