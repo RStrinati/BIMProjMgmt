@@ -128,13 +128,31 @@ def get_review_schedule(project_id, cycle_id):
     try:
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT rs.schedule_id, rs.review_date, rs.cycle_id, p.project_name
+        cursor.execute(
+            """
+            SELECT rs.schedule_id,
+                   rs.review_date,
+                   rs.cycle_id,
+                   p.project_name,
+                   d.construction_stage,
+                   d.proposed_fee,
+                   d.assigned_users,
+                   d.reviews_per_phase,
+                   d.planned_start_date,
+                   d.planned_completion_date,
+                   d.actual_start_date,
+                   d.actual_completion_date,
+                   d.hold_date,
+                   d.resume_date,
+                   d.new_contract
             FROM ReviewSchedule rs
             JOIN Projects p ON rs.project_id = p.project_id
+            LEFT JOIN ReviewCycleDetails d ON rs.project_id = d.project_id AND rs.cycle_id = d.cycle_id
             WHERE rs.project_id = ? AND rs.cycle_id = ?
             ORDER BY rs.review_date ASC;
-        """, (project_id, cycle_id))
+        """,
+            (project_id, cycle_id),
+        )
 
         result = cursor.fetchall()
 
@@ -147,8 +165,36 @@ def get_review_schedule(project_id, cycle_id):
 
         # ✅ Convert query result into a Pandas DataFrame
         structured_result = [tuple(row) for row in result]
-        df = pd.DataFrame(structured_result, columns=["schedule_id", "review_date", "cycle_id", "project_name"])
-        df["review_date"] = pd.to_datetime(df["review_date"], errors="coerce")  # ✅ Ensure proper date format
+        df = pd.DataFrame(
+            structured_result,
+            columns=[
+                "schedule_id",
+                "review_date",
+                "cycle_id",
+                "project_name",
+                "construction_stage",
+                "proposed_fee",
+                "assigned_users",
+                "reviews_per_phase",
+                "planned_start_date",
+                "planned_completion_date",
+                "actual_start_date",
+                "actual_completion_date",
+                "hold_date",
+                "resume_date",
+                "new_contract",
+            ],
+        )
+        df["review_date"] = pd.to_datetime(df["review_date"], errors="coerce")
+        for col in [
+            "planned_start_date",
+            "planned_completion_date",
+            "actual_start_date",
+            "actual_completion_date",
+            "hold_date",
+            "resume_date",
+        ]:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
 
         project_name = df["project_name"].iloc[0] if not df.empty else "Unknown Project"
         cycle_id = df["cycle_id"].iloc[0] if not df.empty else "Unknown Cycle"
@@ -570,3 +616,132 @@ def update_file_validation_status(file_name, status, reason, regex_used):
             conn.commit()
     except Exception as e:
         print(f"❌ Failed to update validation for {file_name}: {e}")
+
+# ------------------------------------------------------------
+# Review cycle detail functions
+# ------------------------------------------------------------
+
+def insert_review_cycle_details(
+    project_id,
+    cycle_id,
+    construction_stage,
+    proposed_fee,
+    assigned_users,
+    reviews_per_phase,
+    planned_start_date,
+    planned_completion_date,
+    actual_start_date,
+    actual_completion_date,
+    hold_date,
+    resume_date,
+    new_contract,
+):
+    """Insert details for a review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO ReviewCycleDetails (
+                project_id,
+                cycle_id,
+                construction_stage,
+                proposed_fee,
+                assigned_users,
+                reviews_per_phase,
+                planned_start_date,
+                planned_completion_date,
+                actual_start_date,
+                actual_completion_date,
+                hold_date,
+                resume_date,
+                new_contract
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                project_id,
+                cycle_id,
+                construction_stage,
+                proposed_fee,
+                assigned_users,
+                reviews_per_phase,
+                planned_start_date,
+                planned_completion_date,
+                actual_start_date,
+                actual_completion_date,
+                hold_date,
+                resume_date,
+                int(new_contract),
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error inserting review cycle details: {e}")
+        return False
+    finally:
+        conn.close()
+
+def update_review_cycle_details(
+    project_id,
+    cycle_id,
+    construction_stage,
+    proposed_fee,
+    assigned_users,
+    reviews_per_phase,
+    planned_start_date,
+    planned_completion_date,
+    actual_start_date,
+    actual_completion_date,
+    hold_date,
+    resume_date,
+    new_contract,
+):
+    """Update details for a review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE ReviewCycleDetails
+            SET construction_stage = ?,
+                proposed_fee = ?,
+                assigned_users = ?,
+                reviews_per_phase = ?,
+                planned_start_date = ?,
+                planned_completion_date = ?,
+                actual_start_date = ?,
+                actual_completion_date = ?,
+                hold_date = ?,
+                resume_date = ?,
+                new_contract = ?
+            WHERE project_id = ? AND cycle_id = ?;
+            """,
+            (
+                construction_stage,
+                proposed_fee,
+                assigned_users,
+                reviews_per_phase,
+                planned_start_date,
+                planned_completion_date,
+                actual_start_date,
+                actual_completion_date,
+                hold_date,
+                resume_date,
+                int(new_contract),
+                project_id,
+                cycle_id,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating review cycle details: {e}")
+        return False
+    finally:
+        conn.close()
+
