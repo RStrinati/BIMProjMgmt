@@ -3,7 +3,8 @@
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from tools.naming_validator import validate_files_against_naming
+from tools.naming_validator import validate_files
+
 
 
 from ui.ui_helpers import (
@@ -109,7 +110,8 @@ def build_validation_tab(tab, status_var):
             return
 
         # Corrected location and use of project_name
-        results = validate_files_against_naming(project_id, json_path, project_files, project_name)
+        results = validate_files(project_id, project_files, json_path, project_name)
+
 
         if results:
             result_msg = "\n".join([f"{file}: {reason}" for file, reason in results])

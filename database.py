@@ -593,29 +593,36 @@ def set_control_file(project_id, file_name):
     finally:
         conn.close()
 
-def update_file_validation_status(file_name, status, reason, regex_used):
-    """
-    Updates validation status for a given Revit file in tblRvtProjHealth.
-    """
-    conn_str = os.getenv("DB_CONNECTION_STRING")  # or use your hardcoded string if not using env vars
-
-    query = """
-    UPDATE RevitHealthCheckDB.dbo.tblRvtProjHealth
-    SET
-        validation_status = ?,
-        validation_reason = ?,
-        compiled_regex = ?,
-        validated_date = ?
-    WHERE strRvtFileName = ?
-    """
+def update_file_validation_status(file_name, status, reason, regex_used,
+                                  failed_field=None, failed_value=None, failed_reason=None):
+    # Convert everything to string if not None
+    file_name = str(file_name) if file_name is not None else ""
+    status = str(status) if status is not None else ""
+    reason = str(reason) if reason is not None else ""
+    regex_used = str(regex_used) if regex_used is not None else ""
+    failed_field = str(failed_field) if failed_field is not None else None
+    failed_value = str(failed_value) if failed_value is not None else None
+    failed_reason = str(failed_reason) if failed_reason is not None else None
 
     try:
-        with pyodbc.connect(conn_str) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, status, reason, regex_used, datetime.now(), file_name)
-            conn.commit()
+        conn = connect_to_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE RevitHealthCheckDB.dbo.tblRvtProjHealth
+            SET validation_status = ?, 
+                validation_reason = ?, 
+                compiled_regex = ?, 
+                validated_date = GETDATE(),
+                failed_field_name = ?, 
+                failed_field_value = ?, 
+                failed_field_reason = ?
+            WHERE strRvtFileName = ?
+        """, status, reason, regex_used, failed_field, failed_value, failed_reason, file_name)
+        conn.commit()
+        conn.close()
     except Exception as e:
         print(f"❌ Failed to update validation for {file_name}: {e}")
+
 
 
 def get_users_list():
@@ -668,25 +675,6 @@ def insert_review_cycle_details(
         cursor = conn.cursor()
         cursor.execute(
             """
-
-            SELECT schedule_id, review_date, assigned_to
-            FROM ReviewSchedule
-            WHERE project_id = ? AND cycle_id = ?
-            ORDER BY review_date
-            """,
-            (project_id, cycle_id),
-        )
-        return cursor.fetchall()
-    except Exception as e:
-        print(f"❌ Error fetching review tasks: {e}")
-        return []
-    finally:
-        conn.close()
-
-
-def update_review_task_assignee(schedule_id, user_id):
-    """Update the assigned reviewer for a review task."""
-
             INSERT INTO ReviewCycleDetails (
                 project_id,
                 cycle_id,
@@ -727,6 +715,26 @@ def update_review_task_assignee(schedule_id, user_id):
     finally:
         conn.close()
 
+
+def update_review_task_assignee(schedule_id, user_id):
+    """Update the assigned reviewer for a review task."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE ReviewSchedule SET assigned_to = ? WHERE schedule_id = ?",
+            (user_id, schedule_id),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating review task assignee: {e}")
+        return False
+    finally:
+        conn.close()
+
 def update_review_cycle_details(
     project_id,
     cycle_id,
@@ -750,9 +758,6 @@ def update_review_cycle_details(
     try:
         cursor = conn.cursor()
         cursor.execute(
-
-            "UPDATE ReviewSchedule SET assigned_to = ? WHERE schedule_id = ?",
-            (user_id, schedule_id),
             """
             UPDATE ReviewCycleDetails
             SET construction_stage = ?,
@@ -787,7 +792,6 @@ def update_review_cycle_details(
         conn.commit()
         return True
     except Exception as e:
-    
         print(f"❌ Error updating review cycle details: {e}")
         return False
     finally:
