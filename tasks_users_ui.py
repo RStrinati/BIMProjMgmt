@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from database import connect_to_db, get_projects, fetch_data
+from database import connect_to_db, get_projects, get_cycle_ids, fetch_data
 
 # Function to fetch users for dropdown
 def get_users():
@@ -34,16 +34,19 @@ def add_user(name, role, email):
         conn.close()
 
 # Function to add a task
-def add_task(task_name, project_id, start_date, end_date, assigned_to):
+def add_task(task_name, project_id, cycle_id, start_date, end_date, assigned_to):
     conn = connect_to_db()
     if conn is None:
         return
     try:
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO tasks (task_name, project_id, start_date, end_date, assigned_to) VALUES (?, ?, ?, ?, ?)", 
-                       (task_name, project_id, start_date, end_date, assigned_to))
+        cursor.execute(
+            "INSERT INTO tasks (task_name, project_id, cycle_id, start_date, end_date, assigned_to) VALUES (?, ?, ?, ?, ?, ?)",
+            (task_name, project_id, cycle_id, start_date, end_date, assigned_to),
+        )
         conn.commit()
         messagebox.showinfo("Success", "Task added successfully!")
+        refresh_tasks()
     except Exception as e:
         messagebox.showerror("Error", str(e))
     finally:
@@ -91,23 +94,84 @@ ttk.Label(task_frame, text="Task Name:").grid(row=0, column=0)
 task_name_entry = ttk.Entry(task_frame)
 task_name_entry.grid(row=0, column=1)
 
-ttk.Label(task_frame, text="Project ID:").grid(row=1, column=0)
-project_id_entry = ttk.Entry(task_frame)
-project_id_entry.grid(row=1, column=1)
+ttk.Label(task_frame, text="Project:").grid(row=1, column=0)
+project_var = tk.StringVar()
+project_dropdown = ttk.Combobox(task_frame, textvariable=project_var,
+                                 values=[f"{p[0]} - {p[1]}" for p in get_projects()])
+project_dropdown.grid(row=1, column=1)
 
-ttk.Label(task_frame, text="Start Date:").grid(row=2, column=0)
+ttk.Label(task_frame, text="Cycle:").grid(row=2, column=0)
+cycle_var = tk.StringVar()
+cycle_dropdown = ttk.Combobox(task_frame, textvariable=cycle_var)
+cycle_dropdown.grid(row=2, column=1)
+
+def load_cycles(event=None):
+    if " - " not in project_var.get():
+        return
+    pid = project_var.get().split(" - ")[0]
+    cycles = get_cycle_ids(pid)
+    cycle_dropdown['values'] = cycles if cycles else ["No Cycles Available"]
+    if cycles:
+        cycle_dropdown.current(0)
+    else:
+        cycle_dropdown.set("No Cycles Available")
+
+project_dropdown.bind("<<ComboboxSelected>>", load_cycles)
+load_cycles()
+
+ttk.Label(task_frame, text="Start Date:").grid(row=3, column=0)
 start_date_entry = ttk.Entry(task_frame)
-start_date_entry.grid(row=2, column=1)
+start_date_entry.grid(row=3, column=1)
 
-ttk.Label(task_frame, text="End Date:").grid(row=3, column=0)
+ttk.Label(task_frame, text="End Date:").grid(row=4, column=0)
 end_date_entry = ttk.Entry(task_frame)
-end_date_entry.grid(row=3, column=1)
+end_date_entry.grid(row=4, column=1)
 
-ttk.Label(task_frame, text="Assigned To:").grid(row=4, column=0)
+ttk.Label(task_frame, text="Assigned To:").grid(row=5, column=0)
 assigned_to_var = tk.StringVar()
 assigned_to_dropdown = ttk.Combobox(task_frame, textvariable=assigned_to_var, values=get_users())
-assigned_to_dropdown.grid(row=4, column=1)
+assigned_to_dropdown.grid(row=5, column=1)
 
-ttk.Button(task_frame, text="Add Task", command=lambda: add_task(task_name_entry.get(), project_id_entry.get(), start_date_entry.get(), end_date_entry.get(), assigned_to_var.get())).grid(row=5, columnspan=2)
+ttk.Button(task_frame, text="Add Task", command=lambda: add_task(
+    task_name_entry.get(),
+    project_var.get().split(" - ")[0] if " - " in project_var.get() else project_var.get(),
+    cycle_var.get(),
+    start_date_entry.get(),
+    end_date_entry.get(),
+    assigned_to_var.get(),
+)).grid(row=6, columnspan=2)
+
+task_tree = ttk.Treeview(task_frame, columns=("name", "start", "end", "user"), show="headings")
+task_tree.heading("name", text="Task")
+task_tree.heading("start", text="Start")
+task_tree.heading("end", text="End")
+task_tree.heading("user", text="Assigned To")
+task_tree.grid(row=7, column=0, columnspan=2, pady=5)
+
+def refresh_tasks():
+    if " - " not in project_var.get():
+        return
+    pid = project_var.get().split(" - ")[0]
+    cid = cycle_var.get()
+    conn = connect_to_db()
+    if conn is None:
+        return
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT task_name, start_date, end_date, assigned_to FROM tasks WHERE project_id = ? AND cycle_id = ?",
+            (pid, cid),
+        )
+        rows = cursor.fetchall()
+        for item in task_tree.get_children():
+            task_tree.delete(item)
+        for r in rows:
+            task_tree.insert("", tk.END, values=r)
+    finally:
+        conn.close()
+
+project_dropdown.bind("<<ComboboxSelected>>", lambda e: [load_cycles(), refresh_tasks()])
+cycle_dropdown.bind("<<ComboboxSelected>>", lambda e: refresh_tasks())
+refresh_tasks()
 
 root.mainloop()

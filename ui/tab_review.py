@@ -16,7 +16,13 @@ from ui.tooltips import CreateToolTip
 
 from review_handler import submit_review_schedule
 from gantt_chart import launch_gantt_chart
-from database import get_projects, get_cycle_ids
+from database import (
+    get_projects,
+    get_cycle_ids,
+    get_users_list,
+    get_review_tasks,
+    update_review_task_assignee,
+)
 
 # Global reference to the project dropdown so other tabs can refresh it
 cmb_projects_ref = None
@@ -150,6 +156,64 @@ def build_review_tab(tab, status_var):
         tab,
         [("Submit Schedule", submit_schedule), ("Launch Gantt Chart", lambda: launch_gantt_chart(None, None))],
     )
+
+    # --- Reviewer Assignment Section ---
+    ttk.Label(tab, text="Reviewer Assignment", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+
+    assignment_frame = ttk.Frame(tab)
+    assignment_frame.pack(fill="both", padx=10, pady=5)
+
+    tree_reviews = ttk.Treeview(assignment_frame, columns=("id", "date", "user"), show="headings", height=5)
+    tree_reviews.heading("id", text="ID")
+    tree_reviews.heading("date", text="Review Date")
+    tree_reviews.heading("user", text="Reviewer")
+    tree_reviews.pack(side="left", fill="both", expand=True)
+
+    scroll = ttk.Scrollbar(assignment_frame, orient="vertical", command=tree_reviews.yview)
+    tree_reviews.configure(yscrollcommand=scroll.set)
+    scroll.pack(side="right", fill="y")
+
+    reviewer_var = tk.StringVar()
+    reviewer_dropdown = ttk.Combobox(tab, textvariable=reviewer_var)
+    reviewer_dropdown.pack(padx=10, anchor="w")
+
+    def load_users():
+        users = get_users_list()
+        reviewer_dropdown['values'] = [u[1] for u in users]
+        return {u[1]: u[0] for u in users}
+
+    users_map = load_users()
+
+    def refresh_tasks(event=None):
+        nonlocal users_map
+        users_map = load_users()
+        for item in tree_reviews.get_children():
+            tree_reviews.delete(item)
+        if " - " not in cmb_projects.get() or not cmb_cycles.get():
+            return
+        pid = cmb_projects.get().split(" - ")[0]
+        cid = cmb_cycles.get()
+        rows = get_review_tasks(pid, cid)
+        for sched_id, date, user in rows:
+            tree_reviews.insert("", tk.END, iid=sched_id, values=(sched_id, date, user or ""))
+
+    def assign_reviewer():
+        sel = tree_reviews.focus()
+        if not sel:
+            messagebox.showerror("Error", "Select a review task")
+            return
+        name = reviewer_var.get()
+        if not name or name not in users_map:
+            messagebox.showerror("Error", "Select a reviewer")
+            return
+        if update_review_task_assignee(sel, users_map[name]):
+            refresh_tasks()
+
+    ttk.Button(tab, text="Assign To Selected", command=assign_reviewer).pack(padx=10, pady=2, anchor="w")
+
+    cmb_projects.bind("<<ComboboxSelected>>", lambda e: [load_cycles(), refresh_tasks()])
+    cmb_cycles.bind("<<ComboboxSelected>>", refresh_tasks)
+    refresh_tasks()
 
     # --- Issue Tracking Section ---
     ttk.Label(tab, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)

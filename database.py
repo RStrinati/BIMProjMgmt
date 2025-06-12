@@ -617,6 +617,29 @@ def update_file_validation_status(file_name, status, reason, regex_used):
     except Exception as e:
         print(f"❌ Failed to update validation for {file_name}: {e}")
 
+
+def get_users_list():
+    """Return a list of (user_id, name) tuples from the users table."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, name FROM users ORDER BY name;")
+        return [(row[0], row[1]) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching users: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_review_tasks(project_id, cycle_id):
+    """Return review schedule tasks for a project and cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+
 # ------------------------------------------------------------
 # Review cycle detail functions
 # ------------------------------------------------------------
@@ -640,10 +663,30 @@ def insert_review_cycle_details(
     conn = connect_to_db()
     if conn is None:
         return False
+
     try:
         cursor = conn.cursor()
         cursor.execute(
             """
+
+            SELECT schedule_id, review_date, assigned_to
+            FROM ReviewSchedule
+            WHERE project_id = ? AND cycle_id = ?
+            ORDER BY review_date
+            """,
+            (project_id, cycle_id),
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching review tasks: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def update_review_task_assignee(schedule_id, user_id):
+    """Update the assigned reviewer for a review task."""
+
             INSERT INTO ReviewCycleDetails (
                 project_id,
                 cycle_id,
@@ -700,12 +743,16 @@ def update_review_cycle_details(
     new_contract,
 ):
     """Update details for a review cycle."""
+
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
         cursor.execute(
+
+            "UPDATE ReviewSchedule SET assigned_to = ? WHERE schedule_id = ?",
+            (user_id, schedule_id),
             """
             UPDATE ReviewCycleDetails
             SET construction_stage = ?,
@@ -740,6 +787,7 @@ def update_review_cycle_details(
         conn.commit()
         return True
     except Exception as e:
+    
         print(f"❌ Error updating review cycle details: {e}")
         return False
     finally:
