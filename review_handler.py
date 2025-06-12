@@ -1,7 +1,7 @@
 import pyodbc
 from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
-from database import connect_to_db
+from database import connect_to_db, insert_review_cycle_details
 import pandas as pd
 from database import get_cycle_ids  
 
@@ -59,9 +59,24 @@ def delete_review_task(review_id):
 # ---------------------------------------------------
 
 def submit_review_schedule(
-    project_dropdown, cycle_dropdown, review_start_date_entry, 
-    number_of_reviews_entry, review_frequency_entry, 
-    license_start_date_entry, license_duration_entry
+    project_dropdown,
+    cycle_dropdown,
+    review_start_date_entry,
+    number_of_reviews_entry,
+    review_frequency_entry,
+    license_start_date_entry,
+    license_duration_entry,
+    stage_entry,
+    fee_entry,
+    assigned_users_entry,
+    reviews_per_phase_entry,
+    planned_start_entry,
+    planned_completion_entry,
+    actual_start_entry,
+    actual_completion_entry,
+    hold_date_entry,
+    resume_date_entry,
+    new_contract_var,
 ):
     """Submit review schedule to the database."""
     try:
@@ -87,15 +102,54 @@ def submit_review_schedule(
         license_start_date_str = license_start_date.strftime('%Y-%m-%d')
         license_end_date_str = license_end_date.strftime('%Y-%m-%d')
 
+        stage = stage_entry.get()
+        fee = float(fee_entry.get() or 0)
+        assigned_users = assigned_users_entry.get()
+        reviews_per_phase = reviews_per_phase_entry.get()
+        planned_start = planned_start_entry.get_date()
+        planned_completion = planned_completion_entry.get_date()
+        actual_start = actual_start_entry.get_date()
+        actual_completion = actual_completion_entry.get_date()
+        hold_date = hold_date_entry.get_date()
+        resume_date = resume_date_entry.get_date()
+        new_contract = bool(new_contract_var.get())
+
         # ✅ Generate cycle ID properly
         cursor.execute("SELECT ISNULL(MAX(cycle_id), 0) + 1 FROM ReviewParameters WHERE ProjectID = ?", (project_id,))
         cycle_id = cursor.fetchone()[0]
 
-        cursor.execute("""
-            INSERT INTO ReviewParameters 
+        cursor.execute(
+            """
+            INSERT INTO ReviewParameters
             (ProjectID, ReviewStartDate, NumberOfReviews, ReviewFrequency, LicenseStartDate, LicenseEndDate, cycle_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, review_start_date_str, number_of_reviews, review_frequency, license_start_date_str, license_end_date_str, cycle_id))
+        """,
+            (
+                project_id,
+                review_start_date_str,
+                number_of_reviews,
+                review_frequency,
+                license_start_date_str,
+                license_end_date_str,
+                cycle_id,
+            ),
+        )
+
+        insert_review_cycle_details(
+            project_id,
+            cycle_id,
+            stage,
+            fee,
+            assigned_users,
+            reviews_per_phase,
+            planned_start.strftime("%Y-%m-%d"),
+            planned_completion.strftime("%Y-%m-%d"),
+            actual_start.strftime("%Y-%m-%d"),
+            actual_completion.strftime("%Y-%m-%d"),
+            hold_date.strftime("%Y-%m-%d"),
+            resume_date.strftime("%Y-%m-%d"),
+            new_contract,
+        )
 
         # ✅ Run stored procedure before closing connection
         print("✅ Running stored procedure: EXEC GenerateReviewSchedule;")

@@ -86,6 +86,49 @@ def build_review_tab(tab, status_var):
     license_duration_entry = ttk.Entry(tab, width=10)
     license_duration_entry.pack(padx=10, pady=2, anchor="w")
 
+    ttk.Label(tab, text="Construction Stage:").pack(padx=10, anchor="w")
+    stage_entry = ttk.Entry(tab, width=20)
+    stage_entry.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Proposed Fee:").pack(padx=10, anchor="w")
+    fee_entry = ttk.Entry(tab, width=12)
+    fee_entry.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Assigned Users:").pack(padx=10, anchor="w")
+    assigned_users_entry = ttk.Entry(tab, width=30)
+    assigned_users_entry.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Reviews Per Phase:").pack(padx=10, anchor="w")
+    reviews_per_phase_entry = ttk.Entry(tab, width=10)
+    reviews_per_phase_entry.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Planned Start Date:").pack(padx=10, anchor="w")
+    planned_start = DateEntry(tab, width=12)
+    planned_start.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Planned Completion Date:").pack(padx=10, anchor="w")
+    planned_completion = DateEntry(tab, width=12)
+    planned_completion.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Actual Start Date:").pack(padx=10, anchor="w")
+    actual_start = DateEntry(tab, width=12)
+    actual_start.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Actual Completion Date:").pack(padx=10, anchor="w")
+    actual_completion = DateEntry(tab, width=12)
+    actual_completion.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Hold Date:").pack(padx=10, anchor="w")
+    hold_date = DateEntry(tab, width=12)
+    hold_date.pack(padx=10, pady=2, anchor="w")
+
+    ttk.Label(tab, text="Resume Date:").pack(padx=10, anchor="w")
+    resume_date = DateEntry(tab, width=12)
+    resume_date.pack(padx=10, pady=2, anchor="w")
+
+    new_contract_var = tk.BooleanVar()
+    ttk.Checkbutton(tab, text="New Contract", variable=new_contract_var).pack(padx=10, anchor="w")
+
     def submit_schedule():
         submit_review_schedule(
             cmb_projects,
@@ -95,6 +138,17 @@ def build_review_tab(tab, status_var):
             freq_entry,
             license_start_date,
             license_duration_entry,
+            stage_entry,
+            fee_entry,
+            assigned_users_entry,
+            reviews_per_phase_entry,
+            planned_start,
+            planned_completion,
+            actual_start,
+            actual_completion,
+            hold_date,
+            resume_date,
+            new_contract_var,
         )
         update_status(status_var, "Review schedule submitted")
 
