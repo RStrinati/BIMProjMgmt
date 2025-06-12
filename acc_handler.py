@@ -63,6 +63,41 @@ def log(message):
     print(timestamped)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(timestamped + "\n")
+        
+def parse_excel_like_time(val):
+    # Try Excel-style time parsing (e.g. "32:21.0" = 32 minutes 21 seconds)
+    try:
+        minutes, seconds = val.strip().split(":")
+        seconds = float(seconds)
+        base = datetime.datetime(2000, 1, 1)
+        return base + datetime.timedelta(minutes=int(minutes), seconds=seconds)
+    except Exception:
+        return None
+
+def parse_custom_datetime(val, col_name):
+    val = val.strip()
+
+    # Accept known good formats
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.datetime.strptime(val, fmt)
+        except ValueError:
+            continue
+
+    # Handle odd time-only formats like "32:21.0"
+    if re.match(r"^\d{1,2}:\d{2}(\.\d+)?$", val):
+        try:
+            minutes, rest = val.split(":")
+            seconds = float(rest)
+            base = datetime.datetime(2000, 1, 1)
+            return base + datetime.timedelta(minutes=int(minutes), seconds=seconds)
+        except Exception as e:
+            log(f"[WARN] Could not parse weird time '{val}' in column {col_name}")
+            return None
+
+    # As last resort: log it
+    log(f"[WARN] Unrecognized datetime format '{val}' in column {col_name}")
+    return None
 
 def convert_to_sql_compatible(val, col=None):
     if val is None or val == "": return None
@@ -90,11 +125,25 @@ def convert_to_sql_compatible(val, col=None):
     if v.lower() in ("f", "false"): return 0
     if v.isdigit(): return int(v)
     try: return float(v)
+    
     except ValueError: pass
+    
+    if col and col.lower() in ("created_at", "updated_at"):
+        result = parse_custom_datetime(v, col)
+        if result is not None:
+            return result
 
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
-        try: return datetime.datetime.strptime(v, fmt)
-        except ValueError: pass
+        result = parse_excel_like_time(v)
+        if result is not None:
+            return result
+
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%H:%M:%S"):
+        try:
+            return datetime.datetime.strptime(v, fmt)
+        except ValueError:
+            pass
+
 
     return v  # Fallback for nvarchar fields
 
