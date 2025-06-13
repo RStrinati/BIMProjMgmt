@@ -143,7 +143,7 @@ def build_data_imports_tab(tab, status_var):
         ):
             messagebox.showerror("Error", "Select a valid folder or ZIP file")
             return
-        success, msg = run_acc_import(cmb_projects, entry_data_export, log_list)
+        success, msg = run_acc_import(cmb_projects, entry_acc_folder, log_list)
         if success:
             update_status(status_var, msg)
         else:
