@@ -348,10 +348,14 @@ def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
         return False, "Select a valid project."
 
     project_id = selected.split(" - ")[0]
-    folder_path = get_acc_folder_path(project_id)
+    folder_path = acc_folder_entry.get().strip()
 
-    if not folder_path or not os.path.isdir(folder_path):
-        return False, "Saved export folder path is invalid."
+    # Fall back to stored path if entry is blank
+    if not folder_path:
+        folder_path = get_acc_folder_path(project_id)
+
+    if not folder_path:
+        return False, "Select a valid folder or ZIP file."
 
     if os.path.isfile(folder_path):
         if not folder_path.lower().endswith(".zip"):
