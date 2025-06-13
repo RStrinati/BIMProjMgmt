@@ -32,6 +32,16 @@ def validate_files(project_id, file_list, schema_path, project_name):
         failed_field = None
         failed_value = None
 
+        discipline = None
+        discipline_full = None
+        for field in fields:
+            if field['name'].lower() == "discipline":
+                pos = field["position"]
+                if pos < len(parts):
+                    discipline = parts[pos]
+                    discipline_full = field.get("mapped_values", {}).get(discipline.upper(), discipline)
+                break
+            
         for field in fields:
             pos = field["position"]
             if pos >= len(parts):
@@ -75,7 +85,9 @@ def validate_files(project_id, file_list, schema_path, project_name):
                 regex_used=compiled_regex.pattern,
                 failed_field=failed_field,
                 failed_value=failed_value,
-                failed_reason=reason
+                failed_reason=reason,
+                discipline=discipline,
+                discipline_full=discipline_full
             )
             results.append((file, reason))
         else:
@@ -86,7 +98,9 @@ def validate_files(project_id, file_list, schema_path, project_name):
                 regex_used=compiled_regex.pattern,
                 failed_field=None,
                 failed_value=None,
-                failed_reason=None
+                failed_reason=None,
+                discipline=discipline,
+                discipline_full=discipline_full
             )
 
     return results

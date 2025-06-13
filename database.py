@@ -594,7 +594,7 @@ def set_control_file(project_id, file_name):
         conn.close()
 
 def update_file_validation_status(file_name, status, reason, regex_used,
-                                  failed_field=None, failed_value=None, failed_reason=None):
+                                  failed_field=None, failed_value=None, failed_reason=None, discipline=None, discipline_full=None):
     # Convert everything to string if not None
     file_name = str(file_name) if file_name is not None else ""
     status = str(status) if status is not None else ""
@@ -603,6 +603,8 @@ def update_file_validation_status(file_name, status, reason, regex_used,
     failed_field = str(failed_field) if failed_field is not None else None
     failed_value = str(failed_value) if failed_value is not None else None
     failed_reason = str(failed_reason) if failed_reason is not None else None
+    discipline = str(discipline) if discipline is not None else None
+    discipline_full = str(discipline_full) if discipline_full is not None else None
 
     try:
         conn = connect_to_db()
@@ -615,9 +617,11 @@ def update_file_validation_status(file_name, status, reason, regex_used,
                 validated_date = GETDATE(),
                 failed_field_name = ?, 
                 failed_field_value = ?, 
-                failed_field_reason = ?
+                failed_field_reason = ?,
+                discipline_code = ?,         
+                discipline_full_name = ?  
             WHERE strRvtFileName = ?
-        """, status, reason, regex_used, failed_field, failed_value, failed_reason, file_name)
+        """, status, reason, regex_used, failed_field, failed_value, failed_reason, discipline, discipline_full, file_name)
         conn.commit()
         conn.close()
     except Exception as e:
