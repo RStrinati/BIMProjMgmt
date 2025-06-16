@@ -2,6 +2,7 @@
 
 import tkinter as tk
 from tkinter import ttk
+from .ui_helpers import create_scrollable_frame
 
 def build_main_ui():
     root = tk.Tk()
@@ -17,15 +18,21 @@ def build_main_ui():
     notebook.pack(fill="both", expand=True)
 
     # Placeholder tabs (content will come from submodules)
-    tab_project = ttk.Frame(notebook)
-    tab_imports = ttk.Frame(notebook)
-    tab_review = ttk.Frame(notebook)
-    tab_validation = ttk.Frame(notebook)
+    tab_project_container = ttk.Frame(notebook)
+    tab_imports_container = ttk.Frame(notebook)
+    tab_review_container = ttk.Frame(notebook)
+    tab_validation_container = ttk.Frame(notebook)
 
-    notebook.add(tab_project, text="Project Setup")
-    notebook.add(tab_imports, text="Data Imports")
-    notebook.add(tab_review, text="Review Management")
-    notebook.add(tab_validation, text="Validation & Results")
+    # Make each tab scrollable and return the inner frame used by builders
+    tab_project = create_scrollable_frame(tab_project_container)
+    tab_imports = create_scrollable_frame(tab_imports_container)
+    tab_review = create_scrollable_frame(tab_review_container)
+    tab_validation = create_scrollable_frame(tab_validation_container)
+
+    notebook.add(tab_project_container, text="Project Setup")
+    notebook.add(tab_imports_container, text="Data Imports")
+    notebook.add(tab_review_container, text="Review Management")
+    notebook.add(tab_validation_container, text="Validation & Results")
 
     # --- Status bar at bottom ---
     status_bar = ttk.Label(root, textvariable=status_var, relief=tk.SUNKEN, anchor="w")

@@ -30,3 +30,28 @@ def create_horizontal_button_group(parent, buttons):
         button = ttk.Button(frame, text=label, command=command)
         button.pack(side="left", padx=5)
     return frame
+
+# Helper to create a scrollable frame within a tab
+import tkinter as tk
+
+def create_scrollable_frame(parent):
+    """Return a frame with vertical scrolling enabled."""
+    container = ttk.Frame(parent)
+    container.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(container, highlightthickness=0)
+    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollable = ttk.Frame(canvas)
+
+    scrollable.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    return scrollable
