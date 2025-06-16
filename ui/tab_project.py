@@ -31,10 +31,50 @@ from database import (
 import subprocess
 
 def build_project_tab(tab, status_var):
-    # --- Project Selection Section ---
-    ttk.Label(tab, text="Select Active Project", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    """Build the project setup tab using a 3 column grid layout."""
+
+    # ------------------------------------------------------------------
+    # Container with three columns
+    # ------------------------------------------------------------------
+    container = ttk.Frame(tab)
+    container.pack(fill="both", expand=True, padx=10, pady=10)
+    for i in range(3):
+        container.columnconfigure(i, weight=1, uniform="col")
+
+    left_col = ttk.Frame(container)
+    left_col.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+    middle_col = ttk.Frame(container)
+    middle_col.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+    right_col = ttk.Frame(container)
+    right_col.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
+
+    # Column 3 summary frame
+    frame_summary = ttk.LabelFrame(right_col, text="Current Project Summary")
+    frame_summary.pack(fill="both", expand=True, pady=5)
+
+    summary_vars = {
+        "Name": tk.StringVar(),
+        "Status": tk.StringVar(),
+        "Priority": tk.StringVar(),
+        "Start Date": tk.StringVar(),
+        "End Date": tk.StringVar(),
+        "Model Path": tk.StringVar(),
+        "IFC Path": tk.StringVar(),
+    }
+
+    for idx, (label, var) in enumerate(summary_vars.items()):
+        ttk.Label(frame_summary, text=f"{label}:").grid(row=idx, column=0, sticky="w", padx=5, pady=2)
+        ttk.Label(frame_summary, textvariable=var).grid(row=idx, column=1, sticky="w", padx=5, pady=2)
+
+    # ------------------------------------------------------------------
+    # Column 1 - Selection & details
+    # ------------------------------------------------------------------
+    frame_select = ttk.LabelFrame(left_col, text="Project Selection")
+    frame_select.pack(fill="x", pady=5)
+
+    ttk.Label(frame_select, text="Select Active Project", font=("Arial", 12, "bold")).pack(pady=5, anchor="w")
     projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
-    _, cmb_projects = create_labeled_combobox(tab, "Project:", projects)
+    _, cmb_projects = create_labeled_combobox(frame_select, "Project:", projects)
     CreateToolTip(cmb_projects, "Select from existing projects")
 
     def refresh_projects():
@@ -45,22 +85,26 @@ def build_project_tab(tab, status_var):
             cmb_projects.current(0)
         update_status(status_var, "Project list refreshed")
 
-    create_horizontal_button_group(tab, [("Refresh", refresh_projects)])
+    create_horizontal_button_group(frame_select, [("Refresh", refresh_projects)])
 
-    # --- Project Details Section ---
-    ttk.Label(tab, text="Project Details", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-    _, entry_proj_number = create_labeled_entry(tab, "Project Name:")
-    _, entry_status = create_labeled_entry(tab, "Status:")
-    _, entry_priority = create_labeled_entry(tab, "Priority:")
-    start_entry = DateEntry(tab, width=12)
+    frame_details = ttk.LabelFrame(left_col, text="Project Details")
+    frame_details.pack(fill="x", pady=5)
+
+    _, entry_proj_number = create_labeled_entry(frame_details, "Project Name:")
+    _, entry_status = create_labeled_entry(frame_details, "Status:")
+    _, entry_priority = create_labeled_entry(frame_details, "Priority:")
+    ttk.Label(frame_details, text="Start Date:").pack(padx=10, anchor="w")
+    start_entry = DateEntry(frame_details, width=12)
     start_entry.pack(padx=10, pady=2, anchor="w")
-    end_entry = DateEntry(tab, width=12)
+    ttk.Label(frame_details, text="End Date:").pack(padx=10, anchor="w")
+    end_entry = DateEntry(frame_details, width=12)
     end_entry.pack(padx=10, pady=2, anchor="w")
 
-    # --- Folder Path Section ---
-    ttk.Label(tab, text="Linked Folder Paths", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-    _, entry_model_path = create_labeled_entry(tab, "Model Folder Path:")
-    _, entry_ifc_path = create_labeled_entry(tab, "IFC Folder Path:")
+    frame_paths = ttk.LabelFrame(middle_col, text="Linked Folder Paths")
+    frame_paths.pack(fill="x", pady=5)
+
+    _, entry_model_path = create_labeled_entry(frame_paths, "Model Folder Path:")
+    _, entry_ifc_path = create_labeled_entry(frame_paths, "IFC Folder Path:")
 
     def browse_models():
         path = filedialog.askdirectory()
@@ -86,9 +130,11 @@ def build_project_tab(tab, status_var):
             ifc_path=entry_ifc_path.get().strip() or None,
         )
         update_status(status_var, "Folder paths saved")
+        summary_vars["Model Path"].set(entry_model_path.get().strip())
+        summary_vars["IFC Path"].set(entry_ifc_path.get().strip())
 
     create_horizontal_button_group(
-        tab,
+        frame_paths,
         [
             ("Browse Models", browse_models),
             ("Browse IFC", browse_ifc),
@@ -110,6 +156,11 @@ def build_project_tab(tab, status_var):
             entry_priority.get(),
         )
         update_status(status_var, "Project details updated")
+        summary_vars["Name"].set(entry_proj_number.get().strip())
+        summary_vars["Status"].set(entry_status.get())
+        summary_vars["Priority"].set(entry_priority.get())
+        summary_vars["Start Date"].set(start_entry.get_date().strftime("%Y-%m-%d"))
+        summary_vars["End Date"].set(end_entry.get_date().strftime("%Y-%m-%d"))
 
     def extract_files():
         if " - " not in cmb_projects.get():
@@ -136,7 +187,7 @@ def build_project_tab(tab, status_var):
             update_status(status_var, f"Created new project: {name}")
 
     create_horizontal_button_group(
-        tab,
+        frame_details,
         [
             ("Save Details", save_details),
             ("Extract Files", extract_files),
@@ -145,8 +196,10 @@ def build_project_tab(tab, status_var):
     )
 
     # --- Cycle Dropdown & Tasks ---
-    ttk.Label(tab, text="Select Review Cycle", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-    _, cmb_cycles = create_labeled_combobox(tab, "Cycle:", [])
+    frame_cycle = ttk.LabelFrame(left_col, text="Review Cycle")
+    frame_cycle.pack(fill="x", pady=5)
+
+    _, cmb_cycles = create_labeled_combobox(frame_cycle, "Cycle:", [])
 
     def load_cycles(pid):
         cycles = get_cycle_ids(pid)
@@ -159,12 +212,13 @@ def build_project_tab(tab, status_var):
     def open_tasks_window():
         subprocess.Popen(["python", "tasks_users_ui.py"])
 
-    create_horizontal_button_group(tab, [("Manage Tasks & Users", open_tasks_window)])
+    create_horizontal_button_group(frame_cycle, [("Manage Tasks & Users", open_tasks_window)])
 
     # --- Recent File List ---
-    ttk.Label(tab, text="Recent ACC Files", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-    lst_recent = tk.Listbox(tab, width=80, height=10)
-    lst_recent.pack(padx=10, pady=5, anchor="w")
+    frame_recent = ttk.LabelFrame(middle_col, text="Recent ACC Files")
+    frame_recent.pack(fill="both", expand=True, pady=5)
+    lst_recent = tk.Listbox(frame_recent, width=80, height=10)
+    lst_recent.pack(padx=10, pady=5, anchor="w", fill="both", expand=True)
 
     def update_results():
         lst_recent.delete(0, tk.END)
@@ -186,9 +240,16 @@ def build_project_tab(tab, status_var):
             entry_priority.insert(0, details["priority"]) if details["priority"] else None
             start_entry.set_date(datetime.strptime(details["start_date"], "%Y-%m-%d").date())
             end_entry.set_date(datetime.strptime(details["end_date"], "%Y-%m-%d").date())
+            summary_vars["Name"].set(details["project_name"])
+            summary_vars["Status"].set(details["status"] or "")
+            summary_vars["Priority"].set(details["priority"] or "")
+            summary_vars["Start Date"].set(details["start_date"])
+            summary_vars["End Date"].set(details["end_date"])
         folder, ifc = get_project_folders(pid)
         entry_model_path.delete(0, tk.END); entry_model_path.insert(0, folder or "")
         entry_ifc_path.delete(0, tk.END); entry_ifc_path.insert(0, ifc or "")
+        summary_vars["Model Path"].set(folder or "")
+        summary_vars["IFC Path"].set(ifc or "")
         load_cycles(pid)
         update_results()
 
