@@ -2,30 +2,68 @@
 
 from tkinter import ttk
 
-def create_labeled_entry(parent, label_text):
-    """Creates a labeled entry field"""
+def create_labeled_entry(parent, label_text, pack=True):
+    """Create a labeled entry field.
+
+    Parameters
+    ----------
+    parent : tk.Widget
+        Parent widget for the entry field.
+    label_text : str
+        Text for the label.
+    pack : bool, optional
+        If True (default) the created frame will be packed into the parent.
+        When False the caller is responsible for placing the frame using
+        `grid` or another geometry manager.
+    """
     frame = ttk.Frame(parent)
-    frame.pack(fill="x", padx=10, pady=2)
+    if pack:
+        frame.pack(fill="x", padx=10, pady=2)
     label = ttk.Label(frame, text=label_text, width=25, anchor="w")
     label.pack(side="left")
     entry = ttk.Entry(frame)
     entry.pack(side="left", fill="x", expand=True)
     return frame, entry
 
-def create_labeled_combobox(parent, label_text, values):
-    """Creates a labeled combobox"""
+def create_labeled_combobox(parent, label_text, values, pack=True):
+    """Create a labeled combobox.
+
+    Parameters
+    ----------
+    parent : tk.Widget
+        Parent widget for the combobox.
+    label_text : str
+        Text for the label.
+    values : list
+        Values for the combobox.
+    pack : bool, optional
+        If True (default) the frame is packed. Set to False when using grid.
+    """
     frame = ttk.Frame(parent)
-    frame.pack(fill="x", padx=10, pady=2)
+    if pack:
+        frame.pack(fill="x", padx=10, pady=2)
     label = ttk.Label(frame, text=label_text, width=25, anchor="w")
     label.pack(side="left")
     combo = ttk.Combobox(frame, values=values, state="readonly")
     combo.pack(side="left", fill="x", expand=True)
     return frame, combo
 
-def create_horizontal_button_group(parent, buttons):
-    """Creates a horizontal group of buttons. `buttons` is a list of tuples (label, command)."""
+def create_horizontal_button_group(parent, buttons, pack=True):
+    """Create a horizontal group of buttons.
+
+    Parameters
+    ----------
+    parent : tk.Widget
+        Parent widget.
+    buttons : list[tuple]
+        Each tuple contains the button label and command.
+    pack : bool, optional
+        Pack the frame if True (default). When False the caller should place
+        the frame manually (e.g. using ``grid``).
+    """
     frame = ttk.Frame(parent)
-    frame.pack(padx=10, pady=10, anchor="w")
+    if pack:
+        frame.pack(padx=10, pady=10, anchor="w")
     for label, command in buttons:
         button = ttk.Button(frame, text=label, command=command)
         button.pack(side="left", padx=5)
