@@ -46,11 +46,32 @@ def open_revizto_csharp_app():
 
 def build_review_tab(tab, status_var):
     global cmb_projects_ref
+
+    # Container to hold two primary columns
+    column_container = ttk.Frame(tab)
+    column_container.pack(fill="both", padx=10, pady=10)
+    column_container.columnconfigure(0, weight=1, uniform="col")
+    column_container.columnconfigure(1, weight=1, uniform="col")
+
+    # --- Column 1 Frames ---
+    frame_project = ttk.LabelFrame(column_container, text="Project Details")
+    frame_project.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+    frame_params = ttk.LabelFrame(column_container, text="Review Parameters")
+    frame_params.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+    # --- Column 2 Frames ---
+    frame_schedule = ttk.LabelFrame(column_container, text="Schedule Dates")
+    frame_schedule.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+    frame_other = ttk.LabelFrame(column_container, text="Other Inputs")
+    frame_other.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
+
     # --- Project & Cycle Selection ---
     projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
-    _, cmb_projects = create_labeled_combobox(tab, "Project:", projects)
+    _, cmb_projects = create_labeled_combobox(frame_project, "Project:", projects)
     cmb_projects_ref = cmb_projects
-    _, cmb_cycles = create_labeled_combobox(tab, "Cycle:", [])
+    _, cmb_cycles = create_labeled_combobox(frame_project, "Cycle:", [])
 
     def load_cycles(event=None):
         if " - " not in cmb_projects.get():
@@ -67,67 +88,72 @@ def build_review_tab(tab, status_var):
     if projects:
         load_cycles()
 
-    create_horizontal_button_group(tab, [("Manage Tasks & Users", lambda: subprocess.Popen(["python", "tasks_users_ui.py"]))])
+    create_horizontal_button_group(
+        frame_project,
+        [("Manage Tasks & Users", lambda: subprocess.Popen(["python", "tasks_users_ui.py"]))],
+    )
 
-    # --- Review Upload Section ---
-    ttk.Label(tab, text="Review Scheduling", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-
-    start_date = DateEntry(tab, width=12)
-    start_date.pack(padx=10, anchor="w")
-    num_reviews_entry = ttk.Entry(tab, width=10)
+    # --- Review Parameters ---
+    ttk.Label(frame_params, text="Review Start Date:").pack(padx=10, anchor="w")
+    start_date = DateEntry(frame_params, width=12)
+    start_date.pack(padx=10, pady=2, anchor="w")
+    ttk.Label(frame_params, text="Number of Reviews:").pack(padx=10, anchor="w")
+    num_reviews_entry = ttk.Entry(frame_params, width=10)
     num_reviews_entry.pack(padx=10, pady=2, anchor="w")
-    freq_entry = ttk.Entry(tab, width=10)
+    ttk.Label(frame_params, text="Review Frequency (days):").pack(padx=10, anchor="w")
+    freq_entry = ttk.Entry(frame_params, width=10)
     freq_entry.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="License Start Date:").pack(padx=10, anchor="w")
-    license_start_date = DateEntry(tab, width=12)
+    ttk.Label(frame_params, text="License Start Date:").pack(padx=10, anchor="w")
+    license_start_date = DateEntry(frame_params, width=12)
     license_start_date.pack(padx=10, pady=2, anchor="w")
-    ttk.Label(tab, text="License Duration (months):").pack(padx=10, anchor="w")
-    license_duration_entry = ttk.Entry(tab, width=10)
+    ttk.Label(frame_params, text="License Duration (months):").pack(padx=10, anchor="w")
+    license_duration_entry = ttk.Entry(frame_params, width=10)
     license_duration_entry.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Construction Stage:").pack(padx=10, anchor="w")
-    stage_entry = ttk.Entry(tab, width=20)
+    ttk.Label(frame_params, text="Construction Stage:").pack(padx=10, anchor="w")
+    stage_entry = ttk.Entry(frame_params, width=20)
     stage_entry.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Proposed Fee:").pack(padx=10, anchor="w")
-    fee_entry = ttk.Entry(tab, width=12)
+    ttk.Label(frame_params, text="Reviews Per Phase:").pack(padx=10, anchor="w")
+    reviews_per_phase_entry = ttk.Entry(frame_params, width=10)
+    reviews_per_phase_entry.pack(padx=10, pady=2, anchor="w")
+    # --- Other Inputs (right column) ---
+    ttk.Label(frame_other, text="Proposed Fee:").pack(padx=10, anchor="w")
+    fee_entry = ttk.Entry(frame_other, width=12)
     fee_entry.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Assigned Users:").pack(padx=10, anchor="w")
-    assigned_users_entry = ttk.Entry(tab, width=30)
+    ttk.Label(frame_other, text="Assigned Users:").pack(padx=10, anchor="w")
+    assigned_users_entry = ttk.Entry(frame_other, width=30)
     assigned_users_entry.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Reviews Per Phase:").pack(padx=10, anchor="w")
-    reviews_per_phase_entry = ttk.Entry(tab, width=10)
-    reviews_per_phase_entry.pack(padx=10, pady=2, anchor="w")
+    new_contract_var = tk.BooleanVar()
+    ttk.Checkbutton(frame_other, text="New Contract", variable=new_contract_var).pack(padx=10, anchor="w")
 
-    ttk.Label(tab, text="Planned Start Date:").pack(padx=10, anchor="w")
-    planned_start = DateEntry(tab, width=12)
+    # --- Schedule Dates (right column) ---
+    ttk.Label(frame_schedule, text="Planned Start Date:").pack(padx=10, anchor="w")
+    planned_start = DateEntry(frame_schedule, width=12)
     planned_start.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Planned Completion Date:").pack(padx=10, anchor="w")
-    planned_completion = DateEntry(tab, width=12)
+    ttk.Label(frame_schedule, text="Planned Completion Date:").pack(padx=10, anchor="w")
+    planned_completion = DateEntry(frame_schedule, width=12)
     planned_completion.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Actual Start Date:").pack(padx=10, anchor="w")
-    actual_start = DateEntry(tab, width=12)
+    ttk.Label(frame_schedule, text="Actual Start Date:").pack(padx=10, anchor="w")
+    actual_start = DateEntry(frame_schedule, width=12)
     actual_start.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Actual Completion Date:").pack(padx=10, anchor="w")
-    actual_completion = DateEntry(tab, width=12)
+    ttk.Label(frame_schedule, text="Actual Completion Date:").pack(padx=10, anchor="w")
+    actual_completion = DateEntry(frame_schedule, width=12)
     actual_completion.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Hold Date:").pack(padx=10, anchor="w")
-    hold_date = DateEntry(tab, width=12)
+    ttk.Label(frame_schedule, text="Hold Date:").pack(padx=10, anchor="w")
+    hold_date = DateEntry(frame_schedule, width=12)
     hold_date.pack(padx=10, pady=2, anchor="w")
 
-    ttk.Label(tab, text="Resume Date:").pack(padx=10, anchor="w")
-    resume_date = DateEntry(tab, width=12)
+    ttk.Label(frame_schedule, text="Resume Date:").pack(padx=10, anchor="w")
+    resume_date = DateEntry(frame_schedule, width=12)
     resume_date.pack(padx=10, pady=2, anchor="w")
-
-    new_contract_var = tk.BooleanVar()
-    ttk.Checkbutton(tab, text="New Contract", variable=new_contract_var).pack(padx=10, anchor="w")
 
     def submit_schedule():
         submit_review_schedule(
