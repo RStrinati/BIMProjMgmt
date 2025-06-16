@@ -6,6 +6,7 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from tkcalendar import DateEntry
+from datetime import datetime
 
 from ui.ui_helpers import (
     create_labeled_entry,
@@ -183,8 +184,8 @@ def build_project_tab(tab, status_var):
             entry_status.insert(0, details["status"]) if details["status"] else None
             entry_priority.delete(0, tk.END)
             entry_priority.insert(0, details["priority"]) if details["priority"] else None
-            start_entry.set_date(details["start_date"])
-            end_entry.set_date(details["end_date"])
+            start_entry.set_date(datetime.strptime(details["start_date"], "%Y-%m-%d").date())
+            end_entry.set_date(datetime.strptime(details["end_date"], "%Y-%m-%d").date())
         folder, ifc = get_project_folders(pid)
         entry_model_path.delete(0, tk.END); entry_model_path.insert(0, folder or "")
         entry_ifc_path.delete(0, tk.END); entry_ifc_path.insert(0, ifc or "")
