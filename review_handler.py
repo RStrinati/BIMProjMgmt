@@ -1,9 +1,13 @@
 import pyodbc
 from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
-from database import connect_to_db, insert_review_cycle_details
 import pandas as pd
-from database import get_cycle_ids  
+from database import (
+    connect_to_db,
+    insert_review_cycle_details,
+    upsert_project_review_progress,
+    get_cycle_ids,
+)
 
 
 
@@ -150,6 +154,9 @@ def submit_review_schedule(
             resume_date.strftime("%Y-%m-%d"),
             new_contract,
         )
+
+        # store scoped review count for progress tracking
+        upsert_project_review_progress(project_id, cycle_id, number_of_reviews, 0)
 
         # ✅ Run stored procedure before closing connection
         print("✅ Running stored procedure: EXEC GenerateReviewSchedule;")
