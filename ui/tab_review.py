@@ -237,7 +237,10 @@ def build_review_tab(tab, status_var):
         )
         update_status(status_var, "Review schedule submitted")
 
+
     btn_frame = create_horizontal_button_group(
+    create_horizontal_button_group(
+
         inner,
         [("Submit Schedule", submit_schedule), ("Launch Gantt Chart", lambda: launch_gantt_chart(None, None))],
         pack=False,
@@ -246,7 +249,11 @@ def build_review_tab(tab, status_var):
 
     # --- Reviewer Assignment Section ---
     frame_assignment = ttk.LabelFrame(inner, text="Reviewer Assignment")
+
     frame_assignment.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
+
+    frame_assignment.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
+
 
     summary_label = ttk.Label(frame_assignment, text="")
     summary_label.pack(anchor="w", padx=5, pady=5)
@@ -316,16 +323,24 @@ def build_review_tab(tab, status_var):
     update_summary()
 
     # --- Issue Tracking Section ---
+
     lbl_sync = ttk.Label(inner, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
     lbl_sync.grid(row=3, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
     frame_revizto, entry_revizto_path = create_labeled_entry(inner, "Revizto Export Folder:", pack=False)
     frame_revizto.grid(row=4, column=0, columnspan=3, sticky="w")
+
+    ttk.Label(inner, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_revizto_path = create_labeled_entry(inner, "Revizto Export Folder:")
+
     CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
 
     def sync_issues():
         update_status(status_var, "Synchronising Revizto issues...")
 
     sync_frame = create_horizontal_button_group(
+
+    create_horizontal_button_group(
+
         inner,
         [
             ("Sync Revizto Issues", sync_issues),
@@ -336,11 +351,16 @@ def build_review_tab(tab, status_var):
     sync_frame.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Review Comment Export ---
+
     lbl_export = ttk.Label(inner, text="Export Review Comments", font=("Arial", 12, "bold"))
     lbl_export.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=(20,0))
 
+    ttk.Label(inner, text="Export Review Comments", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+
+
     def export_review_comments():
         update_status(status_var, "Exporting review comments...")
+
 
     export_frame = create_horizontal_button_group(
         inner,
@@ -348,4 +368,7 @@ def build_review_tab(tab, status_var):
         pack=False,
     )
     export_frame.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+
+    create_horizontal_button_group(inner, [("Export Comments to Excel", export_review_comments)])
+
 
