@@ -22,6 +22,8 @@ from database import (
     get_users_list,
     get_review_tasks,
     update_review_task_assignee,
+    get_review_summary,
+    get_project_review_progress,
 )
 
 # Global reference to the project dropdown so other tabs can refresh it
@@ -47,11 +49,25 @@ def open_revizto_csharp_app():
 def build_review_tab(tab, status_var):
     global cmb_projects_ref
 
-    # Container to hold two primary columns
-    column_container = ttk.Frame(tab)
-    column_container.pack(fill="both", padx=10, pady=10)
-    column_container.columnconfigure(0, weight=1, uniform="col")
-    column_container.columnconfigure(1, weight=1, uniform="col")
+    # ------------------------------------------------------------------
+    # Scrollable container with horizontal scrollbar
+    # ------------------------------------------------------------------
+    canvas = tk.Canvas(tab, highlightthickness=0)
+    h_scroll = ttk.Scrollbar(tab, orient="horizontal", command=canvas.xview)
+    inner = ttk.Frame(canvas)
+    inner.bind(
+        "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    canvas.create_window((0, 0), window=inner, anchor="nw")
+    canvas.configure(xscrollcommand=h_scroll.set)
+    canvas.pack(fill="both", expand=True)
+    h_scroll.pack(fill="x", side=tk.BOTTOM)
+
+    # Container to hold three primary columns
+    column_container = ttk.Frame(inner)
+    column_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+    for i in range(3):
+        column_container.columnconfigure(i, weight=1, uniform="col")
 
     # --- Column 1 Frames ---
     frame_project = ttk.LabelFrame(column_container, text="Project Details")
@@ -66,6 +82,47 @@ def build_review_tab(tab, status_var):
 
     frame_other = ttk.LabelFrame(column_container, text="Other Inputs")
     frame_other.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
+
+    # --- Column 3 Summary Panel ---
+    frame_summary = ttk.LabelFrame(column_container, text="Current Project Summary")
+    frame_summary.grid(row=0, column=2, rowspan=2, sticky="nsew", padx=5, pady=5)
+
+    summary_vars = {
+        "Project Name": tk.StringVar(),
+        "Cycle": tk.StringVar(),
+        "Construction Stage": tk.StringVar(),
+        "License Start": tk.StringVar(),
+        "License Duration": tk.StringVar(),
+        "Scoped Reviews": tk.StringVar(),
+        "Completed Reviews": tk.StringVar(),
+        "Last Updated": tk.StringVar(),
+    }
+
+    for idx, (lbl, var) in enumerate(summary_vars.items()):
+        ttk.Label(frame_summary, text=f"{lbl}:").grid(row=idx, column=0, sticky="w", padx=5, pady=2)
+        ttk.Label(frame_summary, textvariable=var).grid(row=idx, column=1, sticky="w", padx=5, pady=2)
+
+    def update_summary(event=None):
+        if " - " not in cmb_projects.get() or not cmb_cycles.get():
+            for v in summary_vars.values():
+                v.set("")
+            return
+        pid = cmb_projects.get().split(" - ")[0]
+        cid = cmb_cycles.get()
+        data = get_review_summary(pid, cid)
+        progress = get_project_review_progress(pid, cid) or {}
+        if data:
+            summary_vars["Project Name"].set(data.get("project_name", ""))
+            summary_vars["Cycle"].set(data.get("cycle_id", ""))
+            summary_vars["Construction Stage"].set(data.get("construction_stage", ""))
+            summary_vars["License Start"].set(data.get("license_start", ""))
+            summary_vars["License Duration"].set(f"{data.get('license_duration', '')} months")
+            summary_vars["Scoped Reviews"].set(progress.get("scoped_reviews", data.get("scoped_reviews", 0)))
+            summary_vars["Completed Reviews"].set(progress.get("completed_reviews", data.get("completed_reviews", 0)))
+            summary_vars["Last Updated"].set(progress.get("last_updated", data.get("last_updated", "")))
+        else:
+            for v in summary_vars.values():
+                v.set("")
 
     # --- Project & Cycle Selection ---
     projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
@@ -83,6 +140,8 @@ def build_review_tab(tab, status_var):
             cmb_cycles.current(0)
         else:
             cmb_cycles.set("No Cycles Available")
+
+        update_summary()
 
     cmb_projects.bind("<<ComboboxSelected>>", load_cycles)
     if projects:
@@ -178,30 +237,36 @@ def build_review_tab(tab, status_var):
         )
         update_status(status_var, "Review schedule submitted")
 
-    create_horizontal_button_group(
-        tab,
+    btn_frame = create_horizontal_button_group(
+        inner,
         [("Submit Schedule", submit_schedule), ("Launch Gantt Chart", lambda: launch_gantt_chart(None, None))],
+        pack=False,
     )
+    btn_frame.grid(row=1, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Reviewer Assignment Section ---
-    ttk.Label(tab, text="Reviewer Assignment", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    frame_assignment = ttk.LabelFrame(inner, text="Reviewer Assignment")
+    frame_assignment.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
 
-    assignment_frame = ttk.Frame(tab)
-    assignment_frame.pack(fill="both", padx=10, pady=5)
+    summary_label = ttk.Label(frame_assignment, text="")
+    summary_label.pack(anchor="w", padx=5, pady=5)
+    style = ttk.Style()
+    style.configure("Review.Treeview.Heading", font=("Arial", 10, "bold"))
+    style.configure("Review.Treeview", rowheight=20)
 
-    tree_reviews = ttk.Treeview(assignment_frame, columns=("id", "date", "user"), show="headings", height=5)
+    tree_reviews = ttk.Treeview(frame_assignment, columns=("id", "date", "user", "status"), show="headings", height=5, style="Review.Treeview")
     tree_reviews.heading("id", text="ID")
     tree_reviews.heading("date", text="Review Date")
     tree_reviews.heading("user", text="Reviewer")
+    tree_reviews.heading("status", text="Status")
     tree_reviews.pack(side="left", fill="both", expand=True)
-
-    scroll = ttk.Scrollbar(assignment_frame, orient="vertical", command=tree_reviews.yview)
+    scroll = ttk.Scrollbar(frame_assignment, orient="vertical", command=tree_reviews.yview)
     tree_reviews.configure(yscrollcommand=scroll.set)
     scroll.pack(side="right", fill="y")
 
     reviewer_var = tk.StringVar()
-    reviewer_dropdown = ttk.Combobox(tab, textvariable=reviewer_var)
-    reviewer_dropdown.pack(padx=10, anchor="w")
+    reviewer_dropdown = ttk.Combobox(frame_assignment, textvariable=reviewer_var)
+    reviewer_dropdown.pack(padx=5, pady=5, anchor="w")
 
     def load_users():
         users = get_users_list()
@@ -220,8 +285,16 @@ def build_review_tab(tab, status_var):
         pid = cmb_projects.get().split(" - ")[0]
         cid = cmb_cycles.get()
         rows = get_review_tasks(pid, cid)
-        for sched_id, date, user in rows:
-            tree_reviews.insert("", tk.END, iid=sched_id, values=(sched_id, date, user or ""))
+        for idx, (sched_id, date, user, status) in enumerate(rows):
+            tag = "odd" if idx % 2 else "even"
+            tree_reviews.insert("", tk.END, iid=sched_id, values=(sched_id, date, user or "", status or ""), tags=(tag,))
+        tree_reviews.tag_configure("odd", background="#f0f0ff")
+
+        progress = get_project_review_progress(pid, cid) or {"scoped_reviews": len(rows), "completed_reviews": 0}
+        assigned = sum(1 for _, _, u, _ in rows if u)
+        summary_label.config(
+            text=f"Reviews Scoped: {progress.get('scoped_reviews', len(rows))} | Assigned: {assigned} | Completed: {progress.get('completed_reviews', 0)}"
+        )
 
     def assign_reviewer():
         sel = tree_reviews.focus()
@@ -235,33 +308,44 @@ def build_review_tab(tab, status_var):
         if update_review_task_assignee(sel, users_map[name]):
             refresh_tasks()
 
-    ttk.Button(tab, text="Assign To Selected", command=assign_reviewer).pack(padx=10, pady=2, anchor="w")
+    ttk.Button(frame_assignment, text="Assign To Selected", command=assign_reviewer).pack(padx=5, pady=5, anchor="w")
 
     cmb_projects.bind("<<ComboboxSelected>>", lambda e: [load_cycles(), refresh_tasks()])
-    cmb_cycles.bind("<<ComboboxSelected>>", refresh_tasks)
+    cmb_cycles.bind("<<ComboboxSelected>>", lambda e: [refresh_tasks(), update_summary()])
     refresh_tasks()
+    update_summary()
 
     # --- Issue Tracking Section ---
-    ttk.Label(tab, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_revizto_path = create_labeled_entry(tab, "Revizto Export Folder:")
+    lbl_sync = ttk.Label(inner, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
+    lbl_sync.grid(row=3, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    frame_revizto, entry_revizto_path = create_labeled_entry(inner, "Revizto Export Folder:", pack=False)
+    frame_revizto.grid(row=4, column=0, columnspan=3, sticky="w")
     CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
 
     def sync_issues():
         update_status(status_var, "Synchronising Revizto issues...")
 
-    create_horizontal_button_group(
-        tab,
+    sync_frame = create_horizontal_button_group(
+        inner,
         [
             ("Sync Revizto Issues", sync_issues),
             ("Launch Revizto Exporter", open_revizto_csharp_app),
         ],
+        pack=False,
     )
+    sync_frame.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Review Comment Export ---
-    ttk.Label(tab, text="Export Review Comments", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    lbl_export = ttk.Label(inner, text="Export Review Comments", font=("Arial", 12, "bold"))
+    lbl_export.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=(20,0))
 
     def export_review_comments():
         update_status(status_var, "Exporting review comments...")
 
-    create_horizontal_button_group(tab, [("Export Comments to Excel", export_review_comments)])
+    export_frame = create_horizontal_button_group(
+        inner,
+        [("Export Comments to Excel", export_review_comments)],
+        pack=False,
+    )
+    export_frame.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 

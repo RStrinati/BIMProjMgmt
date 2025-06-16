@@ -650,6 +650,30 @@ def get_review_tasks(project_id, cycle_id):
     conn = connect_to_db()
     if conn is None:
         return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT rs.schedule_id,
+                   rs.review_date,
+                   u.name,
+                   rs.status
+            FROM ReviewSchedule rs
+            LEFT JOIN users u ON rs.assigned_to = u.user_id
+            WHERE rs.project_id = ? AND rs.cycle_id = ?
+            ORDER BY rs.review_date ASC;
+            """,
+            (project_id, cycle_id),
+        )
+        return [
+            (row[0], row[1], row[2], row[3])
+            for row in cursor.fetchall()
+        ]
+    except Exception as e:
+        print(f"❌ Error fetching review tasks: {e}")
+        return []
+    finally:
+        conn.close()
 
 # ------------------------------------------------------------
 # Review cycle detail functions
@@ -800,4 +824,114 @@ def update_review_cycle_details(
         return False
     finally:
         conn.close()
+
+
+def upsert_project_review_progress(project_id, cycle_id, scoped_reviews, completed_reviews=0):
+    """Create or update progress metrics for a project's review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            MERGE project_reviews AS tgt
+            USING (SELECT ? AS project_id, ? AS cycle_id) AS src
+            ON tgt.project_id = src.project_id AND tgt.cycle_id = src.cycle_id
+            WHEN MATCHED THEN
+                UPDATE SET scoped_reviews = ?, completed_reviews = ?, last_updated = GETDATE()
+            WHEN NOT MATCHED THEN
+                INSERT (project_id, cycle_id, scoped_reviews, completed_reviews, last_updated)
+                VALUES (?, ?, ?, ?, GETDATE());
+            """,
+            (
+                project_id,
+                cycle_id,
+                scoped_reviews,
+                completed_reviews,
+                project_id,
+                cycle_id,
+                scoped_reviews,
+                completed_reviews,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating project review progress: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_project_review_progress(project_id, cycle_id):
+    """Fetch scoped/completed review counts and last update timestamp."""
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT scoped_reviews, completed_reviews, last_updated FROM project_reviews WHERE project_id = ? AND cycle_id = ?",
+            (project_id, cycle_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "scoped_reviews": row[0],
+            "completed_reviews": row[1],
+            "last_updated": row[2].strftime("%Y-%m-%d %H:%M") if row[2] else "",
+        }
+    except Exception as e:
+        print(f"❌ Error fetching review progress: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def get_review_summary(project_id, cycle_id):
+    """Return key summary information for a review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT p.project_name,
+                   rp.cycle_id,
+                   d.construction_stage,
+                   rp.LicenseStartDate,
+                   DATEDIFF(month, rp.LicenseStartDate, rp.LicenseEndDate) AS license_months,
+                   pr.scoped_reviews,
+                   pr.completed_reviews,
+                   pr.last_updated
+            FROM Projects p
+            JOIN ReviewParameters rp ON p.project_id = rp.ProjectID AND rp.cycle_id = ?
+            LEFT JOIN ReviewCycleDetails d ON d.project_id = rp.ProjectID AND d.cycle_id = rp.cycle_id
+            LEFT JOIN project_reviews pr ON pr.project_id = rp.ProjectID AND pr.cycle_id = rp.cycle_id
+            WHERE p.project_id = ?;
+            """,
+            (cycle_id, project_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "project_name": row[0],
+            "cycle_id": row[1],
+            "construction_stage": row[2] or "",
+            "license_start": row[3].strftime("%Y-%m-%d") if row[3] else "",
+            "license_duration": row[4],
+            "scoped_reviews": row[5] if row[5] is not None else 0,
+            "completed_reviews": row[6] if row[6] is not None else 0,
+            "last_updated": row[7].strftime("%Y-%m-%d %H:%M") if row[7] else "",
+        }
+    except Exception as e:
+        print(f"❌ Error fetching review summary: {e}")
+        return None
+    finally:
+        conn.close()
+
 
