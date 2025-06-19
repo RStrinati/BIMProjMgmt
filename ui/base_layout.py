@@ -26,7 +26,7 @@ def build_main_ui():
     # Make each tab scrollable and return the inner frame used by builders
     tab_project = create_scrollable_frame(tab_project_container)
     tab_imports = create_scrollable_frame(tab_imports_container)
-    tab_review = create_scrollable_frame(tab_review_container)
+    tab_review = create_scrollable_frame(tab_review_container, scroll_x=True)
     tab_validation = create_scrollable_frame(tab_validation_container)
 
     notebook.add(tab_project_container, text="Project Setup")

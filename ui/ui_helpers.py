@@ -72,24 +72,28 @@ def create_horizontal_button_group(parent, buttons, pack=True):
 # Helper to create a scrollable frame within a tab
 import tkinter as tk
 
-def create_scrollable_frame(parent):
-    """Return a frame with vertical scrolling enabled."""
+def create_scrollable_frame(parent, scroll_x=False, scroll_y=True):
+    """Create a scrollable frame that supports vertical and optionally horizontal scrolling."""
     container = ttk.Frame(parent)
     container.pack(fill="both", expand=True)
 
     canvas = tk.Canvas(container, highlightthickness=0)
-    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
     scrollable = ttk.Frame(canvas)
 
-    scrollable.bind(
-        "<Configure>",
-        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-    )
+    v_scroll = ttk.Scrollbar(container, orient="vertical", command=canvas.yview) if scroll_y else None
+    h_scroll = ttk.Scrollbar(container, orient="horizontal", command=canvas.xview) if scroll_x else None
+
+    if scroll_y:
+        canvas.configure(yscrollcommand=v_scroll.set)
+        v_scroll.pack(side="right", fill="y")
+    if scroll_x:
+        canvas.configure(xscrollcommand=h_scroll.set)
+        h_scroll.pack(side="bottom", fill="x")
 
     canvas.create_window((0, 0), window=scrollable, anchor="nw")
-    canvas.configure(yscrollcommand=scrollbar.set)
-
     canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+
+    scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
     return scrollable
+

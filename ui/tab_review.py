@@ -49,22 +49,12 @@ def open_revizto_csharp_app():
 def build_review_tab(tab, status_var):
     global cmb_projects_ref
 
-    # ------------------------------------------------------------------
-    # Scrollable container with horizontal scrollbar
-    # ------------------------------------------------------------------
-    canvas = tk.Canvas(tab, highlightthickness=0)
-    h_scroll = ttk.Scrollbar(tab, orient="horizontal", command=canvas.xview)
-    inner = ttk.Frame(canvas)
-    inner.bind(
-        "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-    )
-    canvas.create_window((0, 0), window=inner, anchor="nw")
-    canvas.configure(xscrollcommand=h_scroll.set)
-    canvas.pack(fill="both", expand=True)
-    h_scroll.pack(fill="x", side=tk.BOTTOM)
+    # tab is already a scrollable frame with x-scroll enabled
+    column_container = ttk.Frame(tab)
+    column_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
     # Container to hold three primary columns
-    column_container = ttk.Frame(inner)
+    column_container = ttk.Frame(tab)
     column_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
     for i in range(3):
         column_container.columnconfigure(i, weight=1, uniform="col")
@@ -238,8 +228,7 @@ def build_review_tab(tab, status_var):
         update_status(status_var, "Review schedule submitted")
 
 
-    btn_frame = create_horizontal_button_group(
-        inner,
+    btn_frame = create_horizontal_button_group(column_container,
         [
             ("Submit Schedule", submit_schedule),
             ("Launch Gantt Chart", lambda: launch_gantt_chart(None, None)),
@@ -249,7 +238,7 @@ def build_review_tab(tab, status_var):
     btn_frame.grid(row=1, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Reviewer Assignment Section ---
-    frame_assignment = ttk.LabelFrame(inner, text="Reviewer Assignment")
+    frame_assignment = ttk.LabelFrame(column_container, text="Reviewer Assignment")
     frame_assignment.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
 
 
@@ -322,9 +311,9 @@ def build_review_tab(tab, status_var):
 
     # --- Issue Tracking Section ---
 
-    lbl_sync = ttk.Label(inner, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
+    lbl_sync = ttk.Label(column_container, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
     lbl_sync.grid(row=3, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
-    frame_revizto, entry_revizto_path = create_labeled_entry(inner, "Revizto Export Folder:", pack=False)
+    frame_revizto, entry_revizto_path = create_labeled_entry(column_container, "Revizto Export Folder:", pack=False)
     frame_revizto.grid(row=4, column=0, columnspan=3, sticky="w")
 
     CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
@@ -333,7 +322,7 @@ def build_review_tab(tab, status_var):
         update_status(status_var, "Synchronising Revizto issues...")
 
     sync_frame = create_horizontal_button_group(
-        inner,
+        column_container,
         [
             ("Sync Revizto Issues", sync_issues),
             ("Launch Revizto Exporter", open_revizto_csharp_app),
@@ -344,7 +333,7 @@ def build_review_tab(tab, status_var):
 
     # --- Review Comment Export ---
 
-    lbl_export = ttk.Label(inner, text="Export Review Comments", font=("Arial", 12, "bold"))
+    lbl_export = ttk.Label(column_container, text="Export Review Comments", font=("Arial", 12, "bold"))
     lbl_export.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
 
 
@@ -353,7 +342,7 @@ def build_review_tab(tab, status_var):
 
 
     export_frame = create_horizontal_button_group(
-        inner,
+        column_container,
         [("Export Comments to Excel", export_review_comments)],
         pack=False,
     )
