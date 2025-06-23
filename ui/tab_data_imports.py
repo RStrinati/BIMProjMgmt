@@ -162,23 +162,36 @@ def build_data_imports_tab(tab, status_var):
     # --- ACC CSV Import Section ---
     ttk.Label(tab, text="ACC Export CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
     _, entry_acc_folder = create_labeled_entry(tab, "ACC CSV Folder/ZIP:")
-    CreateToolTip(entry_acc_folder, "Select the folder containing weekly ACC CSV exports or a ZIP archive")
+    CreateToolTip(entry_acc_folder, "Select the folder containing ACC ZIPs or a .zip file directly")
+
+    create_horizontal_button_group(tab, [
+        ("Browse", browse_acc_folder),
+        ("Import ACC CSVs", import_acc_csv),
+    ])
 
     def browse_acc_folder():
-        path = filedialog.askopenfilename(filetypes=[("ZIP files", "*.zip")])
-        if path:
+        filetypes = [("ZIP files", "*.zip"), ("All files", "*.*")]
+        path = filedialog.askopenfilename(filetypes=filetypes)
+        if path and path.lower().endswith(".zip"):
             entry_acc_folder.delete(0, tk.END)
             entry_acc_folder.insert(0, path)
-        else:
-            path = filedialog.askdirectory()
-            if path:
-                entry_acc_folder.delete(0, tk.END)
-                entry_acc_folder.insert(0, path)
+            return
+
+        folder = filedialog.askdirectory()
+        if folder:
+            entry_acc_folder.delete(0, tk.END)
+            entry_acc_folder.insert(0, folder)
+
 
     # --- Clash CSV Import Section ---
     ttk.Label(tab, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
     _, entry_clash_folder = create_labeled_entry(tab, "Clash CSV Folder:")
     CreateToolTip(entry_clash_folder, "Folder path containing Navisworks clash detection results")
+    create_horizontal_button_group(tab, [
+        ("Browse", browse_acc_folder),
+        ("Import ACC CSVs", import_acc_csv),
+        ])
+
 
     def import_clash_csv():
         update_status(status_var, "Clash CSV import started")
