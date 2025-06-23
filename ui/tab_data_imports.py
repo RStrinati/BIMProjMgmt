@@ -164,11 +164,6 @@ def build_data_imports_tab(tab, status_var):
     _, entry_acc_folder = create_labeled_entry(tab, "ACC CSV Folder/ZIP:")
     CreateToolTip(entry_acc_folder, "Select the folder containing ACC ZIPs or a .zip file directly")
 
-    create_horizontal_button_group(tab, [
-        ("Browse", browse_acc_folder),
-        ("Import ACC CSVs", import_acc_csv),
-    ])
-
     def browse_acc_folder():
         filetypes = [("ZIP files", "*.zip"), ("All files", "*.*")]
         path = filedialog.askopenfilename(filetypes=filetypes)
@@ -182,21 +177,30 @@ def build_data_imports_tab(tab, status_var):
             entry_acc_folder.delete(0, tk.END)
             entry_acc_folder.insert(0, folder)
 
+    create_horizontal_button_group(tab, [
+        ("Browse", browse_acc_folder),
+        ("Import ACC CSVs", import_acc_csv),
+    ])
+
 
     # --- Clash CSV Import Section ---
     ttk.Label(tab, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
     _, entry_clash_folder = create_labeled_entry(tab, "Clash CSV Folder:")
     CreateToolTip(entry_clash_folder, "Folder path containing Navisworks clash detection results")
-    create_horizontal_button_group(tab, [
-        ("Browse", browse_acc_folder),
-        ("Import ACC CSVs", import_acc_csv),
-        ])
 
+    def browse_clash_folder():
+        path = filedialog.askdirectory()
+        if path:
+            entry_clash_folder.delete(0, tk.END)
+            entry_clash_folder.insert(0, path)
 
     def import_clash_csv():
         update_status(status_var, "Clash CSV import started")
 
-    create_horizontal_button_group(tab, [("Import Clash CSVs", import_clash_csv)])
+    create_horizontal_button_group(tab, [
+        ("Browse", browse_clash_folder),
+        ("Import Clash CSVs", import_clash_csv),
+    ])
 
 
     # --- Ideate Health Check Excel Import Section ---
