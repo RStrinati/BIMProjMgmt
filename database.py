@@ -935,3 +935,68 @@ def get_review_summary(project_id, cycle_id):
         conn.close()
 
 
+def insert_contractual_link(project_id, review_cycle_id, bep_clause, billing_event, amount_due, status="Pending"):
+    """Insert a contractual link record."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO ContractualLinks (
+                project_id,
+                review_cycle_id,
+                bep_clause,
+                billing_event,
+                amount_due,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (project_id, review_cycle_id, bep_clause, billing_event, amount_due, status),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error inserting contractual link: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_contractual_links(project_id, review_cycle_id=None):
+    """Fetch contractual links for a project, optionally filtered by cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        if review_cycle_id:
+            cursor.execute(
+                """
+                SELECT bep_clause, billing_event, amount_due, status
+                FROM ContractualLinks
+                WHERE project_id = ? AND review_cycle_id = ?
+                ORDER BY id;
+                """,
+                (project_id, review_cycle_id),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT bep_clause, billing_event, amount_due, status
+                FROM ContractualLinks
+                WHERE project_id = ?
+                ORDER BY id;
+                """,
+                (project_id,),
+            )
+        return [tuple(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching contractual links: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+

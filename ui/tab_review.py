@@ -24,6 +24,7 @@ from database import (
     update_review_task_assignee,
     get_review_summary,
     get_project_review_progress,
+    get_contractual_links,
 )
 
 # Global reference to the project dropdown so other tabs can refresh it
@@ -113,6 +114,28 @@ def build_review_tab(tab, status_var):
         else:
             for v in summary_vars.values():
                 v.set("")
+
+    def show_contract_links():
+        if " - " not in cmb_projects.get():
+            messagebox.showerror("Error", "Select a project first")
+            return
+        pid = cmb_projects.get().split(" - ")[0]
+        cid = cmb_cycles.get() or None
+        links = get_contractual_links(pid, cid if cid else None)
+        win = tk.Toplevel(tab)
+        win.title("Contractual Links")
+        cols = ("BEP Clause", "Billing Event", "Amount Due", "Status")
+        tree = ttk.Treeview(win, columns=cols, show="headings")
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=120, anchor="w")
+        for row in links:
+            tree.insert("", tk.END, values=row)
+        tree.pack(fill="both", expand=True)
+
+    ttk.Button(frame_summary, text="View Contract Links", command=show_contract_links).grid(
+        row=len(summary_vars), column=0, columnspan=2, pady=(10, 0)
+    )
 
     # --- Project & Cycle Selection ---
     projects = [f"{p[0]} - {p[1]}" for p in get_projects()]
