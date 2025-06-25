@@ -6,6 +6,14 @@ import shutil
 from config import REVIT_HEALTH_DB
 
 from database import connect_to_db
+
+
+def safe_float(value):
+    try:
+        return float(value)
+    except:
+        return None
+    
 def import_health_data(json_folder, db_name=None):
     processed_folder = os.path.join(json_folder, "processed")
     os.makedirs(processed_folder, exist_ok=True)
@@ -55,9 +63,10 @@ def import_health_data(json_folder, db_name=None):
                     nExportedOn, nDeletedOn,
                     validation_status, validation_reason,
                     strExtractedProjectName, compiled_regex,
-                    jsonGrids, jsonProjectBasePoint, jsonSurveyPoint
+                    jsonGrids, jsonProjectBasePoint, jsonSurveyPoint,
+                    nModelFileSizeMB, jsonTitleBlocksSummary
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, sys_id,
                 data.get("strRvtVersion"), data.get("strRvtBuildVersion"), data.get("strRvtFileName"),
@@ -78,8 +87,11 @@ def import_health_data(json_folder, db_name=None):
                 data.get("strExtractedProjectName"), None,
                 data.get("jsonGrids"),
                 json.dumps(data.get("projectBasePoint")),
-                json.dumps(data.get("surveyPoint"))
+                json.dumps(data.get("surveyPoint")),
+                safe_float(data.get("ModelFileSizeMB")),
+                data.get("jsonTitleBlocksSummary")
             ))
+
             conn.commit()
             print(f"✅ Inserted: {file}")
             shutil.move(full_path, os.path.join(processed_folder, file))
