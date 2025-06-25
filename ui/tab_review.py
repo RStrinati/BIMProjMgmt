@@ -251,18 +251,126 @@ def build_review_tab(tab, status_var):
         update_status(status_var, "Review schedule submitted")
 
 
-    btn_frame = create_horizontal_button_group(column_container,
+    # Place action buttons at the bottom of the Review Parameters section
+    create_horizontal_button_group(
+        frame_params,
         [
             ("Submit Schedule", submit_schedule),
             ("Launch Gantt Chart", lambda: launch_gantt_chart(None, None)),
         ],
-        pack=False,
     )
-    btn_frame.grid(row=1, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+
+    # --- Review Cycle Table (Central Panel) ---
+    frame_cycle_table = ttk.LabelFrame(column_container, text="Review Cycle Table")
+    frame_cycle_table.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+
+    filter_frame = ttk.Frame(frame_cycle_table)
+    filter_frame.pack(fill="x", pady=(0, 5))
+    ttk.Label(filter_frame, text="Status:").pack(side="left")
+    status_filter = ttk.Entry(filter_frame, width=10)
+    status_filter.pack(side="left", padx=5)
+    ttk.Label(filter_frame, text="Stage:").pack(side="left")
+    stage_filter = ttk.Entry(filter_frame, width=10)
+    stage_filter.pack(side="left", padx=5)
+    ttk.Label(filter_frame, text="Reviewer:").pack(side="left")
+    reviewer_filter = ttk.Entry(filter_frame, width=10)
+    reviewer_filter.pack(side="left", padx=5)
+
+    cycle_columns = (
+        "Cycle Name",
+        "Planned Start",
+        "Planned Completion",
+        "Actual Start",
+        "Actual Completion",
+        "Hold",
+        "Resume",
+        "Status",
+        "Stage",
+        "Frequency",
+        "Reviewer",
+        "Notes",
+    )
+
+    tree_cycles = ttk.Treeview(frame_cycle_table, columns=cycle_columns, show="headings", height=5)
+    for col in cycle_columns:
+        tree_cycles.heading(col, text=col)
+        tree_cycles.column(col, width=100, anchor="w")
+    tree_cycles.pack(side="left", fill="both", expand=True)
+    cycle_scroll = ttk.Scrollbar(frame_cycle_table, orient="vertical", command=tree_cycles.yview)
+    tree_cycles.configure(yscrollcommand=cycle_scroll.set)
+    cycle_scroll.pack(side="right", fill="y")
+
+    cycle_data = []
+
+    def add_cycle_row():
+        item_id = tree_cycles.insert("", tk.END, values=["" for _ in cycle_columns])
+        cycle_data.append((item_id, ["" for _ in cycle_columns]))
+
+    edit_var = tk.StringVar()
+
+    def begin_edit(event):
+        region = tree_cycles.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        row_id = tree_cycles.identify_row(event.y)
+        col = tree_cycles.identify_column(event.x)
+        if not row_id or not col:
+            return
+        x, y, width, height = tree_cycles.bbox(row_id, col)
+        column_index = int(col[1:]) - 1
+        edit_var.set(tree_cycles.set(row_id, column=cycle_columns[column_index]))
+        entry = ttk.Entry(tree_cycles, textvariable=edit_var)
+        entry.place(x=x, y=y, width=width, height=height)
+        entry.focus()
+
+        def save_edit(event=None):
+            tree_cycles.set(row_id, column=cycle_columns[column_index], value=edit_var.get())
+            for idx, (iid, vals) in enumerate(cycle_data):
+                if iid == row_id:
+                    vals[column_index] = edit_var.get()
+                    cycle_data[idx] = (iid, vals)
+                    break
+            entry.destroy()
+
+        entry.bind("<FocusOut>", save_edit)
+        entry.bind("<Return>", save_edit)
+
+    tree_cycles.bind("<Double-1>", begin_edit)
+
+    def apply_filters(event=None):
+        for item, values in cycle_data:
+            show = True
+            if status_filter.get() and status_filter.get().lower() not in values[7].lower():
+                show = False
+            if stage_filter.get() and stage_filter.get().lower() not in values[8].lower():
+                show = False
+            if reviewer_filter.get() and reviewer_filter.get().lower() not in values[10].lower():
+                show = False
+            if show:
+                tree_cycles.reattach(item, "", tk.END)
+            else:
+                tree_cycles.detach(item)
+
+    status_filter.bind("<KeyRelease>", apply_filters)
+    stage_filter.bind("<KeyRelease>", apply_filters)
+    reviewer_filter.bind("<KeyRelease>", apply_filters)
+
+    action_frame = ttk.Frame(frame_cycle_table)
+    action_frame.pack(fill="x", pady=5)
+    ttk.Button(action_frame, text="Add Row", command=add_cycle_row).pack(side="left")
+
+    def delete_selected():
+        selected = tree_cycles.selection()
+        for item in selected:
+            tree_cycles.delete(item)
+        cycle_data[:] = [d for d in cycle_data if d[0] not in selected]
+
+    ttk.Button(action_frame, text="Delete Row", command=delete_selected).pack(side="left", padx=5)
+    ttk.Button(action_frame, text="Apply Changes", command=lambda: update_status(status_var, "Cycle changes applied")).pack(side="right")
 
     # --- Reviewer Assignment Section ---
     frame_assignment = ttk.LabelFrame(column_container, text="Reviewer Assignment")
-    frame_assignment.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
+    frame_assignment.grid(row=3, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
     frame_assignment.grid_propagate(False)
 
 
@@ -340,9 +448,9 @@ def build_review_tab(tab, status_var):
     # --- Issue Tracking Section ---
 
     lbl_sync = ttk.Label(column_container, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
-    lbl_sync.grid(row=3, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    lbl_sync.grid(row=4, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
     frame_revizto, entry_revizto_path = create_labeled_entry(column_container, "Revizto Export Folder:", pack=False)
-    frame_revizto.grid(row=4, column=0, columnspan=3, sticky="w")
+    frame_revizto.grid(row=5, column=0, columnspan=3, sticky="w")
 
     CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
 
@@ -357,12 +465,12 @@ def build_review_tab(tab, status_var):
         ],
         pack=False,
     )
-    sync_frame.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+    sync_frame.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Review Comment Export ---
 
     lbl_export = ttk.Label(column_container, text="Export Review Comments", font=("Arial", 12, "bold"))
-    lbl_export.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    lbl_export.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
 
 
     def export_review_comments():
@@ -374,6 +482,6 @@ def build_review_tab(tab, status_var):
         [("Export Comments to Excel", export_review_comments)],
         pack=False,
     )
-    export_frame.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+    export_frame.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
 
