@@ -55,8 +55,10 @@ def add_task(task_name, project_id, cycle_id, start_date, end_date, assigned_to)
 # UI setup
 root = tk.Tk()
 root.title("Project Management")
+root.geometry("1280x800")
+root.resizable(False, True)
 notebook = ttk.Notebook(root)
-notebook.pack(expand=True, fill="both")
+notebook.pack(fill="both", expand=True)
 
 # Users Tab
 user_frame = ttk.Frame(notebook)
@@ -80,11 +82,17 @@ ttk.Button(user_frame, text="Add User", command=lambda: add_user(name_entry.get(
 project_frame = ttk.Frame(notebook)
 notebook.add(project_frame, text="Projects")
 
-ttk.Label(project_frame, text="Projects:").pack()
+ttk.Label(project_frame, text="Projects:").pack(anchor="w")
+project_frame.pack_propagate(False)
 project_tree = ttk.Treeview(project_frame, columns=("ID", "Name"), show="headings")
 project_tree.heading("ID", text="ID")
 project_tree.heading("Name", text="Project Name")
-project_tree.pack(expand=True, fill="both")
+project_tree.column("ID", width=60, stretch=False)
+project_tree.column("Name", width=250, stretch=False)
+project_tree.pack(side="left", fill="y")
+proj_scroll = ttk.Scrollbar(project_frame, orient="vertical", command=project_tree.yview)
+project_tree.configure(yscrollcommand=proj_scroll.set)
+proj_scroll.pack(side="right", fill="y")
 
 # Tasks Tab
 task_frame = ttk.Frame(notebook)
@@ -141,12 +149,20 @@ ttk.Button(task_frame, text="Add Task", command=lambda: add_task(
     assigned_to_var.get(),
 )).grid(row=6, columnspan=2)
 
+task_frame.grid_propagate(False)
 task_tree = ttk.Treeview(task_frame, columns=("name", "start", "end", "user"), show="headings")
 task_tree.heading("name", text="Task")
 task_tree.heading("start", text="Start")
 task_tree.heading("end", text="End")
 task_tree.heading("user", text="Assigned To")
-task_tree.grid(row=7, column=0, columnspan=2, pady=5)
+task_tree.column("name", width=250, stretch=False)
+task_tree.column("start", width=100, stretch=False)
+task_tree.column("end", width=100, stretch=False)
+task_tree.column("user", width=150, stretch=False)
+task_tree.grid(row=7, column=0, pady=5, sticky="ns")
+task_scroll = ttk.Scrollbar(task_frame, orient="vertical", command=task_tree.yview)
+task_tree.configure(yscrollcommand=task_scroll.set)
+task_scroll.grid(row=7, column=1, sticky="ns")
 
 def refresh_tasks():
     if " - " not in project_var.get():

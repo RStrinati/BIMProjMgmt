@@ -74,8 +74,10 @@ import tkinter as tk
 
 def create_scrollable_frame(parent, scroll_x=False, scroll_y=True):
     """Create a scrollable frame that supports vertical and optionally horizontal scrolling."""
-    container = ttk.Frame(parent)
+    container = ttk.Frame(parent, width=1280)
     container.pack(fill="both", expand=True)
+    # Prevent children from expanding the container beyond its width
+    container.pack_propagate(False)
 
     canvas = tk.Canvas(container, highlightthickness=0)
     scrollable = ttk.Frame(canvas)

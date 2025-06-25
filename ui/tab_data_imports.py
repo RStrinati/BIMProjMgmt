@@ -157,7 +157,10 @@ def build_data_imports_tab(tab, status_var):
     ])
 
     log_list = tk.Listbox(tab, width=80, height=5)
-    log_list.pack(padx=10, pady=5, anchor="w")
+    log_list.pack(padx=10, pady=5, anchor="w", fill="x")
+    log_scroll = ttk.Scrollbar(tab, orient="horizontal", command=log_list.xview)
+    log_list.configure(xscrollcommand=log_scroll.set)
+    log_scroll.pack(fill="x", padx=10)
 
     # --- ACC CSV Import Section ---
     ttk.Label(tab, text="ACC Export CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
