@@ -7,7 +7,9 @@ from .ui_helpers import create_scrollable_frame
 def build_main_ui():
     root = tk.Tk()
     root.title("Project & Review Management System")
-    root.geometry("1280x720")
+    # Constrain the application to a maximum width
+    root.geometry("1280x800")
+    root.resizable(False, True)
 
     # --- Status bar variable ---
     status_var = tk.StringVar()

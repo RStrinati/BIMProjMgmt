@@ -240,6 +240,7 @@ def build_review_tab(tab, status_var):
     # --- Reviewer Assignment Section ---
     frame_assignment = ttk.LabelFrame(column_container, text="Reviewer Assignment")
     frame_assignment.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
+    frame_assignment.grid_propagate(False)
 
 
     summary_label = ttk.Label(frame_assignment, text="")
@@ -253,7 +254,11 @@ def build_review_tab(tab, status_var):
     tree_reviews.heading("date", text="Review Date")
     tree_reviews.heading("user", text="Reviewer")
     tree_reviews.heading("status", text="Status")
-    tree_reviews.pack(side="left", fill="both", expand=True)
+    tree_reviews.column("id", width=60, stretch=False)
+    tree_reviews.column("date", width=120, stretch=False)
+    tree_reviews.column("user", width=150, stretch=False)
+    tree_reviews.column("status", width=100, stretch=False)
+    tree_reviews.pack(side="left", fill="y")
     scroll = ttk.Scrollbar(frame_assignment, orient="vertical", command=tree_reviews.yview)
     tree_reviews.configure(yscrollcommand=scroll.set)
     scroll.pack(side="right", fill="y")

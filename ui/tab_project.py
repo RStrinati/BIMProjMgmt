@@ -64,7 +64,7 @@ def build_project_tab(tab, status_var):
 
     for idx, (label, var) in enumerate(summary_vars.items()):
         ttk.Label(frame_summary, text=f"{label}:").grid(row=idx, column=0, sticky="w", padx=5, pady=2)
-        ttk.Label(frame_summary, textvariable=var).grid(row=idx, column=1, sticky="w", padx=5, pady=2)
+        ttk.Label(frame_summary, textvariable=var, wraplength=300).grid(row=idx, column=1, sticky="w", padx=5, pady=2)
 
     # ------------------------------------------------------------------
     # Column 1 - Selection & details
@@ -217,8 +217,12 @@ def build_project_tab(tab, status_var):
     # --- Recent File List ---
     frame_recent = ttk.LabelFrame(middle_col, text="Recent ACC Files")
     frame_recent.pack(fill="both", expand=True, pady=5)
+    frame_recent.pack_propagate(False)
     lst_recent = tk.Listbox(frame_recent, width=80, height=10)
     lst_recent.pack(padx=10, pady=5, anchor="w", fill="both", expand=True)
+    lst_scroll = ttk.Scrollbar(frame_recent, orient="horizontal", command=lst_recent.xview)
+    lst_recent.configure(xscrollcommand=lst_scroll.set)
+    lst_scroll.pack(side="bottom", fill="x")
 
     def update_results():
         lst_recent.delete(0, tk.END)
