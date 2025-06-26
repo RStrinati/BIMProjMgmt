@@ -2,10 +2,21 @@ import os
 import json
 import pyodbc
 import shutil
+from datetime import datetime
 
 from config import REVIT_HEALTH_DB
+from combine_exports import combine_exports
 
 from database import connect_to_db
+
+LOG_FILE = "rvt_import_summary.txt"
+
+
+def log(message):
+    timestamped = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}"
+    print(timestamped)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(timestamped + "\n")
 
 
 def safe_float(value):
@@ -15,6 +26,19 @@ def safe_float(value):
         return None
     
 def import_health_data(json_folder, db_name=None):
+    """Import merged health check JSON data into SQL."""
+
+    # Clear previous log
+    with open(LOG_FILE, "w"):
+        pass
+
+    # Combine exports first
+    try:
+        json_folder = combine_exports(json_folder)
+    except Exception as exc:
+        log(f"[ERROR] Failed to combine exports: {exc}")
+        return
+
     processed_folder = os.path.join(json_folder, "processed")
     os.makedirs(processed_folder, exist_ok=True)
 
@@ -23,13 +47,13 @@ def import_health_data(json_folder, db_name=None):
     conn = connect_to_db(db_name)
     cursor = conn.cursor()
 
-    print("🧠 Connected to DB:", cursor.execute("SELECT DB_NAME()").fetchone()[0])
+    log(f"Connected to DB: {cursor.execute('SELECT DB_NAME()').fetchone()[0]}")
 
     for file in os.listdir(json_folder):
         if not file.endswith(".json"):
             continue
         full_path = os.path.join(json_folder, file)
-        print(f"📂 Processing: {file}")
+        log(f"[FILE] Processing {file}")
         try:
             with open(full_path, "r") as f:
                 data = json.load(f)
@@ -93,12 +117,12 @@ def import_health_data(json_folder, db_name=None):
             ))
 
             conn.commit()
-            print(f"✅ Inserted: {file}")
+            log(f"[OK] Inserted {file}")
             shutil.move(full_path, os.path.join(processed_folder, file))
-            print(f"📁 Moved to: {processed_folder}\\{file}")
+            log(f"[MOVED] {file} -> {processed_folder}")
         except Exception as e:
-            print(f"❌ Failed: {file}\n   Reason: {e}")
+            log(f"[ERROR] Failed {file}: {e}")
 
     cursor.close()
     conn.close()
-    print("🎉 All files processed.")
+    log("All files processed")
