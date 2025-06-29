@@ -2,11 +2,13 @@ import os
 import json
 import datetime
 
-EXPORT_DIR = r"C:\Users\RicoStrinati\Documents\research\HealthCheck\dynamo\exports"
-PROCESSED_DIR = os.path.join(EXPORT_DIR, "processed")
-os.makedirs(PROCESSED_DIR, exist_ok=True)
+def _ensure_processed_dir(export_dir: str) -> str:
+    """Ensure the processed directory exists and return its path."""
+    processed_dir = os.path.join(export_dir, "processed")
+    os.makedirs(processed_dir, exist_ok=True)
+    return processed_dir
 
-def extract_project_and_timestamp(filename):
+def extract_project_and_timestamp(filename: str):
     parts = filename.replace(".json", "").split("_")
     if len(parts) < 3:
         return None, None
@@ -14,13 +16,13 @@ def extract_project_and_timestamp(filename):
     timestamp = "_".join(parts[2:])
     return project, timestamp
 
-def load_json(file_path):
+def load_json(file_path: str):
     with open(file_path, "r") as f:
         return json.load(f)
 
-def find_latest_files_by_project():
+def find_latest_files_by_project(export_dir: str):
     grouped = {}
-    for file in os.listdir(EXPORT_DIR):
+    for file in os.listdir(export_dir):
         if not file.endswith(".json"):
             continue
         if "combined" in file.lower():
@@ -33,48 +35,73 @@ def find_latest_files_by_project():
         grouped.setdefault(key, []).append(file)
     return grouped
 
-def combine_files(project, timestamp, file_list):
-    data = {
-        "strRvtFileName": project,
-        "nExportedOn": int(datetime.datetime.utcnow().timestamp())
-    }
+def combine_files(export_dir: str, processed_dir: str, project: str, timestamp: str, file_list):
+    """Combine individual export files for a single project/timestamp."""
+    data = {}
 
     for file in file_list:
-        file_path = os.path.join(EXPORT_DIR, file)
+        file_path = os.path.join(export_dir, file)
         json_data = load_json(file_path)
 
-        if "views" in json_data:
-            data["jsonViews"] = json.dumps(json_data["views"])
-        if "levels" in json_data:
-            data["jsonLevels"] = json.dumps(json_data["levels"])
-        if "rooms" in json_data:
-            data["jsonRooms"] = json.dumps(json_data["rooms"])
-        if "title_blocks" in json_data:
-            data["jsonTitleBlocksSummary"] = json.dumps(json_data["title_blocks"])
-        if isinstance(json_data, list) and "FamilyName" in json_data[0]:
-            # From family size script
-            data["jsonFamilySizes"] = json.dumps(json_data)
-        if isinstance(json_data, list) and "TypeName" in json_data[0]:
-            # From placed family script
-            data["jsonFamilies"] = json.dumps(json_data)
+        if isinstance(json_data, dict):
+            # copy all top level keys by default
+            for k, v in json_data.items():
+                if k == "views":
+                    data["jsonViews"] = json.dumps(v)
+                elif k == "levels":
+                    data["jsonLevels"] = json.dumps(v)
+                elif k == "rooms":
+                    data["jsonRooms"] = json.dumps(v)
+                elif k == "title_blocks":
+                    data["jsonTitleBlocksSummary"] = json.dumps(v)
+                else:
+                    data[k] = v
+        elif isinstance(json_data, list) and json_data:
+            # recognise exports that return a list
+            sample = json_data[0]
+            if isinstance(sample, dict) and "FamilyName" in sample:
+                data["jsonFamilySizes"] = json.dumps(json_data)
+            elif isinstance(sample, dict) and "TypeName" in sample:
+                data["jsonFamilies"] = json.dumps(json_data)
+
+    data.setdefault("strRvtFileName", project)
+    data.setdefault("nExportedOn", int(datetime.datetime.utcnow().timestamp()))
 
     combined_filename = f"combined_{project}_{timestamp}.json"
-    combined_path = os.path.join(EXPORT_DIR, combined_filename)
+    combined_path = os.path.join(export_dir, combined_filename)
     with open(combined_path, "w") as f:
         json.dump(data, f, indent=2)
     print(f"✅ Combined export created: {combined_filename}")
 
     # Move source files
     for file in file_list:
-        src = os.path.join(EXPORT_DIR, file)
-        dst = os.path.join(PROCESSED_DIR, file)
+        src = os.path.join(export_dir, file)
+        dst = os.path.join(processed_dir, file)
         os.rename(src, dst)
         print(f"📁 Moved {file} to processed folder.")
 
-def main():
-    groups = find_latest_files_by_project()
+def combine_exports(export_dir: str) -> str:
+    """Combine related export files in ``export_dir``.
+
+    The function searches for JSON exports sharing the same project name and
+    timestamp, merges their contents, and writes a ``combined_<project>_<timestamp>.json``
+    file. Source files are moved into a ``processed`` subfolder. The original
+    ``export_dir`` path is returned so callers can continue processing within the
+    same directory.
+    """
+
+    processed_dir = _ensure_processed_dir(export_dir)
+    groups = find_latest_files_by_project(export_dir)
+
     for (project, timestamp), files in groups.items():
-        combine_files(project, timestamp, files)
+        combine_files(export_dir, processed_dir, project, timestamp, files)
+
+    return export_dir
+
+
+def main():
+    export_dir = os.getcwd()
+    combine_exports(export_dir)
 
 if __name__ == "__main__":
     main()
