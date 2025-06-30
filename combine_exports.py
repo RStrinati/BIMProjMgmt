@@ -1,6 +1,26 @@
 import os
 import json
 import datetime
+from typing import Any, Iterable, Dict
+
+
+def _find_nested_values(obj: Any, keys: Iterable[str]) -> Dict[str, Any]:
+    """Recursively search ``obj`` for ``keys`` and return first occurrences."""
+    found = {}
+
+    def _search(item: Any):
+        if isinstance(item, dict):
+            for k, v in item.items():
+                if k in keys and k not in found:
+                    found[k] = v
+                if isinstance(v, (dict, list)):
+                    _search(v)
+        elif isinstance(item, list):
+            for sub in item:
+                _search(sub)
+
+    _search(obj)
+    return found
 
 def _ensure_processed_dir(export_dir: str) -> str:
     """Ensure the processed directory exists and return its path."""
@@ -39,9 +59,16 @@ def combine_files(export_dir: str, processed_dir: str, project: str, timestamp: 
     """Combine individual export files for a single project/timestamp."""
     data = {}
 
+    search_keys = {"strRvtUserName", "strSysName"}
+
     for file in file_list:
         file_path = os.path.join(export_dir, file)
         json_data = load_json(file_path)
+
+        nested = _find_nested_values(json_data, search_keys)
+        for k in search_keys:
+            if k in nested and k not in data:
+                data[k] = nested[k]
 
         if isinstance(json_data, dict):
             # copy all top level keys by default
@@ -66,6 +93,12 @@ def combine_files(export_dir: str, processed_dir: str, project: str, timestamp: 
 
     data.setdefault("strRvtFileName", project)
     data.setdefault("nExportedOn", int(datetime.datetime.utcnow().timestamp()))
+    if "strRvtUserName" not in data:
+        print("⚠️ strRvtUserName not found. Using default 'Unknown'.")
+        data["strRvtUserName"] = "Unknown"
+    if "strSysName" not in data:
+        print("⚠️ strSysName not found. Using default 'Unknown'.")
+        data["strSysName"] = "Unknown"
 
     combined_filename = f"combined_{project}_{timestamp}.json"
     combined_path = os.path.join(export_dir, combined_filename)
