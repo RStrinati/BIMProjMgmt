@@ -3,6 +3,26 @@ import json
 import datetime
 from typing import Any, Iterable, Dict
 
+# Known prefix names that may appear at the start of export JSON files
+# before the actual project name and timestamp. These prefixes can contain
+# underscores, so they need to be matched as complete tokens.
+KNOWN_PREFIXES = {
+    "families",
+    "family_sizes",
+    "file_sizes",
+    "views",
+    "levels",
+    "rooms",
+    "rooms_levels",
+    "warnings",
+    "worksets",
+    "lines",
+    "grids",
+    "project_base_point",
+    "survey_point",
+    "title_blocks_summary",
+}
+
 
 def _find_nested_values(obj: Any, keys: Iterable[str]) -> Dict[str, Any]:
     """Recursively search ``obj`` for ``keys`` and return first occurrences."""
@@ -31,19 +51,41 @@ def _ensure_processed_dir(export_dir: str) -> str:
 def extract_project_and_timestamp(filename: str):
     """Return project name and timestamp extracted from ``filename``.
 
-    Filenames follow the pattern ``<prefix>_<project>_<YYYYMMDD>_<HHMMSS>.json``.
-    The project name itself may contain underscores, so we take the last two
-    underscore separated tokens as the timestamp and join the remaining middle
-    section back together for the project name.  If the filename does not match
-    this pattern ``(len(parts) < 4)`` we return ``(None, None)``.
+    Filenames generally follow the pattern
+    ``<prefix>_<project>_<YYYYMMDD>_<HHMMSS>.json`` where the prefix can itself
+    contain underscores (e.g. ``file_sizes``).  The project name may also contain
+    underscores.  This helper strips any known prefix tokens and returns the
+    project name along with the date/time portion.  If the filename does not
+    include at least two numeric timestamp tokens the function returns
+    ``(None, None)``.
     """
 
-    parts = filename.replace(".json", "").split("_")
+    name = os.path.splitext(filename)[0]
+    parts = name.split("_")
     if len(parts) < 4:
         return None, None
 
-    project = "_".join(parts[1:-2])
-    timestamp = "_".join(parts[-2:])
+    date_token, time_token = parts[-2], parts[-1]
+    if not (date_token.isdigit() and time_token.isdigit()):
+        return None, None
+    timestamp = f"{date_token}_{time_token}"
+
+    base_parts = parts[:-2]
+    # Remove known prefix tokens from the start if they match
+    removed = False
+    for pref in sorted(KNOWN_PREFIXES, key=lambda p: -len(p.split("_"))):
+        tokens = pref.split("_")
+        if base_parts[: len(tokens)] == tokens:
+            base_parts = base_parts[len(tokens) :]
+            removed = True
+            break
+    if not removed and base_parts:
+        base_parts = base_parts[1:]
+
+    if not base_parts:
+        return None, None
+
+    project = "_".join(base_parts)
     return project, timestamp
 
 def load_json(file_path: str):
