@@ -1,0 +1,8 @@
+[2025-06-30 10:08:10] Connected to DB: RevitHealthCheckDB
+[2025-06-30 10:08:10] [FILE] Processing combined_families_Project1_20250626_130736.json
+[2025-06-30 10:08:10] [ERROR] Failed combined_families_Project1_20250626_130736.json: 'strRvtUserName'
+[2025-06-30 10:08:10] [FILE] Processing combined_file_sizes_Project1_20250626_131700.json
+[2025-06-30 10:08:10] [ERROR] Failed combined_file_sizes_Project1_20250626_131700.json: 'strRvtUserName'
+[2025-06-30 10:08:11] [FILE] Processing combined_rooms_levels_Project1_20250626_125958.json
+[2025-06-30 10:08:11] [ERROR] Failed combined_rooms_levels_Project1_20250626_125958.json: 'strRvtUserName'
+[2025-06-30 10:08:11] All files processed
