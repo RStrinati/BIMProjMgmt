@@ -90,6 +90,10 @@ def combine_files_into_dict(export_dir, file_list) -> Dict[str, Any]:
             for key in content:
                 data[key] = content[key]
 
+            # Map old metadata key to the ordered key expected downstream
+            if "ModelFileSizeMB" in content:
+                data["nModelFileSizeMB"] = content["ModelFileSizeMB"]
+
             # ✅ Check and include base/survey point if available
             if "projectBasePoint" in content:
                 data["jsonProjectBasePoint"] = json.dumps(content["projectBasePoint"])

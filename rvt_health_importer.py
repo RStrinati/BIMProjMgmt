@@ -112,7 +112,7 @@ def import_health_data(json_folder, db_name=None):
                 data.get("jsonGrids"),
                 json.dumps(data.get("projectBasePoint")),
                 json.dumps(data.get("surveyPoint")),
-                safe_float(data.get("ModelFileSizeMB")),
+                safe_float(data.get("ModelFileSizeMB") or data.get("nModelFileSizeMB")),
                 data.get("jsonTitleBlocksSummary")
             ))
 
