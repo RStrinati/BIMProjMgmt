@@ -1,5 +1,6 @@
-[2025-07-01 08:17:35] Connected to DB: RevitHealthCheckDB
-[2025-07-01 08:17:35] [FILE] Processing combined_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250701_081735.json
-[2025-07-01 08:17:35] [ERROR] Failed combined_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250701_081735.json: ('The SQL contains 56 parameter markers, but 53 parameters were supplied', 'HY000')
-[2025-07-01 08:17:35] [SKIPPED] Skipping: processed
-[2025-07-01 08:17:35] All files processed
+[2025-07-01 08:49:53] Connected to DB: RevitHealthCheckDB
+[2025-07-01 08:49:53] [FILE] Processing combined_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250701_084952.json
+[2025-07-01 08:49:53] [OK] Inserted combined_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250701_084952.json
+[2025-07-01 08:49:53] [MOVED] combined_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250701_084952.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-07-01 08:49:53] [SKIPPED] Skipping: processed
+[2025-07-01 08:49:53] All files processed
