@@ -29,11 +29,21 @@ def _ensure_processed_dir(export_dir: str) -> str:
     return processed_dir
 
 def extract_project_and_timestamp(filename: str):
+    """Return project name and timestamp extracted from ``filename``.
+
+    Filenames follow the pattern ``<prefix>_<project>_<YYYYMMDD>_<HHMMSS>.json``.
+    The project name itself may contain underscores, so we take the last two
+    underscore separated tokens as the timestamp and join the remaining middle
+    section back together for the project name.  If the filename does not match
+    this pattern ``(len(parts) < 4)`` we return ``(None, None)``.
+    """
+
     parts = filename.replace(".json", "").split("_")
-    if len(parts) < 3:
+    if len(parts) < 4:
         return None, None
-    project = parts[1]
-    timestamp = "_".join(parts[2:])
+
+    project = "_".join(parts[1:-2])
+    timestamp = "_".join(parts[-2:])
     return project, timestamp
 
 def load_json(file_path: str):
