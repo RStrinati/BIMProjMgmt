@@ -53,6 +53,9 @@ def import_health_data(json_folder, db_name=None):
     for file in os.listdir(json_folder):
         if not file.endswith(".json"):
             continue
+        if "_combined.json" not in file.lower():
+            log(f"[SKIPPED] Skipping uncombined file: {file}")
+            continue
         full_path = os.path.join(json_folder, file)
         log(f"[FILE] Processing {file}")
         try:
