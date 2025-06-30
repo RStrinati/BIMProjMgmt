@@ -5,7 +5,8 @@ import shutil
 from datetime import datetime
 
 from config import REVIT_HEALTH_DB
-from combine_exports import combine_exports
+from combine_exports import combine_exports_to_single_file
+
 
 from database import connect_to_db
 
@@ -34,7 +35,7 @@ def import_health_data(json_folder, db_name=None):
 
     # Combine exports first
     try:
-        json_folder = combine_exports(json_folder)
+        json_folder = combine_exports_to_single_file(json_folder)
     except Exception as exc:
         log(f"[ERROR] Failed to combine exports: {exc}")
         return

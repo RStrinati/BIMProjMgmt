@@ -1,14 +1,22 @@
-[2025-06-30 17:10:51] Connected to DB: RevitHealthCheckDB
-[2025-06-30 17:10:51] [FILE] Processing combined_families_Project1_20250626_130736.json
-[2025-06-30 17:10:51] [OK] Inserted combined_families_Project1_20250626_130736.json
-[2025-06-30 17:10:51] [MOVED] combined_families_Project1_20250626_130736.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 17:10:51] [FILE] Processing combined_file_sizes_Project1_20250626_131700.json
-[2025-06-30 17:10:51] [OK] Inserted combined_file_sizes_Project1_20250626_131700.json
-[2025-06-30 17:10:51] [MOVED] combined_file_sizes_Project1_20250626_131700.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 17:10:51] [FILE] Processing combined_Project1_20250626_130840.json
-[2025-06-30 17:10:51] [OK] Inserted combined_Project1_20250626_130840.json
-[2025-06-30 17:10:51] [MOVED] combined_Project1_20250626_130840.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 17:10:51] [FILE] Processing combined_rooms_levels_Project1_20250626_125958.json
-[2025-06-30 17:10:51] [OK] Inserted combined_rooms_levels_Project1_20250626_125958.json
-[2025-06-30 17:10:51] [MOVED] combined_rooms_levels_Project1_20250626_125958.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 17:10:51] All files processed
+[2025-06-30 19:38:13] Connected to DB: RevitHealthCheckDB
+[2025-06-30 19:38:13] [FILE] Processing families_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [OK] Inserted families_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [MOVED] families_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 19:38:13] [FILE] Processing family_file_sizes_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175842.json
+[2025-06-30 19:38:13] [ERROR] Failed family_file_sizes_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175842.json: 'strRvtUserName'
+[2025-06-30 19:38:13] [FILE] Processing file_sizes_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [OK] Inserted file_sizes_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [MOVED] file_sizes_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 19:38:13] [FILE] Processing metadata_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175845.json
+[2025-06-30 19:38:13] [ERROR] Failed metadata_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175845.json: 'strRvtUserName'
+[2025-06-30 19:38:13] [FILE] Processing placed_families_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175755.json
+[2025-06-30 19:38:13] [ERROR] Failed placed_families_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175755.json: 'strRvtUserName'
+[2025-06-30 19:38:13] [FILE] Processing rooms_levels_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [OK] Inserted rooms_levels_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [MOVED] rooms_levels_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 19:38:13] [FILE] Processing SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [OK] Inserted SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json
+[2025-06-30 19:38:13] [MOVED] SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_combined.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 19:38:13] [FILE] Processing views_rooms_levels_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175848.json
+[2025-06-30 19:38:13] [ERROR] Failed views_rooms_levels_SYD54-HYV-50-XX-M3-S-0001_Asbuilt 04.12.24_20250630_175848.json: 'strRvtUserName'
+[2025-06-30 19:38:13] All files processed

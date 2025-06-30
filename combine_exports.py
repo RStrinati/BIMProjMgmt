@@ -108,41 +108,77 @@ def find_latest_files_by_project(export_dir: str):
     return grouped
 
 def combine_files(export_dir: str, processed_dir: str, project: str, timestamp: str, file_list):
-    """Combine individual export files for a single project/timestamp."""
+    """Combine individual export files for a single project/timestamp into one JSON object."""
     data = {}
-
     search_keys = {"strRvtUserName", "strSysName"}
 
     for file in file_list:
         file_path = os.path.join(export_dir, file)
         json_data = load_json(file_path)
 
+        # Extract strRvtUserName and strSysName if found
         nested = _find_nested_values(json_data, search_keys)
         for k in search_keys:
             if k in nested and k not in data:
                 data[k] = nested[k]
 
-        if isinstance(json_data, dict):
-            # copy all top level keys by default
-            for k, v in json_data.items():
-                if k == "views":
-                    data["jsonViews"] = json.dumps(v)
-                elif k == "levels":
-                    data["jsonLevels"] = json.dumps(v)
-                elif k == "rooms":
-                    data["jsonRooms"] = json.dumps(v)
-                elif k == "title_blocks":
-                    data["jsonTitleBlocksSummary"] = json.dumps(v)
-                else:
-                    data[k] = v
-        elif isinstance(json_data, list) and json_data:
-            # recognise exports that return a list
-            sample = json_data[0]
-            if isinstance(sample, dict) and "FamilyName" in sample:
-                data["jsonFamilySizes"] = json.dumps(json_data)
-            elif isinstance(sample, dict) and "TypeName" in sample:
-                data["jsonFamilies"] = json.dumps(json_data)
+        # Handle dict-type files with expected keys
+        if isinstance(json_data, dict) and "data_type" in json_data and "data" in json_data:
+            dtype = json_data["data_type"]
+            content = json_data["data"]
 
+            # Map data_type to json* keys
+            type_map = {
+                "metadata": None,  # Already handled separately
+                "views": "jsonViews",
+                "levels": "jsonLevels",
+                "rooms": "jsonRooms",
+                "rooms_levels": "jsonRooms",
+                "schedules": "jsonSchedules",
+                "title_blocks_summary": "jsonTitleBlocksSummary",
+                "design_options": "jsonDesignOptions",
+                "worksets": "jsonWorksets",
+                "grids": "jsonGrids",
+                "warnings": "jsonWarnings",
+                "lines": "jsonLines",
+                "project_base_point": "jsonProjectBasePoint",
+                "survey_point": "jsonSurveyPoint",
+                "family_sizes": "jsonFamilySizes",
+                "placed_families": "jsonFamilies",
+                "file_sizes": "jsonFileSizes",
+            }
+
+            json_key = type_map.get(dtype)
+            if json_key:
+                data[json_key] = json.dumps(content)
+
+            # Also pull user/system info from metadata file
+            if dtype == "metadata":
+                nested = _find_nested_values(content, search_keys)
+                for k in search_keys:
+                    if k in nested and k not in data:
+                        data[k] = nested[k]
+                # Set default file name and export timestamp
+                for field in ["strRvtFileName", "nExportedOn"]:
+                    if field in content and field not in data:
+                        data[field] = content[field]
+
+
+        # Handle flat lists like placed families, file sizes, etc.
+        elif isinstance(json_data, list) and json_data:
+            sample = json_data[0]
+            if isinstance(sample, dict):
+                if "FamilyName" in sample and "TypeName" in sample:
+                    data["jsonFamilies"] = json.dumps(json_data)
+                elif "FamilyName" in sample and "SizeMB" in sample:
+                    data["jsonFamilySizes"] = json.dumps(json_data)
+                elif "FileName" in sample and "SizeMB" in sample:
+                    data["jsonFileSizes"] = json.dumps(json_data)
+                elif "TitleBlockName" in sample:
+                    data["jsonTitleBlocksPlaced"] = json.dumps(json_data)
+
+
+    # Add required fallback/default values
     data.setdefault("strRvtFileName", project)
     data.setdefault("nExportedOn", int(datetime.datetime.utcnow().timestamp()))
     if "strRvtUserName" not in data:
@@ -154,39 +190,110 @@ def combine_files(export_dir: str, processed_dir: str, project: str, timestamp: 
 
     combined_filename = f"combined_{project}_{timestamp}.json"
     combined_path = os.path.join(export_dir, combined_filename)
+
     with open(combined_path, "w") as f:
         json.dump(data, f, indent=2)
     print(f"✅ Combined export created: {combined_filename}")
 
-    # Move source files
+    # Move source files to processed folder
     for file in file_list:
         src = os.path.join(export_dir, file)
         dst = os.path.join(processed_dir, file)
-        os.rename(src, dst)
-        print(f"📁 Moved {file} to processed folder.")
+        try:
+            os.rename(src, dst)
+            print(f"📁 Moved {file} to processed folder.")
+        except FileExistsError:
+            print(f"⚠️ Skipping move of {file} — already exists in processed.")
 
-def combine_exports(export_dir: str) -> str:
-    """Combine related export files in ``export_dir``.
 
-    The function searches for JSON exports sharing the same project name and
-    timestamp, merges their contents, and writes a ``combined_<project>_<timestamp>.json``
-    file. Source files are moved into a ``processed`` subfolder. The original
-    ``export_dir`` path is returned so callers can continue processing within the
-    same directory.
-    """
+def combine_exports_to_single_file(export_dir: str) -> str:
+        """Combine all relevant export files into one unified JSON per project name."""
+        processed_dir = _ensure_processed_dir(export_dir)
+        project_files = {}
 
-    processed_dir = _ensure_processed_dir(export_dir)
-    groups = find_latest_files_by_project(export_dir)
+        # Group files by base project name (ignore timestamp)
+        for file in os.listdir(export_dir):
+            if not file.endswith(".json") or "combined" in file.lower():
+                continue
+            project, _ = extract_project_and_timestamp(file)
+            if not project:
+                continue
+            project_files.setdefault(project, []).append(file)
 
-    for (project, timestamp), files in groups.items():
-        combine_files(export_dir, processed_dir, project, timestamp, files)
+        for project, file_list in project_files.items():
+            output_path = os.path.join(export_dir, f"{project}_combined.json")
+            combine_files_into_single(output_path, export_dir, processed_dir, file_list)
 
-    return export_dir
+        return export_dir
 
+def combine_files_into_single(output_path, export_dir, processed_dir, file_list):
+        data = {}
+        search_keys = {"strRvtUserName", "strSysName"}
+
+        for file in file_list:
+            file_path = os.path.join(export_dir, file)
+            json_data = load_json(file_path)
+
+            # Handle metadata
+            if isinstance(json_data, dict) and json_data.get("data_type") == "metadata":
+                content = json_data["data"]
+                for key in ["strRvtFileName", "nExportedOn"]:
+                    if key in content:
+                        data[key] = content[key]
+                for k in search_keys:
+                    if k in content:
+                        data[k] = content[k]
+
+            # Handle other data types
+            elif isinstance(json_data, dict) and "data_type" in json_data:
+                dtype = json_data["data_type"]
+                content = json_data["data"]
+                key_map = {
+                    "views": "jsonViews",
+                    "levels": "jsonLevels",
+                    "rooms": "jsonRooms",
+                    "rooms_levels": "jsonRooms",
+                    "placed_families": "jsonFamilies",
+                    "file_sizes": "jsonFileSizes"
+                }
+                out_key = key_map.get(dtype)
+                if out_key:
+                    data[out_key] = json.dumps(content)
+
+            # Handle legacy flat JSON lists (like old-style placed families or file sizes)
+            elif isinstance(json_data, list):
+                if "FamilyName" in json_data[0]:
+                    if "SizeMB" in json_data[0]:
+                        data["jsonFamilySizes"] = json.dumps(json_data)
+                    else:
+                        data["jsonFamilies"] = json.dumps(json_data)
+                elif "FileName" in json_data[0] and "SizeMB" in json_data[0]:
+                    data["jsonFileSizes"] = json.dumps(json_data)
+
+            # Fallbacks
+            data.setdefault("strRvtUserName", "Unknown")
+            data.setdefault("strSysName", "Unknown")
+            data.setdefault("nExportedOn", int(datetime.datetime.utcnow().timestamp()))
+
+        # Write final combined file
+        with open(output_path, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"✅ Combined project export created: {os.path.basename(output_path)}")
+
+        # Move input files to processed
+        for file in file_list:
+            src = os.path.join(export_dir, file)
+            dst = os.path.join(processed_dir, file)
+            try:
+                os.rename(src, dst)
+                print(f"📁 Moved {file} to processed folder.")
+            except FileExistsError:
+                print(f"⚠️ Skipping move of {file} — already exists in processed.")
 
 def main():
     export_dir = os.getcwd()
-    combine_exports(export_dir)
+    combine_exports_to_single_file(export_dir)
+
 
 if __name__ == "__main__":
     main()
