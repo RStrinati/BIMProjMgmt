@@ -68,7 +68,8 @@ def import_health_data(json_folder, db_name=None):
                 "INSERT INTO tblSysName (sysUserName) OUTPUT INSERTED.nId VALUES (?)", data["strSysName"]
             ).fetchone()[0]
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO tblRvtProjHealth (
                     nRvtUserId, nSysNameId, strRvtVersion, strRvtBuildVersion, strRvtFileName,
                     strProjectName, strProjectNumber, strClientName,
@@ -87,15 +88,14 @@ def import_health_data(json_folder, db_name=None):
                     validation_status, validation_reason,
                     strExtractedProjectName, compiled_regex,
                     jsonGrids, jsonProjectBasePoint, jsonSurveyPoint,
-                    nModelFileSizeMB, jsonTitleBlocksSummary,
-                    jsonFamily_sizes, jsonSchedules, jsonPlaced_families, jsonPhases
+                    nModelFileSizeMB, jsonTitleBlocksSummary
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, sys_id,
                 data.get("strRvtVersion"), data.get("strRvtBuildVersion"), data.get("strRvtFileName"),
                 data.get("strProjectName"), data.get("strProjectNumber"), data.get("strClientName"),
-                data.get("nRvtLinkCount", 0), data.get("nDwgLinkCount", 0), data.get("nDwgImportCount", 0),
+                data.get("nRvtLinkCount", 0), 0, data.get("nDwgImportCount", 0),
                 data.get("nTotalViewCount", 0), data.get("nCopiedViewCount", 0), data.get("nDependentViewCount", 0),
                 data.get("nViewsNotOnSheetsCount", 0), data.get("nViewTemplateCount", 0),
                 data.get("nWarningsCount", 0), data.get("nCriticalWarningsCount", 0),
@@ -106,16 +106,14 @@ def import_health_data(json_folder, db_name=None):
                 data.get("jsonDesignOptions"), data.get("jsonDwgImports"), data.get("jsonFamilies"),
                 data.get("jsonLevels"), data.get("jsonLines"), data.get("jsonRooms"), data.get("jsonViews"),
                 data.get("jsonWarnings"), data.get("jsonWorksets"),
-                data.get("nExportedOn"), None,  # or data.get("nDeletedOn")
-                data.get("validation_status"), data.get("validation_reason"),
-                data.get("strExtractedProjectName"), data.get("compiled_regex"),
-                data.get("jsonGrids"), data.get("jsonProjectBasePoint"), data.get("jsonSurveyPoint"),
-                safe_float(data.get("nModelFileSizeMB")),
-                data.get("jsonTitleBlocksSummary"),
-                data.get("jsonFamily_sizes"),
-                data.get("jsonSchedules"),
-                data.get("jsonPlaced_families"),
-                data.get("jsonPhases")
+                data.get("nExportedOn"), None,
+                None, None,
+                data.get("strExtractedProjectName"), None,
+                data.get("jsonGrids"),
+                json.dumps(data.get("projectBasePoint")),
+                json.dumps(data.get("surveyPoint")),
+                safe_float(data.get("ModelFileSizeMB")),
+                data.get("jsonTitleBlocksSummary")
             ))
 
             conn.commit()
