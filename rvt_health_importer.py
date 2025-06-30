@@ -74,7 +74,8 @@ def import_health_data(json_folder, db_name=None):
                 "INSERT INTO tblSysName (sysUserName) OUTPUT INSERTED.nId VALUES (?)", data["strSysName"]
             ).fetchone()[0]
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO tblRvtProjHealth (
                     nRvtUserId, nSysNameId, strRvtVersion, strRvtBuildVersion, strRvtFileName,
                     strProjectName, strProjectNumber, strClientName,
@@ -92,33 +93,78 @@ def import_health_data(json_folder, db_name=None):
                     validation_status, validation_reason,
                     strExtractedProjectName, compiled_regex,
                     jsonGrids, jsonProjectBasePoint, jsonSurveyPoint,
-                    nModelFileSizeMB, jsonTitleBlocksSummary
+                    validated_date, failed_field_name, failed_field_value, failed_field_reason,
+                    discipline_code, discipline_full_name,
+                    nModelFileSizeMB, jsonTitleBlocksSummary,
+                    jsonFamily_sizes, jsonSchedules, jsonPlaced_families, jsonPhases
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                user_id, sys_id,
-                data.get("strRvtVersion"), data.get("strRvtBuildVersion"), data.get("strRvtFileName"),
-                data.get("strProjectName"), data.get("strProjectNumber"), data.get("strClientName"),
-                data.get("nRvtLinkCount", 0), 0, data.get("nDwgImportCount", 0),
-                data.get("nTotalViewCount", 0), data.get("nCopiedViewCount", 0), data.get("nDependentViewCount", 0),
-                data.get("nViewsNotOnSheetsCount", 0), data.get("nViewTemplateCount", 0),
-                data.get("nWarningsCount", 0), data.get("nCriticalWarningsCount", 0),
-                data.get("nFamilyCount", 0), data.get("nGroupCount", 0), data.get("nDetailGroupTypeCount", 0), data.get("nModelGroupTypeCount", 0),
-                data.get("nTotalElementsCount", 0), data.get("jsonTypeOfElements"),
-                data.get("nInPlaceFamiliesCount", 0), data.get("nSketchupImportsCount", 0), data.get("nSheetsCount", 0),
-                data.get("nDesignOptionSetCount", 0), data.get("nDesignOptionCount", 0),
-                data.get("jsonDesignOptions"), data.get("jsonDwgImports"), data.get("jsonFamilies"),
-                data.get("jsonLevels"), data.get("jsonLines"), data.get("jsonRooms"), data.get("jsonViews"),
-                data.get("jsonWarnings"), data.get("jsonWorksets"),
-                data.get("nExportedOn"), None,
-                None, None,
-                data.get("strExtractedProjectName"), None,
-                data.get("jsonGrids"),
-                json.dumps(data.get("projectBasePoint")),
-                json.dumps(data.get("surveyPoint")),
-                safe_float(data.get("ModelFileSizeMB")),
-                data.get("jsonTitleBlocksSummary")
-            ))
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
+                (
+                    user_id,
+                    sys_id,
+                    data.get("strRvtVersion"),
+                    data.get("strRvtBuildVersion"),
+                    data.get("strRvtFileName"),
+                    data.get("strProjectName"),
+                    data.get("strProjectNumber"),
+                    data.get("strClientName"),
+                    data.get("nRvtLinkCount", 0),
+                    data.get("nDwgLinkCount", 0),
+                    data.get("nDwgImportCount", 0),
+                    data.get("nTotalViewCount", 0),
+                    data.get("nCopiedViewCount", 0),
+                    data.get("nDependentViewCount", 0),
+                    data.get("nViewsNotOnSheetsCount", 0),
+                    data.get("nViewTemplateCount", 0),
+                    data.get("nWarningsCount", 0),
+                    data.get("nCriticalWarningsCount", 0),
+                    data.get("nFamilyCount", 0),
+                    data.get("nGroupCount", 0),
+                    data.get("nDetailGroupTypeCount", 0),
+                    data.get("nModelGroupTypeCount", 0),
+                    data.get("nTotalElementsCount", 0),
+                    data.get("jsonTypeOfElements"),
+                    data.get("nInPlaceFamiliesCount", 0),
+                    data.get("nSketchupImportsCount", 0),
+                    data.get("nSheetsCount", 0),
+                    data.get("nDesignOptionSetCount", 0),
+                    data.get("nDesignOptionCount", 0),
+                    data.get("jsonDesignOptions"),
+                    data.get("jsonDwgImports"),
+                    data.get("jsonFamilies"),
+                    data.get("jsonLevels"),
+                    data.get("jsonLines"),
+                    data.get("jsonRooms"),
+                    data.get("jsonViews"),
+                    data.get("jsonWarnings"),
+                    data.get("jsonWorksets"),
+                    data.get("nExportedOn"),
+                    data.get("nDeletedOn"),
+                    data.get("validation_status"),
+                    data.get("validation_reason"),
+                    data.get("strExtractedProjectName"),
+                    data.get("compiled_regex"),
+                    data.get("jsonGrids"),
+                    json.dumps(data.get("projectBasePoint")),
+                    json.dumps(data.get("surveyPoint")),
+                    data.get("validated_date"),
+                    data.get("failed_field_name"),
+                    data.get("failed_field_value"),
+                    data.get("failed_field_reason"),
+                    data.get("discipline_code"),
+                    data.get("discipline_full_name"),
+                    safe_float(data.get("ModelFileSizeMB")),
+                    data.get("jsonTitleBlocksSummary"),
+                    data.get("jsonFamily_sizes") or data.get("jsonFamilySizes"),
+                    data.get("jsonSchedules"),
+                    data.get("jsonPlaced_families"),
+                    data.get("jsonPhases")
+                )
+            )
 
             conn.commit()
             log(f"[OK] Inserted {file}")
