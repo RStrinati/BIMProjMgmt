@@ -1,14 +1,14 @@
-[2025-06-30 15:44:20] Connected to DB: RevitHealthCheckDB
-[2025-06-30 15:44:20] [FILE] Processing combined_families_Project1_20250626_130736.json
-[2025-06-30 15:44:20] [OK] Inserted combined_families_Project1_20250626_130736.json
-[2025-06-30 15:44:20] [MOVED] combined_families_Project1_20250626_130736.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 15:44:20] [FILE] Processing combined_file_sizes_Project1_20250626_131700.json
-[2025-06-30 15:44:20] [OK] Inserted combined_file_sizes_Project1_20250626_131700.json
-[2025-06-30 15:44:20] [MOVED] combined_file_sizes_Project1_20250626_131700.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 15:44:20] [FILE] Processing combined_Project1_20250626_130840.json
-[2025-06-30 15:44:20] [OK] Inserted combined_Project1_20250626_130840.json
-[2025-06-30 15:44:20] [MOVED] combined_Project1_20250626_130840.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 15:44:20] [FILE] Processing combined_rooms_levels_Project1_20250626_125958.json
-[2025-06-30 15:44:20] [OK] Inserted combined_rooms_levels_Project1_20250626_125958.json
-[2025-06-30 15:44:20] [MOVED] combined_rooms_levels_Project1_20250626_125958.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
-[2025-06-30 15:44:20] All files processed
+[2025-06-30 17:10:51] Connected to DB: RevitHealthCheckDB
+[2025-06-30 17:10:51] [FILE] Processing combined_families_Project1_20250626_130736.json
+[2025-06-30 17:10:51] [OK] Inserted combined_families_Project1_20250626_130736.json
+[2025-06-30 17:10:51] [MOVED] combined_families_Project1_20250626_130736.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 17:10:51] [FILE] Processing combined_file_sizes_Project1_20250626_131700.json
+[2025-06-30 17:10:51] [OK] Inserted combined_file_sizes_Project1_20250626_131700.json
+[2025-06-30 17:10:51] [MOVED] combined_file_sizes_Project1_20250626_131700.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 17:10:51] [FILE] Processing combined_Project1_20250626_130840.json
+[2025-06-30 17:10:51] [OK] Inserted combined_Project1_20250626_130840.json
+[2025-06-30 17:10:51] [MOVED] combined_Project1_20250626_130840.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 17:10:51] [FILE] Processing combined_rooms_levels_Project1_20250626_125958.json
+[2025-06-30 17:10:51] [OK] Inserted combined_rooms_levels_Project1_20250626_125958.json
+[2025-06-30 17:10:51] [MOVED] combined_rooms_levels_Project1_20250626_125958.json -> C:/Users/RicoStrinati/Documents/research/HealthCheck/dynamo/exports\processed
+[2025-06-30 17:10:51] All files processed
