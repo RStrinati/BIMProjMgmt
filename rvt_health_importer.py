@@ -10,119 +10,150 @@ from database import connect_to_db
 
 LOG_FILE = "rvt_import_summary.txt"
 
-def log(message):
-    timestamped = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}"
-    print(timestamped)
+def log(msg):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(timestamped + "\n")
+        f.write(f"[{ts}] {msg}\n")
+    print(f"[{ts}] {msg}")
 
-def safe_float(value):
-    try:
-        return float(value)
-    except:
-        return None
+def safe_float(v):
+    try: return float(v)
+    except: return None
 
 def import_health_data(json_folder, db_name=None):
-    """Import merged health check JSON data into SQL."""
+    # reset log
+    open(LOG_FILE, "w").close()
 
-    with open(LOG_FILE, "w"):
-        pass
-
+    # combine exports into one JSON file
     try:
         json_folder = combine_exports_to_single_file(json_folder)
-    except Exception as exc:
-        log(f"[ERROR] Failed to combine exports: {exc}")
+    except Exception as e:
+        log(f"[ERROR] combine_exports failed: {e}")
         return
 
-    processed_folder = os.path.join(json_folder, "processed")
-    os.makedirs(processed_folder, exist_ok=True)
+    processed = os.path.join(json_folder, "processed")
+    os.makedirs(processed, exist_ok=True)
 
+    # connect
     if db_name is None:
         db_name = REVIT_HEALTH_DB
     conn = connect_to_db(db_name)
     cursor = conn.cursor()
-
     log(f"Connected to DB: {cursor.execute('SELECT DB_NAME()').fetchone()[0]}")
 
-    for file in os.listdir(json_folder):
-        if not file.endswith(".json") or not file.lower().startswith("combined_"):
-            log(f"[SKIPPED] Skipping: {file}")
+    # define the JSON→DB columns we want
+    #
+    # Note: nRvtUserId, nSysNameId get set separately
+    MAPPING = [
+        ("strRvtVersion",       "strRvtVersion"),
+        ("strRvtBuildVersion",  "strRvtBuildVersion"),
+        ("strRvtFileName",      "strRvtFileName"),
+        ("strProjectName",      "strProjectName"),
+        ("strProjectNumber",    "strProjectNumber"),
+        ("strClientName",       "strClientName"),
+        ("nRvtLinkCount",       "nRvtLinkCount"),
+        ("nDwgLinkCount",       "nDwgLinkCount"),
+        ("nDwgImportCount",     "nDwgImportCount"),
+        ("nTotalViewCount",     "nTotalViewCount"),
+        ("nCopiedViewCount",    "nCopiedViewCount"),
+        ("nDependentViewCount", "nDependentViewCount"),
+        ("nViewsNotOnSheetsCount", "nViewsNotOnSheetsCount"),
+        ("nViewTemplateCount",  "nViewTemplateCount"),
+        ("nWarningsCount",      "nWarningsCount"),
+        ("nCriticalWarningsCount","nCriticalWarningsCount"),
+        ("nFamilyCount",        "nFamilyCount"),
+        ("nGroupCount",         "nGroupCount"),
+        ("nDetailGroupTypeCount","nDetailGroupTypeCount"),
+        ("nModelGroupTypeCount","nModelGroupTypeCount"),
+        ("nTotalElementsCount", "nTotalElementsCount"),
+        ("nModelFileSizeMB",    "nModelFileSizeMB"),
+
+        # the big JSON blobs
+        ("jsonDesignOptions",      "jsonDesignOptions"),
+        ("jsonFamily_sizes",       "jsonFamily_sizes"),
+        ("jsonGrids",              "jsonGrids"),
+        ("jsonLevels",             "jsonLevels"),
+        ("jsonPhases",             "jsonPhases"),
+        ("jsonFamilies",           "jsonFamilies"),
+        ("jsonRooms",              "jsonRooms"),
+        ("jsonSchedules",          "jsonSchedules"),
+        ("jsonProjectBasePoint",   "jsonProjectBasePoint"),
+        ("jsonSurveyPoint",        "jsonSurveyPoint"),
+        ("jsonTitleBlocksSummary", "jsonTitleBlocksSummary"),
+        ("jsonViews",              "jsonViews"),
+        ("jsonWarnings",           "jsonWarnings"),
+        ("jsonWorksets",           "jsonWorksets"),
+
+        # extra counts / timestamps
+        ("nInPlaceFamiliesCount",  "nInPlaceFamiliesCount"),
+        ("nSketchupImportsCount",  "nSketchupImportsCount"),
+        ("nSheetsCount",           "nSheetsCount"),
+        ("nDesignOptionSetCount",  "nDesignOptionSetCount"),
+        ("nDesignOptionCount",     "nDesignOptionCount"),
+        ("nExportedOn",            "nExportedOn"),
+    ]
+
+    for fn in os.listdir(json_folder):
+        if not fn.lower().startswith("combined_") or not fn.endswith(".json"):
+            log(f"[SKIP] {fn}")
             continue
 
-        full_path = os.path.join(json_folder, file)
-        log(f"[FILE] Processing {file}")
+        full = os.path.join(json_folder, fn)
+        log(f"[FILE] {fn}")
 
         try:
-            with open(full_path, "r") as f:
-                data = json.load(f)
+            data = json.load(open(full, "r", encoding="utf-8"))
+            log(f"  JSON keys: {list(data.keys())}")
 
-            cursor.execute("SELECT nId FROM tblRvtUser WHERE rvtUserName = ?", data["strRvtUserName"])
-            row = cursor.fetchone()
-            user_id = row[0] if row else cursor.execute(
-                "INSERT INTO tblRvtUser (rvtUserName) OUTPUT INSERTED.nId VALUES (?)", data["strRvtUserName"]
-            ).fetchone()[0]
-
-            cursor.execute("SELECT nId FROM tblSysName WHERE sysUserName = ?", data["strSysName"])
-            row = cursor.fetchone()
-            sys_id = row[0] if row else cursor.execute(
-                "INSERT INTO tblSysName (sysUserName) OUTPUT INSERTED.nId VALUES (?)", data["strSysName"]
-            ).fetchone()[0]
-
+            # upsert user
             cursor.execute(
-                """
-                INSERT INTO tblRvtProjHealth (
-                    nRvtUserId, nSysNameId, strRvtVersion, strRvtBuildVersion, strRvtFileName,
-                    strProjectName, strProjectNumber, strClientName,
-                    nRvtLinkCount, nDwgLinkCount, nDwgImportCount,
-                    nTotalViewCount, nCopiedViewCount, nDependentViewCount,
-                    nViewsNotOnSheetsCount, nViewTemplateCount,
-                    nWarningsCount, nCriticalWarningsCount,
-                    nFamilyCount, nGroupCount, nDetailGroupTypeCount, nModelGroupTypeCount,
-                    nTotalElementsCount, jsonTypeOfElements,
-                    nInPlaceFamiliesCount, nSketchupImportsCount, nSheetsCount,
-                    nDesignOptionSetCount, nDesignOptionCount,
-                    jsonDesignOptions, jsonDwgImports, jsonFamilies,
-                    jsonLevels, jsonLines, jsonRooms, jsonViews,
-                    jsonWarnings, jsonWorksets,
-                    nExportedOn, nDeletedOn,
-                    validation_status, validation_reason,
-                    strExtractedProjectName, compiled_regex,
-                    jsonGrids, jsonProjectBasePoint, jsonSurveyPoint,
-                    nModelFileSizeMB, jsonTitleBlocksSummary
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                user_id, sys_id,
-                data.get("strRvtVersion"), data.get("strRvtBuildVersion"), data.get("strRvtFileName"),
-                data.get("strProjectName"), data.get("strProjectNumber"), data.get("strClientName"),
-                data.get("nRvtLinkCount", 0), 0, data.get("nDwgImportCount", 0),
-                data.get("nTotalViewCount", 0), data.get("nCopiedViewCount", 0), data.get("nDependentViewCount", 0),
-                data.get("nViewsNotOnSheetsCount", 0), data.get("nViewTemplateCount", 0),
-                data.get("nWarningsCount", 0), data.get("nCriticalWarningsCount", 0),
-                data.get("nFamilyCount", 0), data.get("nGroupCount", 0), data.get("nDetailGroupTypeCount", 0), data.get("nModelGroupTypeCount", 0),
-                data.get("nTotalElementsCount", 0), data.get("jsonTypeOfElements"),
-                data.get("nInPlaceFamiliesCount", 0), data.get("nSketchupImportsCount", 0), data.get("nSheetsCount", 0),
-                data.get("nDesignOptionSetCount", 0), data.get("nDesignOptionCount", 0),
-                data.get("jsonDesignOptions"), data.get("jsonDwgImports"), data.get("jsonFamilies"),
-                data.get("jsonLevels"), data.get("jsonLines"), data.get("jsonRooms"), data.get("jsonViews"),
-                data.get("jsonWarnings"), data.get("jsonWorksets"),
-                data.get("nExportedOn"), None,
-                None, None,
-                data.get("strExtractedProjectName"), None,
-                data.get("jsonGrids"),
-                json.dumps(data.get("projectBasePoint")),
-                json.dumps(data.get("surveyPoint")),
-                safe_float(data.get("ModelFileSizeMB") or data.get("nModelFileSizeMB")),
-                data.get("jsonTitleBlocksSummary")
-            ))
+                "SELECT nId FROM tblRvtUser WHERE rvtUserName=?", data["strRvtUserName"]
+            )
+            r = cursor.fetchone()
+            user_id = r[0] if r else cursor.execute(
+                "INSERT INTO tblRvtUser (rvtUserName) OUTPUT INSERTED.nId VALUES (?)",
+                data["strRvtUserName"]
+            ).fetchone()[0]
 
+            # upsert sysname
+            cursor.execute(
+                "SELECT nId FROM tblSysName WHERE sysUserName=?", data["strSysName"]
+            )
+            r = cursor.fetchone()
+            sys_id = r[0] if r else cursor.execute(
+                "INSERT INTO tblSysName (sysUserName) OUTPUT INSERTED.nId VALUES (?)",
+                data["strSysName"]
+            ).fetchone()[0]
+
+            # build columns + values
+            cols = ["nRvtUserId", "nSysNameId"] + [db_col for _,db_col in MAPPING]
+            vals = [user_id, sys_id]
+            for json_key, _ in MAPPING:
+                v = data.get(json_key)
+                # if it’s one of the two JSON objects, dump to text
+                if json_key in ("jsonProjectBasePoint","jsonSurveyPoint") and v is not None:
+                    vals.append(json.dumps(v))
+                else:
+                    vals.append(v)
+
+            # placeholders
+            ph = ",".join("?" for _ in vals)
+
+            sql = f"""
+                INSERT INTO tblRvtProjHealth (
+                  {','.join(cols)}
+                ) VALUES ({ph})
+            """
+            cursor.execute(sql, vals)
             conn.commit()
-            log(f"[OK] Inserted {file}")
-            shutil.move(full_path, os.path.join(processed_folder, file))
-            log(f"[MOVED] {file} -> {processed_folder}")
+
+            log(f"[OK] inserted {fn}")
+            shutil.move(full, os.path.join(processed, fn))
+            log(f"[MOVED] {fn}")
+
         except Exception as e:
-            log(f"[ERROR] Failed {file}: {e}")
+            log(f"[ERROR] {fn}: {e}")
 
     cursor.close()
     conn.close()
-    log("All files processed")
+    log("All done.")
