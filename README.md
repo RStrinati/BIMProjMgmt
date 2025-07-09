@@ -13,3 +13,13 @@ Set the following variables before running the tools:
 - `REVIT_HEALTH_DB` – Revit health check database name (default `RevitHealthCheckDB`)
 
 These variables can be placed in your shell profile or a `.env` file loaded before execution.
+
+## Setup
+
+Install a compatible ODBC driver for SQL Server (see [docs/setup.md](docs/setup.md)) and ensure the environment variables above are set. Then run:
+
+```bash
+./setup_env.sh
+```
+
+This creates a virtual environment in `.venv` and installs the Python dependencies listed in `requirements.txt`.

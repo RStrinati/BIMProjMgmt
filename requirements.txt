@@ -1,0 +1,8 @@
+pandas
+pyodbc
+dash
+plotly
+python-dateutil
+ifcopenshell
+sqlparse
+tkcalendar
