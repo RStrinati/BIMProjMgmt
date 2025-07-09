@@ -78,7 +78,7 @@ def parse_custom_datetime(val, col_name):
     val = val.strip()
 
     # Accept known good formats
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%Y-%m-%dT%H:%M:%S"):
+    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%Y-%m-%dT%H:%M:%S"):
         try:
             return datetime.datetime.strptime(val, fmt)
         except ValueError:
