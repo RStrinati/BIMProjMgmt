@@ -4,6 +4,7 @@ import ifcopenshell.util.file
 import os
 import pyodbc
 from datetime import datetime
+from collections import Counter
 
 def convert_ifc_coordinates(coord):
     """Convert IFC latitude/longitude tuple (D, M, S) to decimal degrees."""
@@ -25,6 +26,9 @@ def extract_ifc_data(ifc_file_path):
 
     file_description = str(header_info.get('description', 'Not available'))  # ✅ Ensure string
     file_schema = str(header_info.get('schema_name', 'Not available'))  # ✅ Ensure string
+    author = header_info.get('author', 'Unknown')
+    organization = header_info.get('organization', 'Unknown')
+    timestamp = header_info.get('timestamp', 'Unknown')
 
     sites = ifc_file.by_type('IfcSite')
     site_coordinates = []
@@ -36,7 +40,29 @@ def extract_ifc_data(ifc_file_path):
         except ValueError:
             print(f"⚠️ Invalid latitude/longitude for {file_name}. Skipping...")
 
-    storeys = ifc_file.by_type('IfcBuildingStorey')
+    # Project base point & model origin
+    contexts = ifc_file.by_type("IfcGeometricRepresentationContext")
+    origin_coords = None
+    rotation_info = None
+    if contexts:
+        origin = contexts[0].WorldCoordinateSystem
+        if origin:
+            loc = origin.Location
+            axis = origin.Axis
+            origin_coords = loc.Coordinates if loc else None
+            rotation_info = axis.DirectionRatios if axis else None
+
+    # Collect building storeys, accounting for nesting
+    storeys = list(ifc_file.by_type('IfcBuildingStorey'))
+    for rel in ifc_file.by_type('IfcRelAggregates'):
+        for obj in getattr(rel, 'RelatedObjects', []):
+            if obj and obj.is_a('IfcBuildingStorey') and obj not in storeys:
+                storeys.append(obj)
+    for rel in ifc_file.by_type('IfcRelContainedInSpatialStructure'):
+        storey = getattr(rel, 'RelatingStructure', None)
+        if storey and storey.is_a('IfcBuildingStorey') and storey not in storeys:
+            storeys.append(storey)
+
     levels = []
     for s in storeys:
         try:
@@ -45,33 +71,64 @@ def extract_ifc_data(ifc_file_path):
             levels.append((level_name, elevation))
         except ValueError:
             print(f"⚠️ Invalid elevation data for {file_name}. Skipping...")
-            
-                    # Extract Uniclass & SINSW parameters
+
+    # Count elements per storey
+    elements_per_storey = {}
+    for rel in ifc_file.by_type('IfcRelContainedInSpatialStructure'):
+        storey = rel.RelatingStructure
+        if storey and storey.is_a('IfcBuildingStorey'):
+            name = storey.Name or "Unnamed Storey"
+            count = len(rel.RelatedElements)
+            elements_per_storey[name] = elements_per_storey.get(name, 0) + count
+    # Element count and type summary
+    product_elements = ifc_file.by_type("IfcProduct")
+    element_counts = Counter(e.is_a() for e in product_elements)
+    total_elements = sum(element_counts.values())
+
+    checked_elements = 0
+    shared_param_hits = 0
+
+    # Extract Uniclass & SINSW parameters
     sinsw_uniclass = []
     for rel in ifc_file.by_type("IfcRelDefinesByProperties"):
         element = rel.RelatedObjects[0] if rel.RelatedObjects else None
         pset = rel.RelatingPropertyDefinition
         if pset.is_a("IfcPropertySet"):
+            checked_elements += 1
+            has_sinsw_param = False
             for prop in pset.HasProperties:
                 name = prop.Name
                 if not name:
                     continue
                 val = getattr(prop, "NominalValue", None)
+                has_sinsw_param = True
                 sinsw_uniclass.append({
-                        "element_id": element.GlobalId if element else None,
-                        "pset_name": pset.Name,
-                        "prop_name": name,
-                        "prop_value": str(val) if val is not None else None
+                    "element_id": element.GlobalId if element else None,
+                    "pset_name": pset.Name,
+                    "prop_name": name,
+                    "prop_value": str(val) if val is not None else None
                 })
+            if has_sinsw_param:
+                shared_param_hits += 1
 
 
     return {
-    "file_name": file_name,
-    "file_description": file_description,
-    "file_schema": file_schema,
-    "site_coordinates": site_coordinates,
-    "levels": levels,
-    "sin_uniclass": sinsw_uniclass
+        "file_name": file_name,
+        "file_description": file_description,
+        "file_schema": file_schema,
+        "author": author,
+        "organization": organization,
+        "timestamp": timestamp,
+        "site_coordinates": site_coordinates,
+        "origin_coords": origin_coords,
+        "rotation_info": rotation_info,
+        "levels": levels,
+        "elements_per_storey": elements_per_storey,
+        "element_counts": dict(element_counts),
+        "total_elements": total_elements,
+        "checked_elements": checked_elements,
+        "shared_param_hits": shared_param_hits,
+        "sin_uniclass": sinsw_uniclass,
     }
 
 def insert_ifc_data_to_db(data):
