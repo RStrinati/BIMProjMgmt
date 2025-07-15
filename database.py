@@ -324,9 +324,10 @@ def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
     """Extract files from ``folder_path`` and store them in ``tblACCDocs``.
 
     Only records for ``project_id`` are replaced.  If ``include_dirs`` is
+
     provided, only directories whose paths contain any of the given strings are
     scanned.  Typical values include ``"WIP"``, ``"Work in Progress"``,
-    ``"Shared"``, ``"Published"`` and ``"Admin Documentation"``.  Directories
+    ``"Shared"``, ``"Published"``, ``"Admin"`` and ``"Documentation"``.  Directories
     that do not match are skipped entirely so inaccessible folders do not halt
     the crawl.
 
@@ -364,6 +365,7 @@ def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
                 if not root_match:
                     dirs[:] = [d for d in dirs if any(inc.lower() in d.lower() for inc in include_dirs)]
                     continue
+
             for file_name in files:
                 file_path = os.path.join(root, file_name)
                 try:
