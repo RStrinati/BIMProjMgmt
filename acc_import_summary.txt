@@ -1,391 +1,100 @@
-[2025-07-09 11:18:04] [SKIP] activities_admin_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_assets_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_bridge_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_cost_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_cost_changes: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_custom_attribute_constraints: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_custom_attributes: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_naming_standards: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_permissions: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_docs_standard_attributes: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_issues_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_issues_changes: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_rfis_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_rfis_changes: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_sheets_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_activities: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_object_ball_in_court_companies: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_object_ball_in_court_roles: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_object_ball_in_court_users: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_ball_in_court_companies: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_ball_in_court_roles: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_ball_in_court_users: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_steps: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_tasks: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_transition_attachments: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] activities_submittals_target_watchers: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] admin_account_services: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] admin_accounts: missing merge SQL
-[2025-07-09 11:18:04] [SKIP] admin_business_units: missing merge SQL
-[2025-07-09 11:18:04] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_companies.csv → staging.admin_companies ...
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2022-01-18 17:05:55.815' in column created_at
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2023-08-03 03:06:32.277' in column created_at
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2023-04-19 00:37:18.719' in column created_at
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2023-07-09 23:48:17.4' in column created_at
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2023-05-02 08:57:43.159' in column created_at
-[2025-07-09 11:18:04] [WARN] Unrecognized datetime format '2025-05-07 00:55:05.02' in column created_at
-[2025-07-09 11:18:04] [DEBUG] First insert into staging.admin_companies: ('82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'School Infrastructure NSW', 'Owner', 'owner', 'Level 8 West', '8 Central Ave', 'Eveleigh', 'NSW', 2015, 'AU', '+61 (13) 0048 2651', 'https://www.schoolinfrastructure.nsw.gov.au/', None, None, None, None, '2022-01-18 17:05:55.815', 125, 71, None)
-[2025-07-09 11:18:04] [DONE] Processed admin_companies in 0.28s
-[2025-07-09 11:18:04] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_companies.csv → staging.admin_project_companies ...
-[2025-07-09 11:18:04] [DEBUG] First insert into staging.admin_project_companies: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 492873690)
-[2025-07-09 11:18:04] [DONE] Processed admin_project_companies in 0.19s
-[2025-07-09 11:18:04] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_products.csv → staging.admin_project_products ...
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.223' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-03 20:49:36.12' in column created_at
-[2025-07-09 11:18:05] [DEBUG] First insert into staging.admin_project_products: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'buildingConnected', 'active', '2025-03-03 00:00:25.223')
-[2025-07-09 11:18:05] [DONE] Processed admin_project_products in 0.27s
-[2025-07-09 11:18:05] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_roles.csv → staging.admin_project_roles ...
-[2025-07-09 11:18:05] [DEBUG] First insert into staging.admin_project_roles: ('7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 492873618, 'Architect', 'active')
-[2025-07-09 11:18:05] [DONE] Processed admin_project_roles in 0.21s
-[2025-07-09 11:18:05] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_services.csv → staging.admin_project_services ...
-[2025-07-09 11:18:05] [DONE] Processed admin_project_services in 0.03s
-[2025-07-09 11:18:05] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_user_companies.csv → staging.admin_project_user_companies ...
-[2025-07-09 11:18:05] [DEBUG] First insert into staging.admin_project_user_companies: ('7a870e2e-a4c3-4733-988b-7d7680564de6', 'fc050da6-c82e-4004-84f4-792dc2dc6356', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 'bdb7c71c-f3f2-48e4-8fb1-5e3ea6a72225')
-[2025-07-09 11:18:05] [DONE] Processed admin_project_user_companies in 0.2s
-[2025-07-09 11:18:05] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_user_products.csv → staging.admin_project_user_products ...
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.478' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.478' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.478' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.478' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.748' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.748' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.748' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.748' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.533' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.533' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.533' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.533' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.125' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.125' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.125' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.125' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.247' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.247' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.247' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.247' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.333' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.333' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.333' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.333' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.815' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.815' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.815' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.815' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.83' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.83' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.83' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.83' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.239' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.239' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.239' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.239' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.661' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.661' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.661' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.661' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.242' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.242' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.242' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.242' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.955' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.955' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.955' in column created_at
-[2025-07-09 11:18:05] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.955' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.284' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.284' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.284' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.284' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.991' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.991' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.991' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.991' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.919' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.919' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.919' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.919' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.251' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.251' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.251' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.251' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.891' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.891' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.891' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.891' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.19' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.19' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.19' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.19' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.801' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.801' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.801' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.801' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.29' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.29' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.29' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.29' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.306' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.306' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.306' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.306' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.834' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.834' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.834' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.834' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.595' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.595' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.595' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.595' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.498' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.498' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.498' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.498' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.932' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:35.172' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:35.172' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:48.131' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.647' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.647' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.647' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.647' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.263' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.795' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.795' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.795' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.795' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.493' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.493' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.493' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.493' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.873' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.873' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.873' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.873' in column created_at
-[2025-07-09 11:18:06] [DEBUG] First insert into staging.admin_project_user_products: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '7a870e2e-a4c3-4733-988b-7d7680564de6', '0dafc249-9f11-41b8-9cdf-095b0ebd6384', 'docs', 'project_user', '2025-06-19 05:37:43.478')
-[2025-07-09 11:18:06] [DONE] Processed admin_project_user_products in 0.84s
-[2025-07-09 11:18:06] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_user_roles.csv → staging.admin_project_user_roles ...
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.471' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.465' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.142' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.216' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.205' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.238' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.26' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.194' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.216' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.449' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.525' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.545' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.729' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.737' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.78' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.713' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.822' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.862' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.835' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.755' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.91' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.21' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.257' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.273' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.685' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.223' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.618' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.076' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.507' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.77' in column created_at
-[2025-07-09 11:18:06] [DEBUG] First insert into staging.admin_project_user_roles: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'bdb7c71c-f3f2-48e4-8fb1-5e3ea6a72225', 'b17088e4-361f-4d90-93bb-0c8044509e51', '2025-06-16 03:42:57.471')
-[2025-07-09 11:18:06] [DONE] Processed admin_project_user_roles in 0.39s
-[2025-07-09 11:18:06] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_user_services.csv → staging.admin_project_user_services ...
-[2025-07-09 11:18:06] [DONE] Processed admin_project_user_services in 0.03s
-[2025-07-09 11:18:06] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_users.csv → staging.admin_project_users ...
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.471' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.842' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:42:57.465' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-16 03:43:07.965' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.142' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.682' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.216' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.775' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.205' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.78' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.238' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.822' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.26' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.872' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 01:39:19.194' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 03:30:35.922' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.216' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-17 03:31:35.61' in column updated_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.449' in column created_at
-[2025-07-09 11:18:06] [WARN] Unrecognized datetime format '2025-06-19 05:37:43.757' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.878' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:48.123' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.525' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:55.717' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.545' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:55.763' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:40.584' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:55.717' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.729' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.632' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.737' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.618' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.78' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:49:03.494874' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.713' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.567' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.822' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.653' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.862' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.743' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.835' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.747' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.755' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.631' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.91' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:18.867' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.21' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:18.901' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.257' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:08.761' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.273' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:31.364' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.685' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:11:40.625' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.223' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 02:17:58.362' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.618' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-24 05:03:57.952' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.076' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-27 06:09:07.456' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.507' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-27 06:21:22.927' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.77' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-07-01 04:24:43.189' in column updated_at
-[2025-07-09 11:18:07] [DEBUG] First insert into staging.admin_project_users: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'bdb7c71c-f3f2-48e4-8fb1-5e3ea6a72225', 'active', 'fc050da6-c82e-4004-84f4-792dc2dc6356', 'project_admin', '2025-06-16 03:42:57.471', '2025-06-16 03:42:57.842')
-[2025-07-09 11:18:07] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_project_users.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-07-09 11:18:07] [DONE] Processed admin_project_users in 0.41s
-[2025-07-09 11:18:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_projects.csv → staging.admin_projects ...
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:25.201' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 00:00:43.395959' in column updated_at
-[2025-07-09 11:18:07] [DEBUG] First insert into staging.admin_projects: ('2afa8925-94b0-4c67-89b1-f2d24a7aec8e', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'Nowra East PS Upgrade [P240601]', None, None, 'Education Facility', 0, 'USD', 'active', 'P240601', '87 Jervis Street', None, 'Nowra', 'NSW', 2541, 'AU', 'Australia/Sydney', None, None, None, None, '2025-03-03 00:00:25.201', 1, -34.882372, 150.60775, '2025-03-03 00:00:43.395959', None, 32, 6, 'production')
-[2025-07-09 11:18:07] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_projects.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-07-09 11:18:07] [DONE] Processed admin_projects in 0.22s
-[2025-07-09 11:18:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_roles.csv → staging.admin_roles ...
-[2025-07-09 11:18:07] [DEBUG] First insert into staging.admin_roles: ('4e84f1d0-83ab-41e3-b152-90ce2b9551a6', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'BIM Technician', 'inactive')
-[2025-07-09 11:18:07] [DONE] Processed admin_roles in 0.23s
-[2025-07-09 11:18:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_users.csv → staging.admin_users ...
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-01-28 23:10:12.66' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-01-28 23:10:57.187' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2023-05-02 09:13:01.04' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-07-26 05:27:13.434' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 01:45:16.878' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 01:45:16.878' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 00:56:02.191' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 00:56:02.191' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-13 02:16:13.373' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-13 02:16:13.373' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 00:56:02.2' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 00:56:02.2' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-13 02:13:43.355' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-13 02:13:43.355' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-13 02:16:13.375' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-07-08 01:17:35.673' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-05-07 00:56:02.199' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-02 23:38:00.985' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-10 05:42:29.513' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-06-10 23:58:02.098' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2023-06-25 23:58:40.244' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-02-16 03:09:18.844' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2022-08-17 01:16:59.991' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-02-16 03:09:08.907' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2022-01-20 00:03:14.566' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-02-16 03:08:56.663' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2023-07-13 05:17:08.359' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-02-23 23:25:50.829144' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:03:14.64' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.733' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-08-22 07:10:40.593' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-08-22 07:11:59.51' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:00:23.502' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:49:03.494874' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-08-22 07:08:28.902' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-08-22 22:20:13.221679' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:03:14.736' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.828' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-04-26 04:07:42.548' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-04-26 04:37:08.073587' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2024-04-04 00:08:34.388' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.839' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-02-26 00:31:12.95' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-02-26 00:32:31.164' in column updated_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:00:23.169' in column created_at
-[2025-07-09 11:18:07] [WARN] Unrecognized datetime format '2025-03-03 01:10:52.915' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 01:00:22.862' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.213' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 01:03:30.104' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.26' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2023-07-09 23:48:23.547' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 01:10:53.276' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2023-03-06 01:55:16.203' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2023-03-06 01:55:16.203' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 02:17:04.374' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-03-03 02:17:43.228' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2023-03-15 02:15:17.556' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-05-28 00:49:27.734' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-05-03 06:39:44.508' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-05-23 06:38:34.977' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2024-09-13 02:59:42.27' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2024-09-13 03:02:42.052' in column updated_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2023-08-29 04:29:07.444' in column created_at
-[2025-07-09 11:18:08] [WARN] Unrecognized datetime format '2025-07-01 04:24:42.775' in column updated_at
-[2025-07-09 11:18:08] [DEBUG] First insert into staging.admin_users: ('bdb7c71c-f3f2-48e4-8fb1-5e3ea6a72225', 'DFW2VRQVRTHVBWGF', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'rico.strinati@iimbe.io', 'Rico Strinati', 'Rico', 'Strinati', None, None, None, None, None, 'AU', None, None, 'BIM Manager', 0, 1, 0, 0, 'b17088e4-361f-4d90-93bb-0c8044509e51', 'fc050da6-c82e-4004-84f4-792dc2dc6356', 'active', None, '2025-01-28 23:10:12.66', '2025-01-28 23:10:57.187')
-[2025-07-09 11:18:08] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\admin_users.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-07-09 11:18:08] [DONE] Processed admin_users in 0.42s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\clashes_assigned_clash_group.csv → staging.clashes_assigned_clash_group ...
-[2025-07-09 11:18:08] [DONE] Processed clashes_assigned_clash_group in 0.03s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\clashes_clash_group_to_clash_id.csv → staging.clashes_clash_group_to_clash_id ...
-[2025-07-09 11:18:08] [DONE] Processed clashes_clash_group_to_clash_id in 0.18s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\clashes_clash_test.csv → staging.clashes_clash_test ...
-[2025-07-09 11:18:08] [DONE] Processed clashes_clash_test in 0.19s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\clashes_closed_clash_group.csv → staging.clashes_closed_clash_group ...
-[2025-07-09 11:18:08] [DONE] Processed clashes_closed_clash_group in 0.2s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_attachments.csv → staging.issues_attachments ...
-[2025-07-09 11:18:08] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
+[2025-07-15 13:10:27] [SKIP] activities_admin_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_assets_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_bridge_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_cost_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_cost_changes: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_custom_attribute_constraints: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_custom_attributes: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_naming_standards: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_permissions: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_docs_standard_attributes: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_issues_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_issues_changes: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_rfis_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_rfis_changes: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_sheets_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_submittals_activities: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_submittals_object_ball_in_court_companies: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_submittals_object_ball_in_court_roles: missing merge SQL
+[2025-07-15 13:10:27] [SKIP] activities_submittals_object_ball_in_court_users: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_ball_in_court_companies: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_ball_in_court_roles: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_ball_in_court_users: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_steps: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_tasks: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_transition_attachments: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] activities_submittals_target_watchers: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] admin_account_services: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] admin_accounts: missing merge SQL
+[2025-07-15 13:10:28] [SKIP] admin_business_units: missing merge SQL
+[2025-07-15 13:10:28] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_companies.csv → staging.admin_companies ...
+[2025-07-15 13:10:28] [DEBUG] First insert into staging.admin_companies: ('82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'School Infrastructure NSW', 'Owner', 'owner', 'Level 8 West', '8 Central Ave', 'Eveleigh', 'NSW', 2015, 'AU', '+61 (13) 0048 2651', 'https://www.schoolinfrastructure.nsw.gov.au/', None, None, None, None, datetime.datetime(2022, 1, 18, 17, 5, 55, 815000), 129, 71, None)
+[2025-07-15 13:10:28] [DONE] Processed admin_companies in 0.46s
+[2025-07-15 13:10:28] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_companies.csv → staging.admin_project_companies ...
+[2025-07-15 13:10:28] [DEBUG] First insert into staging.admin_project_companies: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 393360847)
+[2025-07-15 13:10:28] [DONE] Processed admin_project_companies in 0.24s
+[2025-07-15 13:10:28] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_products.csv → staging.admin_project_products ...
+[2025-07-15 13:10:28] [DEBUG] First insert into staging.admin_project_products: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'capitalPlanning', 'active', datetime.datetime(2024, 7, 3, 4, 2, 7, 482000))
+[2025-07-15 13:10:28] [DONE] Processed admin_project_products in 0.21s
+[2025-07-15 13:10:28] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_roles.csv → staging.admin_project_roles ...
+[2025-07-15 13:10:29] [DEBUG] First insert into staging.admin_project_roles: ('7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 393360802, 'Architect', 'active')
+[2025-07-15 13:10:29] [DONE] Processed admin_project_roles in 0.2s
+[2025-07-15 13:10:29] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_services.csv → staging.admin_project_services ...
+[2025-07-15 13:10:29] [DONE] Processed admin_project_services in 0.04s
+[2025-07-15 13:10:29] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_user_companies.csv → staging.admin_project_user_companies ...
+[2025-07-15 13:10:29] [DEBUG] First insert into staging.admin_project_user_companies: ('7a870e2e-a4c3-4733-988b-7d7680564de6', '7d1ae413-2f69-454e-be7b-04a45621d974', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'd469a130-d255-420e-b3ab-62087ee30fa6')
+[2025-07-15 13:10:29] [DONE] Processed admin_project_user_companies in 0.21s
+[2025-07-15 13:10:29] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_user_products.csv → staging.admin_project_user_products ...
+[2025-07-15 13:10:29] [DEBUG] First insert into staging.admin_project_user_products: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '7a870e2e-a4c3-4733-988b-7d7680564de6', '04b3a3bf-eb7b-4ec1-8237-b4415c6c28f4', 'docs', 'project_user', datetime.datetime(2025, 6, 24, 4, 46, 1, 30000))
+[2025-07-15 13:10:29] [DONE] Processed admin_project_user_products in 0.3s
+[2025-07-15 13:10:29] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_user_roles.csv → staging.admin_project_user_roles ...
+[2025-07-15 13:10:29] [DEBUG] First insert into staging.admin_project_user_roles: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'd469a130-d255-420e-b3ab-62087ee30fa6', 'b17088e4-361f-4d90-93bb-0c8044509e51', datetime.datetime(2024, 7, 3, 4, 2, 49, 807000))
+[2025-07-15 13:10:29] [DONE] Processed admin_project_user_roles in 0.24s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_user_services.csv → staging.admin_project_user_services ...
+[2025-07-15 13:10:30] [DONE] Processed admin_project_user_services in 0.04s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_project_users.csv → staging.admin_project_users ...
+[2025-07-15 13:10:30] [DEBUG] First insert into staging.admin_project_users: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'd469a130-d255-420e-b3ab-62087ee30fa6', 'active', '7d1ae413-2f69-454e-be7b-04a45621d974', 'project_admin', datetime.datetime(2024, 7, 3, 4, 2, 49, 807000), datetime.datetime(2024, 7, 3, 4, 3, 9, 938000))
+[2025-07-15 13:10:30] [DONE] Processed admin_project_users in 0.07s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_projects.csv → staging.admin_projects ...
+[2025-07-15 13:10:30] [DEBUG] First insert into staging.admin_projects: ('a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'Melrose Park HS [P211015]', None, None, 'Education Facility', 0, 'USD', 'active', 'P211015', None, None, None, None, None, 'US', 'Australia/Sydney', None, None, None, None, datetime.datetime(2024, 7, 3, 4, 2, 7, 457000), 1, None, None, datetime.datetime(2024, 7, 3, 4, 2, 30, 138000), None, 45, 14, 'production')
+[2025-07-15 13:10:30] [DONE] Processed admin_projects in 0.25s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_roles.csv → staging.admin_roles ...
+[2025-07-15 13:10:30] [DEBUG] First insert into staging.admin_roles: ('294ad8d9-4cd9-401c-b3eb-b4f5caea97d8', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'BIM Manager', 'inactive')
+[2025-07-15 13:10:30] [DONE] Processed admin_roles in 0.23s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\admin_users.csv → staging.admin_users ...
+[2025-07-15 13:10:30] [DEBUG] First insert into staging.admin_users: ('d469a130-d255-420e-b3ab-62087ee30fa6', '576QMAFSUW3R', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'bruno.medina@nbrs.com.au', 'Bruno Medina', 'Bruno', 'Medina', None, None, None, None, None, 'US', None, '610451984069', 'BIM manager', 0, 1, 1, 0, None, '7d1ae413-2f69-454e-be7b-04a45621d974', 'active', None, datetime.datetime(2023, 5, 16, 23, 29, 43, 336000), datetime.datetime(2024, 7, 10, 2, 7, 23, 221000))
+[2025-07-15 13:10:30] [DONE] Processed admin_users in 0.09s
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_assignees: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_attachments: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_item_doc_attachments: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_items: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_items_answers: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_section_assignees: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_sections: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_sections_signatures: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklist_signatures: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_checklists: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_item_instructions: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_items: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_items_all: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_items_answers: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_sections: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_sections_all: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_signatures: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_template_signatures_all: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_templates: missing merge SQL
+[2025-07-15 13:10:30] [SKIP] checklists_templates_versions: missing merge SQL
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\clashes_assigned_clash_group.csv → staging.clashes_assigned_clash_group ...
+[2025-07-15 13:10:30] [DONE] Processed clashes_assigned_clash_group in 0.04s
+[2025-07-15 13:10:30] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\clashes_clash_group_to_clash_id.csv → staging.clashes_clash_group_to_clash_id ...
+[2025-07-15 13:10:31] [DONE] Processed clashes_clash_group_to_clash_id in 0.21s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\clashes_clash_test.csv → staging.clashes_clash_test ...
+[2025-07-15 13:10:31] [DONE] Processed clashes_clash_test in 0.21s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\clashes_closed_clash_group.csv → staging.clashes_closed_clash_group ...
+[2025-07-15 13:10:31] [DONE] Processed clashes_closed_clash_group in 0.19s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_attachments.csv → staging.issues_attachments ...
+[2025-07-15 13:10:31] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
 -- MERGE for issues_attachments
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -410,13 +119,13 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (attachment_id, issue_id, attachment_name, attachment_type, created_by, created_at, updated_by, updated_at)
     VALUES (src.attachment_id, src.issue_id, src.attachment_name, src.attachment_type, src.created_by, src.created_at, src.updated_by, src.updated_at);
-[2025-07-09 11:18:08] [DONE] Processed issues_attachments in 0.02s
-[2025-07-09 11:18:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
-[2025-07-09 11:18:09] [DONE] Processed issues_checklist_mappings in 0.2s
-[2025-07-09 11:18:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_comments.csv → staging.issues_comments ...
-[2025-07-09 11:18:09] [DONE] Processed issues_comments in 0.04s
-[2025-07-09 11:18:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
-[2025-07-09 11:18:09] [SQL ERROR] in merge_issues_custom_attribute_list_values.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
+[2025-07-15 13:10:31] [DONE] Processed issues_attachments in 0.04s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
+[2025-07-15 13:10:31] [DONE] Processed issues_checklist_mappings in 0.23s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_comments.csv → staging.issues_comments ...
+[2025-07-15 13:10:31] [DONE] Processed issues_comments in 0.04s
+[2025-07-15 13:10:31] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
+[2025-07-15 13:10:32] [SQL ERROR] in merge_issues_custom_attribute_list_values.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
 -- MERGE for issues_custom_attribute_list_values
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -437,9 +146,9 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (attribute_mappings_id, list_id, list_value, created_at)
     VALUES (src.attribute_mappings_id, src.list_id, src.list_value, src.created_at);
-[2025-07-09 11:18:09] [DONE] Processed issues_custom_attribute_list_values in 0.19s
-[2025-07-09 11:18:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_custom_attributes.csv → staging.issues_custom_attributes ...
-[2025-07-09 11:18:09] [SQL ERROR] in merge_issues_custom_attributes.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
+[2025-07-15 13:10:32] [DONE] Processed issues_custom_attribute_list_values in 0.21s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_custom_attributes.csv → staging.issues_custom_attributes ...
+[2025-07-15 13:10:32] [SQL ERROR] in merge_issues_custom_attributes.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
 -- MERGE for issues_custom_attributes
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -464,9 +173,9 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (issue_id, mapped_item_type, attribute_mapping_id, attribute_title, attribute_description, attribute_data_type, is_required, attribute_value)
     VALUES (src.issue_id, src.mapped_item_type, src.attribute_mapping_id, src.attribute_title, src.attribute_description, src.attribute_data_type, src.is_required, src.attribute_value);
-[2025-07-09 11:18:09] [DONE] Processed issues_custom_attributes in 0.02s
-[2025-07-09 11:18:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
-[2025-07-09 11:18:09] [SQL ERROR] in merge_issues_custom_attributes_mappings.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
+[2025-07-15 13:10:32] [DONE] Processed issues_custom_attributes in 0.03s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
+[2025-07-15 13:10:32] [SQL ERROR] in merge_issues_custom_attributes_mappings.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
 -- MERGE for issues_custom_attributes
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -491,248 +200,22 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (issue_id, mapped_item_type, attribute_mapping_id, attribute_title, attribute_description, attribute_data_type, is_required, attribute_value)
     VALUES (src.issue_id, src.mapped_item_type, src.attribute_mapping_id, src.attribute_title, src.attribute_description, src.attribute_data_type, src.is_required, src.attribute_value);
-[2025-07-09 11:18:09] [DONE] Processed issues_custom_attributes_mappings in 0.19s
-[2025-07-09 11:18:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.064' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.064' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.064' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.064' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.076' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.09' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.09' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.108' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.108' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.108' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.108' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.111' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.126' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.18' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.18' in column updated_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.184' in column created_at
-[2025-07-09 11:18:09] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.184' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.298' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.298' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.298' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.298' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.301' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.301' in column updated_at
-[2025-07-09 11:18:10] [DEBUG] First insert into staging.issues_issue_subtypes: ('cf024b6b-7d70-5e9d-ae6e-e8f40796f891', '7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 'd95b66e4-a370-5ea3-b361-b0b364ff0d4e', 'Punch List', 1, 'System', '2025-03-03 00:01:03.064', 'System', '2025-03-03 00:01:03.064', None, None)
-[2025-07-09 11:18:10] [DONE] Processed issues_issue_subtypes in 0.58s
-[2025-07-09 11:18:10] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_issue_types.csv → staging.issues_issue_types ...
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.007' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.071' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.011' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.081' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.026' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.094' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.046' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.112' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:02.988' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.116' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.04' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.13' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.077' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.198' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.081' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.201' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.05' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.31' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.22' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-03-03 00:01:03.313' in column updated_at
-[2025-07-09 11:18:10] [DEBUG] First insert into staging.issues_issue_types: ('d95b66e4-a370-5ea3-b361-b0b364ff0d4e', '7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 'Punch List', 1, 'System', '2025-03-03 00:01:03.007', 'System', '2025-03-03 00:01:03.071', None, None)
-[2025-07-09 11:18:10] [DONE] Processed issues_issue_types in 0.17s
-[2025-07-09 11:18:10] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_issues.csv → staging.issues_issues ...
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:03:49.475' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:01:29.987' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 04:26:47.858' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:12:26.821' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:13:36.332' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:10:19.542' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:15:42.311' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:10:30.916' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:34:09.914' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:11:44.276' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:15:33.369' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:15:37.832' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:17:16.183' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:18:14.101' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:24:44.006' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:25:04.592' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:28:10.009' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:28:12.509' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:47:16.068' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:47:18.859' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:48:32.779' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:48:36.992' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:57:57.092' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:58:00.303' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:06:32.77' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:06:35.503' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:08:49.392' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:21.886' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:11:45.092' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:26.096' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:20:45.299' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:30.018' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:24:21.556' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:33.486' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:35:58.013' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:37.602' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:38:30.333' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:42.051' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:49:11.836' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:45.672' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:46:44.564' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:49.058' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:40:28.461' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:51.831' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:50:44.196' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:55.699' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:55:06.608' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:00:58.005' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 03:59:17.704' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:01:00.847' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 04:00:52.951' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:01:03.688' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 04:06:27.212' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:01:06.569' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-08 23:45:02.569' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:01:11.489' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:03:39.446' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:03:43.073' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:05:00.785' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:05:03.457' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:08:13.388' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2025-07-09 00:08:16.034' in column updated_at
-[2025-07-09 11:18:10] [DEBUG] First insert into staging.issues_issues: ('cb6b3f01-546c-45c8-9e3a-862dea328ada', '7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 1, 'STR v. HYD - In ground clash with footing', 'Pipe to avoid footings.', 'c6001334-b214-5b44-a881-d5bd4ff0dfab', 'ac3c13c7-9bcd-524e-9a79-91a24492096c', 'open', 492887953, 'company', None, 'c5e0108f-9ed4-4c0d-86a8-7a325249574a', 'In Ground', 'urn:adsk.wipprod:dm.lineage:J67NpRWvSaSn6YnkkZ4b3A', 'DFW2VRQVRTHVBWGF', '80a060d3-4647-4352-bd1d-ca93ff4985bc', '369f1b01-8c1a-445f-a5f3-85b1adbb9a14', None, None, None, 'DFW2VRQVRTHVBWGF', '2025-07-08 03:03:49.452', None, None, 'DFW2VRQVRTHVBWGF', '2025-07-08 03:03:49.475', 'DFW2VRQVRTHVBWGF', '2025-07-08 23:01:29.987', None, None, 'urn:adsk.objects:os.object:wip.dm.prod/a1c46db2-8e2f-40d4-8fe9-0e486e5d0a6d.jpg', 1, None, None)
-[2025-07-09 11:18:10] [DONE] Processed issues_issues in 0.58s
-[2025-07-09 11:18:10] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.728' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.048' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2021-03-29 20:33:29.608' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2021-03-29 15:29:01.701' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-09 09:43:32.047' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-09 09:43:32.047' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-09 09:43:32.047' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-09 09:43:32.047' in column updated_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.653' in column created_at
-[2025-07-09 11:18:10] [WARN] Unrecognized datetime format '2018-12-09 09:43:32.047' in column updated_at
-[2025-07-09 11:18:10] [DEBUG] First insert into staging.issues_root_cause_categories: ('a5cc6ec9-7e42-4413-b90d-1e3dcb6ad61c', None, None, 'Quality', 1, 'System', '2018-12-06 08:25:17.653', '8P9VK3RMFR2M', '2021-03-29 15:29:02.728', None, None, 1)
-[2025-07-09 11:18:10] [DONE] Processed issues_root_cause_categories in 0.15s
-[2025-07-09 11:18:11] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\issues_root_causes.csv → staging.issues_root_causes ...
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.932' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 20:33:29.609' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.932' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 20:33:29.609' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.932' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 20:33:29.609' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:19.337' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:01.701' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:19.337' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:01.701' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:17.864' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:02.729' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:19.337' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:29:01.701' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2018-12-06 08:25:18.028' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2021-03-29 15:28:56.049' in column updated_at
-[2025-07-09 11:18:11] [DEBUG] First insert into staging.issues_root_causes: ('08afdebc-35fb-4cf4-9c3e-521906250108', None, None, '93d1b9cb-deb0-4166-9a48-5f0227feaacb', 'Human - Human error', 1, 'System', '2018-12-06 08:25:18.028', '8P9VK3RMFR2M', '2021-03-29 15:28:56.049', None, None, 1)
-[2025-07-09 11:18:11] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (e6bbede9-c08d-44d7-8f3b-0610c18932a3). (2627) (SQLExecDirectW); [23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The statement has been terminated. (3621)")
+[2025-07-15 13:10:32] [DONE] Processed issues_custom_attributes_mappings in 0.23s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
+[2025-07-15 13:10:32] [DEBUG] First insert into staging.issues_issue_subtypes: ('938ac03d-5196-5104-9b6e-73249e9bb9d1', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '516cdd0f-71b7-571c-9117-df641d098aa7', 'Coordination', 1, 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 768000), 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 768000), None, None)
+[2025-07-15 13:10:32] [DONE] Processed issues_issue_subtypes in 0.26s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_issue_types.csv → staging.issues_issue_types ...
+[2025-07-15 13:10:32] [DEBUG] First insert into staging.issues_issue_types: ('516cdd0f-71b7-571c-9117-df641d098aa7', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'Coordination', 1, 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 730000), 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 779000), None, None)
+[2025-07-15 13:10:32] [DONE] Processed issues_issue_types in 0.06s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_issues.csv → staging.issues_issues ...
+[2025-07-15 13:10:32] [DEBUG] First insert into staging.issues_issues: ('bb24e07a-7be1-43fb-833f-a50d73612c66', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 12, 'ARC Lighting v. STR - Lighting layout to avoid structural column.', None, '516cdd0f-71b7-571c-9117-df641d098aa7', '938ac03d-5196-5104-9b6e-73249e9bb9d1', 'open', 393360866, 'company', None, '09a8f943-943f-4abe-bf8b-25f28366a92f', 'A9-AC', 'urn:adsk.wipprod:dm.lineage:HIldhEl0WIS_nRMxGGMS0Q', 'DFW2VRQVRTHVBWGF', '80a060d3-4647-4352-bd1d-ca93ff4985bc', '369f1b01-8c1a-445f-a5f3-85b1adbb9a14', None, None, None, 'DFW2VRQVRTHVBWGF', '2025-07-14 23:49:28.426', None, None, 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 7, 14, 23, 49, 28, 433000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 7, 15, 2, 3, 56, 744000), None, None, 'urn:adsk.objects:os.object:wip.dm.prod/23a5b2f6-1edf-4993-a34f-9fcdede7c500.jpg', 1, None, None)
+[2025-07-15 13:10:32] [DONE] Processed issues_issues in 0.31s
+[2025-07-15 13:10:32] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
+[2025-07-15 13:10:32] [DEBUG] First insert into staging.issues_root_cause_categories: ('78284b01-4b2a-42aa-a7b7-32100c3a1136', None, None, 'Commissioning', 1, 'System', datetime.datetime(2018, 12, 6, 8, 25, 17, 653000), 'System', datetime.datetime(2018, 12, 9, 9, 43, 32, 47000), 'System', '2018-12-09 09:43:32.051', 1)
+[2025-07-15 13:10:33] [DONE] Processed issues_root_cause_categories in 0.06s
+[2025-07-15 13:10:33] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\issues_root_causes.csv → staging.issues_root_causes ...
+[2025-07-15 13:10:33] [DEBUG] First insert into staging.issues_root_causes: ('08afdebc-35fb-4cf4-9c3e-521906250108', None, None, '93d1b9cb-deb0-4166-9a48-5f0227feaacb', 'Human - Human error', 1, 'System', datetime.datetime(2018, 12, 6, 8, 25, 18, 28000), '8P9VK3RMFR2M', datetime.datetime(2021, 3, 29, 15, 28, 56, 49000), None, None, 1)
+[2025-07-15 13:10:33] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (e6bbede9-c08d-44d7-8f3b-0610c18932a3). (2627) (SQLExecDirectW); [23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The statement has been terminated. (3621)")
 -- MERGE for issues_root_causes
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -771,86 +254,95 @@ WHEN NOT MATCHED BY TARGET THEN
         src.created_by, src.created_at, src.updated_by, src.updated_at,
         src.deleted_by, src.deleted_at
     );
-[2025-07-09 11:18:11] [DONE] Processed issues_root_causes in 0.48s
-[2025-07-09 11:18:11] [SKIP] issuesbim360_attachments: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_checklist_mappings: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_comments: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_custom_attribute_list_values: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_custom_attributes: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_custom_attributes_mappings: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_issue_subtypes: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_issue_types: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_issues: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_root_cause_categories: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] issuesbim360_root_causes: missing merge SQL
-[2025-07-09 11:18:11] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\locations_nodes.csv → staging.locations_nodes ...
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-03-03 00:00:49.352' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-03-03 00:00:49.352' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:23:45.506' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:23:49.357782' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:03.236' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:16.280963' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:06.654' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:11.229667' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:26.683' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:30.121332' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:42.624' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:45.746328' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:24:59.135' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 22:25:05.672039' in column updated_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 23:00:33.202' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-07-08 23:00:38.165871' in column updated_at
-[2025-07-09 11:18:11] [DEBUG] First insert into staging.locations_nodes: ('d00dff68-d603-4149-813c-f5428386df24', '7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', None, 'b7e6dd47-e1ed-446b-9059-b9327b525f7a', 'Project', 0, '2025-03-03 00:00:49.352', '2025-03-03 00:00:49.352')
-[2025-07-09 11:18:11] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\locations_nodes.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-07-09 11:18:11] [DONE] Processed locations_nodes in 0.12s
-[2025-07-09 11:18:11] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp1et31kt6\locations_trees.csv → staging.locations_trees ...
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-03-03 00:00:49.348' in column created_at
-[2025-07-09 11:18:11] [WARN] Unrecognized datetime format '2025-03-03 00:00:49.348' in column updated_at
-[2025-07-09 11:18:11] [DEBUG] First insert into staging.locations_trees: ('d00dff68-d603-4149-813c-f5428386df24', '7a870e2e-a4c3-4733-988b-7d7680564de6', '2afa8925-94b0-4c67-89b1-f2d24a7aec8e', 'Default', '2025-03-03 00:00:49.348', '2025-03-03 00:00:49.348')
-[2025-07-09 11:18:11] [DONE] Processed locations_trees in 0.04s
-[2025-07-09 11:18:11] [SKIP] metadata: missing merge SQL
-[2025-07-09 11:18:11] [SKIP] relationships_entity_relationship: missing merge SQL
-[2025-07-09 11:18:11] Skipped table summary:
-[2025-07-09 11:18:11]  - activities_admin_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_assets_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_bridge_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_cost_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_cost_changes: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_custom_attribute_constraints: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_custom_attributes: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_naming_standards: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_permissions: missing merge SQL
-[2025-07-09 11:18:11]  - activities_docs_standard_attributes: missing merge SQL
-[2025-07-09 11:18:11]  - activities_issues_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_issues_changes: missing merge SQL
-[2025-07-09 11:18:11]  - activities_rfis_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_rfis_changes: missing merge SQL
-[2025-07-09 11:18:11]  - activities_sheets_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_activities: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_object_ball_in_court_companies: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_object_ball_in_court_roles: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_object_ball_in_court_users: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_ball_in_court_companies: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_ball_in_court_roles: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_ball_in_court_users: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_steps: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_tasks: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_transition_attachments: missing merge SQL
-[2025-07-09 11:18:11]  - activities_submittals_target_watchers: missing merge SQL
-[2025-07-09 11:18:11]  - admin_account_services: missing merge SQL
-[2025-07-09 11:18:11]  - admin_accounts: missing merge SQL
-[2025-07-09 11:18:11]  - admin_business_units: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_attachments: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_checklist_mappings: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_comments: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_custom_attribute_list_values: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_custom_attributes: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_custom_attributes_mappings: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_issue_subtypes: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_issue_types: missing merge SQL
-[2025-07-09 11:18:11]  - issuesbim360_issues: missing merge SQL
-[2025-07-09 11:18:12]  - issuesbim360_root_cause_categories: missing merge SQL
-[2025-07-09 11:18:12]  - issuesbim360_root_causes: missing merge SQL
-[2025-07-09 11:18:12]  - metadata: missing merge SQL
-[2025-07-09 11:18:12]  - relationships_entity_relationship: missing merge SQL
+[2025-07-15 13:10:33] [DONE] Processed issues_root_causes in 0.09s
+[2025-07-15 13:10:33] [SKIP] issuesbim360_attachments: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_checklist_mappings: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_comments: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_custom_attribute_list_values: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_custom_attributes: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_custom_attributes_mappings: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_issue_subtypes: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_issue_types: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_issues: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_root_cause_categories: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] issuesbim360_root_causes: missing merge SQL
+[2025-07-15 13:10:33] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\locations_nodes.csv → staging.locations_nodes ...
+[2025-07-15 13:10:33] [DEBUG] First insert into staging.locations_nodes: ('df22c737-f3eb-4249-8cc3-6c8695ac6182', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', None, '286bd9b0-1a00-4618-887d-2180b4978046', 'Project', 0, datetime.datetime(2024, 7, 3, 4, 2, 10, 981000), datetime.datetime(2025, 7, 14, 5, 5, 28, 511476))
+[2025-07-15 13:10:33] [DONE] Processed locations_nodes in 0.07s
+[2025-07-15 13:10:33] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpffjjcb75\locations_trees.csv → staging.locations_trees ...
+[2025-07-15 13:10:33] [DEBUG] First insert into staging.locations_trees: ('df22c737-f3eb-4249-8cc3-6c8695ac6182', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'Default', datetime.datetime(2024, 7, 3, 4, 2, 10, 978000), datetime.datetime(2024, 7, 3, 4, 2, 10, 978000))
+[2025-07-15 13:10:33] [DONE] Processed locations_trees in 0.05s
+[2025-07-15 13:10:33] [SKIP] markups_layer: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] markups_link: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] markups_markup: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] markups_placement: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] metadata: missing merge SQL
+[2025-07-15 13:10:33] [SKIP] relationships_entity_relationship: missing merge SQL
+[2025-07-15 13:10:33] Skipped table summary:
+[2025-07-15 13:10:33]  - activities_admin_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_assets_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_bridge_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_cost_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_cost_changes: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_custom_attribute_constraints: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_custom_attributes: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_naming_standards: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_permissions: missing merge SQL
+[2025-07-15 13:10:33]  - activities_docs_standard_attributes: missing merge SQL
+[2025-07-15 13:10:33]  - activities_issues_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_issues_changes: missing merge SQL
+[2025-07-15 13:10:33]  - activities_rfis_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_rfis_changes: missing merge SQL
+[2025-07-15 13:10:33]  - activities_sheets_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_activities: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_object_ball_in_court_companies: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_object_ball_in_court_roles: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_object_ball_in_court_users: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_ball_in_court_companies: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_ball_in_court_roles: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_ball_in_court_users: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_steps: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_tasks: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_transition_attachments: missing merge SQL
+[2025-07-15 13:10:33]  - activities_submittals_target_watchers: missing merge SQL
+[2025-07-15 13:10:33]  - admin_account_services: missing merge SQL
+[2025-07-15 13:10:33]  - admin_accounts: missing merge SQL
+[2025-07-15 13:10:33]  - admin_business_units: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_assignees: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_attachments: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_item_doc_attachments: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_items: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_items_answers: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_section_assignees: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_sections: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_sections_signatures: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklist_signatures: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_checklists: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_item_instructions: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_items: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_items_all: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_items_answers: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_sections: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_sections_all: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_signatures: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_template_signatures_all: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_templates: missing merge SQL
+[2025-07-15 13:10:33]  - checklists_templates_versions: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_attachments: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_checklist_mappings: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_comments: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_custom_attribute_list_values: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_custom_attributes: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_custom_attributes_mappings: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_issue_subtypes: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_issue_types: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_issues: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_root_cause_categories: missing merge SQL
+[2025-07-15 13:10:33]  - issuesbim360_root_causes: missing merge SQL
+[2025-07-15 13:10:33]  - markups_layer: missing merge SQL
+[2025-07-15 13:10:33]  - markups_link: missing merge SQL
+[2025-07-15 13:10:33]  - markups_markup: missing merge SQL
+[2025-07-15 13:10:33]  - markups_placement: missing merge SQL
+[2025-07-15 13:10:33]  - metadata: missing merge SQL
+[2025-07-15 13:10:33]  - relationships_entity_relationship: missing merge SQL
