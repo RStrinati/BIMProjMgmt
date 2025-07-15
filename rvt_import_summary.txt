@@ -1,31 +1,7 @@
-[2025-07-15 13:32:16] Connected to DB: RevitHealthCheckDB
-[2025-07-15 13:32:16] [FILE] combined_MPHS-NBRS-B00A-ZZ-M3-A-0001_20250715_033213.json
-[2025-07-15 13:32:16]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:21] [OK] inserted combined_MPHS-NBRS-B00A-ZZ-M3-A-0001_20250715_033213.json
-[2025-07-15 13:32:21] [MOVED] combined_MPHS-NBRS-B00A-ZZ-M3-A-0001_20250715_033213.json
-[2025-07-15 13:32:21] [FILE] combined_MPHS-NBRS-B00B-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:21] [OK] inserted combined_MPHS-NBRS-B00B-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [MOVED] combined_MPHS-NBRS-B00B-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [FILE] combined_MPHS-NBRS-B00C-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:21] [OK] inserted combined_MPHS-NBRS-B00C-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [MOVED] combined_MPHS-NBRS-B00C-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [FILE] combined_MPHS-NBRS-B00D-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:21] [OK] inserted combined_MPHS-NBRS-B00D-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [MOVED] combined_MPHS-NBRS-B00D-ZZ-M3-A-0001_20250715_033215.json
-[2025-07-15 13:32:21] [FILE] combined_MPHS-PDG-00-00-M3-L-0001_20250715_033216.json
-[2025-07-15 13:32:21]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:21] [OK] inserted combined_MPHS-PDG-00-00-M3-L-0001_20250715_033216.json
-[2025-07-15 13:32:21] [MOVED] combined_MPHS-PDG-00-00-M3-L-0001_20250715_033216.json
-[2025-07-15 13:32:21] [FILE] combined_MPHS-TTW-B00A-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:22] [OK] inserted combined_MPHS-TTW-B00A-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22] [MOVED] combined_MPHS-TTW-B00A-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22] [FILE] combined_MPHS-TTW-B00B-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
-[2025-07-15 13:32:22] [OK] inserted combined_MPHS-TTW-B00B-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22] [MOVED] combined_MPHS-TTW-B00B-ZZ-M3-S-0001_20250715_033216.json
-[2025-07-15 13:32:22] [SKIP] processed
-[2025-07-15 13:32:22] All done.
+[2025-07-15 13:47:49] Connected to DB: RevitHealthCheckDB
+[2025-07-15 13:47:49] [FILE] combined_MPHS-IMB-ZZ-ZZ-M3-J-0001_20250715_034749.json
+[2025-07-15 13:47:49]   JSON keys: ['nModelFileSizeMB', 'jsonFamily_sizes', 'jsonFamilyFileSizesMetadata', 'nFamilyFileSizesCount', 'jsonGrids', 'jsonLevels', 'jsonPhases', 'jsonFamilies', 'jsonProjectBasePoint', 'jsonRooms', 'jsonSchedules', 'jsonSurveyPoint', 'jsonTitleBlocksSummary', 'jsonViews', 'jsonWorksets', 'jsonWarnings', 'nCriticalWarningsCount', 'nExportedOn', 'nFamilyCount', 'nGroupCount', 'nRvtLinkCount', 'nSheetsCount', 'nTotalElementsCount', 'nWarningsCount', 'strClientName', 'strProjectName', 'strProjectNumber', 'strRvtBuildVersion', 'strRvtFileName', 'strRvtUserName', 'strRvtVersion', 'strSysName']
+[2025-07-15 13:47:49] [OK] inserted combined_MPHS-IMB-ZZ-ZZ-M3-J-0001_20250715_034749.json
+[2025-07-15 13:47:49] [MOVED] combined_MPHS-IMB-ZZ-ZZ-M3-J-0001_20250715_034749.json
+[2025-07-15 13:47:49] [SKIP] processed
+[2025-07-15 13:47:49] All done.
