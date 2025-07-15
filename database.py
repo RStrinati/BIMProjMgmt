@@ -324,11 +324,12 @@ def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
     """Extract files from ``folder_path`` and store them in ``tblACCDocs``.
 
     Only records for ``project_id`` are replaced.  If ``include_dirs`` is
-    provided, only sub-folders whose paths contain any of the given strings are
+
+    provided, only directories whose paths contain any of the given strings are
     scanned.  Typical values include ``"WIP"``, ``"Work in Progress"``,
-    ``"Shared"``, ``"Published"`` and ``"Admin Documentation"``.  This allows
-    callers to limit the crawl to relevant locations and avoid restricted
-    folders.
+    ``"Shared"``, ``"Published"``, ``"Admin"`` and ``"Documentation"``.  Directories
+    that do not match are skipped entirely so inaccessible folders do not halt
+    the crawl.
 
     :param project_id: The project ID associated with the files.
     :param folder_path: The root folder path containing the files.
@@ -358,9 +359,13 @@ def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
         def on_error(e):
             print(f"⚠️ Unable to access {getattr(e, 'filename', '')}: {e}")
 
-        for root, _, files in os.walk(folder_path, onerror=on_error):
-            if include_dirs and not any(inc.lower() in root.lower() for inc in include_dirs):
-                continue
+        for root, dirs, files in os.walk(folder_path, topdown=True, onerror=on_error):
+            if include_dirs:
+                root_match = any(inc.lower() in root.lower() for inc in include_dirs)
+                if not root_match:
+                    dirs[:] = [d for d in dirs if any(inc.lower() in d.lower() for inc in include_dirs)]
+                    continue
+
             for file_name in files:
                 file_path = os.path.join(root, file_name)
                 try:
