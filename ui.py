@@ -227,8 +227,17 @@ def extract_files():
     print(f"📂 Folder Path: {folder_path}")
 
     try:
-        # ✅ Call the improved function
-        success = insert_files_into_tblACCDocs(project_id, folder_path)
+        # ✅ Call the improved function and include common ACC directories
+        # Restrict the crawl to WIP/Shared folders to avoid access errors
+        success = insert_files_into_tblACCDocs(
+            project_id,
+            folder_path,
+            include_dirs=[
+                "WIP",
+                "Work in Progress",
+                "Shared",
+            ],
+        )
         
         if success:
             print(f"✅ Files successfully inserted for Project ID {project_id}.")
