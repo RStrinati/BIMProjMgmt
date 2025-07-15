@@ -228,7 +228,6 @@ def extract_files():
 
     try:
         # ✅ Call the improved function and include common ACC directories
-        # Restrict the crawl to WIP/Shared folders to avoid access errors
         success = insert_files_into_tblACCDocs(
             project_id,
             folder_path,
@@ -236,6 +235,10 @@ def extract_files():
                 "WIP",
                 "Work in Progress",
                 "Shared",
+                "Published",
+                "Admin",
+                "Documentation",
+
             ],
         )
         
