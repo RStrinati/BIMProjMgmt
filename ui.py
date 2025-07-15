@@ -237,7 +237,8 @@ def extract_files():
                 "Shared",
                 "Published",
                 "Admin",
-                "Admin Documentation",
+                "Documentation",
+
             ],
         )
         

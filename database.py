@@ -28,10 +28,6 @@ def insert_project(project_name, folder_path, ifc_folder_path=None):
         print(f"❌ Folder does not exist: {folder_path}")
         return False
 
-    if not os.path.exists(folder_path):
-        print(f"❌ Folder does not exist: {folder_path}")
-        return False
-
     try:
         cursor = conn.cursor()
         start_date = datetime.now().strftime('%Y-%m-%d')
@@ -324,7 +320,6 @@ def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
     """Extract files from ``folder_path`` and store them in ``tblACCDocs``.
 
     Only records for ``project_id`` are replaced.  If ``include_dirs`` is
-
     provided, only directories whose paths contain any of the given strings are
     scanned.  Typical values include ``"WIP"``, ``"Work in Progress"``,
     ``"Shared"``, ``"Published"``, ``"Admin"`` and ``"Documentation"``.  Directories
