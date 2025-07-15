@@ -24,6 +24,14 @@ def insert_project(project_name, folder_path, ifc_folder_path=None):
         print("❌ Database connection failed.")
         return False
 
+    if not os.path.exists(folder_path):
+        print(f"❌ Folder does not exist: {folder_path}")
+        return False
+
+    if not os.path.exists(folder_path):
+        print(f"❌ Folder does not exist: {folder_path}")
+        return False
+
     try:
         cursor = conn.cursor()
         start_date = datetime.now().strftime('%Y-%m-%d')
@@ -312,16 +320,27 @@ def fetch_data(query):
         conn.close()
 
 
-def insert_files_into_tblACCDocs(project_id, folder_path):
-    """
-    Extracts files from the given folder and replaces only the records for the selected project in tblACCDocs.
+def insert_files_into_tblACCDocs(project_id, folder_path, include_dirs=None):
+    """Extract files from ``folder_path`` and store them in ``tblACCDocs``.
+
+    Only records for ``project_id`` are replaced.  If ``include_dirs`` is
+    provided, only directories whose paths contain any of the given strings are
+    scanned.  Typical values include ``"WIP"``, ``"Work in Progress"``,
+    ``"Shared"``, ``"Published"`` and ``"Admin Documentation"``.  Directories
+    that do not match are skipped entirely so inaccessible folders do not halt
+    the crawl.
 
     :param project_id: The project ID associated with the files.
-    :param folder_path: The folder path containing the files.
+    :param folder_path: The root folder path containing the files.
+    :param include_dirs: Optional list of directory name fragments to include.
     """
     conn = connect_to_db()
     if conn is None:
         print("❌ Database connection failed.")
+        return False
+
+    if not os.path.exists(folder_path):
+        print(f"❌ Folder does not exist: {folder_path}")
         return False
 
     try:
@@ -336,19 +355,27 @@ def insert_files_into_tblACCDocs(project_id, folder_path):
         # Extract file metadata
         file_details = []
 
-        try:
-            for root, _, files in os.walk(folder_path):
-                for file_name in files:
-                    file_path = os.path.join(root, file_name)
+        def on_error(e):
+            print(f"⚠️ Unable to access {getattr(e, 'filename', '')}: {e}")
+
+        for root, dirs, files in os.walk(folder_path, topdown=True, onerror=on_error):
+            if include_dirs:
+                root_match = any(inc.lower() in root.lower() for inc in include_dirs)
+                if not root_match:
+                    dirs[:] = [d for d in dirs if any(inc.lower() in d.lower() for inc in include_dirs)]
+                    continue
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                try:
                     date_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
                     file_type = os.path.splitext(file_name)[1][1:] if os.path.splitext(file_name)[1] else "Unknown"
                     file_size_kb = round(os.path.getsize(file_path) / 1024, 2)
-                    created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  
+                    created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                except OSError as e:
+                    print(f"⚠️ Skipping {file_path}: {e}")
+                    continue
 
-                    file_details.append((file_name, file_path, date_modified, file_type, file_size_kb, created_at, None, project_id))
-        except Exception as e:
-            print(f"❌ Error accessing folder: {e}")
-            return False
+                file_details.append((file_name, file_path, date_modified, file_type, file_size_kb, created_at, None, project_id))
 
         # ✅ Print file details for debugging
         if not file_details:
