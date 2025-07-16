@@ -3,12 +3,19 @@ from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
 from database import connect_to_db
 import pandas as pd
-from database import get_cycle_ids  
+from database import get_cycle_ids
+
 
 def submit_review_schedule(
-    project_dropdown, review_start_date_entry, number_of_reviews_entry, 
-    review_frequency_entry, license_start_date_entry, license_duration_entry
+    project_dropdown,
+    review_start_date_entry,
+    number_of_reviews_entry,
+    review_frequency_entry,
+    license_start_date_entry,
+    license_duration_entry,
+    cycle_dropdown=None,
 ):
+    """Submit review schedule to the database."""
     try:
         conn = connect_to_db()
         cursor = conn.cursor()
@@ -49,6 +56,9 @@ def submit_review_schedule(
 
         conn.commit()
         conn.close()
+
+        if cycle_dropdown is not None:
+            update_cycle_dropdown(project_id, cycle_dropdown)
 
         messagebox.showinfo("Success", f"Review schedule submitted successfully!")
 
@@ -108,63 +118,6 @@ def delete_review_task(schedule_id):
 # ---------------------------------------------------
 # Function to Fetch Review Summary
 # ---------------------------------------------------
-import pyodbc
-from tkinter import messagebox
-from dateutil.relativedelta import relativedelta
-from database import connect_to_db
-import pandas as pd
-
-def submit_review_schedule(
-    project_dropdown, cycle_dropdown, review_start_date_entry, 
-    number_of_reviews_entry, review_frequency_entry, 
-    license_start_date_entry, license_duration_entry
-):
-    """Submit review schedule to the database."""
-    try:
-        conn = connect_to_db()
-        cursor = conn.cursor()
-
-        selected_project = project_dropdown.get()
-        if " - " in selected_project:
-            project_id = selected_project.split(" - ")[0]
-        else:
-            messagebox.showerror("Error", "Invalid project selection!")
-            return
-
-        review_start_date = review_start_date_entry.get_date()
-        number_of_reviews = int(number_of_reviews_entry.get())
-        review_frequency = int(review_frequency_entry.get())
-        license_start_date = license_start_date_entry.get_date()
-        license_duration_months = int(license_duration_entry.get())
-
-        license_end_date = license_start_date + relativedelta(months=license_duration_months)
-
-        review_start_date_str = review_start_date.strftime('%Y-%m-%d')
-        license_start_date_str = license_start_date.strftime('%Y-%m-%d')
-        license_end_date_str = license_end_date.strftime('%Y-%m-%d')
-
-        # ✅ Generate cycle ID properly
-        cursor.execute("SELECT ISNULL(MAX(cycle_id), 0) + 1 FROM ReviewParameters WHERE ProjectID = ?", (project_id,))
-        cycle_id = cursor.fetchone()[0]
-
-        cursor.execute("""
-            INSERT INTO ReviewParameters 
-            (ProjectID, ReviewStartDate, NumberOfReviews, ReviewFrequency, LicenseStartDate, LicenseEndDate, cycle_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, review_start_date_str, number_of_reviews, review_frequency, license_start_date_str, license_end_date_str, cycle_id))
-
-        # ✅ Run stored procedure before closing connection
-        print("✅ Running stored procedure: EXEC GenerateReviewSchedule;")
-        cursor.execute("EXEC GenerateReviewSchedule;")
-        print("✅ Stored procedure executed successfully!")
-
-        conn.commit()
-        conn.close()
-
-        messagebox.showinfo("Success", f"Review schedule submitted successfully!")
-
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
 def update_cycle_dropdown(project_id, cycle_dropdown):
     """Fetch latest cycle IDs and update the UI dropdown."""
