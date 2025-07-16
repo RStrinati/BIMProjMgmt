@@ -2,6 +2,7 @@ import pyodbc
 from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta
+import datetime
 import pandas as pd
 from database import (
     connect_to_db,
@@ -75,14 +76,9 @@ def submit_review_schedule(
     fee_entry,
     assigned_users_entry,
     reviews_per_phase_entry,
-    planned_start_entry,
-    planned_completion_entry,
-    actual_start_entry,
-    actual_completion_entry,
-    hold_date_entry,
-    resume_date_entry,
+    cycle_rows,
     new_contract_var,
-):
+): 
     """Submit review schedule to the database."""
     try:
         conn = connect_to_db()
@@ -111,12 +107,25 @@ def submit_review_schedule(
         fee = float(fee_entry.get() or 0)
         assigned_users = assigned_users_entry.get()
         reviews_per_phase = reviews_per_phase_entry.get()
-        planned_start = planned_start_entry.get_date()
-        planned_completion = planned_completion_entry.get_date()
-        actual_start = actual_start_entry.get_date()
-        actual_completion = actual_completion_entry.get_date()
-        hold_date = hold_date_entry.get_date()
-        resume_date = resume_date_entry.get_date()
+
+        if not cycle_rows:
+            messagebox.showerror("Error", "Cycle table has no rows to submit")
+            return
+
+        row_vals = cycle_rows[0][1]
+
+        def parse_date(val):
+            try:
+                return datetime.datetime.strptime(val, "%Y-%m-%d").date()
+            except Exception:
+                return None
+
+        planned_start = parse_date(row_vals[1])
+        planned_completion = parse_date(row_vals[2])
+        actual_start = parse_date(row_vals[3])
+        actual_completion = parse_date(row_vals[4])
+        hold_date = parse_date(row_vals[5])
+        resume_date = parse_date(row_vals[6])
         new_contract = bool(new_contract_var.get())
 
         # ✅ Generate cycle ID properly
@@ -147,12 +156,12 @@ def submit_review_schedule(
             fee,
             assigned_users,
             reviews_per_phase,
-            planned_start.strftime("%Y-%m-%d"),
-            planned_completion.strftime("%Y-%m-%d"),
-            actual_start.strftime("%Y-%m-%d"),
-            actual_completion.strftime("%Y-%m-%d"),
-            hold_date.strftime("%Y-%m-%d"),
-            resume_date.strftime("%Y-%m-%d"),
+            planned_start.strftime("%Y-%m-%d") if planned_start else None,
+            planned_completion.strftime("%Y-%m-%d") if planned_completion else None,
+            actual_start.strftime("%Y-%m-%d") if actual_start else None,
+            actual_completion.strftime("%Y-%m-%d") if actual_completion else None,
+            hold_date.strftime("%Y-%m-%d") if hold_date else None,
+            resume_date.strftime("%Y-%m-%d") if resume_date else None,
             new_contract,
         )
 

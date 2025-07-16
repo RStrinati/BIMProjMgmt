@@ -153,14 +153,6 @@ def build_review_tab(tab, status_var):
         else:
             cmb_cycles.set("No Cycles Available")
 
-        details = get_project_details(pid)
-        if details:
-            try:
-                planned_start.set_date(datetime.datetime.strptime(details["start_date"], "%Y-%m-%d").date())
-                planned_completion.set_date(datetime.datetime.strptime(details["end_date"], "%Y-%m-%d").date())
-            except Exception:
-                pass
-
         update_summary()
 
     # initial binding moved later after all widgets are created
@@ -207,30 +199,9 @@ def build_review_tab(tab, status_var):
     new_contract_var = tk.BooleanVar()
     ttk.Checkbutton(frame_other, text="New Contract", variable=new_contract_var).pack(padx=10, anchor="w")
 
-    # --- Schedule Dates (right column) ---
-    ttk.Label(frame_schedule, text="Planned Start Date:").pack(padx=10, anchor="w")
-    planned_start = DateEntry(frame_schedule, width=12)
-    planned_start.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Planned Completion Date:").pack(padx=10, anchor="w")
-    planned_completion = DateEntry(frame_schedule, width=12)
-    planned_completion.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Actual Start Date:").pack(padx=10, anchor="w")
-    actual_start = DateEntry(frame_schedule, width=12)
-    actual_start.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Actual Completion Date:").pack(padx=10, anchor="w")
-    actual_completion = DateEntry(frame_schedule, width=12)
-    actual_completion.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Hold Date:").pack(padx=10, anchor="w")
-    hold_date = DateEntry(frame_schedule, width=12)
-    hold_date.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Resume Date:").pack(padx=10, anchor="w")
-    resume_date = DateEntry(frame_schedule, width=12)
-    resume_date.pack(padx=10, pady=2, anchor="w")
+    # --- Schedule Dates ---
+    # Date fields are now edited directly in the cycle table so
+    # the standalone inputs are removed.
 
     def submit_schedule():
         submit_review_schedule(
@@ -245,12 +216,7 @@ def build_review_tab(tab, status_var):
             fee_entry,
             assigned_users_entry,
             reviews_per_phase_entry,
-            planned_start,
-            planned_completion,
-            actual_start,
-            actual_completion,
-            hold_date,
-            resume_date,
+            cycle_data,
             new_contract_var,
         )
         update_status(status_var, "Review schedule submitted")
@@ -412,7 +378,14 @@ def build_review_tab(tab, status_var):
         x, y, width, height = tree_cycles.bbox(row_id, col)
         column_index = int(col[1:]) - 1
         edit_var.set(tree_cycles.set(row_id, column=cycle_columns[column_index]))
-        entry = ttk.Entry(tree_cycles, textvariable=edit_var)
+        if column_index in {1, 2, 3, 4, 5, 6}:
+            entry = DateEntry(tree_cycles, textvariable=edit_var, width=10)
+            try:
+                entry.set_date(datetime.datetime.strptime(edit_var.get(), "%Y-%m-%d").date())
+            except Exception:
+                pass
+        else:
+            entry = ttk.Entry(tree_cycles, textvariable=edit_var)
         entry.place(x=x, y=y, width=width, height=height)
         entry.focus()
 
