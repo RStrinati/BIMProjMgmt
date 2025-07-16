@@ -2,11 +2,11 @@
 
 import tkinter as tk
 from tkinter import ttk
-from ui.tab_project import build_project_tab
-from ui.tab_data_imports import build_data_imports_tab
-from ui.tab_review import build_review_tab
-from ui.tab_validation import build_validation_tab
-from ui.status_bar import update_status
+from ui-ss.tab_project import build_project_tab
+from ui-ss.tab_data_imports import build_data_imports_tab
+from ui-ss.tab_review import build_review_tab
+from ui-ss.tab_validation import build_validation_tab
+from ui-ss.status_bar import update_status
 
 # --- Main App Window ---
 def main():
