@@ -540,32 +540,10 @@ def build_review_tab(tab, status_var):
     refresh_tasks()
     update_summary()
 
-    # --- Issue Tracking Section ---
-
-    lbl_sync = ttk.Label(column_container, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
-    lbl_sync.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
-    frame_revizto, entry_revizto_path = create_labeled_entry(column_container, "Revizto Export Folder:", pack=False)
-    frame_revizto.grid(row=6, column=0, columnspan=3, sticky="w")
-
-    CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
-
-    def sync_issues():
-        update_status(status_var, "Synchronising Revizto issues...")
-
-    sync_frame = create_horizontal_button_group(
-        column_container,
-        [
-            ("Sync Revizto Issues", sync_issues),
-            ("Launch Revizto Exporter", open_revizto_csharp_app),
-        ],
-        pack=False,
-    )
-    sync_frame.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=10)
-
     # --- Review Comment Export ---
 
     lbl_export = ttk.Label(column_container, text="Export Review Comments", font=("Arial", 12, "bold"))
-    lbl_export.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    lbl_export.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
 
 
     def export_review_comments():
@@ -577,6 +555,6 @@ def build_review_tab(tab, status_var):
         [("Export Comments to Excel", export_review_comments)],
         pack=False,
     )
-    export_frame.grid(row=9, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+    export_frame.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
 
