@@ -393,6 +393,15 @@ def build_review_tab(tab, status_var):
     tree_cycles.configure(yscrollcommand=cycle_scroll.set)
     cycle_scroll.pack(side="right", fill="y")
 
+    date_columns = {
+        "Planned Start",
+        "Planned Completion",
+        "Actual Start",
+        "Actual Completion",
+        "Hold",
+        "Resume",
+    }
+
     cycle_data = []
 
     def add_cycle_row():
@@ -411,8 +420,22 @@ def build_review_tab(tab, status_var):
             return
         x, y, width, height = tree_cycles.bbox(row_id, col)
         column_index = int(col[1:]) - 1
-        edit_var.set(tree_cycles.set(row_id, column=cycle_columns[column_index]))
-        entry = ttk.Entry(tree_cycles, textvariable=edit_var)
+        column_name = cycle_columns[column_index]
+        edit_var.set(tree_cycles.set(row_id, column=column_name))
+
+        if column_name in date_columns:
+            entry = DateEntry(
+                tree_cycles,
+                textvariable=edit_var,
+                date_pattern="yyyy-mm-dd",
+            )
+            try:
+                entry.set_date(datetime.datetime.strptime(edit_var.get(), "%Y-%m-%d").date())
+            except Exception:
+                pass
+        else:
+            entry = ttk.Entry(tree_cycles, textvariable=edit_var)
+
         entry.place(x=x, y=y, width=width, height=height)
         entry.focus()
 
