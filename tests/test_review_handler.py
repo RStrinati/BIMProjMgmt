@@ -27,7 +27,7 @@ sys.modules.setdefault("tkinter.messagebox", _tk.messagebox)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from review_handler import generate_stage_review_schedule
+from review_handler import generate_stage_review_schedule, update_review_date
 
 
 class FakeCursor:
@@ -102,3 +102,15 @@ def test_generate_stage_review_schedule_no_connection():
     with patch("review_handler.connect_to_db", return_value=None):
         result = generate_stage_review_schedule(1, [])
     assert result is False
+
+
+def test_update_review_date_sets_manual_override():
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor)
+
+    with patch("review_handler.connect_to_db", return_value=conn):
+        update_review_date(5, "2024-05-01")
+
+    assert conn.committed
+    assert ("manual_override = 1" in cursor.executed[0][0])
+    assert cursor.executed[0][1] == ("2024-05-01", 5)

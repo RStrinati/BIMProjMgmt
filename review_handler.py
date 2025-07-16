@@ -19,11 +19,14 @@ def update_review_date(review_id, new_date):
     """Update a specific review date."""
     conn = connect_to_db()
     cursor = conn.cursor()
-    cursor.execute("""
+    cursor.execute(
+        """
         UPDATE ReviewSchedule
-        SET review_date = ?
+        SET review_date = ?, manual_override = 1
         WHERE review_id = ?;
-    """, (new_date, review_id))
+    """,
+        (new_date, review_id),
+    )
     conn.commit()
     conn.close()
 
