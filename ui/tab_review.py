@@ -53,9 +53,6 @@ def build_review_tab(tab, status_var):
     global cmb_projects_ref
 
     # tab is already a scrollable frame with x-scroll enabled
-    column_container = ttk.Frame(tab)
-    column_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
     # Container to hold three primary columns
     column_container = ttk.Frame(tab)
     column_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
