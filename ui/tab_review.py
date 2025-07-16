@@ -324,8 +324,17 @@ def build_review_tab(tab, status_var):
 
     stage_btn_frame = ttk.Frame(frame_stage_plan)
     stage_btn_frame.pack(fill="x", pady=5)
-    ttk.Button(stage_btn_frame, text="Add Stage", command=add_stage_row).pack(side="left")
-    ttk.Button(stage_btn_frame, text="Delete Stage", command=delete_stage_row).pack(side="left", padx=5)
+
+    stage_menu = tk.Menu(tree_stages, tearoff=0)
+    stage_menu.add_command(label="Add Stage", command=add_stage_row)
+    stage_menu.add_command(label="Delete Stage", command=delete_stage_row)
+
+    def show_stage_menu(event):
+        stage_menu.tk_popup(event.x_root, event.y_root)
+
+    tree_stages.bind("<Button-3>", show_stage_menu)
+    tree_stages.bind("<Insert>", lambda e: add_stage_row())
+    tree_stages.bind("<Delete>", lambda e: delete_stage_row())
 
     def generate_schedule():
         if " - " not in cmb_projects.get():
@@ -450,7 +459,6 @@ def build_review_tab(tab, status_var):
 
     action_frame = ttk.Frame(frame_cycle_table)
     action_frame.pack(fill="x", pady=5)
-    ttk.Button(action_frame, text="Add Row", command=add_cycle_row).pack(side="left")
 
     def delete_selected():
         selected = tree_cycles.selection()
@@ -458,7 +466,17 @@ def build_review_tab(tab, status_var):
             tree_cycles.delete(item)
         cycle_data[:] = [d for d in cycle_data if d[0] not in selected]
 
-    ttk.Button(action_frame, text="Delete Row", command=delete_selected).pack(side="left", padx=5)
+    cycle_menu = tk.Menu(tree_cycles, tearoff=0)
+    cycle_menu.add_command(label="Add Row", command=add_cycle_row)
+    cycle_menu.add_command(label="Delete Row", command=delete_selected)
+
+    def show_cycle_menu(event):
+        cycle_menu.tk_popup(event.x_root, event.y_root)
+
+    tree_cycles.bind("<Button-3>", show_cycle_menu)
+    tree_cycles.bind("<Insert>", lambda e: add_cycle_row())
+    tree_cycles.bind("<Delete>", lambda e: delete_selected())
+
     ttk.Button(action_frame, text="Apply Changes", command=lambda: update_status(status_var, "Cycle changes applied")).pack(side="right")
 
     # --- Reviewer Assignment Section ---

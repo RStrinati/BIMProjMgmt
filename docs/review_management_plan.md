@@ -17,6 +17,16 @@ The repository already provides a Tkinter based interface under `ui/tab_review.p
 - A summary panel shows selected project metadata.
 - A Dash based `gantt_chart.py` visualises review dates.
 
+## Row Editing Workflow
+Rows in the stage plan and cycle tables can be managed via lightweight
+interactions. Right‑clicking on a table shows a context menu with **Add Row** and
+**Delete Row** options. The same actions are available using keyboard shortcuts:
+
+* **Insert** – add a new row
+* **Delete** – remove the selected rows
+
+Dedicated buttons for adding or deleting rows have been removed from the UI.
+
 ## Gaps and Potential Enhancements
 - **Inline Editing:** The current task table supports assigning reviewers but does not allow editing dates directly. Integrating inline editing for Treeview rows would align with the requested editable table feature.
 - **Contractual Data:** The database layer lacks the optional `ContractualLinks` table. Adding this table and exposing data through the UI would enable contract compliance tracking.
