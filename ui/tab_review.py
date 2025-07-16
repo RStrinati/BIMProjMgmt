@@ -153,14 +153,6 @@ def build_review_tab(tab, status_var):
         else:
             cmb_cycles.set("No Cycles Available")
 
-        details = get_project_details(pid)
-        if details:
-            try:
-                planned_start.set_date(datetime.datetime.strptime(details["start_date"], "%Y-%m-%d").date())
-                planned_completion.set_date(datetime.datetime.strptime(details["end_date"], "%Y-%m-%d").date())
-            except Exception:
-                pass
-
         update_summary()
 
     # initial binding moved later after all widgets are created
@@ -207,30 +199,9 @@ def build_review_tab(tab, status_var):
     new_contract_var = tk.BooleanVar()
     ttk.Checkbutton(frame_other, text="New Contract", variable=new_contract_var).pack(padx=10, anchor="w")
 
-    # --- Schedule Dates (right column) ---
-    ttk.Label(frame_schedule, text="Planned Start Date:").pack(padx=10, anchor="w")
-    planned_start = DateEntry(frame_schedule, width=12)
-    planned_start.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Planned Completion Date:").pack(padx=10, anchor="w")
-    planned_completion = DateEntry(frame_schedule, width=12)
-    planned_completion.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Actual Start Date:").pack(padx=10, anchor="w")
-    actual_start = DateEntry(frame_schedule, width=12)
-    actual_start.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Actual Completion Date:").pack(padx=10, anchor="w")
-    actual_completion = DateEntry(frame_schedule, width=12)
-    actual_completion.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Hold Date:").pack(padx=10, anchor="w")
-    hold_date = DateEntry(frame_schedule, width=12)
-    hold_date.pack(padx=10, pady=2, anchor="w")
-
-    ttk.Label(frame_schedule, text="Resume Date:").pack(padx=10, anchor="w")
-    resume_date = DateEntry(frame_schedule, width=12)
-    resume_date.pack(padx=10, pady=2, anchor="w")
+    # --- Schedule Dates ---
+    # Date fields are now edited directly in the cycle table so
+    # the standalone inputs are removed.
 
     def submit_schedule():
         submit_review_schedule(
@@ -245,12 +216,7 @@ def build_review_tab(tab, status_var):
             fee_entry,
             assigned_users_entry,
             reviews_per_phase_entry,
-            planned_start,
-            planned_completion,
-            actual_start,
-            actual_completion,
-            hold_date,
-            resume_date,
+            cycle_data,
             new_contract_var,
         )
         update_status(status_var, "Review schedule submitted")
@@ -324,8 +290,17 @@ def build_review_tab(tab, status_var):
 
     stage_btn_frame = ttk.Frame(frame_stage_plan)
     stage_btn_frame.pack(fill="x", pady=5)
-    ttk.Button(stage_btn_frame, text="Add Stage", command=add_stage_row).pack(side="left")
-    ttk.Button(stage_btn_frame, text="Delete Stage", command=delete_stage_row).pack(side="left", padx=5)
+
+    stage_menu = tk.Menu(tree_stages, tearoff=0)
+    stage_menu.add_command(label="Add Stage", command=add_stage_row)
+    stage_menu.add_command(label="Delete Stage", command=delete_stage_row)
+
+    def show_stage_menu(event):
+        stage_menu.tk_popup(event.x_root, event.y_root)
+
+    tree_stages.bind("<Button-3>", show_stage_menu)
+    tree_stages.bind("<Insert>", lambda e: add_stage_row())
+    tree_stages.bind("<Delete>", lambda e: delete_stage_row())
 
     def generate_schedule():
         if " - " not in cmb_projects.get():
@@ -420,6 +395,7 @@ def build_review_tab(tab, status_var):
             return
         x, y, width, height = tree_cycles.bbox(row_id, col)
         column_index = int(col[1:]) - 1
+        
         column_name = cycle_columns[column_index]
         edit_var.set(tree_cycles.set(row_id, column=column_name))
 
@@ -473,7 +449,6 @@ def build_review_tab(tab, status_var):
 
     action_frame = ttk.Frame(frame_cycle_table)
     action_frame.pack(fill="x", pady=5)
-    ttk.Button(action_frame, text="Add Row", command=add_cycle_row).pack(side="left")
 
     def delete_selected():
         selected = tree_cycles.selection()
@@ -481,7 +456,17 @@ def build_review_tab(tab, status_var):
             tree_cycles.delete(item)
         cycle_data[:] = [d for d in cycle_data if d[0] not in selected]
 
-    ttk.Button(action_frame, text="Delete Row", command=delete_selected).pack(side="left", padx=5)
+    cycle_menu = tk.Menu(tree_cycles, tearoff=0)
+    cycle_menu.add_command(label="Add Row", command=add_cycle_row)
+    cycle_menu.add_command(label="Delete Row", command=delete_selected)
+
+    def show_cycle_menu(event):
+        cycle_menu.tk_popup(event.x_root, event.y_root)
+
+    tree_cycles.bind("<Button-3>", show_cycle_menu)
+    tree_cycles.bind("<Insert>", lambda e: add_cycle_row())
+    tree_cycles.bind("<Delete>", lambda e: delete_selected())
+
     ttk.Button(action_frame, text="Apply Changes", command=lambda: update_status(status_var, "Cycle changes applied")).pack(side="right")
 
     # --- Reviewer Assignment Section ---
