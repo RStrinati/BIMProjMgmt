@@ -20,7 +20,10 @@ from database import (
     save_acc_folder_path,
     get_acc_folder_path,
     get_acc_import_logs,
+    get_last_export_date,
 )
+from process_ifc import process_folder
+from ui.tab_review import open_revizto_csharp_app
 
 from acc_handler import run_acc_import
 from rvt_health_importer import import_health_data
@@ -48,15 +51,26 @@ def build_data_imports_tab(tab, status_var):
     cmb_projects.bind("<<ComboboxSelected>>", load_project_details)
     if projects:
         load_project_details()
+
+    # --- Section Containers ---
+    frame_revit = ttk.LabelFrame(tab, text="Revit")
+    frame_revit.pack(fill="x", padx=10, pady=10)
+
+    frame_ifc = ttk.LabelFrame(tab, text="IFC")
+    frame_ifc.pack(fill="x", padx=10, pady=10)
+
+    frame_revizto = ttk.LabelFrame(tab, text="Revizto")
+    frame_revizto.pack(fill="x", padx=10, pady=10)
+
     # --- Revit Audit Import Section ---
-    ttk.Label(tab, text="Revit Health Check JSON Import", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
-    _, entry_json_path = create_labeled_entry(tab, "Audit JSON Folder:")
+    ttk.Label(frame_revit, text="Revit Health Check JSON Import", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    _, entry_json_path = create_labeled_entry(frame_revit, "Audit JSON Folder:")
     CreateToolTip(entry_json_path, "Folder where exported Revit audit JSONs are saved")
 
     # --- Control Model Selection ---
-    ttk.Label(tab, text="Set Control Model File", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    ttk.Label(frame_revit, text="Set Control Model File", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
     control_file_var = tk.StringVar()
-    cmb_control_file = ttk.Combobox(tab, textvariable=control_file_var, width=60)
+    cmb_control_file = ttk.Combobox(frame_revit, textvariable=control_file_var, width=60)
     cmb_control_file.pack(padx=10, pady=5, anchor="w")
     CreateToolTip(cmb_control_file, "Select the .rvt file to be used as the control model")
 
@@ -87,7 +101,7 @@ def build_data_imports_tab(tab, status_var):
     # Link dropdown refresh to project change
     cmb_projects.bind("<<ComboboxSelected>>", lambda e: [load_project_details(), load_control_files()])
 
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Save Control Model", save_control_file),
     ])
 
@@ -108,14 +122,14 @@ def build_data_imports_tab(tab, status_var):
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
 
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Browse", browse_audit_folder),
         ("Import Audit JSONs", import_revit_audit),
     ])
 
     # --- ACC Data Export Folder Management ---
-    ttk.Label(tab, text="ACC Data Export Folder", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_data_export = create_labeled_entry(tab, "Export Folder:")
+    ttk.Label(frame_revit, text="ACC Data Export Folder", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_data_export = create_labeled_entry(frame_revit, "Export Folder:")
 
     def browse_data_export():
         path = filedialog.askdirectory()
@@ -150,21 +164,21 @@ def build_data_imports_tab(tab, status_var):
             messagebox.showerror("Error", msg)
             return
         
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Browse", browse_data_export),
         ("Save Path", save_data_export),
         ("Import ACC CSVs", import_acc_csv),
     ])
 
-    log_list = tk.Listbox(tab, width=80, height=5)
+    log_list = tk.Listbox(frame_revit, width=80, height=5)
     log_list.pack(padx=10, pady=5, anchor="w", fill="x")
-    log_scroll = ttk.Scrollbar(tab, orient="horizontal", command=log_list.xview)
+    log_scroll = ttk.Scrollbar(frame_revit, orient="horizontal", command=log_list.xview)
     log_list.configure(xscrollcommand=log_scroll.set)
     log_scroll.pack(fill="x", padx=10)
 
     # --- ACC CSV Import Section ---
-    ttk.Label(tab, text="ACC Export CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_acc_folder = create_labeled_entry(tab, "ACC CSV Folder/ZIP:")
+    ttk.Label(frame_revit, text="ACC Export CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_acc_folder = create_labeled_entry(frame_revit, "ACC CSV Folder/ZIP:")
     CreateToolTip(entry_acc_folder, "Select the folder containing ACC ZIPs or a .zip file directly")
 
     def browse_acc_folder():
@@ -180,15 +194,15 @@ def build_data_imports_tab(tab, status_var):
             entry_acc_folder.delete(0, tk.END)
             entry_acc_folder.insert(0, folder)
 
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Browse", browse_acc_folder),
         ("Import ACC CSVs", import_acc_csv),
     ])
 
 
     # --- Clash CSV Import Section ---
-    ttk.Label(tab, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_clash_folder = create_labeled_entry(tab, "Clash CSV Folder:")
+    ttk.Label(frame_revit, text="Clash CSV Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_clash_folder = create_labeled_entry(frame_revit, "Clash CSV Folder:")
     CreateToolTip(entry_clash_folder, "Folder path containing Navisworks clash detection results")
 
     def browse_clash_folder():
@@ -200,15 +214,15 @@ def build_data_imports_tab(tab, status_var):
     def import_clash_csv():
         update_status(status_var, "Clash CSV import started")
 
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Browse", browse_clash_folder),
         ("Import Clash CSVs", import_clash_csv),
     ])
 
 
     # --- Ideate Health Check Excel Import Section ---
-    ttk.Label(tab, text="Ideate Health Check Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
-    _, entry_ideate_folder = create_labeled_entry(tab, "Ideate Excel Folder:")
+    ttk.Label(frame_revit, text="Ideate Health Check Import", font=("Arial", 12, "bold")).pack(pady=20, anchor="w", padx=10)
+    _, entry_ideate_folder = create_labeled_entry(frame_revit, "Ideate Excel Folder:")
     CreateToolTip(entry_ideate_folder, "Select the folder containing Ideate Health Check Excel files")
 
     def browse_ideate_folder():
@@ -240,7 +254,54 @@ def build_data_imports_tab(tab, status_var):
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
 
-    create_horizontal_button_group(tab, [
+    create_horizontal_button_group(frame_revit, [
         ("Browse", browse_ideate_folder),
         ("Import Ideate Excel", import_ideate_health_checks),
     ])
+
+    # --- IFC Import Section ---
+    ttk.Label(frame_ifc, text="IFC Processing", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    _, entry_ifc_folder = create_labeled_entry(frame_ifc, "IFC Folder:")
+
+    def browse_ifc_folder():
+        path = filedialog.askdirectory()
+        if path:
+            entry_ifc_folder.delete(0, tk.END)
+            entry_ifc_folder.insert(0, path)
+
+    def process_ifc():
+        folder = entry_ifc_folder.get().strip()
+        if not folder or not os.path.isdir(folder):
+            messagebox.showerror("Error", "Select a valid IFC folder")
+            return
+        process_folder(folder)
+        last = get_last_export_date()
+        export_label.config(text=f"Last Export Date: {last}")
+        update_status(status_var, f"Last Export: {last}")
+
+    create_horizontal_button_group(
+        frame_ifc,
+        [
+            ("Browse IFC", browse_ifc_folder),
+            ("Process IFC", process_ifc),
+        ],
+    )
+
+    export_label = ttk.Label(frame_ifc, text="Last Export Date: Not available")
+    export_label.pack(padx=10, pady=5, anchor="w")
+
+    # --- Revizto Issue Synchronisation ---
+    ttk.Label(frame_revizto, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold")).pack(pady=10, anchor="w", padx=10)
+    _, entry_revizto_path = create_labeled_entry(frame_revizto, "Revizto Export Folder:")
+    CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
+
+    def sync_issues():
+        update_status(status_var, "Synchronising Revizto issues...")
+
+    create_horizontal_button_group(
+        frame_revizto,
+        [
+            ("Sync Revizto Issues", sync_issues),
+            ("Launch Revizto Exporter", open_revizto_csharp_app),
+        ],
+    )
