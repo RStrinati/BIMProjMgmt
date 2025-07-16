@@ -58,50 +58,50 @@ def submit_review_schedule(
 
 
 
-def update_review_date(review_id, new_date):
+def update_review_date(schedule_id, new_date):
     """Update a specific review date."""
     conn = connect_to_db()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE ReviewSchedule
         SET review_date = ?
-        WHERE review_id = ?;
-    """, (new_date, review_id))
+        WHERE schedule_id = ?;
+    """, (new_date, schedule_id))
     conn.commit()
     conn.close()
 
-def adjust_future_tasks(review_id, new_date, project_id, cycle_id):
+def adjust_future_tasks(schedule_id, new_date, project_id, cycle_id):
     """Auto-adjust all future reviews after moving a task."""
     conn = connect_to_db()
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT review_id, review_date FROM ReviewSchedule
-        WHERE project_id = ? AND cycle_id = ? AND review_id > ?
+        SELECT schedule_id, review_date FROM ReviewSchedule
+        WHERE project_id = ? AND cycle_id = ? AND schedule_id > ?
         ORDER BY review_date ASC;
-    """, (project_id, cycle_id, review_id))
+    """, (project_id, cycle_id, schedule_id))
 
     future_reviews = cursor.fetchall()
     original_review_date = pd.to_datetime(new_date)
 
-    for idx, (future_review_id, future_review_date) in enumerate(future_reviews):
+    for idx, (future_schedule_id, future_review_date) in enumerate(future_reviews):
         shift_days = (pd.to_datetime(future_review_date) - original_review_date).days
         new_future_date = original_review_date + pd.Timedelta(days=shift_days)
 
         cursor.execute("""
             UPDATE ReviewSchedule
             SET review_date = ?
-            WHERE review_id = ?;
-        """, (new_future_date.strftime('%Y-%m-%d'), future_review_id))
+            WHERE schedule_id = ?;
+        """, (new_future_date.strftime('%Y-%m-%d'), future_schedule_id))
 
     conn.commit()
     conn.close()
 
-def delete_review_task(review_id):
+def delete_review_task(schedule_id):
     """Delete a review task while keeping future tasks unchanged."""
     conn = connect_to_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM ReviewSchedule WHERE review_id = ?;", (review_id,))
+    cursor.execute("DELETE FROM ReviewSchedule WHERE schedule_id = ?;", (schedule_id,))
     conn.commit()
     conn.close()
 
