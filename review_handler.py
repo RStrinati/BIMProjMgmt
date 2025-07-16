@@ -257,6 +257,41 @@ def generate_stage_review_schedule(project_id, stages):
         )
         cycle_id = cursor.fetchone()[0]
 
+        # Insert placeholder row so new cycle is visible via get_cycle_ids
+        if stages:
+            start_dates = [s["start_date"] for s in stages]
+            end_dates = [s["end_date"] for s in stages]
+            review_start = min(start_dates).strftime("%Y-%m-%d")
+            license_start = review_start
+            license_end = max(end_dates).strftime("%Y-%m-%d")
+        else:
+            review_start = None
+            license_start = None
+            license_end = None
+
+        cursor.execute(
+            """
+            INSERT INTO ReviewParameters (
+                ProjectID,
+                ReviewStartDate,
+                NumberOfReviews,
+                ReviewFrequency,
+                LicenseStartDate,
+                LicenseEndDate,
+                cycle_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                project_id,
+                review_start,
+                0,
+                0,
+                license_start,
+                license_end,
+                cycle_id,
+            ),
+        )
+
         for stage in stages:
             start = stage["start_date"]
             end = stage["end_date"]
