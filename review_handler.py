@@ -1,6 +1,7 @@
 import pyodbc
 from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
+from datetime import timedelta
 import pandas as pd
 from database import (
     connect_to_db,
@@ -241,3 +242,60 @@ def fetch_review_summary(project_dropdown, cycle_dropdown, summary_label):
 
     except Exception as e:
         summary_label.config(text=f"Error: {str(e)}", fg="red")
+
+
+def generate_stage_review_schedule(project_id, stages):
+    """Create review schedule entries for provided project stages."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT ISNULL(MAX(cycle_id),0)+1 FROM ReviewParameters WHERE ProjectID = ?",
+            (project_id,),
+        )
+        cycle_id = cursor.fetchone()[0]
+
+        for stage in stages:
+            start = stage["start_date"]
+            end = stage["end_date"]
+            count = int(stage["num_reviews"])
+            stage_name = stage["stage_name"]
+
+            insert_review_cycle_details(
+                project_id,
+                cycle_id,
+                stage_name,
+                0,
+                "",
+                count,
+                start.strftime("%Y-%m-%d"),
+                end.strftime("%Y-%m-%d"),
+                start.strftime("%Y-%m-%d"),
+                end.strftime("%Y-%m-%d"),
+                None,
+                None,
+                False,
+            )
+
+            if count <= 0:
+                continue
+            interval = (end - start).days / float(count)
+            for i in range(count):
+                r_date = start + timedelta(days=round(interval * i))
+                cursor.execute(
+                    "INSERT INTO ReviewSchedule (project_id, cycle_id, review_date) VALUES (?, ?, ?);",
+                    (project_id, cycle_id, r_date.strftime("%Y-%m-%d")),
+                )
+
+        upsert_project_review_progress(project_id, cycle_id, sum(int(s["num_reviews"]) for s in stages), 0)
+
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error generating stage schedule: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()

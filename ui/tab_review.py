@@ -5,6 +5,7 @@ import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
+import datetime
 
 from ui.ui_helpers import (
     create_labeled_entry,
@@ -14,7 +15,7 @@ from ui.ui_helpers import (
 from ui.status_bar import update_status
 from ui.tooltips import CreateToolTip
 
-from review_handler import submit_review_schedule
+from review_handler import submit_review_schedule, generate_stage_review_schedule
 from gantt_chart import launch_gantt_chart
 from database import (
     get_projects,
@@ -25,6 +26,7 @@ from database import (
     get_review_summary,
     get_project_review_progress,
     get_contractual_links,
+    get_project_details,
 )
 
 # Global reference to the project dropdown so other tabs can refresh it
@@ -154,11 +156,17 @@ def build_review_tab(tab, status_var):
         else:
             cmb_cycles.set("No Cycles Available")
 
+        details = get_project_details(pid)
+        if details:
+            try:
+                planned_start.set_date(datetime.datetime.strptime(details["start_date"], "%Y-%m-%d").date())
+                planned_completion.set_date(datetime.datetime.strptime(details["end_date"], "%Y-%m-%d").date())
+            except Exception:
+                pass
+
         update_summary()
 
-    cmb_projects.bind("<<ComboboxSelected>>", load_cycles)
-    if projects:
-        load_cycles()
+    # initial binding moved later after all widgets are created
 
     create_horizontal_button_group(
         frame_project,
@@ -260,9 +268,97 @@ def build_review_tab(tab, status_var):
         ],
     )
 
+    # --- Stage Review Plan ---
+    frame_stage_plan = ttk.LabelFrame(column_container, text="Stage Review Plan")
+    frame_stage_plan.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+
+    stage_columns = ("Stage", "Start", "End", "Reviews")
+    tree_stages = ttk.Treeview(frame_stage_plan, columns=stage_columns, show="headings", height=4)
+    for col in stage_columns:
+        tree_stages.heading(col, text=col)
+        tree_stages.column(col, width=100, anchor="w")
+    tree_stages.pack(side="left", fill="both", expand=True)
+    stage_scroll = ttk.Scrollbar(frame_stage_plan, orient="vertical", command=tree_stages.yview)
+    tree_stages.configure(yscrollcommand=stage_scroll.set)
+    stage_scroll.pack(side="right", fill="y")
+
+    stage_data = []
+
+    def add_stage_row():
+        iid = tree_stages.insert("", tk.END, values=["" for _ in stage_columns])
+        stage_data.append((iid, ["" for _ in stage_columns]))
+
+    def delete_stage_row():
+        selected = tree_stages.selection()
+        for item in selected:
+            tree_stages.delete(item)
+        stage_data[:] = [d for d in stage_data if d[0] not in selected]
+
+    edit_stage_var = tk.StringVar()
+
+    def begin_stage_edit(event):
+        region = tree_stages.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        row_id = tree_stages.identify_row(event.y)
+        col = tree_stages.identify_column(event.x)
+        if not row_id or not col:
+            return
+        x, y, width, height = tree_stages.bbox(row_id, col)
+        col_idx = int(col[1:]) - 1
+        edit_stage_var.set(tree_stages.set(row_id, column=stage_columns[col_idx]))
+        entry = ttk.Entry(tree_stages, textvariable=edit_stage_var)
+        entry.place(x=x, y=y, width=width, height=height)
+        entry.focus()
+
+        def save_stage(event=None):
+            tree_stages.set(row_id, column=stage_columns[col_idx], value=edit_stage_var.get())
+            for idx, (iid, vals) in enumerate(stage_data):
+                if iid == row_id:
+                    vals[col_idx] = edit_stage_var.get()
+                    stage_data[idx] = (iid, vals)
+                    break
+            entry.destroy()
+
+        entry.bind("<FocusOut>", save_stage)
+        entry.bind("<Return>", save_stage)
+
+    tree_stages.bind("<Double-1>", begin_stage_edit)
+
+    stage_btn_frame = ttk.Frame(frame_stage_plan)
+    stage_btn_frame.pack(fill="x", pady=5)
+    ttk.Button(stage_btn_frame, text="Add Stage", command=add_stage_row).pack(side="left")
+    ttk.Button(stage_btn_frame, text="Delete Stage", command=delete_stage_row).pack(side="left", padx=5)
+
+    def generate_schedule():
+        if " - " not in cmb_projects.get():
+            messagebox.showerror("Error", "Select a project first")
+            return
+        pid = cmb_projects.get().split(" - ")[0]
+        stages = []
+        for iid, vals in stage_data:
+            stage, start, end, reviews = vals
+            if not stage or not start or not end or not reviews:
+                continue
+            try:
+                s_date = datetime.datetime.strptime(start, "%Y-%m-%d").date()
+                e_date = datetime.datetime.strptime(end, "%Y-%m-%d").date()
+                stages.append({"stage_name": stage, "start_date": s_date, "end_date": e_date, "num_reviews": int(reviews)})
+            except Exception:
+                continue
+        if not stages:
+            messagebox.showerror("Error", "No valid stages defined")
+            return
+        if generate_stage_review_schedule(pid, stages):
+            messagebox.showinfo("Success", "Review schedule generated")
+            refresh_tasks()
+            update_summary()
+
+    ttk.Button(stage_btn_frame, text="Generate Schedule", command=generate_schedule).pack(side="right")
+
     # --- Review Cycle Table (Central Panel) ---
     frame_cycle_table = ttk.LabelFrame(column_container, text="Review Cycle Table")
-    frame_cycle_table.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+    frame_cycle_table.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
     filter_frame = ttk.Frame(frame_cycle_table)
     filter_frame.pack(fill="x", pady=(0, 5))
@@ -370,7 +466,7 @@ def build_review_tab(tab, status_var):
 
     # --- Reviewer Assignment Section ---
     frame_assignment = ttk.LabelFrame(column_container, text="Reviewer Assignment")
-    frame_assignment.grid(row=3, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
+    frame_assignment.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=10, pady=10)
     frame_assignment.grid_propagate(False)
 
 
@@ -442,15 +538,17 @@ def build_review_tab(tab, status_var):
 
     cmb_projects.bind("<<ComboboxSelected>>", lambda e: [load_cycles(), refresh_tasks()])
     cmb_cycles.bind("<<ComboboxSelected>>", lambda e: [refresh_tasks(), update_summary()])
+    if projects:
+        load_cycles()
     refresh_tasks()
     update_summary()
 
     # --- Issue Tracking Section ---
 
     lbl_sync = ttk.Label(column_container, text="Revizto Issue Synchronisation", font=("Arial", 12, "bold"))
-    lbl_sync.grid(row=4, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    lbl_sync.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
     frame_revizto, entry_revizto_path = create_labeled_entry(column_container, "Revizto Export Folder:", pack=False)
-    frame_revizto.grid(row=5, column=0, columnspan=3, sticky="w")
+    frame_revizto.grid(row=6, column=0, columnspan=3, sticky="w")
 
     CreateToolTip(entry_revizto_path, "Folder containing Revizto issue data")
 
@@ -465,12 +563,12 @@ def build_review_tab(tab, status_var):
         ],
         pack=False,
     )
-    sync_frame.grid(row=6, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+    sync_frame.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
     # --- Review Comment Export ---
 
     lbl_export = ttk.Label(column_container, text="Export Review Comments", font=("Arial", 12, "bold"))
-    lbl_export.grid(row=7, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
+    lbl_export.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=(20, 0))
 
 
     def export_review_comments():
@@ -482,6 +580,6 @@ def build_review_tab(tab, status_var):
         [("Export Comments to Excel", export_review_comments)],
         pack=False,
     )
-    export_frame.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+    export_frame.grid(row=9, column=0, columnspan=3, sticky="w", padx=10, pady=10)
 
 
