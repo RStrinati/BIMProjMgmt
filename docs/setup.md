@@ -31,3 +31,15 @@ Set the following variables before running the tools:
 - `REVIT_HEALTH_DB` – Revit health check database (default `RevitHealthCheckDB`)
 
 These variables can be stored in your shell profile or in a `.env` file loaded before execution.
+
+## Database Schema Updates
+
+After setting up your Python environment and environment variables, run the SQL
+script to ensure the `ReviewSchedule` table includes the latest columns:
+
+```bash
+sqlcmd -S <server> -d <database> -i sql/update_review_schedule_schema.sql
+```
+
+Run this script whenever setting up a new database or upgrading from an older
+version of the project.
