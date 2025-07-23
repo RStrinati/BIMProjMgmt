@@ -8,12 +8,10 @@ from tkcalendar import DateEntry
 import datetime
 
 from ui.ui_helpers import (
-    create_labeled_entry,
     create_labeled_combobox,
     create_horizontal_button_group,
 )
 from ui.status_bar import update_status
-from ui.tooltips import CreateToolTip
 
 from review_handler import submit_review_schedule, generate_stage_review_schedule
 from gantt_chart import launch_gantt_chart
@@ -26,7 +24,6 @@ from database import (
     get_review_summary,
     get_project_review_progress,
     get_contractual_links,
-    get_project_details,
 )
 
 # Global reference to the project dropdown so other tabs can refresh it
