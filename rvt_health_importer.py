@@ -1,6 +1,5 @@
 import os
 import json
-import pyodbc
 import shutil
 from datetime import datetime
 
@@ -17,8 +16,11 @@ def log(msg):
     print(f"[{ts}] {msg}")
 
 def safe_float(v):
-    try: return float(v)
-    except: return None
+    """Return ``float(v)`` or ``None`` if conversion fails."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
 def import_health_data(json_folder, db_name=None):
     # reset log

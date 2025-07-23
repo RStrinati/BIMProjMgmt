@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import pyodbc
 
 def assess_health_check(file_path, control_model_name=None):
     """Analyze a single Ideate Health Check Excel file.

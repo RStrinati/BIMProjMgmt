@@ -1,7 +1,6 @@
 import json
 import os
 import pandas as pd
-import pyodbc
 import datetime
 import re
 import sqlparse
@@ -91,7 +90,7 @@ def parse_custom_datetime(val, col_name):
             seconds = float(rest)
             base = datetime.datetime(2000, 1, 1)
             return base + datetime.timedelta(minutes=int(minutes), seconds=seconds)
-        except Exception as e:
+        except Exception:
             log(f"[WARN] Could not parse weird time '{val}' in column {col_name}")
             return None
 
@@ -100,7 +99,8 @@ def parse_custom_datetime(val, col_name):
     return None
 
 def convert_to_sql_compatible(val, col=None):
-    if val is None or val == "": return None
+    if val is None or val == "":
+        return None
     v = val.strip()
 
     # Special patch for the known DD/MM/YYYY HH:MM format in this dataset
@@ -121,12 +121,16 @@ def convert_to_sql_compatible(val, col=None):
             return None
 
 
-    if v.lower() in ("t", "true"): return 1
-    if v.lower() in ("f", "false"): return 0
-    if v.isdigit(): return int(v)
-    try: return float(v)
-    
-    except ValueError: pass
+    if v.lower() in ("t", "true"):
+        return 1
+    if v.lower() in ("f", "false"):
+        return 0
+    if v.isdigit():
+        return int(v)
+    try:
+        return float(v)
+    except ValueError:
+        pass
     
     if col and col.lower() in ("created_at", "updated_at"):
         result = parse_custom_datetime(v, col)

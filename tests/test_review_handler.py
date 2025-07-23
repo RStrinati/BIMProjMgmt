@@ -27,7 +27,7 @@ sys.modules.setdefault("tkinter.messagebox", _tk.messagebox)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from review_handler import generate_stage_review_schedule, update_review_date
+from review_handler import generate_stage_review_schedule, update_review_date  # noqa: E402
 
 
 class FakeCursor:

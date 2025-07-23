@@ -151,10 +151,8 @@ def combine_files_into_dict(export_dir: str, file_list) -> Dict[str, Any]:
 
         # 5) Any other single-array exports
         elif isinstance(blob, dict) and isinstance(blob.get("data"), list):
-            arr = blob["data"]
             # already handled family_sizes/placed_families above
             # warnings, lines, grids, etc can be expanded here if standalone
-            # e.g. dtype == "warnings": data["jsonWarnings"] = json.dumps(arr)
             pass
 
     # Ensure every expected key is present (None if missing)

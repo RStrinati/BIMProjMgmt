@@ -39,7 +39,8 @@ def build_data_imports_tab(tab, status_var):
             return
         pid = cmb_projects.get().split(" - ")[0]
         folder = get_acc_folder_path(pid)
-        entry_data_export.delete(0, tk.END); entry_data_export.insert(0, folder or "")
+        entry_data_export.delete(0, tk.END)
+        entry_data_export.insert(0, folder or "")
         log_list.delete(0, tk.END)
         logs = get_acc_import_logs(pid)
         if logs:

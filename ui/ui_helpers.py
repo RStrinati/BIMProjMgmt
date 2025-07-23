@@ -1,6 +1,7 @@
 # ui/ui_helpers.py
 
 from tkinter import ttk
+import tkinter as tk
 
 def create_labeled_entry(parent, label_text, pack=True):
     """Create a labeled entry field.
@@ -70,7 +71,6 @@ def create_horizontal_button_group(parent, buttons, pack=True):
     return frame
 
 # Helper to create a scrollable frame within a tab
-import tkinter as tk
 
 def create_scrollable_frame(parent, scroll_x=False, scroll_y=True):
     """Create a scrollable frame that supports vertical and optionally horizontal scrolling."""

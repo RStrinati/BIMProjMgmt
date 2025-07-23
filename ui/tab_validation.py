@@ -17,7 +17,6 @@ from ui.tooltips import CreateToolTip
 
 from database import (
     get_projects,
-    get_project_details,
     get_project_folders,
     get_last_export_date,
     get_project_health_files,

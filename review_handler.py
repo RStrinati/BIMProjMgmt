@@ -1,4 +1,3 @@
-import pyodbc
 from tkinter import messagebox
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta
@@ -187,7 +186,7 @@ def submit_review_schedule(
         conn.commit()
         conn.close()
 
-        messagebox.showinfo("Success", f"Review schedule submitted successfully!")
+        messagebox.showinfo("Success", "Review schedule submitted successfully!")
 
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {str(e)}")
