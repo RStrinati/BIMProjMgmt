@@ -24,6 +24,7 @@ from database import (
     get_review_summary,
     get_project_review_progress,
     get_contractual_links,
+    get_project_details,
 )
 
 # Global reference to the project dropdown so other tabs can refresh it
@@ -139,6 +140,8 @@ def build_review_tab(tab, status_var):
     cmb_projects_ref = cmb_projects
     _, cmb_cycles = create_labeled_combobox(frame_project, "Cycle:", [])
 
+    project_dates = {"start": "", "end": ""}
+
     def load_cycles(event=None):
         if " - " not in cmb_projects.get():
             return
@@ -149,6 +152,11 @@ def build_review_tab(tab, status_var):
             cmb_cycles.current(0)
         else:
             cmb_cycles.set("No Cycles Available")
+
+        details = get_project_details(pid)
+        if details:
+            project_dates["start"] = details.get("start_date", "")
+            project_dates["end"] = details.get("end_date", "")
 
         update_summary()
 
@@ -232,7 +240,7 @@ def build_review_tab(tab, status_var):
     frame_stage_plan = ttk.LabelFrame(column_container, text="Stage Review Plan")
     frame_stage_plan.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-    stage_columns = ("Stage", "Start", "End", "Reviews")
+    stage_columns = ("Stage", "Start", "End", "Reviews", "Frequency")
     tree_stages = ttk.Treeview(frame_stage_plan, columns=stage_columns, show="headings", height=4)
     for col in stage_columns:
         tree_stages.heading(col, text=col)
@@ -245,8 +253,13 @@ def build_review_tab(tab, status_var):
     stage_data = []
 
     def add_stage_row():
-        iid = tree_stages.insert("", tk.END, values=["" for _ in stage_columns])
-        stage_data.append((iid, ["" for _ in stage_columns]))
+        vals = ["" for _ in stage_columns]
+        if project_dates["start"]:
+            vals[1] = project_dates["start"]
+        if project_dates["end"]:
+            vals[2] = project_dates["end"]
+        iid = tree_stages.insert("", tk.END, values=vals)
+        stage_data.append((iid, vals.copy()))
 
     def delete_stage_row():
         selected = tree_stages.selection()
@@ -288,14 +301,9 @@ def build_review_tab(tab, status_var):
     stage_btn_frame = ttk.Frame(frame_stage_plan)
     stage_btn_frame.pack(fill="x", pady=5)
 
-    stage_menu = tk.Menu(tree_stages, tearoff=0)
-    stage_menu.add_command(label="Add Stage", command=add_stage_row)
-    stage_menu.add_command(label="Delete Stage", command=delete_stage_row)
+    ttk.Button(stage_btn_frame, text="Add Stage", command=add_stage_row).pack(side="left")
+    ttk.Button(stage_btn_frame, text="Delete Stage", command=delete_stage_row).pack(side="left", padx=5)
 
-    def show_stage_menu(event):
-        stage_menu.tk_popup(event.x_root, event.y_root)
-
-    tree_stages.bind("<Button-3>", show_stage_menu)
     tree_stages.bind("<Insert>", lambda e: add_stage_row())
     tree_stages.bind("<Delete>", lambda e: delete_stage_row())
 
@@ -306,13 +314,13 @@ def build_review_tab(tab, status_var):
         pid = cmb_projects.get().split(" - ")[0]
         stages = []
         for iid, vals in stage_data:
-            stage, start, end, reviews = vals
+            stage, start, end, reviews, freq = vals
             if not stage or not start or not end or not reviews:
                 continue
             try:
                 s_date = datetime.datetime.strptime(start, "%Y-%m-%d").date()
                 e_date = datetime.datetime.strptime(end, "%Y-%m-%d").date()
-                stages.append({"stage_name": stage, "start_date": s_date, "end_date": e_date, "num_reviews": int(reviews)})
+                stages.append({"stage_name": stage, "start_date": s_date, "end_date": e_date, "num_reviews": int(reviews), "frequency": freq})
             except Exception:
                 continue
         if not stages:
