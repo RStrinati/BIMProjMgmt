@@ -241,14 +241,17 @@ def build_review_tab(tab, status_var):
     frame_stage_plan.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
     stage_columns = ("Stage", "Start", "End", "Reviews", "Frequency")
+    frame_stage_plan.columnconfigure(0, weight=1)
+    frame_stage_plan.rowconfigure(0, weight=1)
+
     tree_stages = ttk.Treeview(frame_stage_plan, columns=stage_columns, show="headings", height=4)
     for col in stage_columns:
         tree_stages.heading(col, text=col)
         tree_stages.column(col, width=100, anchor="w")
-    tree_stages.pack(side="left", fill="both", expand=True)
+    tree_stages.grid(row=0, column=0, sticky="nsew")
     stage_scroll = ttk.Scrollbar(frame_stage_plan, orient="vertical", command=tree_stages.yview)
     tree_stages.configure(yscrollcommand=stage_scroll.set)
-    stage_scroll.pack(side="right", fill="y")
+    stage_scroll.grid(row=0, column=1, sticky="ns")
 
     stage_data = []
 
@@ -258,6 +261,8 @@ def build_review_tab(tab, status_var):
             vals[1] = project_dates["start"]
         if project_dates["end"]:
             vals[2] = project_dates["end"]
+        vals[3] = reviews_per_phase_entry.get().strip()
+        vals[4] = freq_entry.get().strip()
         iid = tree_stages.insert("", tk.END, values=vals)
         stage_data.append((iid, vals.copy()))
 
@@ -299,7 +304,7 @@ def build_review_tab(tab, status_var):
     tree_stages.bind("<Double-1>", begin_stage_edit)
 
     stage_btn_frame = ttk.Frame(frame_stage_plan)
-    stage_btn_frame.pack(fill="x", pady=5)
+    stage_btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
 
     ttk.Button(stage_btn_frame, text="Add Stage", command=add_stage_row).pack(side="left")
     ttk.Button(stage_btn_frame, text="Delete Stage", command=delete_stage_row).pack(side="left", padx=5)
@@ -385,8 +390,15 @@ def build_review_tab(tab, status_var):
     cycle_data = []
 
     def add_cycle_row():
-        item_id = tree_cycles.insert("", tk.END, values=["" for _ in cycle_columns])
-        cycle_data.append((item_id, ["" for _ in cycle_columns]))
+        vals = ["" for _ in cycle_columns]
+        if project_dates["start"]:
+            vals[1] = project_dates["start"]
+        if project_dates["end"]:
+            vals[2] = project_dates["end"]
+        vals[8] = stage_entry.get().strip()
+        vals[9] = freq_entry.get().strip()
+        item_id = tree_cycles.insert("", tk.END, values=vals)
+        cycle_data.append((item_id, vals))
 
     edit_var = tk.StringVar()
 

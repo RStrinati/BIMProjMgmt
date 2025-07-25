@@ -25,7 +25,7 @@ interactions. Right‑clicking on a table shows a context menu with **Add Row** 
 * **Insert** – add a new row
 * **Delete** – remove the selected rows
 
-Dedicated buttons for adding or deleting rows have been removed from the UI.
+Add and Delete buttons sit below the Stage Review Plan table for convenience, but keyboard shortcuts remain available.
 
 ## Gaps and Potential Enhancements
 - **Inline Editing:** The current task table supports assigning reviewers but does not allow editing dates directly. Integrating inline editing for Treeview rows would align with the requested editable table feature.
