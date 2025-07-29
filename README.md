@@ -23,3 +23,15 @@ Install a compatible ODBC driver for SQL Server (see [docs/setup.md](docs/setup.
 ```
 
 This creates a virtual environment in `.venv` and installs the Python dependencies listed in `requirements.txt`.
+
+## Local Web Application
+
+A simple Flask backend and React frontend are now provided.
+
+Start the backend:
+
+```bash
+python -m backend.app
+```
+
+Then open `frontend/index.html` in a browser for a basic review task manager.
