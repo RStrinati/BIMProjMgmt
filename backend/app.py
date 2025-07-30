@@ -7,6 +7,10 @@ from database import (
     get_review_tasks,
     update_review_task_assignee,
     get_users_list,
+    get_project_details,
+    get_review_summary,
+    get_contractual_links,
+    get_cycle_ids,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -57,6 +61,51 @@ def api_update_review_task(schedule_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
+
+
+@app.route('/api/project/<int:project_id>', methods=['GET'])
+def api_get_project_details_endpoint(project_id):
+    details = get_project_details(project_id)
+    if details is None:
+        return jsonify({'error': 'project not found'}), 404
+    return jsonify(details)
+
+
+@app.route('/api/review_summary', methods=['GET'])
+def api_review_summary():
+    project_id = request.args.get('project_id')
+    cycle_id = request.args.get('cycle_id')
+    if not project_id or not cycle_id:
+        return jsonify({'error': 'project_id and cycle_id required'}), 400
+    summary = get_review_summary(project_id, cycle_id)
+    if summary is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(summary)
+
+
+@app.route('/api/contractual_links', methods=['GET'])
+def api_contractual_links():
+    project_id = request.args.get('project_id')
+    cycle_id = request.args.get('cycle_id')
+    if not project_id:
+        return jsonify({'error': 'project_id required'}), 400
+    links = get_contractual_links(project_id, cycle_id)
+    data = [
+        {
+            'bep_clause': b,
+            'billing_event': ev,
+            'amount_due': amt,
+            'status': status,
+        }
+        for b, ev, amt, status in links
+    ]
+    return jsonify(data)
+
+
+@app.route('/api/cycle_ids/<int:project_id>', methods=['GET'])
+def api_cycle_ids(project_id):
+    cycles = get_cycle_ids(project_id)
+    return jsonify(cycles)
 
 
 @app.route('/')

@@ -31,3 +31,36 @@ def test_patch_review_task(monkeypatch):
     assert resp.status_code == 200
     assert resp.get_json()['success'] is True
     assert called == {'schedule_id': 5, 'user_id': 8}
+
+
+def test_get_project_details(monkeypatch):
+    monkeypatch.setattr('backend.app.get_project_details', lambda pid: {'project_name': 'P', 'start_date': '2024-01-01', 'end_date': '2024-12-31', 'status': 'Active', 'priority': 'High'})
+    client = app.test_client()
+    resp = client.get('/api/project/1')
+    assert resp.status_code == 200
+    assert resp.get_json()['project_name'] == 'P'
+
+
+def test_review_summary(monkeypatch):
+    monkeypatch.setattr('backend.app.get_review_summary', lambda p, c: {'cycle_id': c, 'scoped_reviews': 5})
+    client = app.test_client()
+    resp = client.get('/api/review_summary?project_id=1&cycle_id=2')
+    assert resp.status_code == 200
+    assert resp.get_json()['cycle_id'] == '2'
+
+
+def test_contractual_links(monkeypatch):
+    monkeypatch.setattr('backend.app.get_contractual_links', lambda p, c=None: [('clause', 'event', 100, 'Pending')])
+    client = app.test_client()
+    resp = client.get('/api/contractual_links?project_id=1&cycle_id=2')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data[0]['bep_clause'] == 'clause'
+
+
+def test_cycle_ids(monkeypatch):
+    monkeypatch.setattr('backend.app.get_cycle_ids', lambda pid: ['1', '2'])
+    client = app.test_client()
+    resp = client.get('/api/cycle_ids/1')
+    assert resp.status_code == 200
+    assert resp.get_json() == ['1', '2']
