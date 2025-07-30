@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
+from pathlib import Path
 from flask_cors import CORS
 
 from database import (
@@ -8,7 +9,8 @@ from database import (
     get_users_list,
 )
 
-app = Flask(__name__)
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
 
@@ -55,6 +57,12 @@ def api_update_review_task(schedule_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
+
+
+@app.route('/')
+def serve_index():
+    """Serve the React frontend."""
+    return send_from_directory(app.static_folder, 'index.html')
 
 
 if __name__ == '__main__':

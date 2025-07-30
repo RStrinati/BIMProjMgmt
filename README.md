@@ -30,10 +30,11 @@ The requirements now include `Flask` and `Flask-Cors` for the API server.
 
 A simple Flask backend and React frontend are now provided.
 
-Start the backend:
+Launch the web interface with:
 
 ```bash
-python -m backend.app
+python app.py
 ```
 
-Then open `frontend/index.html` in a browser for a basic review task manager.
+This command starts the Flask backend and automatically opens the React
+frontend in your default browser for a basic review task manager.
