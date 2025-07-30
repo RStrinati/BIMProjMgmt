@@ -118,10 +118,3 @@ def test_extract_files(monkeypatch):
     assert resp.status_code == 200
     assert resp.get_json()['success'] is True
 
-
-def test_recent_files(monkeypatch):
-    monkeypatch.setattr('backend.app.get_recent_files', lambda: [('L','F','D',1)])
-    client = app.test_client()
-    resp = client.get('/api/recent_files')
-    assert resp.status_code == 200
-    assert resp.get_json()[0]['file_name'] == 'F'

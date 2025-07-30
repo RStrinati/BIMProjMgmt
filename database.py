@@ -264,39 +264,6 @@ def get_acc_import_logs(project_id):
         conn.close()
 
 
-def get_recent_files():
-    """Fetch the latest 1000 records from the view qry_SharedFolderValidation."""
-    conn = connect_to_db()  # ✅ Use the shared connection function
-    if conn is None:
-        print("❌ Error: Could not connect to the database.")
-        return []
-
-    try:
-        cursor = conn.cursor()
-
-        query = """
-            SELECT TOP (1000)
-                [project_id],
-                [file_name],
-                [date_modified],
-                [level_10_folder],
-                [is_recent]  -- ✅ Make sure this column exists in the SQL View
-            FROM dbo.qry_SharedFolderValidation
-            ORDER BY date_modified DESC;
-        """
-
-        cursor.execute(query)
-        results = cursor.fetchall()
-
-        # ✅ Convert results into a list of tuples
-        return [(row.level_10_folder, row.file_name, row.date_modified, row.is_recent) for row in results]
-
-    except pyodbc.Error as e:
-        print(f"❌ Error fetching recent files: {e}")
-        return []
-    
-    finally:
-        conn.close()  # ✅ Ensure connection is always closed
 
 def get_project_folders(project_id):
     """Fetch both the standard and IFC folder paths for a given project from dbo.projects."""
