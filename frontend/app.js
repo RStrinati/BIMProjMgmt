@@ -124,4 +124,150 @@ function ReviewTasks() {
   );
 }
 
-ReactDOM.render(<ReviewTasks />, document.getElementById('root'));
+function ProjectManagement() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [details, setDetails] = useState({});
+  const [folders, setFolders] = useState({});
+  const [cycles, setCycles] = useState([]);
+  const [recent, setRecent] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(setProjects);
+  }, []);
+
+  useEffect(() => {
+    if (projectId) {
+      fetch(`/api/project/${projectId}`)
+        .then(res => res.json())
+        .then(setDetails);
+      fetch(`/api/project/${projectId}/folders`)
+        .then(res => res.json())
+        .then(setFolders);
+      fetch(`/api/cycle_ids/${projectId}`)
+        .then(res => res.json())
+        .then(setCycles);
+      fetch('/api/recent_files')
+        .then(res => res.json())
+        .then(setRecent);
+    } else {
+      setDetails({});
+      setFolders({});
+      setCycles([]);
+      setRecent([]);
+    }
+  }, [projectId]);
+
+  const updateDetails = () => {
+    fetch(`/api/project/${projectId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details)
+    });
+  };
+
+  const updateFolders = () => {
+    fetch(`/api/project/${projectId}/folders`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(folders)
+    });
+  };
+
+  const createProject = () => {
+    fetch('/api/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_name: details.project_name || '' })
+    }).then(() => {
+      fetch('/api/projects').then(res => res.json()).then(setProjects);
+    });
+  };
+
+  const extractFiles = () => {
+    fetch('/api/extract_files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId })
+    });
+  };
+
+  return (
+    <div>
+      <h2>Project Setup</h2>
+      <select value={projectId} onChange={e => setProjectId(e.target.value)}>
+        <option value="">Select Project</option>
+        {projects.map(p => (
+          <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+        ))}
+      </select>
+
+      {projectId && (
+        <div style={{marginTop:'10px'}}>
+          <div>
+            <label>Name</label>
+            <input value={details.project_name || ''} onChange={e => setDetails({...details, project_name: e.target.value})}/>
+          </div>
+          <div>
+            <label>Status</label>
+            <input value={details.status || ''} onChange={e => setDetails({...details, status: e.target.value})}/>
+          </div>
+          <div>
+            <label>Priority</label>
+            <input value={details.priority || ''} onChange={e => setDetails({...details, priority: e.target.value})}/>
+          </div>
+          <div>
+            <label>Start</label>
+            <input type="date" value={details.start_date || ''} onChange={e => setDetails({...details, start_date: e.target.value})}/>
+          </div>
+          <div>
+            <label>End</label>
+            <input type="date" value={details.end_date || ''} onChange={e => setDetails({...details, end_date: e.target.value})}/>
+          </div>
+          <button onClick={updateDetails}>Save Details</button>
+          <button onClick={createProject}>Create Project</button>
+          <button onClick={extractFiles}>Extract Files</button>
+
+          <div style={{marginTop:'10px'}}>
+            <label>Model Path</label>
+            <input value={folders.model_path || ''} onChange={e => setFolders({...folders, model_path: e.target.value})}/>
+            <label style={{marginLeft:'10px'}}>IFC Path</label>
+            <input value={folders.ifc_path || ''} onChange={e => setFolders({...folders, ifc_path: e.target.value})}/>
+            <button onClick={updateFolders}>Save Paths</button>
+          </div>
+
+          <div style={{marginTop:'10px'}}>
+            <h4>Cycles</h4>
+            <ul>{cycles.map(c => <li key={c}>{c}</li>)}</ul>
+          </div>
+
+          <div style={{marginTop:'10px'}}>
+            <h4>Recent Files</h4>
+            <ul>
+              {recent.map((r, idx) => (
+                <li key={idx}>{r.file_name}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useState('review');
+  return (
+    <div>
+      <div>
+        <button onClick={() => setView('review')}>Review Tasks</button>
+        <button onClick={() => setView('project')}>Project Setup</button>
+      </div>
+      {view === 'review' ? <ReviewTasks /> : <ProjectManagement />}
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));

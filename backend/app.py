@@ -8,9 +8,15 @@ from database import (
     update_review_task_assignee,
     get_users_list,
     get_project_details,
+    update_project_details,
+    update_project_folders,
+    insert_project,
+    insert_files_into_tblACCDocs,
+    get_project_folders,
     get_review_summary,
     get_contractual_links,
     get_cycle_ids,
+    get_recent_files,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -69,6 +75,76 @@ def api_get_project_details_endpoint(project_id):
     if details is None:
         return jsonify({'error': 'project not found'}), 404
     return jsonify(details)
+
+
+@app.route('/api/project/<int:project_id>', methods=['PATCH'])
+def api_update_project_details_endpoint(project_id):
+    body = request.get_json() or {}
+    success = update_project_details(
+        project_id,
+        body.get('start_date'),
+        body.get('end_date'),
+        body.get('status'),
+        body.get('priority'),
+    )
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/project/<int:project_id>/folders', methods=['GET', 'PATCH'])
+def api_project_folders(project_id):
+    if request.method == 'GET':
+        models, ifc = get_project_folders(project_id)
+        if models is None and ifc is None:
+            return jsonify({'error': 'project not found'}), 404
+        return jsonify({'model_path': models or '', 'ifc_path': ifc or ''})
+
+    body = request.get_json() or {}
+    success = update_project_folders(
+        project_id,
+        body.get('model_path'),
+        body.get('data_path'),
+        body.get('ifc_path'),
+    )
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/project', methods=['POST'])
+def api_create_project():
+    body = request.get_json() or {}
+    name = body.get('project_name')
+    if not name:
+        return jsonify({'error': 'project_name required'}), 400
+    success = insert_project(name, body.get('folder_path', ''), body.get('ifc_folder_path'))
+    if success:
+        return jsonify({'success': True}), 201
+    return jsonify({'success': False}), 500
+
+
+@app.route('/api/extract_files', methods=['POST'])
+def api_extract_files():
+    body = request.get_json() or {}
+    pid = body.get('project_id')
+    if not pid:
+        return jsonify({'error': 'project_id required'}), 400
+    folder, _ = get_project_folders(pid)
+    if not folder:
+        return jsonify({'error': 'model folder not set'}), 400
+    success = insert_files_into_tblACCDocs(pid, folder)
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/recent_files', methods=['GET'])
+def api_recent_files():
+    data = [
+        {
+            'level': lvl,
+            'file_name': name,
+            'date_modified': date,
+            'recent': recent,
+        }
+        for lvl, name, date, recent in get_recent_files()
+    ]
+    return jsonify(data)
 
 
 @app.route('/api/review_summary', methods=['GET'])

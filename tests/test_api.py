@@ -64,3 +64,64 @@ def test_cycle_ids(monkeypatch):
     resp = client.get('/api/cycle_ids/1')
     assert resp.status_code == 200
     assert resp.get_json() == ['1', '2']
+
+
+def test_project_folders_get(monkeypatch):
+    monkeypatch.setattr('backend.app.get_project_folders', lambda pid: ('A', 'B'))
+    client = app.test_client()
+    resp = client.get('/api/project/1/folders')
+    assert resp.status_code == 200
+    assert resp.get_json()['model_path'] == 'A'
+
+
+def test_project_folders_patch(monkeypatch):
+    called = {}
+
+    def fake_update(pid, m, d, i):
+        called.update({'pid': pid, 'm': m, 'd': d, 'i': i})
+        return True
+
+    monkeypatch.setattr('backend.app.update_project_folders', fake_update)
+    client = app.test_client()
+    resp = client.patch('/api/project/2/folders', json={'model_path': 'X'})
+    assert resp.status_code == 200
+    assert called == {'pid': 2, 'm': 'X', 'd': None, 'i': None}
+
+
+def test_update_project_details(monkeypatch):
+    called = {}
+
+    def fake_update(pid, start, end, status, priority):
+        called.update({'pid': pid, 'start': start, 'end': end, 'status': status, 'priority': priority})
+        return True
+
+    monkeypatch.setattr('backend.app.update_project_details', fake_update)
+    client = app.test_client()
+    resp = client.patch('/api/project/3', json={'status': 'A'})
+    assert resp.status_code == 200
+    assert called['pid'] == 3
+
+
+def test_create_project(monkeypatch):
+    monkeypatch.setattr('backend.app.insert_project', lambda n, f, i: True)
+    client = app.test_client()
+    resp = client.post('/api/project', json={'project_name': 'New'})
+    assert resp.status_code == 201
+    assert resp.get_json()['success'] is True
+
+
+def test_extract_files(monkeypatch):
+    monkeypatch.setattr('backend.app.get_project_folders', lambda pid: ('p', None))
+    monkeypatch.setattr('backend.app.insert_files_into_tblACCDocs', lambda pid, p: True)
+    client = app.test_client()
+    resp = client.post('/api/extract_files', json={'project_id': 4})
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+
+def test_recent_files(monkeypatch):
+    monkeypatch.setattr('backend.app.get_recent_files', lambda: [('L','F','D',1)])
+    client = app.test_client()
+    resp = client.get('/api/recent_files')
+    assert resp.status_code == 200
+    assert resp.get_json()[0]['file_name'] == 'F'
