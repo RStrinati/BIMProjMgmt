@@ -130,7 +130,6 @@ function ProjectManagement() {
   const [details, setDetails] = useState({});
   const [folders, setFolders] = useState({});
   const [cycles, setCycles] = useState([]);
-  const [recent, setRecent] = useState([]);
 
   useEffect(() => {
     fetch('/api/projects')
@@ -149,14 +148,10 @@ function ProjectManagement() {
       fetch(`/api/cycle_ids/${projectId}`)
         .then(res => res.json())
         .then(setCycles);
-      fetch('/api/recent_files')
-        .then(res => res.json())
-        .then(setRecent);
     } else {
       setDetails({});
       setFolders({});
       setCycles([]);
-      setRecent([]);
     }
   }, [projectId]);
 
@@ -243,14 +238,6 @@ function ProjectManagement() {
             <ul>{cycles.map(c => <li key={c}>{c}</li>)}</ul>
           </div>
 
-          <div style={{marginTop:'10px'}}>
-            <h4>Recent Files</h4>
-            <ul>
-              {recent.map((r, idx) => (
-                <li key={idx}>{r.file_name}</li>
-              ))}
-            </ul>
-          </div>
         </div>
       )}
     </div>

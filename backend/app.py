@@ -16,7 +16,6 @@ from database import (
     get_review_summary,
     get_contractual_links,
     get_cycle_ids,
-    get_recent_files,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -131,20 +130,6 @@ def api_extract_files():
         return jsonify({'error': 'model folder not set'}), 400
     success = insert_files_into_tblACCDocs(pid, folder)
     return jsonify({'success': bool(success)})
-
-
-@app.route('/api/recent_files', methods=['GET'])
-def api_recent_files():
-    data = [
-        {
-            'level': lvl,
-            'file_name': name,
-            'date_modified': date,
-            'recent': recent,
-        }
-        for lvl, name, date, recent in get_recent_files()
-    ]
-    return jsonify(data)
 
 
 @app.route('/api/review_summary', methods=['GET'])

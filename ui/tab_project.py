@@ -25,7 +25,6 @@ from database import (
     get_project_folders,
     insert_files_into_tblACCDocs,
     insert_project,
-    get_recent_files,
     get_cycle_ids,
 )
 import subprocess
@@ -214,21 +213,6 @@ def build_project_tab(tab, status_var):
 
     create_horizontal_button_group(frame_cycle, [("Manage Tasks & Users", open_tasks_window)])
 
-    # --- Recent File List ---
-    frame_recent = ttk.LabelFrame(middle_col, text="Recent ACC Files")
-    frame_recent.pack(fill="both", expand=True, pady=5)
-    frame_recent.pack_propagate(False)
-    lst_recent = tk.Listbox(frame_recent, width=80, height=10)
-    lst_recent.pack(padx=10, pady=5, anchor="w", fill="both", expand=True)
-    lst_scroll = ttk.Scrollbar(frame_recent, orient="horizontal", command=lst_recent.xview)
-    lst_recent.configure(xscrollcommand=lst_scroll.set)
-    lst_scroll.pack(side="bottom", fill="x")
-
-    def update_results():
-        lst_recent.delete(0, tk.END)
-        for row in get_recent_files():
-            level, fname, dmod, recent = row
-            lst_recent.insert(tk.END, f"{level} | {fname} | {dmod} | {recent}")
 
     def load_selected_project(event=None):
         if " - " not in cmb_projects.get():
@@ -257,7 +241,6 @@ def build_project_tab(tab, status_var):
         summary_vars["Model Path"].set(folder or "")
         summary_vars["IFC Path"].set(ifc or "")
         load_cycles(pid)
-        update_results()
 
     cmb_projects.bind("<<ComboboxSelected>>", load_selected_project)
 
