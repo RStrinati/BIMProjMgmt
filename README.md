@@ -22,7 +22,9 @@ Install a compatible ODBC driver for SQL Server (see [docs/setup.md](docs/setup.
 ./setup_env.sh
 ```
 
-This creates a virtual environment in `.venv` and installs the Python dependencies listed in `requirements.txt`.
+This creates a virtual environment in `.venv` and installs the Python dependencies listed in `requirements.txt`, including the Flask components used by the backend.
+
+The requirements now include `Flask` and `Flask-Cors` for the API server.
 
 ## Local Web Application
 
