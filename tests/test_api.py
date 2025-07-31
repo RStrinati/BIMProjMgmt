@@ -118,3 +118,89 @@ def test_extract_files(monkeypatch):
     assert resp.status_code == 200
     assert resp.get_json()['success'] is True
 
+
+def test_review_cycles_get(monkeypatch):
+    monkeypatch.setattr('backend.app.get_review_cycles', lambda pid: [(1, 2, '2024-01-01', '2024-02-01', 3)])
+    client = app.test_client()
+    resp = client.get('/api/reviews/1')
+    assert resp.status_code == 200
+    assert resp.get_json()[0]['review_cycle_id'] == 1
+
+
+def test_create_review_cycle(monkeypatch):
+    monkeypatch.setattr('backend.app.create_review_cycle', lambda *a: 5)
+    client = app.test_client()
+    payload = {'project_id': 1, 'stage_id': 2, 'start_date': '2024-01-01', 'end_date': '2024-02-01', 'num_reviews': 3, 'created_by': 9}
+    resp = client.post('/api/reviews', json=payload)
+    assert resp.status_code == 201
+    assert resp.get_json()['id'] == 5
+
+
+def test_update_review_cycle(monkeypatch):
+    called = {}
+    def fake_update(cid, s, e, n, stage):
+        called.update({'cid': cid, 's': s, 'e': e, 'n': n, 'stage': stage})
+        return True
+    monkeypatch.setattr('backend.app.update_review_cycle', fake_update)
+    client = app.test_client()
+    resp = client.put('/api/reviews/3', json={'num_reviews': 4})
+    assert resp.status_code == 200
+    assert called['cid'] == 3
+
+
+def test_delete_review_cycle(monkeypatch):
+    monkeypatch.setattr('backend.app.delete_review_cycle', lambda cid: True)
+    client = app.test_client()
+    resp = client.delete('/api/reviews/7')
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+
+def test_review_cycle_tasks_get(monkeypatch):
+    monkeypatch.setattr('backend.app.get_review_cycle_tasks', lambda sid: [(1, 5, 2, 'Pending')])
+    client = app.test_client()
+    resp = client.get('/api/review_tasks/10')
+    assert resp.status_code == 200
+    assert resp.get_json()[0]['review_task_id'] == 1
+
+
+def test_update_review_cycle_task(monkeypatch):
+    called = {}
+    def fake_upd(tid, a, st):
+        called.update({'tid': tid, 'a': a, 'st': st})
+        return True
+    monkeypatch.setattr('backend.app.update_review_cycle_task', fake_upd)
+    client = app.test_client()
+    resp = client.put('/api/review_tasks/4', json={'status': 'Done'})
+    assert resp.status_code == 200
+    assert called['tid'] == 4
+
+
+def test_bep_get(monkeypatch):
+    monkeypatch.setattr('backend.app.get_bep_matrix', lambda pid: [(1, 'Sec', 2, 'Draft', '')])
+    client = app.test_client()
+    resp = client.get('/api/bep/1')
+    assert resp.status_code == 200
+    assert resp.get_json()[0]['section_id'] == 1
+
+
+def test_bep_section_post(monkeypatch):
+    monkeypatch.setattr('backend.app.upsert_bep_section', lambda *a: True)
+    client = app.test_client()
+    payload = {'project_id': 1, 'section_id': 2}
+    resp = client.post('/api/bep/section', json=payload)
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+
+def test_bep_status_put(monkeypatch):
+    called = {}
+    def fake_upd(pid, sid, status):
+        called.update({'pid': pid, 'sid': sid, 'status': status})
+        return True
+    monkeypatch.setattr('backend.app.update_bep_status', fake_upd)
+    client = app.test_client()
+    resp = client.put('/api/bep/status', json={'project_id':1,'section_id':2,'status':'Draft'})
+    assert resp.status_code == 200
+    assert called['sid'] == 2
+
