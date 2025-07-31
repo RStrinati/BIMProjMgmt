@@ -1,7 +1,13 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # Load variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # Load variables from .env file if python-dotenv is available
+except ModuleNotFoundError:
+    # The optional dependency python-dotenv is not installed in some
+    # environments (e.g. during CI tests). Falling back to environment
+    # variables only keeps the configuration flexible without raising an
+    # import error.
+    pass
 
 class Config:
     DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
@@ -12,3 +18,8 @@ class Config:
     PROJECT_MGMT_DB = os.getenv("PROJECT_MGMT_DB", "ProjectManagement")
     ACC_DB = os.getenv("ACC_DB", "acc_data_schema")
     REVIT_HEALTH_DB = os.getenv("REVIT_HEALTH_DB", "RevitHealthCheckDB")
+
+# Provide module-level aliases for backwards compatibility with code that
+# imports configuration values directly from this module.
+ACC_DB = Config.ACC_DB
+REVIT_HEALTH_DB = Config.REVIT_HEALTH_DB

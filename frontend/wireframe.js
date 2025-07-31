@@ -24,44 +24,13 @@ const supabaseUrl = 'https://your-project.supabase.co';
 const supabaseKey = 'public-anon-key';
 const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-// Sample project data used until backend integration is complete
+// Fallback sample data used if the backend is not available
 const sampleProjects = [
   {
     project_id: 1,
-    project_name: 'HQ Revamp',
-    client: 'Acme Corp',
-    project_type: 'Office',
-    delivery_method: 'Design-Build',
-    contract_value: '$1,000,000',
-    contract_number: 'CN001',
+    project_name: 'Sample Project',
     start_date: '2024-01-01',
     end_date: '2024-12-31',
-    status: 'Active',
-    priority: 'High',
-  },
-  {
-    project_id: 2,
-    project_name: 'New Warehouse',
-    client: 'LogiTrans',
-    project_type: 'Industrial',
-    delivery_method: 'CM at Risk',
-    contract_value: '$2,500,000',
-    contract_number: 'CN002',
-    start_date: '2023-06-15',
-    end_date: '2024-05-30',
-    status: 'Planning',
-    priority: 'Medium',
-  },
-  {
-    project_id: 3,
-    project_name: 'City Library',
-    client: 'Municipality',
-    project_type: 'Civic',
-    delivery_method: 'Design-Bid-Build',
-    contract_value: '$3,300,000',
-    contract_number: 'CN003',
-    start_date: '2024-02-01',
-    end_date: '2025-02-01',
     status: 'Active',
     priority: 'High',
   },
@@ -126,12 +95,26 @@ function TabPanel({ children, value, index }) {
 
 function ProjectDetail({ project, onBack }) {
   const [tab, setTab] = useState(0);
+  const [details, setDetails] = useState(project);
+
+  useEffect(() => {
+    // Retrieve up-to-date project details from the backend when the
+    // component mounts. Only a subset of fields may be returned so we
+    // merge them with the provided project object.
+    fetch(`/api/project/${project.project_id}`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setDetails(prev => ({ ...prev, ...data })))
+      .catch(() => setDetails(project));
+  }, [project.project_id]);
+
+  if (!details) return null;
+
   return (
     <div>
       <Button variant="outlined" onClick={onBack} style={{ marginBottom: '1rem' }}>
         Back to list
       </Button>
-      <h3>{project.project_name}</h3>
+      <h3>{details.project_name}</h3>
       <Tabs value={tab} onChange={(e, v) => setTab(v)}>
         <Tab label="Overview" />
         <Tab label="Review Schedule" />
@@ -142,14 +125,10 @@ function ProjectDetail({ project, onBack }) {
       </Tabs>
       <TabPanel value={tab} index={0}>
         <Box sx={{ p: 2 }}>
-          <p><strong>Client:</strong> {project.client}</p>
-          <p><strong>Type:</strong> {project.project_type}</p>
-          <p><strong>Delivery:</strong> {project.delivery_method}</p>
-          <p><strong>Contract Value:</strong> {project.contract_value}</p>
-          <p><strong>Start:</strong> {project.start_date}</p>
-          <p><strong>End:</strong> {project.end_date}</p>
-          <p><strong>Status:</strong> {project.status}</p>
-          <p><strong>Priority:</strong> {project.priority}</p>
+          <p><strong>Start:</strong> {details.start_date}</p>
+          <p><strong>End:</strong> {details.end_date}</p>
+          <p><strong>Status:</strong> {details.status}</p>
+          <p><strong>Priority:</strong> {details.priority}</p>
         </Box>
       </TabPanel>
       <TabPanel value={tab} index={1}>
@@ -178,8 +157,13 @@ function ProjectsPage() {
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    // Replace with API call in the future
-    setProjects(sampleProjects);
+    // Fetch projects from the Flask backend. If the request fails (for
+    // example when the API is not running) fall back to the bundled sample
+    // data so the UI continues to render.
+    fetch('/api/projects')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(setProjects)
+      .catch(() => setProjects(sampleProjects));
   }, []);
 
   const filtered = projects.filter(p => {
@@ -214,28 +198,12 @@ function ProjectsPage() {
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell>Client</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Method</TableCell>
-              <TableCell>Contract Value</TableCell>
-              <TableCell>Start</TableCell>
-              <TableCell>End</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Priority</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.map(p => (
               <TableRow key={p.project_id} hover style={{ cursor: 'pointer' }} onClick={() => setSelected(p)}>
                 <TableCell>{p.project_name}</TableCell>
-                <TableCell>{p.client}</TableCell>
-                <TableCell>{p.project_type}</TableCell>
-                <TableCell>{p.delivery_method}</TableCell>
-                <TableCell>{p.contract_value}</TableCell>
-                <TableCell>{p.start_date}</TableCell>
-                <TableCell>{p.end_date}</TableCell>
-                <TableCell>{p.status}</TableCell>
-                <TableCell>{p.priority}</TableCell>
               </TableRow>
             ))}
           </TableBody>
