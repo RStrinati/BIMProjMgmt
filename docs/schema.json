@@ -1,0 +1,1010 @@
+[
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportFolders",
+    "column_name": "acc_folder_path",
+    "data_type": "nvarchar",
+    "max_length": 1000
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportFolders",
+    "column_name": "last_import_date",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportFolders",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportLogs",
+    "column_name": "folder_name",
+    "data_type": "nvarchar",
+    "max_length": 1000
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportLogs",
+    "column_name": "import_date",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportLogs",
+    "column_name": "log_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportLogs",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ACCImportLogs",
+    "column_name": "summary",
+    "data_type": "nvarchar",
+    "max_length": -1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "BlockingPeriods",
+    "column_name": "block_end_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "BlockingPeriods",
+    "column_name": "block_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "BlockingPeriods",
+    "column_name": "block_start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "created_by",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "hold_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "hold_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "reason",
+    "data_type": "nvarchar",
+    "max_length": -1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "resume_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_holds",
+    "column_name": "stage_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_review_cycles",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_review_cycles",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_review_cycles",
+    "column_name": "cycle_number",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_review_cycles",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "completed_reviews",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "last_updated",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "review_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "project_reviews",
+    "column_name": "scoped_reviews",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "data_export_folder",
+    "data_type": "nvarchar",
+    "max_length": 1000
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "end_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "folder_path",
+    "data_type": "nvarchar",
+    "max_length": 1000
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "ifc_folder_path",
+    "data_type": "nvarchar",
+    "max_length": 1000
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "priority",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "project_name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "status",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "projects",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "actual_end",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "actual_start",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "manual_override",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "notes",
+    "data_type": "nvarchar",
+    "max_length": -1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "planned_end",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "planned_start",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "review_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "review_number",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "reviewer_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "stage_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "status",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "review_cycles",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewAssignments",
+    "column_name": "assignment_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewAssignments",
+    "column_name": "review_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewAssignments",
+    "column_name": "schedule_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewAssignments",
+    "column_name": "user_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "actual_completion_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "actual_start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "construction_stage",
+    "data_type": "nvarchar",
+    "max_length": 200
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "cycle_detail_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "hold_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "is_new_contract",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "last_updated",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "license_duration_months",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "license_start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "planned_completion_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "planned_start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "proposed_fee",
+    "data_type": "decimal",
+    "max_length": 9
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "resume_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewCycleDetails",
+    "column_name": "reviews_per_phase",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "LicenseEndDate",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "LicenseStartDate",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "NumberOfReviews",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "ParameterID",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "ProjectID",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "ReviewFrequency",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewParameters",
+    "column_name": "ReviewStartDate",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "assigned_to",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "is_blocked",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "is_within_license_period",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "review_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "schedule_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewSchedule",
+    "column_name": "status",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "cycle_id",
+    "data_type": "varchar",
+    "max_length": 50
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "end_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "number_of_reviews",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "stage_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "stage_name",
+    "data_type": "varchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewStages",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewTasks",
+    "column_name": "assigned_to",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewTasks",
+    "column_name": "review_task_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewTasks",
+    "column_name": "schedule_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewTasks",
+    "column_name": "status",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "ReviewTasks",
+    "column_name": "task_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "cycle_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "end_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "is_generated",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "number_of_reviews",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "review_frequency_days",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "stage_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "stage_name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "stage_review_plan",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "assigned_to",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "dependencies",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "end_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "progress",
+    "data_type": "decimal",
+    "max_length": 5
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "start_date",
+    "data_type": "date",
+    "max_length": 3
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "task_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "task_name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tasks",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "date_modified",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "deleted_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "file_name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "file_path",
+    "data_type": "nvarchar",
+    "max_length": -1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "file_size_kb",
+    "data_type": "float",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "file_type",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblACCDocs",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "control_file_name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "is_active",
+    "data_type": "bit",
+    "max_length": 1
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "project_id",
+    "data_type": "int",
+    "max_length": 4
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "tblControlModels",
+    "column_name": "updated_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "users",
+    "column_name": "created_at",
+    "data_type": "datetime",
+    "max_length": 8
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "users",
+    "column_name": "email",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "users",
+    "column_name": "name",
+    "data_type": "nvarchar",
+    "max_length": 510
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "users",
+    "column_name": "role",
+    "data_type": "nvarchar",
+    "max_length": 100
+  },
+  {
+    "database_name": "ProjectManagement",
+    "table_name": "users",
+    "column_name": "user_id",
+    "data_type": "int",
+    "max_length": 4
+  }
+]
