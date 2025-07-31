@@ -124,6 +124,62 @@ function ReviewTasks() {
   );
 }
 
+function ReviewCycles() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [cycles, setCycles] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(setProjects);
+  }, []);
+
+  useEffect(() => {
+    if (projectId) {
+      fetch(`/api/reviews/${projectId}`)
+        .then(res => res.json())
+        .then(setCycles);
+    } else {
+      setCycles([]);
+    }
+  }, [projectId]);
+
+  return (
+    <div>
+      <h2>Review Cycles</h2>
+      <select value={projectId} onChange={e => setProjectId(e.target.value)}>
+        <option value="">Select Project</option>
+        {projects.map(p => (
+          <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+        ))}
+      </select>
+      <table border="1" cellPadding="4" style={{marginTop:'10px'}}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Stage</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Reviews</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cycles.map(c => (
+            <tr key={c.review_cycle_id}>
+              <td>{c.review_cycle_id}</td>
+              <td>{c.stage_id}</td>
+              <td>{c.start_date}</td>
+              <td>{c.end_date}</td>
+              <td>{c.num_reviews}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ProjectManagement() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState('');
@@ -250,9 +306,10 @@ function App() {
     <div>
       <div>
         <button onClick={() => setView('review')}>Review Tasks</button>
+        <button onClick={() => setView('cycles')}>Review Cycles</button>
         <button onClick={() => setView('project')}>Project Setup</button>
       </div>
-      {view === 'review' ? <ReviewTasks /> : <ProjectManagement />}
+      {view === 'review' ? <ReviewTasks /> : view === 'cycles' ? <ReviewCycles /> : <ProjectManagement />}
     </div>
   );
 }
