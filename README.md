@@ -44,3 +44,13 @@ python app.py
 
 This command starts the Flask backend and automatically opens the React
 frontend in your default browser for a basic review task manager.
+
+## API additions
+
+Two endpoints provide access to enriched project data and updates:
+
+* `GET /api/projects_full` – returns all columns from the `vw_projects_full` SQL
+  view.
+* `PUT /api/projects/<id>` – updates contract and client details in the base
+  tables. Pass `contract_value`, `payment_terms`, `client_contact` and
+  `contact_email` in the JSON body.
