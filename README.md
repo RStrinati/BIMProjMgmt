@@ -26,6 +26,12 @@ This creates a virtual environment in `.venv` and installs the Python dependenci
 
 The requirements now include `Flask` and `Flask-Cors` for the API server.
 
+## Database Schema
+
+The main tables used by the application are documented in
+[docs/database_schema.md](docs/database_schema.md). Consult that file for a full
+list of columns if you need to create the SQL schema manually.
+
 ## Local Web Application
 
 A simple Flask backend and React frontend are now provided.
