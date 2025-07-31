@@ -3,23 +3,33 @@ import os
 import pandas as pd 
 from datetime import datetime, timedelta
 
-from config import (DB_DRIVER, DB_SERVER, DB_USER, DB_PASSWORD, PROJECT_MGMT_DB)
+from config import Config
+
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""
-    if not db_name:
-        db_name = PROJECT_MGMT_DB
     try:
-        connection = pyodbc.connect(
-            f"Driver={{{DB_DRIVER}}};"
-            f"Server={DB_SERVER};"
-            f"Database={db_name};"
-            f"UID={DB_USER};"
-            f"PWD={DB_PASSWORD}"
+        driver = Config.DB_DRIVER
+        server = Config.DB_SERVER
+        user = Config.DB_USER
+        password = Config.DB_PASSWORD
+        database = db_name if db_name else Config.PROJECT_MGMT_DB
+
+        conn_str = (
+            f"DRIVER={{{driver}}};"
+            f"SERVER={server};"
+            f"UID={user};"
+            f"PWD={password};"
+            f"DATABASE={database};"
+            "TrustServerCertificate=yes;"
         )
+
+        connection = pyodbc.connect(conn_str)
         return connection
+
     except pyodbc.Error as e:
         print(f"❌ Database connection error ({db_name}): {e}")
         return None
+
 
     
 def insert_project(project_name, folder_path, ifc_folder_path=None):
@@ -964,6 +974,14 @@ def get_contractual_links(project_id, review_cycle_id=None):
         return []
     finally:
         conn.close()
+        
+if __name__ == "__main__":
+    conn = connect_to_db()
+    if conn:
+        print("✅ Connected to database successfully.")
+        conn.close()
+    else:
+        print("❌ Failed to connect.")
 
 
 

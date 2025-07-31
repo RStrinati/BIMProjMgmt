@@ -3,7 +3,12 @@ import subprocess
 import webbrowser
 
 from backend.app import app
+from config import Config
 
+server = Config.DB_SERVER
+user = Config.DB_USER
+password = Config.DB_PASSWORD
+driver = Config.DB_DRIVER
 
 def _open_browser():
     """Open the React frontend in the default web browser."""
@@ -16,7 +21,10 @@ def _launch_tkinter():
 
 
 if __name__ == "__main__":
+    print(f"Connected to SQL Server at: {Config.DB_SERVER}")
     _launch_tkinter()
     # Start a timer to open the browser after the server starts
     threading.Timer(1.0, _open_browser).start()
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
+
+

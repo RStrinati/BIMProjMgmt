@@ -30,7 +30,26 @@ Set the following variables before running the tools:
 - `ACC_DB` – Autodesk Construction Cloud staging database (default `acc_data_schema`)
 - `REVIT_HEALTH_DB` – Revit health check database (default `RevitHealthCheckDB`)
 
-These variables can be stored in your shell profile or in a `.env` file loaded before execution.
+### Setting Environment Variables
+
+To avoid setting variables every session, create a .env file in the root directory (same level as app.py).
+
+Example .env file:
+
+DB_SERVER=localhost\SQLEXPRESS
+DB_USER=sa
+DB_PASSWORD=1234
+DB_DRIVER=ODBC Driver 18 for SQL Server
+PROJECT_MGMT_DB=ProjectManagement
+ACC_DB=acc_data_schema
+REVIT_HEALTH_DB=RevitHealthCheckDB
+
+Ensure your config.py includes:
+
+from dotenv import load_dotenv
+load_dotenv()
+
+🔒 Add .env to your .gitignore to keep credentials secure.
 
 ## Database Schema Updates
 
@@ -43,3 +62,19 @@ sqlcmd -S <server> -d <database> -i sql/update_review_schedule_schema.sql
 
 Run this script whenever setting up a new database or upgrading from an older
 version of the project.
+
+## Running the Application
+Once everything is configured:
+
+```bash
+source .venv/bin/activate  # or .\.venv\Scripts\activate on Windows
+python app.py
+```
+
+This launches the Flask backend and serves the React frontend. The interface will be available at:
+
+
+```arduino
+http://localhost:5000
+```
+React frontend requests will hit /api/* routes in app.py.
