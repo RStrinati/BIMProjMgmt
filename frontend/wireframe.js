@@ -1,10 +1,4 @@
-const { useState } = React;
-const { createClient } = supabase;
-
-// TODO: replace with your Supabase project credentials
-const supabaseUrl = 'https://your-project.supabase.co';
-const supabaseKey = 'public-anon-key';
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
+const { useState, useEffect } = React;
 
 function Sidebar({ active, onChange }) {
   const items = [
@@ -55,8 +49,57 @@ function Placeholder({ title }) {
   );
 }
 
+function ProjectsPage() {
+  const [projects, setProjects] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(setProjects);
+  }, []);
+
+  const addProject = () => {
+    const name = prompt('Project name');
+    if (!name) return;
+    fetch('/api/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_name: name })
+    }).then(() => {
+      fetch('/api/projects')
+        .then(res => res.json())
+        .then(setProjects);
+    });
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <h3>Projects</h3>
+        <button onClick={addProject}>+ New Project</button>
+      </div>
+      <table className="project-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map(p => (
+            <tr key={p.project_id}>
+              <td>{p.project_id}</td>
+              <td>{p.project_name}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const pages = {
-  projects: () => <Placeholder title="Projects" />,
+  projects: ProjectsPage,
   bep: () => <Placeholder title="BEP Manager" />,
   imports: () => <Placeholder title="Data Imports" />,
   reviews: () => <Placeholder title="Review Cycles" />,
