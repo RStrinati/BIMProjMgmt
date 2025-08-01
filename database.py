@@ -1141,7 +1141,7 @@ def get_bep_matrix(project_id):
         return [tuple(row) for row in cursor.fetchall()]
     except Exception as e:
         print(f"❌ Error fetching BEP matrix: {e}")
-=======
+
 def get_projects_full():
     """Return all rows from the vw_projects_full view."""
     conn = connect_to_db()
@@ -1199,7 +1199,7 @@ def update_project_financials(project_id, contract_value=None, payment_terms=Non
         return True
     except Exception as e:
         print(f"❌ Error upserting BEP section: {e}")
-=======
+
         sets = []
         params = []
         if contract_value is not None:
