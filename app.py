@@ -2,7 +2,7 @@ import threading
 import subprocess
 import webbrowser
 
-from backend.app import app
+from backend import flask_app
 from config import Config
 
 server = Config.DB_SERVER
@@ -25,6 +25,6 @@ if __name__ == "__main__":
     _launch_tkinter()
     # Start a timer to open the browser after the server starts
     threading.Timer(1.0, _open_browser).start()
-    app.run(debug=True, use_reloader=False)
+    flask_app.run(debug=True, use_reloader=False)
 
 
