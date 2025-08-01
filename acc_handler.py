@@ -12,7 +12,8 @@ import tempfile
 import shutil
 from database import get_acc_folder_path, log_acc_import, connect_to_db
 
-from config import ACC_DB
+from config import Config
+ACC_DB = Config.ACC_DB
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 

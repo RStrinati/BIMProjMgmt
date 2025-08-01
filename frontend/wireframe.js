@@ -33,6 +33,11 @@ const sampleProjects = [
     end_date: '2024-12-31',
     status: 'Active',
     priority: 'High',
+    client_name: 'ACME Corp',
+    contract_value: 100000,
+    payment_terms: 'Monthly',
+    client_contact: 'Jane Doe',
+    contact_email: 'jane@example.com',
   },
 ];
 
@@ -81,6 +86,51 @@ function Placeholder({ title }) {
     <div>
       <h3>{title}</h3>
       <p>Content coming soon...</p>
+    </div>
+  );
+}
+
+function EditProject({ project, onClose }) {
+  const [form, setForm] = useState({
+    contract_value: project.contract_value || '',
+    payment_terms: project.payment_terms || '',
+    client_contact: project.client_contact || '',
+    contact_email: project.contact_email || '',
+  });
+
+  const save = () => {
+    fetch(`/api/projects/${project.project_id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    }).then(onClose);
+  };
+
+  return (
+    <div className="modal">
+      <div className="modal-content">
+        <h4>Edit {project.project_name}</h4>
+        <TextField label="Contract Value" fullWidth margin="dense"
+          value={form.contract_value}
+          onChange={e => setForm({ ...form, contract_value: e.target.value })}
+        />
+        <TextField label="Payment Terms" fullWidth margin="dense"
+          value={form.payment_terms}
+          onChange={e => setForm({ ...form, payment_terms: e.target.value })}
+        />
+        <TextField label="Client Contact" fullWidth margin="dense"
+          value={form.client_contact}
+          onChange={e => setForm({ ...form, client_contact: e.target.value })}
+        />
+        <TextField label="Contact Email" fullWidth margin="dense"
+          value={form.contact_email}
+          onChange={e => setForm({ ...form, contact_email: e.target.value })}
+        />
+        <div style={{ marginTop: '1rem' }}>
+          <Button variant="contained" onClick={save}>Save</Button>
+          <Button onClick={onClose} style={{ marginLeft: '1rem' }}>Cancel</Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -154,13 +204,13 @@ function ProjectsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [selected, setSelected] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    // Fetch projects from the Flask backend. If the request fails (for
-    // example when the API is not running) fall back to the bundled sample
-    // data so the UI continues to render.
-    fetch('/api/projects')
+    // Retrieve project data from the vw_projects_full view.
+    // Fallback to the bundled sample when the API is unavailable.
+    fetch('/api/projects_full')
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(setProjects)
       .catch(() => setProjects(sampleProjects));
@@ -177,6 +227,17 @@ function ProjectsPage() {
 
   if (selected) {
     return <ProjectDetail project={selected} onBack={() => setSelected(null)} />;
+  }
+
+  if (editing) {
+    const refresh = () => {
+      setEditing(null);
+      fetch('/api/projects_full')
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(setProjects)
+        .catch(() => {});
+    };
+    return <EditProject project={editing} onClose={refresh} />;
   }
 
   return (
@@ -198,12 +259,20 @@ function ProjectsPage() {
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
+              <TableCell>Client</TableCell>
+              <TableCell>Contract Value</TableCell>
+              <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.map(p => (
-              <TableRow key={p.project_id} hover style={{ cursor: 'pointer' }} onClick={() => setSelected(p)}>
-                <TableCell>{p.project_name}</TableCell>
+              <TableRow key={p.project_id} hover>
+                <TableCell onClick={() => setSelected(p)}>{p.project_name}</TableCell>
+                <TableCell>{p.client_name}</TableCell>
+                <TableCell>{p.contract_value}</TableCell>
+                <TableCell>
+                  <Button size="small" onClick={() => setEditing(p)}>Edit</Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

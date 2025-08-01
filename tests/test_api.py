@@ -119,6 +119,7 @@ def test_extract_files(monkeypatch):
     assert resp.get_json()['success'] is True
 
 
+
 def test_review_cycles_get(monkeypatch):
     monkeypatch.setattr('backend.app.get_review_cycles', lambda pid: [(1, 2, '2024-01-01', '2024-02-01', 3)])
     client = app.test_client()
@@ -203,4 +204,34 @@ def test_bep_status_put(monkeypatch):
     resp = client.put('/api/bep/status', json={'project_id':1,'section_id':2,'status':'Draft'})
     assert resp.status_code == 200
     assert called['sid'] == 2
+
+def test_projects_full(monkeypatch):
+    monkeypatch.setattr(
+        'backend.app.get_projects_full',
+        lambda: [{'project_id': 1, 'project_name': 'P'}],
+    )
+    client = app.test_client()
+    resp = client.get('/api/projects_full')
+    assert resp.status_code == 200
+    assert resp.get_json()[0]['project_name'] == 'P'
+
+
+def test_update_full_project(monkeypatch):
+    called = {}
+
+    def fake_fin(pid, cv, pt):
+        called['fin'] = (pid, cv, pt)
+        return True
+
+    def fake_client(pid, cc, ce):
+        called['cli'] = (pid, cc, ce)
+        return True
+
+    monkeypatch.setattr('backend.app.update_project_financials', fake_fin)
+    monkeypatch.setattr('backend.app.update_client_info', fake_client)
+    client = app.test_client()
+    resp = client.put('/api/projects/5', json={'contract_value': 10})
+    assert resp.status_code == 200
+    assert called['fin'] == (5, 10, None)
+
 

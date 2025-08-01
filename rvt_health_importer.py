@@ -3,7 +3,9 @@ import json
 import shutil
 from datetime import datetime
 
-from config import REVIT_HEALTH_DB
+from config import Config
+REVIT_HEALTH_DB = Config.REVIT_HEALTH_DB
+
 from combine_exports import combine_exports_to_single_file
 from database import connect_to_db
 

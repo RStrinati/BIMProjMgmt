@@ -25,6 +25,9 @@ from database import (
     get_bep_matrix,
     upsert_bep_section,
     update_bep_status,
+    get_projects_full,
+    update_project_financials,
+    update_client_info,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -37,6 +40,13 @@ def api_get_projects():
     projects = get_projects()
     data = [{'project_id': pid, 'project_name': name} for pid, name in projects]
     return jsonify(data)
+
+
+@app.route('/api/projects_full', methods=['GET'])
+def api_get_projects_full():
+    """Return enriched project data from the SQL view."""
+    projects = get_projects_full()
+    return jsonify(projects)
 
 
 @app.route('/api/users', methods=['GET'])
@@ -126,6 +136,25 @@ def api_create_project():
     if success:
         return jsonify({'success': True}), 201
     return jsonify({'success': False}), 500
+
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def api_update_full_project(project_id):
+    """Update financial and client details for a project."""
+    data = request.get_json() or {}
+
+    update_project_financials(
+        project_id,
+        data.get('contract_value'),
+        data.get('payment_terms'),
+    )
+    update_client_info(
+        project_id,
+        data.get('client_contact'),
+        data.get('contact_email'),
+    )
+
+    return jsonify({'message': 'Project updated'})
 
 
 @app.route('/api/extract_files', methods=['POST'])

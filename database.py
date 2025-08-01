@@ -1141,18 +1141,38 @@ def get_bep_matrix(project_id):
         return [tuple(row) for row in cursor.fetchall()]
     except Exception as e:
         print(f"❌ Error fetching BEP matrix: {e}")
+=======
+def get_projects_full():
+    """Return all rows from the vw_projects_full view."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM vw_projects_full")
+        columns = [c[0] for c in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching full projects: {e}")
         return []
     finally:
         conn.close()
 
 
+
 def upsert_bep_section(project_id, section_id, responsible_user_id, status, notes):
     """Create or update a project BEP section record."""
+
+def update_project_financials(project_id, contract_value=None, payment_terms=None):
+    """Update financial fields in the projects table."""
+
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
+
         cursor.execute(
             """
             MERGE project_bep_sections AS tgt
@@ -1179,18 +1199,41 @@ def upsert_bep_section(project_id, section_id, responsible_user_id, status, note
         return True
     except Exception as e:
         print(f"❌ Error upserting BEP section: {e}")
+=======
+        sets = []
+        params = []
+        if contract_value is not None:
+            sets.append("contract_value = ?")
+            params.append(contract_value)
+        if payment_terms is not None:
+            sets.append("payment_terms = ?")
+            params.append(payment_terms)
+        if sets:
+            sql = "UPDATE projects SET " + ", ".join(sets) + " WHERE project_id = ?"
+            params.append(project_id)
+            cursor.execute(sql, params)
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating project financials: {e}")
         return False
     finally:
         conn.close()
 
 
+
 def update_bep_status(project_id, section_id, status):
     """Update the status of a BEP section for a project."""
+
+def update_client_info(project_id, client_contact=None, contact_email=None):
+    """Update client contact details for a project."""
+
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
+
         cursor.execute(
             "UPDATE project_bep_sections SET status = ? WHERE project_id = ? AND section_id = ?;",
             (status, project_id, section_id),
@@ -1199,6 +1242,24 @@ def update_bep_status(project_id, section_id, status):
         return True
     except Exception as e:
         print(f"❌ Error updating BEP status: {e}")
+
+        sets = []
+        params = []
+        if client_contact is not None:
+            sets.append("client_contact = ?")
+            params.append(client_contact)
+        if contact_email is not None:
+            sets.append("contact_email = ?")
+            params.append(contact_email)
+        if sets:
+            sql = "UPDATE clients SET " + ", ".join(sets) + " WHERE project_id = ?"
+            params.append(project_id)
+            cursor.execute(sql, params)
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating client info: {e}")
+
         return False
     finally:
         conn.close()
