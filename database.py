@@ -976,6 +976,172 @@ def get_contractual_links(project_id, review_cycle_id=None):
         conn.close()
 
 
+def get_review_cycles(project_id):
+    """Return review cycles for the given project."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT review_cycle_id, stage_id, start_date, end_date, num_reviews
+            FROM review_cycles
+            WHERE project_id = ?
+            ORDER BY review_cycle_id;
+            """,
+            (project_id,),
+        )
+        return [tuple(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching review cycles: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def create_review_cycle(project_id, stage_id, start_date, end_date, num_reviews, created_by):
+    """Insert a new review cycle and return its ID."""
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO review_cycles
+            (project_id, stage_id, start_date, end_date, num_reviews, created_by)
+            VALUES (?, ?, ?, ?, ?, ?);
+            SELECT SCOPE_IDENTITY();
+            """,
+            (project_id, stage_id, start_date, end_date, num_reviews, created_by),
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+        return int(new_id)
+    except Exception as e:
+        print(f"❌ Error creating review cycle: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def update_review_cycle(review_cycle_id, start_date=None, end_date=None, num_reviews=None, stage_id=None):
+    """Update an existing review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE review_cycles
+            SET start_date = COALESCE(?, start_date),
+                end_date = COALESCE(?, end_date),
+                num_reviews = COALESCE(?, num_reviews),
+                stage_id = COALESCE(?, stage_id)
+            WHERE review_cycle_id = ?;
+            """,
+            (start_date, end_date, num_reviews, stage_id, review_cycle_id),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating review cycle: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def delete_review_cycle(review_cycle_id):
+    """Delete a review cycle."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM review_cycles WHERE review_cycle_id = ?;",
+            (review_cycle_id,),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error deleting review cycle: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_review_cycle_tasks(schedule_id):
+    """Return tasks linked to a review schedule."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT review_task_id, task_id, assigned_to, status
+            FROM review_tasks
+            WHERE schedule_id = ?
+            ORDER BY review_task_id;
+            """,
+            (schedule_id,),
+        )
+        return [tuple(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching review tasks: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def update_review_cycle_task(review_task_id, assigned_to=None, status=None):
+    """Update a review task's status or assignee."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE review_tasks
+            SET assigned_to = COALESCE(?, assigned_to),
+                status = COALESCE(?, status)
+            WHERE review_task_id = ?;
+            """,
+            (assigned_to, status, review_task_id),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating review task: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_bep_matrix(project_id):
+    """Return BEP section data for a project."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT s.id, s.section_title, p.responsible_user_id, p.status, p.notes
+            FROM bep_sections s
+            LEFT JOIN project_bep_sections p ON s.id = p.section_id AND p.project_id = ?
+            ORDER BY s.id;
+            """,
+            (project_id,),
+        )
+        return [tuple(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching BEP matrix: {e}")
+=======
 def get_projects_full():
     """Return all rows from the vw_projects_full view."""
     conn = connect_to_db()
@@ -994,13 +1160,46 @@ def get_projects_full():
         conn.close()
 
 
+
+def upsert_bep_section(project_id, section_id, responsible_user_id, status, notes):
+    """Create or update a project BEP section record."""
+
 def update_project_financials(project_id, contract_value=None, payment_terms=None):
     """Update financial fields in the projects table."""
+
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            MERGE project_bep_sections AS tgt
+            USING (SELECT ? AS project_id, ? AS section_id) AS src
+            ON tgt.project_id = src.project_id AND tgt.section_id = src.section_id
+            WHEN MATCHED THEN
+                UPDATE SET responsible_user_id = ?, status = ?, notes = ?
+            WHEN NOT MATCHED THEN
+                INSERT (project_id, section_id, responsible_user_id, status, notes)
+                VALUES (src.project_id, src.section_id, ?, ?, ?);
+            """,
+            (
+                project_id,
+                section_id,
+                responsible_user_id,
+                status,
+                notes,
+                responsible_user_id,
+                status,
+                notes,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error upserting BEP section: {e}")
+=======
         sets = []
         params = []
         if contract_value is not None:
@@ -1022,13 +1221,28 @@ def update_project_financials(project_id, contract_value=None, payment_terms=Non
         conn.close()
 
 
+
+def update_bep_status(project_id, section_id, status):
+    """Update the status of a BEP section for a project."""
+
 def update_client_info(project_id, client_contact=None, contact_email=None):
     """Update client contact details for a project."""
+
     conn = connect_to_db()
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
+
+        cursor.execute(
+            "UPDATE project_bep_sections SET status = ? WHERE project_id = ? AND section_id = ?;",
+            (status, project_id, section_id),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating BEP status: {e}")
+
         sets = []
         params = []
         if client_contact is not None:
@@ -1045,6 +1259,7 @@ def update_client_info(project_id, client_contact=None, contact_email=None):
         return True
     except Exception as e:
         print(f"❌ Error updating client info: {e}")
+
         return False
     finally:
         conn.close()

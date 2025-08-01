@@ -16,7 +16,15 @@ from database import (
     get_review_summary,
     get_contractual_links,
     get_cycle_ids,
-    # newly added helpers
+    get_review_cycles,
+    create_review_cycle,
+    update_review_cycle,
+    delete_review_cycle,
+    get_review_cycle_tasks,
+    update_review_cycle_task,
+    get_bep_matrix,
+    upsert_bep_section,
+    update_bep_status,
     get_projects_full,
     update_project_financials,
     update_client_info,
@@ -197,6 +205,126 @@ def api_contractual_links():
 def api_cycle_ids(project_id):
     cycles = get_cycle_ids(project_id)
     return jsonify(cycles)
+
+
+@app.route('/api/reviews/<int:project_id>', methods=['GET'])
+def api_get_review_cycles_endpoint(project_id):
+    cycles = get_review_cycles(project_id)
+    data = [
+        {
+            'review_cycle_id': cid,
+            'stage_id': stage,
+            'start_date': s,
+            'end_date': e,
+            'num_reviews': n,
+        }
+        for cid, stage, s, e, n in cycles
+    ]
+    return jsonify(data)
+
+
+@app.route('/api/reviews', methods=['POST'])
+def api_create_review_cycle_endpoint():
+    body = request.get_json() or {}
+    required = ['project_id', 'stage_id', 'start_date', 'end_date', 'num_reviews', 'created_by']
+    if not all(k in body for k in required):
+        return jsonify({'error': 'missing fields'}), 400
+    new_id = create_review_cycle(
+        body['project_id'],
+        body['stage_id'],
+        body['start_date'],
+        body['end_date'],
+        body['num_reviews'],
+        body['created_by'],
+    )
+    if new_id is None:
+        return jsonify({'success': False}), 500
+    return jsonify({'id': new_id}), 201
+
+
+@app.route('/api/reviews/<int:cycle_id>', methods=['PUT'])
+def api_update_review_cycle_endpoint(cycle_id):
+    body = request.get_json() or {}
+    success = update_review_cycle(
+        cycle_id,
+        body.get('start_date'),
+        body.get('end_date'),
+        body.get('num_reviews'),
+        body.get('stage_id'),
+    )
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/reviews/<int:cycle_id>', methods=['DELETE'])
+def api_delete_review_cycle_endpoint(cycle_id):
+    success = delete_review_cycle(cycle_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
+
+
+@app.route('/api/review_tasks/<int:schedule_id>', methods=['GET'])
+def api_get_review_cycle_tasks_endpoint(schedule_id):
+    tasks = get_review_cycle_tasks(schedule_id)
+    data = [
+        {
+            'review_task_id': tid,
+            'task_id': t,
+            'assigned_to': a,
+            'status': st,
+        }
+        for tid, t, a, st in tasks
+    ]
+    return jsonify(data)
+
+
+@app.route('/api/review_tasks/<int:task_id>', methods=['PUT'])
+def api_update_review_cycle_task_endpoint(task_id):
+    body = request.get_json() or {}
+    success = update_review_cycle_task(task_id, body.get('assigned_to'), body.get('status'))
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/bep/<int:project_id>', methods=['GET'])
+def api_get_bep_matrix(project_id):
+    rows = get_bep_matrix(project_id)
+    data = [
+        {
+            'section_id': sid,
+            'title': title,
+            'responsible_user_id': uid,
+            'status': status,
+            'notes': notes,
+        }
+        for sid, title, uid, status, notes in rows
+    ]
+    return jsonify(data)
+
+
+@app.route('/api/bep/section', methods=['POST'])
+def api_upsert_bep_section():
+    body = request.get_json() or {}
+    required = ['project_id', 'section_id']
+    if not all(k in body for k in required):
+        return jsonify({'error': 'missing fields'}), 400
+    success = upsert_bep_section(
+        body['project_id'],
+        body['section_id'],
+        body.get('responsible_user_id'),
+        body.get('status'),
+        body.get('notes'),
+    )
+    return jsonify({'success': bool(success)})
+
+
+@app.route('/api/bep/status', methods=['PUT'])
+def api_update_bep_status_endpoint():
+    body = request.get_json() or {}
+    required = ['project_id', 'section_id', 'status']
+    if not all(k in body for k in required):
+        return jsonify({'error': 'missing fields'}), 400
+    success = update_bep_status(body['project_id'], body['section_id'], body['status'])
+    return jsonify({'success': bool(success)})
 
 
 @app.route('/')
