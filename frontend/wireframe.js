@@ -136,24 +136,136 @@ function EditProject({ project, onClose }) {
 }
 
 function AddProject({ onClose }) {
-  const [form, setForm] = useState({ project_name: '' });
+  const empty = {
+    project_name: '',
+    client_id: '',
+    project_type_id: '',
+    sector_id: '',
+    delivery_method_id: '',
+    project_phase_id: '',
+    construction_stage_id: '',
+    project_manager: '',
+    internal_lead: '',
+    contract_number: '',
+    contract_value: '',
+    agreed_fee: '',
+    payment_terms: '',
+    folder_path: '',
+    ifc_folder_path: '',
+    data_export_folder: '',
+    start_date: '',
+    end_date: '',
+    status: 'Planning',
+    priority: 'Low',
+  };
+  const [form, setForm] = useState(empty);
+
+  const [options, setOptions] = useState({
+    clients: [],
+    project_types: [],
+    sectors: [],
+    delivery_methods: [],
+    project_phases: [],
+    construction_stages: [],
+  });
+
+  useEffect(() => {
+    const tables = [
+      'clients',
+      'project_types',
+      'sectors',
+      'delivery_methods',
+      'project_phases',
+      'construction_stages',
+    ];
+    tables.forEach(t => {
+      fetch(`/api/reference/${t}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setOptions(o => ({ ...o, [t]: data })))
+        .catch(() => {});
+    });
+  }, []);
 
   const save = () => {
-    fetch('/api/project', {
+    fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     }).then(onClose);
   };
 
+  const handle = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
   return (
     <div className="modal">
-      <div className="modal-content">
+      <div className="modal-content" style={{ maxHeight: '80vh', overflow: 'auto' }}>
         <h4>New Project</h4>
-        <TextField label="Project Name" fullWidth margin="dense"
-          value={form.project_name}
-          onChange={e => setForm({ project_name: e.target.value })}
-        />
+        <TextField label="Project Name" fullWidth margin="dense" value={form.project_name}
+          onChange={e => handle('project_name', e.target.value)} required />
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Client</InputLabel>
+          <Select value={form.client_id} label="Client" onChange={e => handle('client_id', e.target.value)}>
+            {options.clients.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Project Type</InputLabel>
+          <Select value={form.project_type_id} label="Project Type" onChange={e => handle('project_type_id', e.target.value)}>
+            {options.project_types.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Sector</InputLabel>
+          <Select value={form.sector_id} label="Sector" onChange={e => handle('sector_id', e.target.value)}>
+            {options.sectors.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Delivery Method</InputLabel>
+          <Select value={form.delivery_method_id} label="Delivery Method" onChange={e => handle('delivery_method_id', e.target.value)}>
+            {options.delivery_methods.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Project Phase</InputLabel>
+          <Select value={form.project_phase_id} label="Project Phase" onChange={e => handle('project_phase_id', e.target.value)}>
+            {options.project_phases.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Construction Stage</InputLabel>
+          <Select value={form.construction_stage_id} label="Construction Stage" onChange={e => handle('construction_stage_id', e.target.value)}>
+            {options.construction_stages.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <TextField label="Project Manager" fullWidth margin="dense" value={form.project_manager} onChange={e => handle('project_manager', e.target.value)} />
+        <TextField label="Internal Lead" fullWidth margin="dense" value={form.internal_lead} onChange={e => handle('internal_lead', e.target.value)} />
+        <TextField label="Contract Number" fullWidth margin="dense" value={form.contract_number} onChange={e => handle('contract_number', e.target.value)} />
+        <TextField label="Contract Value" fullWidth margin="dense" value={form.contract_value} onChange={e => handle('contract_value', e.target.value)} />
+        <TextField label="Agreed Fee" fullWidth margin="dense" value={form.agreed_fee} onChange={e => handle('agreed_fee', e.target.value)} />
+        <TextField label="Payment Terms" fullWidth margin="dense" value={form.payment_terms} onChange={e => handle('payment_terms', e.target.value)} />
+        <TextField label="Folder Path" fullWidth margin="dense" value={form.folder_path} onChange={e => handle('folder_path', e.target.value)} />
+        <TextField label="IFC Folder Path" fullWidth margin="dense" value={form.ifc_folder_path} onChange={e => handle('ifc_folder_path', e.target.value)} />
+        <TextField label="Data Export Folder" fullWidth margin="dense" value={form.data_export_folder} onChange={e => handle('data_export_folder', e.target.value)} />
+        <TextField label="Start Date" type="date" fullWidth margin="dense" InputLabelProps={{ shrink: true }} value={form.start_date} onChange={e => handle('start_date', e.target.value)} />
+        <TextField label="End Date" type="date" fullWidth margin="dense" InputLabelProps={{ shrink: true }} value={form.end_date} onChange={e => handle('end_date', e.target.value)} />
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Status</InputLabel>
+          <Select value={form.status} label="Status" onChange={e => handle('status', e.target.value)}>
+            <MenuItem value="Planning">Planning</MenuItem>
+            <MenuItem value="Active">Active</MenuItem>
+            <MenuItem value="On Hold">On Hold</MenuItem>
+            <MenuItem value="Complete">Complete</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin="dense">
+          <InputLabel>Priority</InputLabel>
+          <Select value={form.priority} label="Priority" onChange={e => handle('priority', e.target.value)}>
+            <MenuItem value="Low">Low</MenuItem>
+            <MenuItem value="Medium">Medium</MenuItem>
+            <MenuItem value="High">High</MenuItem>
+          </Select>
+        </FormControl>
         <div style={{ marginTop: '1rem' }}>
           <Button variant="contained" onClick={save}>Create</Button>
           <Button onClick={onClose} style={{ marginLeft: '1rem' }}>Cancel</Button>
@@ -235,6 +347,16 @@ function ProjectsPage() {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [editRow, setEditRow] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [refs, setRefs] = useState({
+    clients: [],
+    project_types: [],
+    sectors: [],
+    delivery_methods: [],
+    project_phases: [],
+    construction_stages: [],
+  });
 
   useEffect(() => {
     // Retrieve project data from the vw_projects_full view.
@@ -245,6 +367,23 @@ function ProjectsPage() {
       .catch(() => setProjects(sampleProjects));
   }, []);
 
+  useEffect(() => {
+    const tables = [
+      'clients',
+      'project_types',
+      'sectors',
+      'delivery_methods',
+      'project_phases',
+      'construction_stages',
+    ];
+    tables.forEach(t => {
+      fetch(`/api/reference/${t}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setRefs(r => ({ ...r, [t]: data })))
+        .catch(() => {});
+    });
+  }, []);
+
   const filtered = projects.filter(p => {
     const matchesSearch =
       !search ||
@@ -253,6 +392,37 @@ function ProjectsPage() {
     const matchesStatus = !status || p.status === status;
     return matchesSearch && matchesStatus;
   });
+
+  const startEdit = (p) => {
+    setEditRow(p.project_id);
+    setEditForm({
+      project_name: p.project_name,
+      client_id: p.client_id,
+      project_type_id: p.project_type_id,
+      sector_id: p.sector_id,
+      delivery_method_id: p.delivery_method_id,
+      project_phase_id: p.project_phase_id,
+      construction_stage_id: p.construction_stage_id,
+      project_manager: p.project_manager,
+      internal_lead: p.internal_lead,
+      status: p.status,
+      priority: p.priority,
+    });
+  };
+
+  const saveEdit = (pid) => {
+    fetch(`/api/projects/${pid}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    }).then(() => {
+      setEditRow(null);
+      fetch('/api/projects_full')
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(setProjects)
+        .catch(() => {});
+    });
+  };
 
   if (selected) {
     return <ProjectDetail project={selected} onBack={() => setSelected(null)} />;
@@ -301,21 +471,59 @@ function ProjectsPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
+              <TableCell>Project Name</TableCell>
               <TableCell>Client</TableCell>
-              <TableCell>Contract Value</TableCell>
+              <TableCell>Project Type</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell>Delivery Method</TableCell>
+              <TableCell>Phase</TableCell>
+              <TableCell>Stage</TableCell>
+              <TableCell>Project Manager</TableCell>
+              <TableCell>Internal Lead</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Priority</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.map(p => (
               <TableRow key={p.project_id} hover>
-                <TableCell onClick={() => setSelected(p)}>{p.project_name}</TableCell>
-                <TableCell>{p.client_name}</TableCell>
-                <TableCell>{p.contract_value}</TableCell>
-                <TableCell>
-                  <Button size="small" onClick={() => setEditing(p)}>Edit</Button>
-                </TableCell>
+                {editRow === p.project_id ? (
+                  <>
+                    <TableCell><TextField value={editForm.project_name} onChange={e=>setEditForm(f=>({...f,project_name:e.target.value}))}/></TableCell>
+                    <TableCell><Select size="small" value={editForm.client_id||''} onChange={e=>setEditForm(f=>({...f,client_id:e.target.value}))}>{refs.clients.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.project_type_id||''} onChange={e=>setEditForm(f=>({...f,project_type_id:e.target.value}))}>{refs.project_types.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.sector_id||''} onChange={e=>setEditForm(f=>({...f,sector_id:e.target.value}))}>{refs.sectors.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.delivery_method_id||''} onChange={e=>setEditForm(f=>({...f,delivery_method_id:e.target.value}))}>{refs.delivery_methods.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.project_phase_id||''} onChange={e=>setEditForm(f=>({...f,project_phase_id:e.target.value}))}>{refs.project_phases.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.construction_stage_id||''} onChange={e=>setEditForm(f=>({...f,construction_stage_id:e.target.value}))}>{refs.construction_stages.map(o=><MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}</Select></TableCell>
+                    <TableCell><TextField size="small" value={editForm.project_manager||''} onChange={e=>setEditForm(f=>({...f,project_manager:e.target.value}))}/></TableCell>
+                    <TableCell><TextField size="small" value={editForm.internal_lead||''} onChange={e=>setEditForm(f=>({...f,internal_lead:e.target.value}))}/></TableCell>
+                    <TableCell><Select size="small" value={editForm.status||''} onChange={e=>setEditForm(f=>({...f,status:e.target.value}))}><MenuItem value="Planning">Planning</MenuItem><MenuItem value="Active">Active</MenuItem><MenuItem value="On Hold">On Hold</MenuItem><MenuItem value="Complete">Complete</MenuItem></Select></TableCell>
+                    <TableCell><Select size="small" value={editForm.priority||''} onChange={e=>setEditForm(f=>({...f,priority:e.target.value}))}><MenuItem value="Low">Low</MenuItem><MenuItem value="Medium">Medium</MenuItem><MenuItem value="High">High</MenuItem></Select></TableCell>
+                    <TableCell>
+                      <Button size="small" onClick={()=>saveEdit(p.project_id)}>Save</Button>
+                      <Button size="small" onClick={()=>setEditRow(null)}>Cancel</Button>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell onClick={() => setSelected(p)}>{p.project_name}</TableCell>
+                    <TableCell>{p.client_name}</TableCell>
+                    <TableCell>{p.project_type}</TableCell>
+                    <TableCell>{p.sector}</TableCell>
+                    <TableCell>{p.delivery_method}</TableCell>
+                    <TableCell>{p.phase}</TableCell>
+                    <TableCell>{p.stage}</TableCell>
+                    <TableCell>{p.project_manager}</TableCell>
+                    <TableCell>{p.internal_lead}</TableCell>
+                    <TableCell>{p.status}</TableCell>
+                    <TableCell>{p.priority}</TableCell>
+                    <TableCell>
+                      <Button size="small" onClick={()=>startEdit(p)}>Edit</Button>
+                    </TableCell>
+                  </>
+                )}
               </TableRow>
             ))}
           </TableBody>

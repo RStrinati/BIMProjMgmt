@@ -1283,6 +1283,46 @@ def update_client_info(project_id, client_contact=None, contact_email=None):
         return False
     finally:
         conn.close()
+
+
+def get_reference_options(table):
+    """Return (id, name) tuples from a reference table."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        id_col = table.rstrip('s') + '_id'
+        name_col = table.rstrip('s') + '_name'
+        cursor.execute(f"SELECT {id_col}, {name_col} FROM {table} ORDER BY {name_col};")
+        return [(row[0], row[1]) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"❌ Error fetching {table}: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def insert_project_full(data):
+    """Insert a project record with arbitrary fields."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cols = list(data.keys())
+        if not cols:
+            return False
+        placeholders = ', '.join(['?'] * len(cols))
+        sql = f"INSERT INTO projects ({', '.join(cols)}) VALUES ({placeholders})"
+        cursor.execute(sql, [data[c] for c in cols])
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error inserting project: {e}")
+        return False
+    finally:
+        conn.close()
         
 if __name__ == "__main__":
     conn = connect_to_db()

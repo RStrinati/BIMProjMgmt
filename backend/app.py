@@ -28,6 +28,8 @@ from database import (
     get_projects_full,
     update_project_financials,
     update_client_info,
+    insert_project_full,
+    get_reference_options,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -35,11 +37,20 @@ app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
 
-@app.route('/api/projects', methods=['GET'])
-def api_get_projects():
-    projects = get_projects()
-    data = [{'project_id': pid, 'project_name': name} for pid, name in projects]
-    return jsonify(data)
+@app.route('/api/projects', methods=['GET', 'POST'])
+def api_projects():
+    if request.method == 'GET':
+        projects = get_projects()
+        data = [{'project_id': pid, 'project_name': name} for pid, name in projects]
+        return jsonify(data)
+
+    body = request.get_json() or {}
+    if not body.get('project_name'):
+        return jsonify({'error': 'project_name required'}), 400
+    success = insert_project_full(body)
+    if success:
+        return jsonify({'success': True}), 201
+    return jsonify({'success': False}), 500
 
 
 @app.route('/api/projects_full', methods=['GET'])
@@ -54,6 +65,12 @@ def api_get_users():
     users = get_users_list()
     data = [{'user_id': uid, 'name': name} for uid, name in users]
     return jsonify(data)
+
+
+@app.route('/api/reference/<table>', methods=['GET'])
+def api_reference_table(table):
+    rows = get_reference_options(table)
+    return jsonify([{'id': r[0], 'name': r[1]} for r in rows])
 
 
 @app.route('/api/review_tasks', methods=['GET'])
