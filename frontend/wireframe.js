@@ -135,6 +135,34 @@ function EditProject({ project, onClose }) {
   );
 }
 
+function AddProject({ onClose }) {
+  const [form, setForm] = useState({ project_name: '' });
+
+  const save = () => {
+    fetch('/api/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    }).then(onClose);
+  };
+
+  return (
+    <div className="modal">
+      <div className="modal-content">
+        <h4>New Project</h4>
+        <TextField label="Project Name" fullWidth margin="dense"
+          value={form.project_name}
+          onChange={e => setForm({ project_name: e.target.value })}
+        />
+        <div style={{ marginTop: '1rem' }}>
+          <Button variant="contained" onClick={save}>Create</Button>
+          <Button onClick={onClose} style={{ marginLeft: '1rem' }}>Cancel</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabPanel({ children, value, index }) {
   return (
     <div role="tabpanel" hidden={value !== index}>
@@ -205,6 +233,7 @@ function ProjectsPage() {
   const [status, setStatus] = useState('');
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(false);
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
@@ -240,6 +269,17 @@ function ProjectsPage() {
     return <EditProject project={editing} onClose={refresh} />;
   }
 
+  if (adding) {
+    const refresh = () => {
+      setAdding(false);
+      fetch('/api/projects_full')
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(setProjects)
+        .catch(() => {});
+    };
+    return <AddProject onClose={refresh} />;
+  }
+
   return (
     <div>
       <h3>Projects</h3>
@@ -253,6 +293,9 @@ function ProjectsPage() {
             <MenuItem value="Planning">Planning</MenuItem>
           </Select>
         </FormControl>
+        <Button variant="contained" size="small" onClick={() => setAdding(true)}>
+          New Project
+        </Button>
       </div>
       <TableContainer component={Paper}>
         <Table size="small">
