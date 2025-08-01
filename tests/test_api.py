@@ -3,7 +3,7 @@ import types
 import pytest
 
 flask = pytest.importorskip("flask")
-from backend.app import app
+from backend import flask_app as app
 
 # Mock heavy dependencies
 _dummy = types.ModuleType("dummy")
