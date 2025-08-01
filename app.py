@@ -1,7 +1,7 @@
 import threading
 import subprocess
 import webbrowser
-
+import os
 from backend import flask_app
 from config import Config
 
@@ -22,7 +22,10 @@ def _launch_tkinter():
 
 if __name__ == "__main__":
     print(f"Connected to SQL Server at: {Config.DB_SERVER}")
-    _launch_tkinter()
+    # Only start the Tkinter UI when a display is detected. This prevents
+    # crashes in headless environments where launching a GUI would fail.
+    if os.environ.get("DISPLAY"):
+        _launch_tkinter()
     # Start a timer to open the browser after the server starts
     threading.Timer(1.0, _open_browser).start()
     flask_app.run(debug=True, use_reloader=False)
