@@ -19,11 +19,6 @@ const {
   Box,
   Button,
 } = MaterialUI;
-const { createClient } = supabase;
-// TODO: replace with your Supabase project credentials
-const supabaseUrl = 'https://your-project.supabase.co';
-const supabaseKey = 'public-anon-key';
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
 // Fallback sample data used if the backend is not available
 const sampleProjects = [
   {
