@@ -1323,6 +1323,28 @@ def insert_project_full(data):
         return False
     finally:
         conn.close()
+
+
+def update_project_record(project_id, data):
+    """Update arbitrary project fields for a given project_id."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cols = [c for c in data.keys() if c]
+        if not cols:
+            return False
+        set_clause = ', '.join([f"{c} = ?" for c in cols])
+        sql = f"UPDATE projects SET {set_clause} WHERE project_id = ?"
+        cursor.execute(sql, [data[c] for c in cols] + [project_id])
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating project: {e}")
+        return False
+    finally:
+        conn.close()
         
 if __name__ == "__main__":
     conn = connect_to_db()

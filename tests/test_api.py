@@ -12,7 +12,7 @@ for mod in ["pyodbc"]:
 
 
 def test_get_projects_endpoint(monkeypatch):
-    monkeypatch.setattr('backend.app.get_projects', lambda: [(1, 'A')])
+    monkeypatch.setattr('backend.app.get_projects_full', lambda: [{'project_id': 1, 'project_name': 'A'}])
     client = app.test_client()
     resp = client.get('/api/projects')
     assert resp.status_code == 200
@@ -219,19 +219,14 @@ def test_projects_full(monkeypatch):
 def test_update_full_project(monkeypatch):
     called = {}
 
-    def fake_fin(pid, cv, pt):
-        called['fin'] = (pid, cv, pt)
+    def fake_update(pid, data):
+        called['args'] = (pid, data)
         return True
 
-    def fake_client(pid, cc, ce):
-        called['cli'] = (pid, cc, ce)
-        return True
-
-    monkeypatch.setattr('backend.app.update_project_financials', fake_fin)
-    monkeypatch.setattr('backend.app.update_client_info', fake_client)
+    monkeypatch.setattr('backend.app.update_project_record', fake_update)
     client = app.test_client()
     resp = client.put('/api/projects/5', json={'contract_value': 10})
     assert resp.status_code == 200
-    assert called['fin'] == (5, 10, None)
+    assert called['args'] == (5, {'contract_value': 10})
 
 
