@@ -99,8 +99,8 @@ function EditProject({ project, onClose }) {
   });
 
   const save = () => {
-    fetch(`/api/projects/${project.project_id}`, {
-      method: 'PUT',
+    fetch(`/api/project/${project.project_id}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     }).then(onClose);
@@ -411,8 +411,8 @@ function ProjectsPage() {
   };
 
   const saveEdit = (pid) => {
-    fetch(`/api/projects/${pid}`, {
-      method: 'PUT',
+    fetch(`/api/project/${pid}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm),
     }).then(() => {

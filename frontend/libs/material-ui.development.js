@@ -1,1 +1,2 @@
-// Placeholder for MUI. Replace with Material UI 5 UMD build.
+// Load Material UI from CDN
+document.write('<script src="https://cdn.jsdelivr.net/npm/@mui/material@5.15.15/umd/material-ui.development.js"><\/script>');
