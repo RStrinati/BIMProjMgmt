@@ -1,1 +1,2 @@
-// Placeholder for React library. Replace with full React 18 build.
+// Load React from CDN
+document.write('<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"><\/script>');
