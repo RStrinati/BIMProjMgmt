@@ -3,7 +3,6 @@ from pathlib import Path
 from flask_cors import CORS
 
 from database import (
-    get_projects,
     get_review_tasks,
     update_review_task_assignee,
     get_users_list,
@@ -26,8 +25,7 @@ from database import (
     upsert_bep_section,
     update_bep_status,
     get_projects_full,
-    update_project_financials,
-    update_client_info,
+    update_project_record,
     insert_project_full,
     get_reference_options,
 )
@@ -40,9 +38,8 @@ CORS(app)
 @app.route('/api/projects', methods=['GET', 'POST'])
 def api_projects():
     if request.method == 'GET':
-        projects = get_projects()
-        data = [{'project_id': pid, 'project_name': name} for pid, name in projects]
-        return jsonify(data)
+        projects = get_projects_full()
+        return jsonify(projects)
 
     body = request.get_json() or {}
     if not body.get('project_name'):
@@ -157,20 +154,9 @@ def api_create_project():
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
 def api_update_full_project(project_id):
-    """Update financial and client details for a project."""
+    """Update project fields via a generic PUT."""
     data = request.get_json() or {}
-
-    update_project_financials(
-        project_id,
-        data.get('contract_value'),
-        data.get('payment_terms'),
-    )
-    update_client_info(
-        project_id,
-        data.get('client_contact'),
-        data.get('contact_email'),
-    )
-
+    update_project_record(project_id, data)
     return jsonify({'message': 'Project updated'})
 
 

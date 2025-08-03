@@ -180,122 +180,147 @@ function ReviewCycles() {
   );
 }
 
-function ProjectManagement() {
+function ProjectsView() {
+  const empty = {
+    project_name: '',
+    client: '',
+    project_type: '',
+    sector: '',
+    delivery_method: '',
+    project_phase: '',
+    construction_stage: '',
+    project_manager: '',
+    internal_lead: '',
+    contract_number: '',
+    contract_value: '',
+    agreed_fee: '',
+    payment_terms: '',
+    folder_path: '',
+    ifc_folder_path: '',
+    data_export_folder: '',
+    start_date: '',
+    end_date: '',
+    status: 'Planning',
+    priority: 'Low'
+  };
+
   const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState('');
-  const [details, setDetails] = useState({});
-  const [folders, setFolders] = useState({});
-  const [cycles, setCycles] = useState([]);
+  const [form, setForm] = useState(empty);
+  const [showForm, setShowForm] = useState(false);
+  const [refs, setRefs] = useState({});
+
+  const refresh = () => {
+    fetch('/api/projects').then(res => res.json()).then(setProjects);
+  };
+
+  const loadRefs = () => {
+    const tables = ['clients','project_types','sectors','delivery_methods','project_phases','construction_stages'];
+    tables.forEach(t => {
+      fetch(`/api/reference/${t}`)
+        .then(res => res.json())
+        .then(opts => setRefs(r => ({...r, [t]: opts})));
+    });
+  };
 
   useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
-      .then(setProjects);
+    refresh();
+    loadRefs();
   }, []);
 
-  useEffect(() => {
-    if (projectId) {
-      fetch(`/api/project/${projectId}`)
-        .then(res => res.json())
-        .then(setDetails);
-      fetch(`/api/project/${projectId}/folders`)
-        .then(res => res.json())
-        .then(setFolders);
-      fetch(`/api/cycle_ids/${projectId}`)
-        .then(res => res.json())
-        .then(setCycles);
-    } else {
-      setDetails({});
-      setFolders({});
-      setCycles([]);
-    }
-  }, [projectId]);
-
-  const updateDetails = () => {
-    fetch(`/api/project/${projectId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(details)
-    });
-  };
-
-  const updateFolders = () => {
-    fetch(`/api/project/${projectId}/folders`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(folders)
-    });
-  };
+  const handleChange = e => setForm({...form, [e.target.name]: e.target.value});
 
   const createProject = () => {
-    fetch('/api/project', {
+    fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_name: details.project_name || '' })
+      body: JSON.stringify(form)
     }).then(() => {
-      fetch('/api/projects').then(res => res.json()).then(setProjects);
+      setForm(empty);
+      setShowForm(false);
+      refresh();
     });
   };
 
-  const extractFiles = () => {
-    fetch('/api/extract_files', {
-      method: 'POST',
+  const updateProject = (id, field, value) => {
+    fetch(`/api/projects/${id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId })
-    });
+      body: JSON.stringify({ [field]: value })
+    }).then(refresh);
   };
+
+  const renderSelect = (value, options, onChange) => (
+    <select value={value || ''} onChange={e => onChange(e.target.value)}>
+      <option value=""></option>
+      {options.map(o => (
+        <option key={o.id || o.name} value={o.id || o.name}>{o.name}</option>
+      ))}
+    </select>
+  );
 
   return (
     <div>
-      <h2>Project Setup</h2>
-      <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-        <option value="">Select Project</option>
-        {projects.map(p => (
-          <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
-        ))}
-      </select>
-
-      {projectId && (
-        <div style={{marginTop:'10px'}}>
-          <div>
-            <label>Name</label>
-            <input value={details.project_name || ''} onChange={e => setDetails({...details, project_name: e.target.value})}/>
-          </div>
-          <div>
-            <label>Status</label>
-            <input value={details.status || ''} onChange={e => setDetails({...details, status: e.target.value})}/>
-          </div>
-          <div>
-            <label>Priority</label>
-            <input value={details.priority || ''} onChange={e => setDetails({...details, priority: e.target.value})}/>
-          </div>
-          <div>
-            <label>Start</label>
-            <input type="date" value={details.start_date || ''} onChange={e => setDetails({...details, start_date: e.target.value})}/>
-          </div>
-          <div>
-            <label>End</label>
-            <input type="date" value={details.end_date || ''} onChange={e => setDetails({...details, end_date: e.target.value})}/>
-          </div>
-          <button onClick={updateDetails}>Save Details</button>
-          <button onClick={createProject}>Create Project</button>
-          <button onClick={extractFiles}>Extract Files</button>
-
-          <div style={{marginTop:'10px'}}>
-            <label>Model Path</label>
-            <input value={folders.model_path || ''} onChange={e => setFolders({...folders, model_path: e.target.value})}/>
-            <label style={{marginLeft:'10px'}}>IFC Path</label>
-            <input value={folders.ifc_path || ''} onChange={e => setFolders({...folders, ifc_path: e.target.value})}/>
-            <button onClick={updateFolders}>Save Paths</button>
-          </div>
-
-          <div style={{marginTop:'10px'}}>
-            <h4>Cycles</h4>
-            <ul>{cycles.map(c => <li key={c}>{c}</li>)}</ul>
-          </div>
-
+      <button onClick={() => setShowForm(!showForm)}>New Project</button>
+      {showForm && (
+        <div className="new-project-form" style={{marginTop:'10px'}}>
+          <input placeholder="Project Name" name="project_name" value={form.project_name} onChange={handleChange} />
+          {renderSelect(form.client, refs.clients || [], v => setForm({...form, client: v}))}
+          {renderSelect(form.project_type, refs.project_types || [], v => setForm({...form, project_type: v}))}
+          {renderSelect(form.sector, refs.sectors || [], v => setForm({...form, sector: v}))}
+          {renderSelect(form.delivery_method, refs.delivery_methods || [], v => setForm({...form, delivery_method: v}))}
+          {renderSelect(form.project_phase, refs.project_phases || [], v => setForm({...form, project_phase: v}))}
+          {renderSelect(form.construction_stage, refs.construction_stages || [], v => setForm({...form, construction_stage: v}))}
+          <input placeholder="Project Manager" name="project_manager" value={form.project_manager} onChange={handleChange} />
+          <input placeholder="Internal Lead" name="internal_lead" value={form.internal_lead} onChange={handleChange} />
+          <input placeholder="Contract Number" name="contract_number" value={form.contract_number} onChange={handleChange} />
+          <input placeholder="Contract Value" name="contract_value" value={form.contract_value} onChange={handleChange} />
+          <input placeholder="Agreed Fee" name="agreed_fee" value={form.agreed_fee} onChange={handleChange} />
+          <input placeholder="Payment Terms" name="payment_terms" value={form.payment_terms} onChange={handleChange} />
+          <input placeholder="Folder Path" name="folder_path" value={form.folder_path} onChange={handleChange} />
+          <input placeholder="IFC Folder Path" name="ifc_folder_path" value={form.ifc_folder_path} onChange={handleChange} />
+          <input placeholder="Data Export Folder" name="data_export_folder" value={form.data_export_folder} onChange={handleChange} />
+          <input type="date" name="start_date" value={form.start_date} onChange={handleChange} />
+          <input type="date" name="end_date" value={form.end_date} onChange={handleChange} />
+          {renderSelect(form.status, [{name:'Planning'},{name:'Active'},{name:'On Hold'},{name:'Complete'}], v => setForm({...form, status: v}))}
+          {renderSelect(form.priority, [{name:'Low'},{name:'Medium'},{name:'High'}], v => setForm({...form, priority: v}))}
+          <button onClick={createProject}>Save</button>
         </div>
       )}
+
+      <table border="1" cellPadding="4" style={{marginTop:'10px'}}>
+        <thead>
+          <tr>
+            <th>Project Name</th>
+            <th>Client</th>
+            <th>Project Type</th>
+            <th>Sector</th>
+            <th>Delivery Method</th>
+            <th>Phase</th>
+            <th>Stage</th>
+            <th>Project Manager</th>
+            <th>Internal Lead</th>
+            <th>Status</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map(p => (
+            <tr key={p.project_id}>
+              <td><input value={p.project_name || ''} onChange={e => updateProject(p.project_id, 'project_name', e.target.value)} /></td>
+              <td>{renderSelect(p.client, refs.clients || [], v => updateProject(p.project_id, 'client', v))}</td>
+              <td>{renderSelect(p.project_type, refs.project_types || [], v => updateProject(p.project_id, 'project_type', v))}</td>
+              <td>{renderSelect(p.sector, refs.sectors || [], v => updateProject(p.project_id, 'sector', v))}</td>
+              <td>{renderSelect(p.delivery_method, refs.delivery_methods || [], v => updateProject(p.project_id, 'delivery_method', v))}</td>
+              <td>{renderSelect(p.phase, refs.project_phases || [], v => updateProject(p.project_id, 'phase', v))}</td>
+              <td>{renderSelect(p.stage, refs.construction_stages || [], v => updateProject(p.project_id, 'stage', v))}</td>
+              <td><input value={p.project_manager || ''} onChange={e => updateProject(p.project_id, 'project_manager', e.target.value)} /></td>
+              <td><input value={p.internal_lead || ''} onChange={e => updateProject(p.project_id, 'internal_lead', e.target.value)} /></td>
+              <td>{renderSelect(p.status, [{name:'Planning'},{name:'Active'},{name:'On Hold'},{name:'Complete'}], v => updateProject(p.project_id, 'status', v))}</td>
+              <td>{renderSelect(p.priority, [{name:'Low'},{name:'Medium'},{name:'High'}], v => updateProject(p.project_id, 'priority', v))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -307,9 +332,9 @@ function App() {
       <div>
         <button onClick={() => setView('review')}>Review Tasks</button>
         <button onClick={() => setView('cycles')}>Review Cycles</button>
-        <button onClick={() => setView('project')}>Project Setup</button>
+        <button onClick={() => setView('projects')}>Projects</button>
       </div>
-      {view === 'review' ? <ReviewTasks /> : view === 'cycles' ? <ReviewCycles /> : <ProjectManagement />}
+      {view === 'review' ? <ReviewTasks /> : view === 'cycles' ? <ReviewCycles /> : <ProjectsView />}
     </div>
   );
 }
