@@ -1,3 +1,5 @@
+
+console.log("✅ wireframe.js is being loaded");
 const { useState, useEffect } = React;
 const {
   Table,
@@ -18,12 +20,10 @@ const {
   Button,
 } = MaterialUI;
 const { createClient } = supabase;
-
 // TODO: replace with your Supabase project credentials
 const supabaseUrl = 'https://your-project.supabase.co';
 const supabaseKey = 'public-anon-key';
 const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
 // Fallback sample data used if the backend is not available
 const sampleProjects = [
   {
@@ -40,7 +40,6 @@ const sampleProjects = [
     contact_email: 'jane@example.com',
   },
 ];
-
 function Sidebar({ active, onChange }) {
   const items = [
     { key: 'projects', label: 'Projects' },
@@ -66,7 +65,6 @@ function Sidebar({ active, onChange }) {
     </div>
   );
 }
-
 function TopBar() {
   return (
     <div className="topbar">
@@ -80,7 +78,6 @@ function TopBar() {
     </div>
   );
 }
-
 function Placeholder({ title }) {
   return (
     <div>
@@ -89,7 +86,6 @@ function Placeholder({ title }) {
     </div>
   );
 }
-
 function EditProject({ project, onClose }) {
   const [form, setForm] = useState({
     contract_value: project.contract_value || '',
@@ -97,7 +93,6 @@ function EditProject({ project, onClose }) {
     client_contact: project.client_contact || '',
     contact_email: project.contact_email || '',
   });
-
   const save = () => {
     fetch(`/api/projects/${project.project_id}`, {
       method: 'PUT',
@@ -105,7 +100,6 @@ function EditProject({ project, onClose }) {
       body: JSON.stringify(form),
     }).then(onClose);
   };
-
   return (
     <div className="modal">
       <div className="modal-content">
@@ -134,7 +128,6 @@ function EditProject({ project, onClose }) {
     </div>
   );
 }
-
 function AddProject({ onClose }) {
   const empty = {
     project_name: '',
@@ -159,7 +152,6 @@ function AddProject({ onClose }) {
     priority: 'Low',
   };
   const [form, setForm] = useState(empty);
-
   const [options, setOptions] = useState({
     clients: [],
     project_types: [],
@@ -168,7 +160,6 @@ function AddProject({ onClose }) {
     project_phases: [],
     construction_stages: [],
   });
-
   useEffect(() => {
     const tables = [
       'clients',
@@ -185,7 +176,6 @@ function AddProject({ onClose }) {
         .catch(() => {});
     });
   }, []);
-
   const save = () => {
     fetch('/api/projects', {
       method: 'POST',
@@ -193,9 +183,7 @@ function AddProject({ onClose }) {
       body: JSON.stringify(form),
     }).then(onClose);
   };
-
   const handle = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
   return (
     <div className="modal">
       <div className="modal-content" style={{ maxHeight: '80vh', overflow: 'auto' }}>
@@ -274,7 +262,6 @@ function AddProject({ onClose }) {
     </div>
   );
 }
-
 function TabPanel({ children, value, index }) {
   return (
     <div role="tabpanel" hidden={value !== index}>
@@ -282,11 +269,9 @@ function TabPanel({ children, value, index }) {
     </div>
   );
 }
-
 function ProjectDetail({ project, onBack }) {
   const [tab, setTab] = useState(0);
   const [details, setDetails] = useState(project);
-
   useEffect(() => {
     // Retrieve up-to-date project details from the backend when the
     // component mounts. Only a subset of fields may be returned so we
@@ -296,9 +281,7 @@ function ProjectDetail({ project, onBack }) {
       .then(data => setDetails(prev => ({ ...prev, ...data })))
       .catch(() => setDetails(project));
   }, [project.project_id]);
-
   if (!details) return null;
-
   return (
     <div>
       <Button variant="outlined" onClick={onBack} style={{ marginBottom: '1rem' }}>
@@ -339,7 +322,6 @@ function ProjectDetail({ project, onBack }) {
     </div>
   );
 }
-
 function ProjectsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -357,7 +339,6 @@ function ProjectsPage() {
     project_phases: [],
     construction_stages: [],
   });
-
   useEffect(() => {
     // Retrieve project data from the vw_projects_full view.
     // Fallback to the bundled sample when the API is unavailable.
@@ -366,7 +347,6 @@ function ProjectsPage() {
       .then(setProjects)
       .catch(() => setProjects(sampleProjects));
   }, []);
-
   useEffect(() => {
     const tables = [
       'clients',
@@ -383,7 +363,6 @@ function ProjectsPage() {
         .catch(() => {});
     });
   }, []);
-
   const filtered = projects.filter(p => {
     const matchesSearch =
       !search ||
@@ -392,7 +371,6 @@ function ProjectsPage() {
     const matchesStatus = !status || p.status === status;
     return matchesSearch && matchesStatus;
   });
-
   const startEdit = (p) => {
     setEditRow(p.project_id);
     setEditForm({
@@ -409,7 +387,6 @@ function ProjectsPage() {
       priority: p.priority,
     });
   };
-
   const saveEdit = (pid) => {
     fetch(`/api/projects/${pid}`, {
       method: 'PUT',
@@ -423,11 +400,9 @@ function ProjectsPage() {
         .catch(() => {});
     });
   };
-
   if (selected) {
     return <ProjectDetail project={selected} onBack={() => setSelected(null)} />;
   }
-
   if (editing) {
     const refresh = () => {
       setEditing(null);
@@ -438,7 +413,6 @@ function ProjectsPage() {
     };
     return <EditProject project={editing} onClose={refresh} />;
   }
-
   if (adding) {
     const refresh = () => {
       setAdding(false);
@@ -449,7 +423,6 @@ function ProjectsPage() {
     };
     return <AddProject onClose={refresh} />;
   }
-
   return (
     <div>
       <h3>Projects</h3>
@@ -532,7 +505,6 @@ function ProjectsPage() {
     </div>
   );
 }
-
 const pages = {
   projects: ProjectsPage,
   bep: () => <Placeholder title="BEP Manager" />,
@@ -542,7 +514,6 @@ const pages = {
   issues: () => <Placeholder title="Coordination Issues" />,
   kpis: () => <Placeholder title="KPIs & Reports" />,
 };
-
 function App() {
   const [page, setPage] = useState('projects');
   const Page = pages[page];
@@ -558,5 +529,4 @@ function App() {
     </div>
   );
 }
-
 ReactDOM.render(<App />, document.getElementById('root'));
