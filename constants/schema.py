@@ -1,0 +1,136 @@
+"""Database schema constants for tables and columns."""
+
+class Projects:
+    TABLE = "Projects"
+    ID = "project_id"
+    NAME = "project_name"
+    FOLDER_PATH = "folder_path"
+    IFC_FOLDER_PATH = "ifc_folder_path"
+    DATA_EXPORT_FOLDER = "data_export_folder"
+    START_DATE = "start_date"
+    END_DATE = "end_date"
+    STATUS = "status"
+    PRIORITY = "priority"
+    UPDATED_AT = "updated_at"
+
+class ReviewParameters:
+    TABLE = "ReviewParameters"
+    ID = "ParameterID"
+    PROJECT_ID = "ProjectID"
+    REVIEW_START_DATE = "ReviewStartDate"
+    NUMBER_OF_REVIEWS = "NumberOfReviews"
+    REVIEW_FREQUENCY = "ReviewFrequency"
+    LICENSE_START = "LicenseStartDate"
+    LICENSE_END = "LicenseEndDate"
+    CYCLE_ID = "cycle_id"
+
+class ReviewCycleDetails:
+    TABLE = "ReviewCycleDetails"
+    ID = "cycle_detail_id"
+    PROJECT_ID = "project_id"
+    CYCLE_ID = "cycle_id"
+    CONSTRUCTION_STAGE = "construction_stage"
+    PROPOSED_FEE = "proposed_fee"
+    ASSIGNED_USERS = "assigned_users"
+    REVIEWS_PER_PHASE = "reviews_per_phase"
+    PLANNED_START = "planned_start_date"
+    PLANNED_COMPLETION = "planned_completion_date"
+    ACTUAL_START = "actual_start_date"
+    ACTUAL_COMPLETION = "actual_completion_date"
+    HOLD_DATE = "hold_date"
+    RESUME_DATE = "resume_date"
+    NEW_CONTRACT = "new_contract"
+
+class ReviewSchedule:
+    TABLE = "ReviewSchedule"
+    ID = "schedule_id"
+    PROJECT_ID = "project_id"
+    CYCLE_ID = "cycle_id"
+    REVIEW_DATE = "review_date"
+    ASSIGNED_TO = "assigned_to"
+    STATUS = "status"
+    IS_BLOCKED = "is_blocked"
+    IS_WITHIN_LICENSE = "is_within_license_period"
+    MANUAL_OVERRIDE = "manual_override"
+
+class ProjectReviews:
+    TABLE = "project_reviews"
+    ID = "review_id"
+    PROJECT_ID = "project_id"
+    CYCLE_ID = "cycle_id"
+    SCOPED_REVIEWS = "scoped_reviews"
+    COMPLETED_REVIEWS = "completed_reviews"
+    LAST_UPDATED = "last_updated"
+
+class ACCImportFolders:
+    TABLE = "ACCImportFolders"
+    PROJECT_ID = "project_id"
+    ACC_FOLDER_PATH = "acc_folder_path"
+    LAST_IMPORT_DATE = "last_import_date"
+
+class ACCImportLogs:
+    TABLE = "ACCImportLogs"
+    ID = "log_id"
+    PROJECT_ID = "project_id"
+    FOLDER_NAME = "folder_name"
+    IMPORT_DATE = "import_date"
+    SUMMARY = "summary"
+
+class ACCDocs:
+    TABLE = "tblACCDocs"
+    ID = "id"
+    FILE_NAME = "file_name"
+    FILE_PATH = "file_path"
+    DATE_MODIFIED = "date_modified"
+    FILE_TYPE = "file_type"
+    FILE_SIZE_KB = "file_size_kb"
+    CREATED_AT = "created_at"
+    DELETED_AT = "deleted_at"
+    PROJECT_ID = "project_id"
+
+class Users:
+    TABLE = "users"
+    ID = "user_id"
+    NAME = "name"
+    ROLE = "role"
+    EMAIL = "email"
+
+class Tasks:
+    TABLE = "tasks"
+    ID = "task_id"
+    NAME = "task_name"
+    PROJECT_ID = "project_id"
+    CYCLE_ID = "cycle_id"
+    START_DATE = "start_date"
+    END_DATE = "end_date"
+    ASSIGNED_TO = "assigned_to"
+    DEPENDENCIES = "dependencies"
+    PROGRESS = "progress"
+
+class ContractualLinks:
+    TABLE = "ContractualLinks"
+    ID = "id"
+    PROJECT_ID = "project_id"
+    REVIEW_CYCLE_ID = "review_cycle_id"
+    BEP_CLAUSE = "bep_clause"
+    BILLING_EVENT = "billing_event"
+    AMOUNT_DUE = "amount_due"
+    STATUS = "status"
+
+class ReviewCycles:
+    TABLE = "review_cycles"
+    ID = "review_cycle_id"
+    PROJECT_ID = "project_id"
+    STAGE_ID = "stage_id"
+    START_DATE = "start_date"
+    END_DATE = "end_date"
+    NUM_REVIEWS = "num_reviews"
+    CREATED_BY = "created_by"
+
+class ReviewTasks:
+    TABLE = "review_tasks"
+    ID = "review_task_id"
+    SCHEDULE_ID = "schedule_id"
+    TASK_ID = "task_id"
+    ASSIGNED_TO = "assigned_to"
+    STATUS = "status"
