@@ -9,6 +9,7 @@ from database import (
     upsert_project_review_progress,
     get_cycle_ids,
 )
+from constants import schema as S
 
 
 
@@ -19,11 +20,11 @@ def update_review_date(schedule_id, new_date):
     conn = connect_to_db()
     cursor = conn.cursor()
     cursor.execute(
-        """
-        UPDATE ReviewSchedule
-        SET review_date = ?, manual_override = 1
-        WHERE schedule_id = ?;
-    """,
+        f"""
+        UPDATE {S.ReviewSchedule.TABLE}
+        SET {S.ReviewSchedule.REVIEW_DATE} = ?, {S.ReviewSchedule.MANUAL_OVERRIDE} = 1
+        WHERE {S.ReviewSchedule.ID} = ?;
+        """,
         (new_date, schedule_id),
     )
     conn.commit()
@@ -33,12 +34,13 @@ def adjust_future_tasks(schedule_id, new_date, project_id, cycle_id):
     """Auto-adjust all future reviews after moving a task."""
     conn = connect_to_db()
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT schedule_id, review_date FROM ReviewSchedule
-        WHERE project_id = ? AND cycle_id = ? AND schedule_id > ?
-        ORDER BY review_date ASC;
-    """,
+
+    cursor.execute(
+        f"""
+        SELECT {S.ReviewSchedule.ID}, {S.ReviewSchedule.REVIEW_DATE} FROM {S.ReviewSchedule.TABLE}
+        WHERE {S.ReviewSchedule.PROJECT_ID} = ? AND {S.ReviewSchedule.CYCLE_ID} = ? AND {S.ReviewSchedule.ID} > ?
+        ORDER BY {S.ReviewSchedule.REVIEW_DATE} ASC;
+        """,
         (project_id, cycle_id, schedule_id),
     )
 
@@ -50,10 +52,10 @@ def adjust_future_tasks(schedule_id, new_date, project_id, cycle_id):
         new_future_date = original_review_date + pd.Timedelta(days=shift_days)
 
         cursor.execute(
-            """
-            UPDATE ReviewSchedule
-            SET review_date = ?
-            WHERE schedule_id = ?;
+            f"""
+            UPDATE {S.ReviewSchedule.TABLE}
+            SET {S.ReviewSchedule.REVIEW_DATE} = ?
+            WHERE {S.ReviewSchedule.ID} = ?;
             """,
             (new_future_date.strftime("%Y-%m-%d"), future_schedule_id),
         )
@@ -66,7 +68,7 @@ def delete_review_task(schedule_id):
     conn = connect_to_db()
     cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM ReviewSchedule WHERE schedule_id = ?;",
+        f"DELETE FROM {S.ReviewSchedule.TABLE} WHERE {S.ReviewSchedule.ID} = ?;",
         (schedule_id,),
     )
     conn.commit()
@@ -139,13 +141,16 @@ def submit_review_schedule(
         new_contract = bool(new_contract_var.get())
 
         # ✅ Generate cycle ID properly
-        cursor.execute("SELECT ISNULL(MAX(cycle_id), 0) + 1 FROM ReviewParameters WHERE ProjectID = ?", (project_id,))
+        cursor.execute(
+            f"SELECT ISNULL(MAX({S.ReviewParameters.CYCLE_ID}), 0) + 1 FROM {S.ReviewParameters.TABLE} WHERE {S.ReviewParameters.PROJECT_ID} = ?",
+            (project_id,),
+        )
         cycle_id = cursor.fetchone()[0]
 
         cursor.execute(
-            """
-            INSERT INTO ReviewParameters
-            (ProjectID, ReviewStartDate, NumberOfReviews, ReviewFrequency, LicenseStartDate, LicenseEndDate, cycle_id)
+            f"""
+            INSERT INTO {S.ReviewParameters.TABLE}
+            ({S.ReviewParameters.PROJECT_ID}, {S.ReviewParameters.REVIEW_START_DATE}, {S.ReviewParameters.NUMBER_OF_REVIEWS}, {S.ReviewParameters.REVIEW_FREQUENCY}, {S.ReviewParameters.LICENSE_START}, {S.ReviewParameters.LICENSE_END}, {S.ReviewParameters.CYCLE_ID})
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
             (
@@ -212,27 +217,30 @@ def fetch_review_summary(project_dropdown, cycle_dropdown, summary_label):
     try:
         conn = connect_to_db()
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            f"""
                     WITH ReviewData AS (
-                        SELECT 
-                            rp.ProjectID, rp.cycle_id, rp.ReviewStartDate, rp.LicenseStartDate, rp.LicenseEndDate,
-                            rp.NumberOfReviews, rp.ReviewFrequency,
-                            MAX(rs.review_date) AS LastReviewDate,
-                            DATEDIFF(DAY, rp.LicenseStartDate, rp.LicenseEndDate) AS LicenseDays,
-                            DATEDIFF(MONTH, rp.LicenseStartDate, rp.LicenseEndDate) AS LicenseMonths,
-                            (DATEDIFF(DAY, rp.LicenseStartDate, rp.LicenseEndDate) / rp.ReviewFrequency) AS PossibleReviewsWithinLicense
-                        FROM ReviewParameters rp
-                        LEFT JOIN ReviewSchedule rs ON rp.ProjectID = rs.project_id AND rp.cycle_id = rs.cycle_id
-                        WHERE rp.ProjectID = ? AND rp.cycle_id = ?
-                        GROUP BY rp.ProjectID, rp.cycle_id, rp.ReviewStartDate, rp.LicenseStartDate, rp.LicenseEndDate, rp.NumberOfReviews, rp.ReviewFrequency
+                        SELECT
+                            rp.{S.ReviewParameters.PROJECT_ID}, rp.{S.ReviewParameters.CYCLE_ID}, rp.{S.ReviewParameters.REVIEW_START_DATE}, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END},
+                            rp.{S.ReviewParameters.NUMBER_OF_REVIEWS}, rp.{S.ReviewParameters.REVIEW_FREQUENCY},
+                            MAX(rs.{S.ReviewSchedule.REVIEW_DATE}) AS LastReviewDate,
+                            DATEDIFF(DAY, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END}) AS LicenseDays,
+                            DATEDIFF(MONTH, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END}) AS LicenseMonths,
+                            (DATEDIFF(DAY, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END}) / rp.{S.ReviewParameters.REVIEW_FREQUENCY}) AS PossibleReviewsWithinLicense
+                        FROM {S.ReviewParameters.TABLE} rp
+                        LEFT JOIN {S.ReviewSchedule.TABLE} rs ON rp.{S.ReviewParameters.PROJECT_ID} = rs.{S.ReviewSchedule.PROJECT_ID} AND rp.{S.ReviewParameters.CYCLE_ID} = rs.{S.ReviewSchedule.CYCLE_ID}
+                        WHERE rp.{S.ReviewParameters.PROJECT_ID} = ? AND rp.{S.ReviewParameters.CYCLE_ID} = ?
+                        GROUP BY rp.{S.ReviewParameters.PROJECT_ID}, rp.{S.ReviewParameters.CYCLE_ID}, rp.{S.ReviewParameters.REVIEW_START_DATE}, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END}, rp.{S.ReviewParameters.NUMBER_OF_REVIEWS}, rp.{S.ReviewParameters.REVIEW_FREQUENCY}
                     )
-                    SELECT *, 
-                        CASE 
-                            WHEN NumberOfReviews > PossibleReviewsWithinLicense THEN 'Yes' 
-                            ELSE 'No' 
+                    SELECT *,
+                        CASE
+                            WHEN NumberOfReviews > PossibleReviewsWithinLicense THEN 'Yes'
+                            ELSE 'No'
                         END AS ExceedsLicense
                     FROM ReviewData;
-                """, (project_id, cycle_id))
+                """,
+            (project_id, cycle_id),
+        )
 
         data = cursor.fetchone()
         conn.close()
@@ -271,7 +279,7 @@ def generate_stage_review_schedule(project_id, stages):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT ISNULL(MAX(cycle_id),0)+1 FROM ReviewParameters WHERE ProjectID = ?",
+            f"SELECT ISNULL(MAX({S.ReviewParameters.CYCLE_ID}),0)+1 FROM {S.ReviewParameters.TABLE} WHERE {S.ReviewParameters.PROJECT_ID} = ?",
             (project_id,),
         )
         cycle_id = cursor.fetchone()[0]
@@ -289,15 +297,15 @@ def generate_stage_review_schedule(project_id, stages):
             license_end = None
 
         cursor.execute(
-            """
-            INSERT INTO ReviewParameters (
-                ProjectID,
-                ReviewStartDate,
-                NumberOfReviews,
-                ReviewFrequency,
-                LicenseStartDate,
-                LicenseEndDate,
-                cycle_id
+            f"""
+            INSERT INTO {S.ReviewParameters.TABLE} (
+                {S.ReviewParameters.PROJECT_ID},
+                {S.ReviewParameters.REVIEW_START_DATE},
+                {S.ReviewParameters.NUMBER_OF_REVIEWS},
+                {S.ReviewParameters.REVIEW_FREQUENCY},
+                {S.ReviewParameters.LICENSE_START},
+                {S.ReviewParameters.LICENSE_END},
+                {S.ReviewParameters.CYCLE_ID}
             ) VALUES (?, ?, ?, ?, ?, ?, ?);
             """,
             (
@@ -339,7 +347,7 @@ def generate_stage_review_schedule(project_id, stages):
             for i in range(count):
                 r_date = start + timedelta(days=round(interval * i))
                 cursor.execute(
-                    "INSERT INTO ReviewSchedule (project_id, cycle_id, review_date) VALUES (?, ?, ?);",
+                    f"INSERT INTO {S.ReviewSchedule.TABLE} ({S.ReviewSchedule.PROJECT_ID}, {S.ReviewSchedule.CYCLE_ID}, {S.ReviewSchedule.REVIEW_DATE}) VALUES (?, ?, ?);",
                     (project_id, cycle_id, r_date.strftime("%Y-%m-%d")),
                 )
 

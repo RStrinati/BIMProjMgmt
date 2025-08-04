@@ -1,9 +1,10 @@
 import pyodbc
 import os
-import pandas as pd 
+import pandas as pd
 from datetime import datetime, timedelta
 
 from config import Config
+from constants import schema as S
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""
@@ -44,10 +45,15 @@ def insert_project(project_name, folder_path, ifc_folder_path=None):
         start_date = datetime.now().strftime('%Y-%m-%d')
         end_date = (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')
 
-        cursor.execute("""
-            INSERT INTO projects (project_name, folder_path, ifc_folder_path, start_date, end_date)
-            VALUES (?, ?, ?, ?, ?);
-        """, (project_name, folder_path, ifc_folder_path, start_date, end_date))
+        cursor.execute(
+            f"""
+            INSERT INTO {S.Projects.TABLE} (
+                {S.Projects.NAME}, {S.Projects.FOLDER_PATH}, {S.Projects.IFC_FOLDER_PATH},
+                {S.Projects.START_DATE}, {S.Projects.END_DATE}
+            ) VALUES (?, ?, ?, ?, ?);
+            """,
+            (project_name, folder_path, ifc_folder_path, start_date, end_date),
+        )
 
         conn.commit()
         print(f"✅ Project '{project_name}' inserted with IFC folder: {ifc_folder_path}")
@@ -66,7 +72,9 @@ def get_projects():
     
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT project_id, project_name FROM projects ORDER BY project_id;")
+        cursor.execute(
+            f"SELECT {S.Projects.ID}, {S.Projects.NAME} FROM {S.Projects.TABLE} ORDER BY {S.Projects.ID};"
+        )
         projects = [(row[0], row[1]) for row in cursor.fetchall()]
         return projects
     except Exception as e:
@@ -83,11 +91,14 @@ def get_project_details(project_id):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT project_name, start_date, end_date, status, priority
-            FROM dbo.projects 
-            WHERE project_id = ?;
-        """, (project_id,))
+        cursor.execute(
+            f"""
+            SELECT {S.Projects.NAME}, {S.Projects.START_DATE}, {S.Projects.END_DATE}, {S.Projects.STATUS}, {S.Projects.PRIORITY}
+            FROM dbo.{S.Projects.TABLE}
+            WHERE {S.Projects.ID} = ?;
+            """,
+            (project_id,),
+        )
         row = cursor.fetchone()
         
         if row:
@@ -115,11 +126,14 @@ def update_project_details(project_id, start_date, end_date, status, priority):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE dbo.projects 
-            SET start_date = ?, end_date = ?, status = ?, priority = ?, updated_at = GETDATE()
-            WHERE project_id = ?;
-        """, (start_date, end_date, status, priority, project_id))
+        cursor.execute(
+            f"""
+            UPDATE dbo.{S.Projects.TABLE}
+            SET {S.Projects.START_DATE} = ?, {S.Projects.END_DATE} = ?, {S.Projects.STATUS} = ?, {S.Projects.PRIORITY} = ?, {S.Projects.UPDATED_AT} = GETDATE()
+            WHERE {S.Projects.ID} = ?;
+            """,
+            (start_date, end_date, status, priority, project_id),
+        )
         conn.commit()
         print(f"✅ Project {project_id} details updated.")
         return True
@@ -137,30 +151,17 @@ def get_review_schedule(project_id, cycle_id):
 
     try:
         cursor = conn.cursor()
-        
+
         cursor.execute(
-            """
-            SELECT rs.schedule_id,
-                   rs.review_date,
-                   rs.cycle_id,
-                   p.project_name,
-                   d.construction_stage,
-                   d.proposed_fee,
-                   d.assigned_users,
-                   d.reviews_per_phase,
-                   d.planned_start_date,
-                   d.planned_completion_date,
-                   d.actual_start_date,
-                   d.actual_completion_date,
-                   d.hold_date,
-                   d.resume_date,
-                   d.new_contract
-            FROM ReviewSchedule rs
-            JOIN Projects p ON rs.project_id = p.project_id
-            LEFT JOIN ReviewCycleDetails d ON rs.project_id = d.project_id AND rs.cycle_id = d.cycle_id
-            WHERE rs.project_id = ? AND rs.cycle_id = ?
-            ORDER BY rs.review_date ASC;
-        """,
+            f"""
+            SELECT {S.ReviewSchedule.ID}, {S.ReviewSchedule.REVIEW_DATE}, {S.ReviewSchedule.CYCLE_ID},
+                   project_name, construction_stage, proposed_fee, assigned_users,
+                   reviews_per_phase, planned_start_date, planned_completion_date,
+                   actual_start_date, actual_completion_date, hold_date, resume_date, new_contract
+            FROM vw_ReviewScheduleDetails
+            WHERE {S.ReviewSchedule.PROJECT_ID} = ? AND {S.ReviewSchedule.CYCLE_ID} = ?
+            ORDER BY {S.ReviewSchedule.REVIEW_DATE} ASC;
+            """,
             (project_id, cycle_id),
         )
 
@@ -232,13 +233,22 @@ def update_project_folders(project_id, models_path=None, data_path=None, ifc_pat
         cursor = conn.cursor()
 
         if models_path is not None:
-            cursor.execute("UPDATE dbo.projects SET folder_path = ? WHERE project_id = ?", (models_path, project_id))
+            cursor.execute(
+                f"UPDATE dbo.{S.Projects.TABLE} SET {S.Projects.FOLDER_PATH} = ? WHERE {S.Projects.ID} = ?",
+                (models_path, project_id),
+            )
 
         if data_path is not None:
-            cursor.execute("UPDATE dbo.projects SET data_export_folder = ? WHERE project_id = ?", (data_path, project_id))
+            cursor.execute(
+                f"UPDATE dbo.{S.Projects.TABLE} SET {S.Projects.DATA_EXPORT_FOLDER} = ? WHERE {S.Projects.ID} = ?",
+                (data_path, project_id),
+            )
 
         if ifc_path is not None:
-            cursor.execute("UPDATE dbo.projects SET ifc_folder_path = ? WHERE project_id = ?", (ifc_path, project_id))
+            cursor.execute(
+                f"UPDATE dbo.{S.Projects.TABLE} SET {S.Projects.IFC_FOLDER_PATH} = ? WHERE {S.Projects.ID} = ?",
+                (ifc_path, project_id),
+            )
 
         conn.commit()
         print(f"✅ Project {project_id} paths updated: models={models_path}, data={data_path}, ifc={ifc_path}")
@@ -260,12 +270,15 @@ def get_acc_import_logs(project_id):
         return []
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT TOP 5 folder_name, import_date, summary
-            FROM ACCImportLogs
-            WHERE project_id = ?
-            ORDER BY import_date DESC
-        """, (project_id,))
+        cursor.execute(
+            f"""
+            SELECT TOP 5 {S.ACCImportLogs.FOLDER_NAME}, {S.ACCImportLogs.IMPORT_DATE}, {S.ACCImportLogs.SUMMARY}
+            FROM {S.ACCImportLogs.TABLE}
+            WHERE {S.ACCImportLogs.PROJECT_ID} = ?
+            ORDER BY {S.ACCImportLogs.IMPORT_DATE} DESC
+            """,
+            (project_id,),
+        )
         return cursor.fetchall()
     except Exception as e:
         print(f"❌ Error retrieving import logs: {e}")
@@ -284,7 +297,10 @@ def get_project_folders(project_id):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT folder_path, ifc_folder_path FROM dbo.projects WHERE project_id = ?", (project_id,))
+        cursor.execute(
+            f"SELECT {S.Projects.FOLDER_PATH}, {S.Projects.IFC_FOLDER_PATH} FROM dbo.{S.Projects.TABLE} WHERE {S.Projects.ID} = ?",
+            (project_id,),
+        )
         row = cursor.fetchone()
         
         if row:
@@ -309,11 +325,14 @@ def get_cycle_ids(project_id):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT DISTINCT cycle_id FROM ReviewParameters 
-            WHERE ProjectID = ? 
-            ORDER BY cycle_id DESC;
-        """, (project_id,))
+        cursor.execute(
+            f"""
+            SELECT DISTINCT {S.ReviewParameters.CYCLE_ID} FROM {S.ReviewParameters.TABLE}
+            WHERE {S.ReviewParameters.PROJECT_ID} = ?
+            ORDER BY {S.ReviewParameters.CYCLE_ID} DESC;
+            """,
+            (project_id,),
+        )
         
         cycles = [str(row[0]) for row in cursor.fetchall()]
         
@@ -356,7 +375,10 @@ def insert_files_into_tblACCDocs(project_id, folder_path):
         cursor = conn.cursor()
 
         # ✅ DELETE only files related to the selected project
-        cursor.execute("DELETE FROM tblACCDocs WHERE project_id = ?", (project_id,))
+        cursor.execute(
+            f"DELETE FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?",
+            (project_id,),
+        )
         rows_deleted = cursor.rowcount
         conn.commit()
         print(f"🗑️ {rows_deleted} existing records deleted for project {project_id} from tblACCDocs.")
@@ -390,11 +412,14 @@ def insert_files_into_tblACCDocs(project_id, folder_path):
 
         # ✅ Insert new records only for the selected project
         try:
-            cursor.executemany("""
-                INSERT INTO tblACCDocs 
-                (file_name, file_path, date_modified, file_type, file_size_kb, created_at, deleted_at, project_id)
+            cursor.executemany(
+                f"""
+                INSERT INTO {S.ACCDocs.TABLE}
+                ({S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, {S.ACCDocs.DATE_MODIFIED}, {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB}, {S.ACCDocs.CREATED_AT}, {S.ACCDocs.DELETED_AT}, {S.ACCDocs.PROJECT_ID})
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-            """, file_details)
+                """,
+                file_details,
+            )
 
             rows_inserted = cursor.rowcount
             conn.commit()
@@ -422,14 +447,17 @@ def store_file_details_in_db(file_details):
         cursor = conn.cursor()
 
         # Clear existing records (optional: use `TRUNCATE TABLE` if necessary)
-        cursor.execute("DELETE FROM dbo.tblACCDocs")
+        cursor.execute(f"DELETE FROM dbo.{S.ACCDocs.TABLE}")
         conn.commit()
 
         # Insert new data
-        cursor.executemany("""
-            INSERT INTO dbo.tblACCDocs (file_name, file_path, date_modified, file_type, file_size_kb)
+        cursor.executemany(
+            f"""
+            INSERT INTO dbo.{S.ACCDocs.TABLE} ({S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, {S.ACCDocs.DATE_MODIFIED}, {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB})
             VALUES (?, ?, ?, ?, ?)
-        """, file_details)
+            """,
+            file_details,
+        )
 
         conn.commit()
         print("✅ File details successfully stored in the database.")
@@ -470,20 +498,27 @@ def get_last_export_date():
 def save_acc_folder_path(project_id, folder_path):
     conn = connect_to_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        MERGE INTO ACCImportFolders AS target
-        USING (SELECT ? AS project_id, ? AS acc_folder_path) AS source
-        ON target.project_id = source.project_id
-        WHEN MATCHED THEN UPDATE SET acc_folder_path = source.acc_folder_path
-        WHEN NOT MATCHED THEN INSERT (project_id, acc_folder_path) VALUES (source.project_id, source.acc_folder_path);
-    """, (project_id, folder_path))
+    cursor.execute(
+        f"""
+        MERGE INTO {S.ACCImportFolders.TABLE} AS target
+        USING (SELECT ? AS {S.ACCImportFolders.PROJECT_ID}, ? AS {S.ACCImportFolders.ACC_FOLDER_PATH}) AS source
+        ON target.{S.ACCImportFolders.PROJECT_ID} = source.{S.ACCImportFolders.PROJECT_ID}
+        WHEN MATCHED THEN UPDATE SET {S.ACCImportFolders.ACC_FOLDER_PATH} = source.{S.ACCImportFolders.ACC_FOLDER_PATH}
+        WHEN NOT MATCHED THEN INSERT ({S.ACCImportFolders.PROJECT_ID}, {S.ACCImportFolders.ACC_FOLDER_PATH})
+            VALUES (source.{S.ACCImportFolders.PROJECT_ID}, source.{S.ACCImportFolders.ACC_FOLDER_PATH});
+        """,
+        (project_id, folder_path),
+    )
     conn.commit()
     conn.close()
 
 def get_acc_folder_path(project_id):
     conn = connect_to_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT acc_folder_path FROM ACCImportFolders WHERE project_id = ?", (project_id,))
+    cursor.execute(
+        f"SELECT {S.ACCImportFolders.ACC_FOLDER_PATH} FROM {S.ACCImportFolders.TABLE} WHERE {S.ACCImportFolders.PROJECT_ID} = ?",
+        (project_id,),
+    )
     row = cursor.fetchone()
     conn.close()
     return row[0] if row else None
@@ -491,10 +526,13 @@ def get_acc_folder_path(project_id):
 def log_acc_import(project_id, folder_name, summary):
     conn = connect_to_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO ACCImportLogs (project_id, folder_name, import_date, summary)
+    cursor.execute(
+        f"""
+        INSERT INTO {S.ACCImportLogs.TABLE} ({S.ACCImportLogs.PROJECT_ID}, {S.ACCImportLogs.FOLDER_NAME}, {S.ACCImportLogs.IMPORT_DATE}, {S.ACCImportLogs.SUMMARY})
         VALUES (?, ?, GETDATE(), ?)
-    """, (project_id, folder_name, summary))
+        """,
+        (project_id, folder_name, summary),
+    )
     conn.commit()
     conn.close()
 
@@ -613,7 +651,9 @@ def get_users_list():
         return []
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, name FROM users ORDER BY name;")
+        cursor.execute(
+            f"SELECT {S.Users.ID}, {S.Users.NAME} FROM {S.Users.TABLE} ORDER BY {S.Users.NAME};"
+        )
         return [(row[0], row[1]) for row in cursor.fetchall()]
     except Exception as e:
         print(f"❌ Error fetching users: {e}")
@@ -630,15 +670,13 @@ def get_review_tasks(project_id, cycle_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT rs.schedule_id,
-                   rs.review_date,
-                   u.name,
-                   rs.status
-            FROM ReviewSchedule rs
-            LEFT JOIN users u ON rs.assigned_to = u.user_id
-            WHERE rs.project_id = ? AND rs.cycle_id = ?
-            ORDER BY rs.review_date ASC;
+            f"""
+            SELECT rs.{S.ReviewSchedule.ID}, rs.{S.ReviewSchedule.REVIEW_DATE},
+                   u.{S.Users.NAME}, rs.{S.ReviewSchedule.STATUS}
+            FROM {S.ReviewSchedule.TABLE} rs
+            LEFT JOIN {S.Users.TABLE} u ON rs.{S.ReviewSchedule.ASSIGNED_TO} = u.{S.Users.ID}
+            WHERE rs.{S.ReviewSchedule.PROJECT_ID} = ? AND rs.{S.ReviewSchedule.CYCLE_ID} = ?
+            ORDER BY rs.{S.ReviewSchedule.REVIEW_DATE} ASC;
             """,
             (project_id, cycle_id),
         )
@@ -679,21 +717,21 @@ def insert_review_cycle_details(
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            INSERT INTO ReviewCycleDetails (
-                project_id,
-                cycle_id,
-                construction_stage,
-                proposed_fee,
-                assigned_users,
-                reviews_per_phase,
-                planned_start_date,
-                planned_completion_date,
-                actual_start_date,
-                actual_completion_date,
-                hold_date,
-                resume_date,
-                new_contract
+            f"""
+            INSERT INTO {S.ReviewCycleDetails.TABLE} (
+                {S.ReviewCycleDetails.PROJECT_ID},
+                {S.ReviewCycleDetails.CYCLE_ID},
+                {S.ReviewCycleDetails.CONSTRUCTION_STAGE},
+                {S.ReviewCycleDetails.PROPOSED_FEE},
+                {S.ReviewCycleDetails.ASSIGNED_USERS},
+                {S.ReviewCycleDetails.REVIEWS_PER_PHASE},
+                {S.ReviewCycleDetails.PLANNED_START},
+                {S.ReviewCycleDetails.PLANNED_COMPLETION},
+                {S.ReviewCycleDetails.ACTUAL_START},
+                {S.ReviewCycleDetails.ACTUAL_COMPLETION},
+                {S.ReviewCycleDetails.HOLD_DATE},
+                {S.ReviewCycleDetails.RESUME_DATE},
+                {S.ReviewCycleDetails.NEW_CONTRACT}
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
@@ -729,7 +767,7 @@ def update_review_task_assignee(schedule_id, user_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE ReviewSchedule SET assigned_to = ? WHERE schedule_id = ?",
+            f"UPDATE {S.ReviewSchedule.TABLE} SET {S.ReviewSchedule.ASSIGNED_TO} = ? WHERE {S.ReviewSchedule.ID} = ?",
             (user_id, schedule_id),
         )
         conn.commit()
@@ -763,20 +801,20 @@ def update_review_cycle_details(
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            UPDATE ReviewCycleDetails
-            SET construction_stage = ?,
-                proposed_fee = ?,
-                assigned_users = ?,
-                reviews_per_phase = ?,
-                planned_start_date = ?,
-                planned_completion_date = ?,
-                actual_start_date = ?,
-                actual_completion_date = ?,
-                hold_date = ?,
-                resume_date = ?,
-                new_contract = ?
-            WHERE project_id = ? AND cycle_id = ?;
+            f"""
+            UPDATE {S.ReviewCycleDetails.TABLE}
+            SET {S.ReviewCycleDetails.CONSTRUCTION_STAGE} = ?,
+                {S.ReviewCycleDetails.PROPOSED_FEE} = ?,
+                {S.ReviewCycleDetails.ASSIGNED_USERS} = ?,
+                {S.ReviewCycleDetails.REVIEWS_PER_PHASE} = ?,
+                {S.ReviewCycleDetails.PLANNED_START} = ?,
+                {S.ReviewCycleDetails.PLANNED_COMPLETION} = ?,
+                {S.ReviewCycleDetails.ACTUAL_START} = ?,
+                {S.ReviewCycleDetails.ACTUAL_COMPLETION} = ?,
+                {S.ReviewCycleDetails.HOLD_DATE} = ?,
+                {S.ReviewCycleDetails.RESUME_DATE} = ?,
+                {S.ReviewCycleDetails.NEW_CONTRACT} = ?
+            WHERE {S.ReviewCycleDetails.PROJECT_ID} = ? AND {S.ReviewCycleDetails.CYCLE_ID} = ?;
             """,
             (
                 construction_stage,
@@ -811,14 +849,17 @@ def upsert_project_review_progress(project_id, cycle_id, scoped_reviews, complet
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            MERGE project_reviews AS tgt
-            USING (SELECT ? AS project_id, ? AS cycle_id) AS src
-            ON tgt.project_id = src.project_id AND tgt.cycle_id = src.cycle_id
+            f"""
+            MERGE {S.ProjectReviews.TABLE} AS tgt
+            USING (SELECT ? AS {S.ProjectReviews.PROJECT_ID}, ? AS {S.ProjectReviews.CYCLE_ID}) AS src
+            ON tgt.{S.ProjectReviews.PROJECT_ID} = src.{S.ProjectReviews.PROJECT_ID}
+               AND tgt.{S.ProjectReviews.CYCLE_ID} = src.{S.ProjectReviews.CYCLE_ID}
             WHEN MATCHED THEN
-                UPDATE SET scoped_reviews = ?, completed_reviews = ?, last_updated = GETDATE()
+                UPDATE SET {S.ProjectReviews.SCOPED_REVIEWS} = ?,
+                           {S.ProjectReviews.COMPLETED_REVIEWS} = ?,
+                           {S.ProjectReviews.LAST_UPDATED} = GETDATE()
             WHEN NOT MATCHED THEN
-                INSERT (project_id, cycle_id, scoped_reviews, completed_reviews, last_updated)
+                INSERT ({S.ProjectReviews.PROJECT_ID}, {S.ProjectReviews.CYCLE_ID}, {S.ProjectReviews.SCOPED_REVIEWS}, {S.ProjectReviews.COMPLETED_REVIEWS}, {S.ProjectReviews.LAST_UPDATED})
                 VALUES (?, ?, ?, ?, GETDATE());
             """,
             (
@@ -849,7 +890,7 @@ def get_project_review_progress(project_id, cycle_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT scoped_reviews, completed_reviews, last_updated FROM project_reviews WHERE project_id = ? AND cycle_id = ?",
+            f"SELECT {S.ProjectReviews.SCOPED_REVIEWS}, {S.ProjectReviews.COMPLETED_REVIEWS}, {S.ProjectReviews.LAST_UPDATED} FROM {S.ProjectReviews.TABLE} WHERE {S.ProjectReviews.PROJECT_ID} = ? AND {S.ProjectReviews.CYCLE_ID} = ?",
             (project_id, cycle_id),
         )
         row = cursor.fetchone()
@@ -875,20 +916,20 @@ def get_review_summary(project_id, cycle_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT p.project_name,
-                   rp.cycle_id,
-                   d.construction_stage,
-                   rp.LicenseStartDate,
-                   DATEDIFF(month, rp.LicenseStartDate, rp.LicenseEndDate) AS license_months,
-                   pr.scoped_reviews,
-                   pr.completed_reviews,
-                   pr.last_updated
-            FROM Projects p
-            JOIN ReviewParameters rp ON p.project_id = rp.ProjectID AND rp.cycle_id = ?
-            LEFT JOIN ReviewCycleDetails d ON d.project_id = rp.ProjectID AND d.cycle_id = rp.cycle_id
-            LEFT JOIN project_reviews pr ON pr.project_id = rp.ProjectID AND pr.cycle_id = rp.cycle_id
-            WHERE p.project_id = ?;
+            f"""
+            SELECT p.{S.Projects.NAME},
+                   rp.{S.ReviewParameters.CYCLE_ID},
+                   d.{S.ReviewCycleDetails.CONSTRUCTION_STAGE},
+                   rp.{S.ReviewParameters.LICENSE_START},
+                   DATEDIFF(month, rp.{S.ReviewParameters.LICENSE_START}, rp.{S.ReviewParameters.LICENSE_END}) AS license_months,
+                   pr.{S.ProjectReviews.SCOPED_REVIEWS},
+                   pr.{S.ProjectReviews.COMPLETED_REVIEWS},
+                   pr.{S.ProjectReviews.LAST_UPDATED}
+            FROM {S.Projects.TABLE} p
+            JOIN {S.ReviewParameters.TABLE} rp ON p.{S.Projects.ID} = rp.{S.ReviewParameters.PROJECT_ID} AND rp.{S.ReviewParameters.CYCLE_ID} = ?
+            LEFT JOIN {S.ReviewCycleDetails.TABLE} d ON d.{S.ReviewCycleDetails.PROJECT_ID} = rp.{S.ReviewParameters.PROJECT_ID} AND d.{S.ReviewCycleDetails.CYCLE_ID} = rp.{S.ReviewParameters.CYCLE_ID}
+            LEFT JOIN {S.ProjectReviews.TABLE} pr ON pr.{S.ProjectReviews.PROJECT_ID} = rp.{S.ReviewParameters.PROJECT_ID} AND pr.{S.ProjectReviews.CYCLE_ID} = rp.{S.ReviewParameters.CYCLE_ID}
+            WHERE p.{S.Projects.ID} = ?;
             """,
             (cycle_id, project_id),
         )
@@ -920,14 +961,14 @@ def insert_contractual_link(project_id, review_cycle_id, bep_clause, billing_eve
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            INSERT INTO ContractualLinks (
-                project_id,
-                review_cycle_id,
-                bep_clause,
-                billing_event,
-                amount_due,
-                status
+            f"""
+            INSERT INTO {S.ContractualLinks.TABLE} (
+                {S.ContractualLinks.PROJECT_ID},
+                {S.ContractualLinks.REVIEW_CYCLE_ID},
+                {S.ContractualLinks.BEP_CLAUSE},
+                {S.ContractualLinks.BILLING_EVENT},
+                {S.ContractualLinks.AMOUNT_DUE},
+                {S.ContractualLinks.STATUS}
             ) VALUES (?, ?, ?, ?, ?, ?);
             """,
             (project_id, review_cycle_id, bep_clause, billing_event, amount_due, status),
@@ -950,21 +991,21 @@ def get_contractual_links(project_id, review_cycle_id=None):
         cursor = conn.cursor()
         if review_cycle_id:
             cursor.execute(
-                """
-                SELECT bep_clause, billing_event, amount_due, status
-                FROM ContractualLinks
-                WHERE project_id = ? AND review_cycle_id = ?
-                ORDER BY id;
+                f"""
+                SELECT {S.ContractualLinks.BEP_CLAUSE}, {S.ContractualLinks.BILLING_EVENT}, {S.ContractualLinks.AMOUNT_DUE}, {S.ContractualLinks.STATUS}
+                FROM {S.ContractualLinks.TABLE}
+                WHERE {S.ContractualLinks.PROJECT_ID} = ? AND {S.ContractualLinks.REVIEW_CYCLE_ID} = ?
+                ORDER BY {S.ContractualLinks.ID};
                 """,
                 (project_id, review_cycle_id),
             )
         else:
             cursor.execute(
-                """
-                SELECT bep_clause, billing_event, amount_due, status
-                FROM ContractualLinks
-                WHERE project_id = ?
-                ORDER BY id;
+                f"""
+                SELECT {S.ContractualLinks.BEP_CLAUSE}, {S.ContractualLinks.BILLING_EVENT}, {S.ContractualLinks.AMOUNT_DUE}, {S.ContractualLinks.STATUS}
+                FROM {S.ContractualLinks.TABLE}
+                WHERE {S.ContractualLinks.PROJECT_ID} = ?
+                ORDER BY {S.ContractualLinks.ID};
                 """,
                 (project_id,),
             )
@@ -984,11 +1025,11 @@ def get_review_cycles(project_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT review_cycle_id, stage_id, start_date, end_date, num_reviews
-            FROM review_cycles
-            WHERE project_id = ?
-            ORDER BY review_cycle_id;
+            f"""
+            SELECT {S.ReviewCycles.ID}, {S.ReviewCycles.STAGE_ID}, {S.ReviewCycles.START_DATE}, {S.ReviewCycles.END_DATE}, {S.ReviewCycles.NUM_REVIEWS}
+            FROM {S.ReviewCycles.TABLE}
+            WHERE {S.ReviewCycles.PROJECT_ID} = ?
+            ORDER BY {S.ReviewCycles.ID};
             """,
             (project_id,),
         )
@@ -1008,9 +1049,9 @@ def create_review_cycle(project_id, stage_id, start_date, end_date, num_reviews,
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            INSERT INTO review_cycles
-            (project_id, stage_id, start_date, end_date, num_reviews, created_by)
+            f"""
+            INSERT INTO {S.ReviewCycles.TABLE}
+            ({S.ReviewCycles.PROJECT_ID}, {S.ReviewCycles.STAGE_ID}, {S.ReviewCycles.START_DATE}, {S.ReviewCycles.END_DATE}, {S.ReviewCycles.NUM_REVIEWS}, {S.ReviewCycles.CREATED_BY})
             VALUES (?, ?, ?, ?, ?, ?);
             SELECT SCOPE_IDENTITY();
             """,
@@ -1034,13 +1075,13 @@ def update_review_cycle(review_cycle_id, start_date=None, end_date=None, num_rev
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            UPDATE review_cycles
-            SET start_date = COALESCE(?, start_date),
-                end_date = COALESCE(?, end_date),
-                num_reviews = COALESCE(?, num_reviews),
-                stage_id = COALESCE(?, stage_id)
-            WHERE review_cycle_id = ?;
+            f"""
+            UPDATE {S.ReviewCycles.TABLE}
+            SET {S.ReviewCycles.START_DATE} = COALESCE(?, {S.ReviewCycles.START_DATE}),
+                {S.ReviewCycles.END_DATE} = COALESCE(?, {S.ReviewCycles.END_DATE}),
+                {S.ReviewCycles.NUM_REVIEWS} = COALESCE(?, {S.ReviewCycles.NUM_REVIEWS}),
+                {S.ReviewCycles.STAGE_ID} = COALESCE(?, {S.ReviewCycles.STAGE_ID})
+            WHERE {S.ReviewCycles.ID} = ?;
             """,
             (start_date, end_date, num_reviews, stage_id, review_cycle_id),
         )
@@ -1061,7 +1102,7 @@ def delete_review_cycle(review_cycle_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "DELETE FROM review_cycles WHERE review_cycle_id = ?;",
+            f"DELETE FROM {S.ReviewCycles.TABLE} WHERE {S.ReviewCycles.ID} = ?;",
             (review_cycle_id,),
         )
         conn.commit()
@@ -1081,11 +1122,11 @@ def get_review_cycle_tasks(schedule_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT review_task_id, task_id, assigned_to, status
-            FROM review_tasks
-            WHERE schedule_id = ?
-            ORDER BY review_task_id;
+            f"""
+            SELECT {S.ReviewTasks.ID}, {S.ReviewTasks.TASK_ID}, {S.ReviewTasks.ASSIGNED_TO}, {S.ReviewTasks.STATUS}
+            FROM {S.ReviewTasks.TABLE}
+            WHERE {S.ReviewTasks.SCHEDULE_ID} = ?
+            ORDER BY {S.ReviewTasks.ID};
             """,
             (schedule_id,),
         )
@@ -1105,11 +1146,11 @@ def update_review_cycle_task(review_task_id, assigned_to=None, status=None):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            UPDATE review_tasks
-            SET assigned_to = COALESCE(?, assigned_to),
-                status = COALESCE(?, status)
-            WHERE review_task_id = ?;
+            f"""
+            UPDATE {S.ReviewTasks.TABLE}
+            SET {S.ReviewTasks.ASSIGNED_TO} = COALESCE(?, {S.ReviewTasks.ASSIGNED_TO}),
+                {S.ReviewTasks.STATUS} = COALESCE(?, {S.ReviewTasks.STATUS})
+            WHERE {S.ReviewTasks.ID} = ?;
             """,
             (assigned_to, status, review_task_id),
         )

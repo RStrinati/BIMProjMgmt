@@ -1,10 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from database import connect_to_db, get_projects, get_cycle_ids, fetch_data
+from constants import schema as S
 
 # Function to fetch users for dropdown
 def get_users():
-    users = fetch_data("SELECT name FROM users")
+    users = fetch_data(f"SELECT {S.Users.NAME} FROM {S.Users.TABLE}")
     return [user[0] for user in users]
 
 # Function to add a user
@@ -17,13 +18,19 @@ def add_user(name, role, email):
         cursor = conn.cursor()
         
         # Check if email already exists
-        cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", (email,))
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {S.Users.TABLE} WHERE {S.Users.EMAIL} = ?",
+            (email,),
+        )
         if cursor.fetchone()[0] > 0:
             messagebox.showerror("Error", "This email is already registered!")
             return
 
         # Insert new user if email is unique
-        cursor.execute("INSERT INTO users (name, role, email) VALUES (?, ?, ?)", (name, role, email))
+        cursor.execute(
+            f"INSERT INTO {S.Users.TABLE} ({S.Users.NAME}, {S.Users.ROLE}, {S.Users.EMAIL}) VALUES (?, ?, ?)",
+            (name, role, email),
+        )
         conn.commit()
         messagebox.showinfo("Success", "User added successfully!")
     
@@ -166,7 +173,7 @@ def main():
         try:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT task_name, start_date, end_date, assigned_to FROM tasks WHERE project_id = ? AND cycle_id = ?",
+                f"SELECT {S.Tasks.NAME}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO} FROM {S.Tasks.TABLE} WHERE {S.Tasks.PROJECT_ID} = ? AND {S.Tasks.CYCLE_ID} = ?",
                 (pid, cid),
             )
             rows = cursor.fetchall()
@@ -184,7 +191,7 @@ def main():
         try:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO tasks (task_name, project_id, cycle_id, start_date, end_date, assigned_to) VALUES (?, ?, ?, ?, ?, ?)",
+                f"INSERT INTO {S.Tasks.TABLE} ({S.Tasks.NAME}, {S.Tasks.PROJECT_ID}, {S.Tasks.CYCLE_ID}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO}) VALUES (?, ?, ?, ?, ?, ?)",
                 (task_name, project_id, cycle_id, start_date, end_date, assigned_to),
             )
             conn.commit()
