@@ -1345,7 +1345,14 @@ def get_reference_options(table):
 
 
 def insert_project_full(data):
-    """Insert a project record with arbitrary fields."""
+    """Insert a project record with arbitrary fields.
+
+    SQL Server is strict about data types, so values coming from the
+    frontend (often as strings) need to be coerced into the proper
+    numeric types before insertion. Without this, pyodbc tries to insert
+    NVARCHAR values into numeric columns and the database raises
+    "Error converting data type nvarchar to numeric".
+    """
     conn = connect_to_db()
     if conn is None:
         return False
@@ -1354,9 +1361,38 @@ def insert_project_full(data):
         cols = list(data.keys())
         if not cols:
             return False
+
+        # Columns expected to be numeric in the projects table
+        numeric_fields = {
+            S.Projects.CLIENT_ID,
+            S.Projects.TYPE_ID,
+            S.Projects.SECTOR_ID,
+            S.Projects.METHOD_ID,
+            S.Projects.PHASE_ID,
+            S.Projects.STAGE_ID,
+            S.Projects.PROJECT_MANAGER,
+            S.Projects.INTERNAL_LEAD,
+            S.Projects.CONTRACT_VALUE,
+            S.Projects.AGREED_FEE,
+            S.Projects.PRIORITY,
+        }
+
+        values = []
+        for c in cols:
+            val = data.get(c)
+            if val in ("", None):
+                values.append(None)
+            elif c in numeric_fields:
+                try:
+                    values.append(float(val) if "." in str(val) else int(val))
+                except (ValueError, TypeError):
+                    values.append(None)
+            else:
+                values.append(val)
+
         placeholders = ', '.join(['?'] * len(cols))
         sql = f"INSERT INTO projects ({', '.join(cols)}) VALUES ({placeholders})"
-        cursor.execute(sql, [data[c] for c in cols])
+        cursor.execute(sql, values)
         conn.commit()
         return True
     except Exception as e:

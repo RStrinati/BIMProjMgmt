@@ -490,13 +490,13 @@ class ContractualLinks:
 
 class ReviewParameters:
     TABLE = "ReviewParameters"
-    PARAMETERID = "ParameterID"
-    PROJECTID = "ProjectID"
-    REVIEWSTARTDATE = "ReviewStartDate"
-    NUMBEROFREVIEWS = "NumberOfReviews"
-    REVIEWFREQUENCY = "ReviewFrequency"
-    LICENSESTARTDATE = "LicenseStartDate"
-    LICENSEENDDATE = "LicenseEndDate"
+    PARAMETER_ID = "ParameterID"
+    PROJECT_ID = "ProjectID"
+    REVIEW_START_DATE = "ReviewStartDate"
+    NUMBER_OF_REVIEWS = "NumberOfReviews"
+    REVIEW_FREQUENCY = "ReviewFrequency"
+    LICENSE_START = "LicenseStartDate"
+    LICENSE_END = "LicenseEndDate"
     CYCLE_ID = "cycle_id"
 
 class StageReviewPlan:
