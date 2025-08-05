@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import pyodbc
+from pyparsing import col
 
 from config import Config
 from constants import schema as S
@@ -153,30 +154,46 @@ def main(argv: List[str] | None = None) -> int:
 
     missing_tables: Dict[str, List[str]] = {}
     missing_cols: Dict[str, List[str]] = {}
+    # Create a lowercased version of existing for case-insensitive comparison
+    existing_lower = {k.lower(): [col.lower() for col in v] for k, v in existing.items()}
     for table, cols in required.items():
-        if table not in existing:
+        table_lower = table.lower()
+        if table_lower not in existing_lower:
             missing_tables[table] = cols
         else:
-            missing = [c for c in cols if c not in existing[table]]
+            missing = [c for c in cols if c.lower() not in existing_lower[table_lower]]
             if missing:
                 missing_cols[table] = missing
 
     if missing_tables or missing_cols:
         print("Schema issues detected.")
         for table, cols in missing_tables.items():
-            sql = generate_create_table_sql(table, cols)
-            print(f"\n-- Missing table: {table}\n{sql}")
-            if args.autofix:
-                cursor.execute(sql)
+            if table not in existing:
+                sql = generate_create_table_sql(table, cols)
+                print(f"\n-- Creating missing table: {table}\n{sql}")
+                if args.autofix:
+                    try:
+                        cursor.execute(sql)
+                        print(f"✅ Created table {table} with columns: {', '.join(cols)}")
+                    except pyodbc.ProgrammingError as e:
+                        print(f"❌ Could not create table {table}: {e}")
+
         for table, cols in missing_cols.items():
-            sqls = generate_add_column_sql(table, cols)
             print(f"\n-- Missing columns in {table}: {', '.join(cols)}")
-            for stmt in sqls:
+            for col in cols:
+                stmt = f"ALTER TABLE [{table}] ADD [{col}] NVARCHAR(MAX);"
                 print(stmt)
                 if args.autofix:
-                    cursor.execute(stmt)
+                    try:
+                        cursor.execute(stmt)
+                        print(f"✅ Added column [{col}] to [{table}]")
+                    except pyodbc.ProgrammingError as e:
+                        print(f"❌ Failed to add column [{col}] to [{table}]: {e}")
+
         if args.autofix:
             conn.commit()
+            print("\n✅ Schema autofix completed. All changes committed.")
+
     else:
         print("Database schema is up to date.")
 

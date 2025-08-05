@@ -183,12 +183,12 @@ function ReviewCycles() {
 function ProjectsView() {
   const empty = {
     project_name: '',
-    client: '',
-    project_type: '',
-    sector: '',
-    delivery_method: '',
-    project_phase: '',
-    construction_stage: '',
+    client_id: '',
+    type_id: '',
+    sector_id: '',
+    method_id: '',
+    phase_id: '',
+    stage_id: '',
     project_manager: '',
     internal_lead: '',
     contract_number: '',
@@ -214,11 +214,11 @@ function ProjectsView() {
   };
 
   const loadRefs = () => {
-    const tables = ['clients','project_types','sectors','delivery_methods','project_phases','construction_stages'];
+    const tables = ['clients', 'project_types', 'sectors', 'delivery_methods', 'project_phases', 'construction_stages'];
     tables.forEach(t => {
       fetch(`/api/reference/${t}`)
         .then(res => res.json())
-        .then(opts => setRefs(r => ({...r, [t]: opts})));
+        .then(opts => setRefs(r => ({ ...r, [t]: opts })));
     });
   };
 
@@ -227,7 +227,7 @@ function ProjectsView() {
     loadRefs();
   }, []);
 
-  const handleChange = e => setForm({...form, [e.target.name]: e.target.value});
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const createProject = () => {
     fetch('/api/projects', {
@@ -262,14 +262,14 @@ function ProjectsView() {
     <div>
       <button onClick={() => setShowForm(!showForm)}>New Project</button>
       {showForm && (
-        <div className="new-project-form" style={{marginTop:'10px'}}>
+        <div className="new-project-form" style={{ marginTop: '10px' }}>
           <input placeholder="Project Name" name="project_name" value={form.project_name} onChange={handleChange} />
-          {renderSelect(form.client, refs.clients || [], v => setForm({...form, client: v}))}
-          {renderSelect(form.project_type, refs.project_types || [], v => setForm({...form, project_type: v}))}
-          {renderSelect(form.sector, refs.sectors || [], v => setForm({...form, sector: v}))}
-          {renderSelect(form.delivery_method, refs.delivery_methods || [], v => setForm({...form, delivery_method: v}))}
-          {renderSelect(form.project_phase, refs.project_phases || [], v => setForm({...form, project_phase: v}))}
-          {renderSelect(form.construction_stage, refs.construction_stages || [], v => setForm({...form, construction_stage: v}))}
+          {renderSelect(form.client_id, refs.clients || [], v => setForm({ ...form, client_id: v }))}
+          {renderSelect(form.type_id, refs.project_types || [], v => setForm({ ...form, type_id: v }))}
+          {renderSelect(form.sector_id, refs.sectors || [], v => setForm({ ...form, sector_id: v }))}
+          {renderSelect(form.method_id, refs.delivery_methods || [], v => setForm({ ...form, method_id: v }))}
+          {renderSelect(form.phase_id, refs.project_phases || [], v => setForm({ ...form, phase_id: v }))}
+          {renderSelect(form.stage_id, refs.construction_stages || [], v => setForm({ ...form, stage_id: v }))}
           <input placeholder="Project Manager" name="project_manager" value={form.project_manager} onChange={handleChange} />
           <input placeholder="Internal Lead" name="internal_lead" value={form.internal_lead} onChange={handleChange} />
           <input placeholder="Contract Number" name="contract_number" value={form.contract_number} onChange={handleChange} />
@@ -281,13 +281,13 @@ function ProjectsView() {
           <input placeholder="Data Export Folder" name="data_export_folder" value={form.data_export_folder} onChange={handleChange} />
           <input type="date" name="start_date" value={form.start_date} onChange={handleChange} />
           <input type="date" name="end_date" value={form.end_date} onChange={handleChange} />
-          {renderSelect(form.status, [{name:'Planning'},{name:'Active'},{name:'On Hold'},{name:'Complete'}], v => setForm({...form, status: v}))}
-          {renderSelect(form.priority, [{name:'Low'},{name:'Medium'},{name:'High'}], v => setForm({...form, priority: v}))}
+          {renderSelect(form.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => setForm({ ...form, status: v }))}
+          {renderSelect(form.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => setForm({ ...form, priority: v }))}
           <button onClick={createProject}>Save</button>
         </div>
       )}
 
-      <table border="1" cellPadding="4" style={{marginTop:'10px'}}>
+      <table border="1" cellPadding="4" style={{ marginTop: '10px' }}>
         <thead>
           <tr>
             <th>Project Name</th>
@@ -307,16 +307,16 @@ function ProjectsView() {
           {projects.map(p => (
             <tr key={p.project_id}>
               <td><input value={p.project_name || ''} onChange={e => updateProject(p.project_id, 'project_name', e.target.value)} /></td>
-              <td>{renderSelect(p.client, refs.clients || [], v => updateProject(p.project_id, 'client', v))}</td>
-              <td>{renderSelect(p.project_type, refs.project_types || [], v => updateProject(p.project_id, 'project_type', v))}</td>
-              <td>{renderSelect(p.sector, refs.sectors || [], v => updateProject(p.project_id, 'sector', v))}</td>
-              <td>{renderSelect(p.delivery_method, refs.delivery_methods || [], v => updateProject(p.project_id, 'delivery_method', v))}</td>
-              <td>{renderSelect(p.phase, refs.project_phases || [], v => updateProject(p.project_id, 'phase', v))}</td>
-              <td>{renderSelect(p.stage, refs.construction_stages || [], v => updateProject(p.project_id, 'stage', v))}</td>
+              <td>{renderSelect(p.client_id, refs.clients || [], v => updateProject(p.project_id, 'client_id', v))}</td>
+              <td>{renderSelect(p.type_id, refs.project_types || [], v => updateProject(p.project_id, 'type_id', v))}</td>
+              <td>{renderSelect(p.sector_id, refs.sectors || [], v => updateProject(p.project_id, 'sector_id', v))}</td>
+              <td>{renderSelect(p.method_id, refs.delivery_methods || [], v => updateProject(p.project_id, 'method_id', v))}</td>
+              <td>{renderSelect(p.phase_id, refs.project_phases || [], v => updateProject(p.project_id, 'phase_id', v))}</td>
+              <td>{renderSelect(p.stage_id, refs.construction_stages || [], v => updateProject(p.project_id, 'stage_id', v))}</td>
               <td><input value={p.project_manager || ''} onChange={e => updateProject(p.project_id, 'project_manager', e.target.value)} /></td>
               <td><input value={p.internal_lead || ''} onChange={e => updateProject(p.project_id, 'internal_lead', e.target.value)} /></td>
-              <td>{renderSelect(p.status, [{name:'Planning'},{name:'Active'},{name:'On Hold'},{name:'Complete'}], v => updateProject(p.project_id, 'status', v))}</td>
-              <td>{renderSelect(p.priority, [{name:'Low'},{name:'Medium'},{name:'High'}], v => updateProject(p.project_id, 'priority', v))}</td>
+              <td>{renderSelect(p.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => updateProject(p.project_id, 'status', v))}</td>
+              <td>{renderSelect(p.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => updateProject(p.project_id, 'priority', v))}</td>
             </tr>
           ))}
         </tbody>
@@ -324,6 +324,7 @@ function ProjectsView() {
     </div>
   );
 }
+
 
 function App() {
   const [view, setView] = useState('review');
