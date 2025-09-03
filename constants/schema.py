@@ -511,3 +511,8 @@ class StageReviewPlan:
     IS_GENERATED = "is_generated"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+class ProjectAliases:
+    TABLE = "project_aliases"
+    ALIAS_NAME = "alias_name"
+    PM_PROJECT_ID = "pm_project_id"

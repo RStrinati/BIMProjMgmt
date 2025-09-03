@@ -84,7 +84,7 @@ def get_projects():
         conn.close()
 
 def get_project_details(project_id):
-    """Fetch project details from the database (excluding folder paths)."""
+    """Fetch project details from the database including client information."""
     conn = connect_to_db("ProjectManagement")  
     if conn is None:
         return None
@@ -93,22 +93,29 @@ def get_project_details(project_id):
         cursor = conn.cursor()
         cursor.execute(
             f"""
-            SELECT {S.Projects.NAME}, {S.Projects.START_DATE}, {S.Projects.END_DATE}, {S.Projects.STATUS}, {S.Projects.PRIORITY}
-            FROM dbo.{S.Projects.TABLE}
-            WHERE {S.Projects.ID} = ?;
+            SELECT p.{S.Projects.NAME}, p.{S.Projects.START_DATE}, p.{S.Projects.END_DATE}, 
+                   p.{S.Projects.STATUS}, p.{S.Projects.PRIORITY},
+                   c.{S.Clients.CLIENT_NAME}, c.{S.Clients.CONTACT_NAME}, c.{S.Clients.CONTACT_EMAIL}
+            FROM dbo.{S.Projects.TABLE} p
+            LEFT JOIN dbo.{S.Clients.TABLE} c ON p.{S.Projects.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
+            WHERE p.{S.Projects.ID} = ?;
             """,
             (project_id,),
         )
         row = cursor.fetchone()
         
         if row:
-            return {
+            result = {
                 "project_name": row[0],
                 "start_date": row[1].strftime('%Y-%m-%d') if row[1] else "",
                 "end_date": row[2].strftime('%Y-%m-%d') if row[2] else "",
                 "status": row[3],
-                "priority": row[4]
+                "priority": row[4],
+                "client_name": row[5],
+                "client_contact": row[6],
+                "contact_email": row[7]
             }
+            return result
         else:
             return None
     except Exception as e:
@@ -1026,10 +1033,10 @@ def get_review_cycles(project_id):
         cursor = conn.cursor()
         cursor.execute(
             f"""
-            SELECT {S.ReviewCycles.ID}, {S.ReviewCycles.STAGE_ID}, {S.ReviewCycles.START_DATE}, {S.ReviewCycles.END_DATE}, {S.ReviewCycles.NUM_REVIEWS}
+            SELECT {S.ReviewCycles.REVIEW_CYCLE_ID}, {S.ReviewCycles.STAGE_ID}, {S.ReviewCycles.START_DATE}, {S.ReviewCycles.END_DATE}, {S.ReviewCycles.NUM_REVIEWS}
             FROM {S.ReviewCycles.TABLE}
             WHERE {S.ReviewCycles.PROJECT_ID} = ?
-            ORDER BY {S.ReviewCycles.ID};
+            ORDER BY {S.ReviewCycles.REVIEW_CYCLE_ID};
             """,
             (project_id,),
         )
@@ -1298,30 +1305,138 @@ def update_bep_status(project_id, section_id, status):
 
 def update_client_info(project_id, client_contact=None, contact_email=None):
     """Update client contact details for a project."""
-
-    conn = connect_to_db()
+    
+    conn = connect_to_db("ProjectManagement")
     if conn is None:
         return False
     try:
         cursor = conn.cursor()
-
+        
+        # First, get the client_id for this project
+        cursor.execute(
+            f"SELECT {S.Projects.CLIENT_ID} FROM dbo.{S.Projects.TABLE} WHERE {S.Projects.ID} = ?",
+            (project_id,)
+        )
+        result = cursor.fetchone()
+        
+        if not result or not result[0]:
+            print(f"⚠️ No client_id found for project {project_id}")
+            return False
+            
+        client_id = result[0]
+        
+        # Update the client information
         sets = []
         params = []
         if client_contact is not None:
-            sets.append("client_contact = ?")
+            sets.append(f"{S.Clients.CONTACT_NAME} = ?")
             params.append(client_contact)
         if contact_email is not None:
-            sets.append("contact_email = ?")
+            sets.append(f"{S.Clients.CONTACT_EMAIL} = ?")
             params.append(contact_email)
+            
         if sets:
-            sql = "UPDATE clients SET " + ", ".join(sets) + " WHERE project_id = ?"
-            params.append(project_id)
+            sql = f"UPDATE dbo.{S.Clients.TABLE} SET " + ", ".join(sets) + f" WHERE {S.Clients.CLIENT_ID} = ?"
+            params.append(client_id)
             cursor.execute(sql, params)
             conn.commit()
+            print(f"✅ Updated client info for client_id {client_id}")
+            
         return True
     except Exception as e:
         print(f"❌ Error updating client info: {e}")
         return False
+    finally:
+        conn.close()
+
+
+def get_available_clients():
+    """Return list of all available clients."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.Clients.CLIENT_ID}, {S.Clients.CLIENT_NAME}, 
+                   {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL}
+            FROM dbo.{S.Clients.TABLE}
+            ORDER BY {S.Clients.CLIENT_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching clients: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def assign_client_to_project(project_id, client_id):
+    """Assign a client to a project by updating the project's client_id."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            UPDATE dbo.{S.Projects.TABLE} 
+            SET {S.Projects.CLIENT_ID} = ? 
+            WHERE {S.Projects.ID} = ?
+            """,
+            (client_id, project_id)
+        )
+        conn.commit()
+        print(f"✅ Assigned client {client_id} to project {project_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Error assigning client to project: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def create_new_client(client_data):
+    """Create a new client in the database and return the client_id."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            INSERT INTO dbo.{S.Clients.TABLE} (
+                {S.Clients.CLIENT_NAME}, {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
+                {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS}, {S.Clients.CITY},
+                {S.Clients.STATE}, {S.Clients.POSTCODE}, {S.Clients.COUNTRY}
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                client_data['client_name'],
+                client_data['contact_name'], 
+                client_data['contact_email'],
+                client_data['contact_phone'],
+                client_data['address'],
+                client_data['city'],
+                client_data['state'],
+                client_data['postcode'],
+                client_data['country']
+            )
+        )
+        conn.commit()
+        
+        # Get the newly created client_id
+        cursor.execute("SELECT @@IDENTITY")
+        client_id = cursor.fetchone()[0]
+        
+        print(f"✅ Created new client: {client_data['client_name']} (ID: {client_id})")
+        return client_id
+        
+    except Exception as e:
+        print(f"❌ Error creating client: {e}")
+        return None
     finally:
         conn.close()
 
