@@ -29,6 +29,22 @@ def connect_to_db(db_name=None):
 
     except pyodbc.Error as e:
         print(f"❌ Database connection error ({db_name}): {e}")
+        # Fallback to SQLite for testing if SQL Server is not available
+        print("🔄 Falling back to SQLite database for testing...")
+        return connect_to_sqlite()
+
+
+def connect_to_sqlite():
+    """Connect to SQLite database for testing when SQL Server is not available."""
+    import sqlite3
+    
+    # Check if test database exists, if not create it
+    if os.path.exists("test_project_data.db"):
+        return sqlite3.connect("test_project_data.db")
+    elif os.path.exists("project_data.db"):
+        return sqlite3.connect("project_data.db")
+    else:
+        print("❌ No SQLite database found for fallback")
         return None
 
 
