@@ -19,10 +19,7 @@ def main():
             ACCFolderManagementTab,
             ReviewManagementTab,
             DocumentManagementTab,
-            ProjectSetupTab,
-            BEPDocumentTab,
-            EIRDocumentTab,
-            PIRDocumentTab,
+            ProjectSetupTab
         )
         
         # Create main window
@@ -34,7 +31,10 @@ def main():
         notebook = ttk.Notebook(root)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Create and add tabs
+        # Create and add tabs in proper order - Project Setup first
+        print("🏗️ Creating Project Setup tab...")
+        project_tab = ProjectSetupTab(notebook)
+        
         print("📋 Creating Enhanced Task Management tab...")
         task_tab = EnhancedTaskManagementTab(notebook)
         
@@ -46,20 +46,9 @@ def main():
         
         print("📋 Creating Review Management tab...")
         review_tab = ReviewManagementTab(notebook)
-
-        # Add BEP / EIR / PIR top-level tabs per outline
-        print("Adding BEP / EIR / PIR tabs...")
-        bep_tab = BEPDocumentTab(notebook)
-        eir_tab = EIRDocumentTab(notebook)
-        pir_tab = PIRDocumentTab(notebook)
         
         print("📄 Creating Document Management tab...")
-        doc_tab = DocumentManagementTab(notebook)
-        
-        print("🏗️ Creating Project Setup tab...")
-        project_tab = ProjectSetupTab(notebook)
-        
-        # Start the UI
+        doc_tab = DocumentManagementTab(notebook)        # Start the UI
         print("✅ UI initialized successfully!")
         print("🖥️ Starting main loop...")
         root.mainloop()

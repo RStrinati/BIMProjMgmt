@@ -2552,249 +2552,231 @@ class DocumentManagementTab:
         
     def setup_bep_tab(self):
         """Setup BEP document management interface"""
-        # Create scrollable frame
-        canvas = tk.Canvas(self.bep_frame)
-        scrollbar = ttk.Scrollbar(self.bep_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Library Section
-        library_frame = ttk.LabelFrame(scrollable_frame, text="📚 BEP Library", padding=10)
-        library_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Library controls
-        library_controls = ttk.Frame(library_frame)
-        library_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(library_controls, text="📥 Import Template", 
-                  command=lambda: self.import_document('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="📤 Export Template", 
-                  command=lambda: self.export_document('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="🔄 Refresh", 
-                  command=lambda: self.refresh_documents('BEP')).pack(side=tk.LEFT)
-        
-        # Library list
-        self.bep_library_tree = ttk.Treeview(library_frame, height=6)
-        self.bep_library_tree["columns"] = ("Type", "Version", "Date", "Status")
-        self.bep_library_tree.heading("#0", text="Document Name")
-        self.bep_library_tree.heading("Type", text="Type")
-        self.bep_library_tree.heading("Version", text="Version")
-        self.bep_library_tree.heading("Date", text="Date")
-        self.bep_library_tree.heading("Status", text="Status")
-        self.bep_library_tree.pack(fill=tk.X, pady=(5, 0))
-        
-        # Composition Section
-        composition_frame = ttk.LabelFrame(scrollable_frame, text="✏️ BEP Composition", padding=10)
-        composition_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        comp_controls = ttk.Frame(composition_frame)
-        comp_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(comp_controls, text="📝 New BEP", 
-                  command=lambda: self.create_new_document('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="✏️ Edit Selected", 
-                  command=lambda: self.edit_document('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="📋 Duplicate", 
-                  command=lambda: self.duplicate_document('BEP')).pack(side=tk.LEFT)
-        
-        # WIP Section
-        wip_frame = ttk.LabelFrame(scrollable_frame, text="🚧 Work in Progress", padding=10)
-        wip_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.bep_wip_tree = ttk.Treeview(wip_frame, height=4)
-        self.bep_wip_tree["columns"] = ("Author", "Modified", "Status")
-        self.bep_wip_tree.heading("#0", text="Document")
-        self.bep_wip_tree.heading("Author", text="Author")
-        self.bep_wip_tree.heading("Modified", text="Last Modified")
-        self.bep_wip_tree.heading("Status", text="Status")
-        self.bep_wip_tree.pack(fill=tk.X)
-        
-        # Publishing Section
-        publishing_frame = ttk.LabelFrame(scrollable_frame, text="📤 Publishing", padding=10)
-        publishing_frame.pack(fill=tk.X)
-        
-        pub_controls = ttk.Frame(publishing_frame)
-        pub_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(pub_controls, text="✅ Approve for Publishing", 
-                  command=lambda: self.approve_document('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📧 Send for Review", 
-                  command=lambda: self.send_for_review('BEP')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📊 Generate Report", 
-                  command=lambda: self.generate_report('BEP')).pack(side=tk.LEFT)
-        
-        # Pack canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Create the 4-pillar structure for BEP documents
+        nb = ttk.Notebook(self.bep_frame)
+        nb.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Library
+        lib = ttk.Frame(nb)
+        nb.add(lib, text="📚 Library")
+        lib_head = ttk.Frame(lib)
+        lib_head.pack(fill="x", padx=8, pady=6)
+        ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('BEP')).pack(side="left")
+        ttk.Button(lib_head, text="Seed WIP", command=lambda: self._seed_wip('BEP')).pack(side="left", padx=(6,0))
+        lib_body = ttk.Frame(lib)
+        lib_body.pack(fill="both", expand=True, padx=8, pady=6)
+        self.bep_lib_tree = ttk.Treeview(lib_body, columns=("Code","Title","Body"), show="headings", height=8)
+        for col in ("Code","Title","Body"):
+            self.bep_lib_tree.heading(col, text=col)
+            self.bep_lib_tree.column(col, width=240 if col=="Title" else 100)
+        self.bep_lib_tree.pack(side="left", fill="both", expand=True)
+        ttk.Scrollbar(lib_body, orient="vertical", command=self.bep_lib_tree.yview).pack(side="right", fill="y")
+        self.bep_lib_preview = tk.Text(lib, height=6, wrap="word")
+        self.bep_lib_preview.pack(fill="x", padx=8, pady=(0,8))
+        ttk.Button(lib, text="Add Selected to Compose", command=lambda: self._add_selected_to_compose('BEP')).pack(anchor="w", padx=8)
+        self.bep_lib_tree.bind('<<TreeviewSelect>>', lambda e: self._on_lib_select('BEP', e))
+
+        # Compose
+        comp = ttk.Frame(nb)
+        nb.add(comp, text="✏️ Compose")
+        comp_body = ttk.Frame(comp)
+        comp_body.pack(fill="both", expand=True, padx=8, pady=6)
+        ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
+        ttk.Label(comp_body, text="Included").grid(row=0, column=2, sticky="w")
+        self.bep_avail_list = tk.Listbox(comp_body, height=8)
+        self.bep_inclu_list = tk.Listbox(comp_body, height=8)
+        self.bep_avail_list.grid(row=1, column=0, sticky="nsew")
+        btns = ttk.Frame(comp_body)
+        btns.grid(row=1, column=1, padx=6)
+        self.bep_inclu_list.grid(row=1, column=2, sticky="nsew")
+        ttk.Button(btns, text=">>", command=lambda: self._move_list_items(self.bep_avail_list, self.bep_inclu_list)).pack(pady=4)
+        ttk.Button(btns, text="<<", command=lambda: self._move_list_items(self.bep_inclu_list, self.bep_avail_list)).pack(pady=4)
+        comp_body.columnconfigure(0, weight=1)
+        comp_body.columnconfigure(2, weight=1)
+        comp_footer = ttk.Frame(comp)
+        comp_footer.pack(fill="x", padx=8, pady=6)
+        ttk.Label(comp_footer, text="Title:").pack(side="left")
+        self.bep_title_var = tk.StringVar(value="BEP Document")
+        ttk.Entry(comp_footer, textvariable=self.bep_title_var, width=26).pack(side="left", padx=(4,10))
+        ttk.Label(comp_footer, text="Version:").pack(side="left")
+        self.bep_ver_var = tk.StringVar(value="1.0")
+        ttk.Entry(comp_footer, textvariable=self.bep_ver_var, width=10).pack(side="left", padx=(4,10))
+        ttk.Button(comp_footer, text="Instantiate", command=lambda: self._instantiate_document('BEP')).pack(side="left")
+
+        # Assign & Execute
+        ass = ttk.Frame(nb)
+        nb.add(ass, text="🎯 Assign & Execute")
+        run_bar = ttk.Frame(ass)
+        run_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('BEP')).pack(side="left")
+        a_cols = ("Clause", "Owner", "Due", "Check", "Status")
+        self.bep_assign_tree = ttk.Treeview(ass, columns=a_cols, show="headings", height=7)
+        for c in a_cols:
+            self.bep_assign_tree.heading(c, text=c)
+            self.bep_assign_tree.column(c, width=140)
+        self.bep_assign_tree.pack(fill="both", expand=True, padx=8, pady=6)
+
+        # Publish
+        pub = ttk.Frame(nb)
+        nb.add(pub, text="📤 Publish & Sign-off")
+        pub_bar = ttk.Frame(pub)
+        pub_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Label(pub_bar, text="Change note:").pack(side="left")
+        self.bep_note_var = tk.StringVar()
+        ttk.Entry(pub_bar, textvariable=self.bep_note_var, width=60).pack(side="left", padx=(4,10))
+        ttk.Button(pub_bar, text="Publish DOCX", command=lambda: self._publish_document('BEP')).pack(side="left")
         
     def setup_pir_tab(self):
         """Setup PIR document management interface"""
-        # Similar structure to BEP but for PIR documents
-        canvas = tk.Canvas(self.pir_frame)
-        scrollbar = ttk.Scrollbar(self.pir_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Library Section
-        library_frame = ttk.LabelFrame(scrollable_frame, text="📚 PIR Library", padding=10)
-        library_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        library_controls = ttk.Frame(library_frame)
-        library_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(library_controls, text="📥 Import Template", 
-                  command=lambda: self.import_document('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="📤 Export Template", 
-                  command=lambda: self.export_document('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="🔄 Refresh", 
-                  command=lambda: self.refresh_documents('PIR')).pack(side=tk.LEFT)
-        
-        self.pir_library_tree = ttk.Treeview(library_frame, height=6)
-        self.pir_library_tree["columns"] = ("Type", "Version", "Date", "Status")
-        self.pir_library_tree.heading("#0", text="Document Name")
-        self.pir_library_tree.heading("Type", text="Type")
-        self.pir_library_tree.heading("Version", text="Version")
-        self.pir_library_tree.heading("Date", text="Date")
-        self.pir_library_tree.heading("Status", text="Status")
-        self.pir_library_tree.pack(fill=tk.X, pady=(5, 0))
-        
-        # Composition Section
-        composition_frame = ttk.LabelFrame(scrollable_frame, text="✏️ PIR Composition", padding=10)
-        composition_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        comp_controls = ttk.Frame(composition_frame)
-        comp_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(comp_controls, text="📝 New PIR", 
-                  command=lambda: self.create_new_document('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="✏️ Edit Selected", 
-                  command=lambda: self.edit_document('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="📋 Duplicate", 
-                  command=lambda: self.duplicate_document('PIR')).pack(side=tk.LEFT)
-        
-        # WIP Section
-        wip_frame = ttk.LabelFrame(scrollable_frame, text="🚧 Work in Progress", padding=10)
-        wip_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.pir_wip_tree = ttk.Treeview(wip_frame, height=4)
-        self.pir_wip_tree["columns"] = ("Author", "Modified", "Status")
-        self.pir_wip_tree.heading("#0", text="Document")
-        self.pir_wip_tree.heading("Author", text="Author")
-        self.pir_wip_tree.heading("Modified", text="Last Modified")
-        self.pir_wip_tree.heading("Status", text="Status")
-        self.pir_wip_tree.pack(fill=tk.X)
-        
-        # Publishing Section
-        publishing_frame = ttk.LabelFrame(scrollable_frame, text="📤 Publishing", padding=10)
-        publishing_frame.pack(fill=tk.X)
-        
-        pub_controls = ttk.Frame(publishing_frame)
-        pub_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(pub_controls, text="✅ Approve for Publishing", 
-                  command=lambda: self.approve_document('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📧 Send for Review", 
-                  command=lambda: self.send_for_review('PIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📊 Generate Report", 
-                  command=lambda: self.generate_report('PIR')).pack(side=tk.LEFT)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Create the 4-pillar structure for PIR documents
+        nb = ttk.Notebook(self.pir_frame)
+        nb.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Library
+        lib = ttk.Frame(nb)
+        nb.add(lib, text="📚 Library")
+        lib_head = ttk.Frame(lib)
+        lib_head.pack(fill="x", padx=8, pady=6)
+        ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('PIR')).pack(side="left")
+        ttk.Button(lib_head, text="Seed WIP", command=lambda: self._seed_wip('PIR')).pack(side="left", padx=(6,0))
+        lib_body = ttk.Frame(lib)
+        lib_body.pack(fill="both", expand=True, padx=8, pady=6)
+        self.pir_lib_tree = ttk.Treeview(lib_body, columns=("Code","Title","Body"), show="headings", height=8)
+        for col in ("Code","Title","Body"):
+            self.pir_lib_tree.heading(col, text=col)
+            self.pir_lib_tree.column(col, width=240 if col=="Title" else 100)
+        self.pir_lib_tree.pack(side="left", fill="both", expand=True)
+        ttk.Scrollbar(lib_body, orient="vertical", command=self.pir_lib_tree.yview).pack(side="right", fill="y")
+        self.pir_lib_preview = tk.Text(lib, height=6, wrap="word")
+        self.pir_lib_preview.pack(fill="x", padx=8, pady=(0,8))
+        ttk.Button(lib, text="Add Selected to Compose", command=lambda: self._add_selected_to_compose('PIR')).pack(anchor="w", padx=8)
+        self.pir_lib_tree.bind('<<TreeviewSelect>>', lambda e: self._on_lib_select('PIR', e))
+
+        # Compose
+        comp = ttk.Frame(nb)
+        nb.add(comp, text="✏️ Compose")
+        comp_body = ttk.Frame(comp)
+        comp_body.pack(fill="both", expand=True, padx=8, pady=6)
+        ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
+        ttk.Label(comp_body, text="Included").grid(row=0, column=2, sticky="w")
+        self.pir_avail_list = tk.Listbox(comp_body, height=8)
+        self.pir_inclu_list = tk.Listbox(comp_body, height=8)
+        self.pir_avail_list.grid(row=1, column=0, sticky="nsew")
+        btns = ttk.Frame(comp_body)
+        btns.grid(row=1, column=1, padx=6)
+        self.pir_inclu_list.grid(row=1, column=2, sticky="nsew")
+        ttk.Button(btns, text=">>", command=lambda: self._move_list_items(self.pir_avail_list, self.pir_inclu_list)).pack(pady=4)
+        ttk.Button(btns, text="<<", command=lambda: self._move_list_items(self.pir_inclu_list, self.pir_avail_list)).pack(pady=4)
+        comp_body.columnconfigure(0, weight=1)
+        comp_body.columnconfigure(2, weight=1)
+        comp_footer = ttk.Frame(comp)
+        comp_footer.pack(fill="x", padx=8, pady=6)
+        ttk.Label(comp_footer, text="Title:").pack(side="left")
+        self.pir_title_var = tk.StringVar(value="PIR Document")
+        ttk.Entry(comp_footer, textvariable=self.pir_title_var, width=26).pack(side="left", padx=(4,10))
+        ttk.Label(comp_footer, text="Version:").pack(side="left")
+        self.pir_ver_var = tk.StringVar(value="1.0")
+        ttk.Entry(comp_footer, textvariable=self.pir_ver_var, width=10).pack(side="left", padx=(4,10))
+        ttk.Button(comp_footer, text="Instantiate", command=lambda: self._instantiate_document('PIR')).pack(side="left")
+
+        # Assign & Execute
+        ass = ttk.Frame(nb)
+        nb.add(ass, text="🎯 Assign & Execute")
+        run_bar = ttk.Frame(ass)
+        run_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('PIR')).pack(side="left")
+        a_cols = ("Clause", "Owner", "Due", "Check", "Status")
+        self.pir_assign_tree = ttk.Treeview(ass, columns=a_cols, show="headings", height=7)
+        for c in a_cols:
+            self.pir_assign_tree.heading(c, text=c)
+            self.pir_assign_tree.column(c, width=140)
+        self.pir_assign_tree.pack(fill="both", expand=True, padx=8, pady=6)
+
+        # Publish
+        pub = ttk.Frame(nb)
+        nb.add(pub, text="📤 Publish & Sign-off")
+        pub_bar = ttk.Frame(pub)
+        pub_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Label(pub_bar, text="Change note:").pack(side="left")
+        self.pir_note_var = tk.StringVar()
+        ttk.Entry(pub_bar, textvariable=self.pir_note_var, width=60).pack(side="left", padx=(4,10))
+        ttk.Button(pub_bar, text="Publish DOCX", command=lambda: self._publish_document('PIR')).pack(side="left")
         
     def setup_eir_tab(self):
         """Setup EIR document management interface"""
-        # Similar structure to BEP and PIR but for EIR documents
-        canvas = tk.Canvas(self.eir_frame)
-        scrollbar = ttk.Scrollbar(self.eir_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Library Section
-        library_frame = ttk.LabelFrame(scrollable_frame, text="📚 EIR Library", padding=10)
-        library_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        library_controls = ttk.Frame(library_frame)
-        library_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(library_controls, text="📥 Import Template", 
-                  command=lambda: self.import_document('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="📤 Export Template", 
-                  command=lambda: self.export_document('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(library_controls, text="🔄 Refresh", 
-                  command=lambda: self.refresh_documents('EIR')).pack(side=tk.LEFT)
-        
-        self.eir_library_tree = ttk.Treeview(library_frame, height=6)
-        self.eir_library_tree["columns"] = ("Type", "Version", "Date", "Status")
-        self.eir_library_tree.heading("#0", text="Document Name")
-        self.eir_library_tree.heading("Type", text="Type")
-        self.eir_library_tree.heading("Version", text="Version")
-        self.eir_library_tree.heading("Date", text="Date")
-        self.eir_library_tree.heading("Status", text="Status")
-        self.eir_library_tree.pack(fill=tk.X, pady=(5, 0))
-        
-        # Composition Section
-        composition_frame = ttk.LabelFrame(scrollable_frame, text="✏️ EIR Composition", padding=10)
-        composition_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        comp_controls = ttk.Frame(composition_frame)
-        comp_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(comp_controls, text="📝 New EIR", 
-                  command=lambda: self.create_new_document('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="✏️ Edit Selected", 
-                  command=lambda: self.edit_document('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(comp_controls, text="📋 Duplicate", 
-                  command=lambda: self.duplicate_document('EIR')).pack(side=tk.LEFT)
-        
-        # WIP Section
-        wip_frame = ttk.LabelFrame(scrollable_frame, text="🚧 Work in Progress", padding=10)
-        wip_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.eir_wip_tree = ttk.Treeview(wip_frame, height=4)
-        self.eir_wip_tree["columns"] = ("Author", "Modified", "Status")
-        self.eir_wip_tree.heading("#0", text="Document")
-        self.eir_wip_tree.heading("Author", text="Author")
-        self.eir_wip_tree.heading("Modified", text="Last Modified")
-        self.eir_wip_tree.heading("Status", text="Status")
-        self.eir_wip_tree.pack(fill=tk.X)
-        
-        # Publishing Section
-        publishing_frame = ttk.LabelFrame(scrollable_frame, text="📤 Publishing", padding=10)
-        publishing_frame.pack(fill=tk.X)
-        
-        pub_controls = ttk.Frame(publishing_frame)
-        pub_controls.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(pub_controls, text="✅ Approve for Publishing", 
-                  command=lambda: self.approve_document('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📧 Send for Review", 
-                  command=lambda: self.send_for_review('EIR')).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(pub_controls, text="📊 Generate Report", 
-                  command=lambda: self.generate_report('EIR')).pack(side=tk.LEFT)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Create the 4-pillar structure for EIR documents
+        nb = ttk.Notebook(self.eir_frame)
+        nb.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Library
+        lib = ttk.Frame(nb)
+        nb.add(lib, text="📚 Library")
+        lib_head = ttk.Frame(lib)
+        lib_head.pack(fill="x", padx=8, pady=6)
+        ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('EIR')).pack(side="left")
+        ttk.Button(lib_head, text="Seed WIP", command=lambda: self._seed_wip('EIR')).pack(side="left", padx=(6,0))
+        lib_body = ttk.Frame(lib)
+        lib_body.pack(fill="both", expand=True, padx=8, pady=6)
+        self.eir_lib_tree = ttk.Treeview(lib_body, columns=("Code","Title","Body"), show="headings", height=8)
+        for col in ("Code","Title","Body"):
+            self.eir_lib_tree.heading(col, text=col)
+            self.eir_lib_tree.column(col, width=240 if col=="Title" else 100)
+        self.eir_lib_tree.pack(side="left", fill="both", expand=True)
+        ttk.Scrollbar(lib_body, orient="vertical", command=self.eir_lib_tree.yview).pack(side="right", fill="y")
+        self.eir_lib_preview = tk.Text(lib, height=6, wrap="word")
+        self.eir_lib_preview.pack(fill="x", padx=8, pady=(0,8))
+        ttk.Button(lib, text="Add Selected to Compose", command=lambda: self._add_selected_to_compose('EIR')).pack(anchor="w", padx=8)
+        self.eir_lib_tree.bind('<<TreeviewSelect>>', lambda e: self._on_lib_select('EIR', e))
+
+        # Compose
+        comp = ttk.Frame(nb)
+        nb.add(comp, text="✏️ Compose")
+        comp_body = ttk.Frame(comp)
+        comp_body.pack(fill="both", expand=True, padx=8, pady=6)
+        ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
+        ttk.Label(comp_body, text="Included").grid(row=0, column=2, sticky="w")
+        self.eir_avail_list = tk.Listbox(comp_body, height=8)
+        self.eir_inclu_list = tk.Listbox(comp_body, height=8)
+        self.eir_avail_list.grid(row=1, column=0, sticky="nsew")
+        btns = ttk.Frame(comp_body)
+        btns.grid(row=1, column=1, padx=6)
+        self.eir_inclu_list.grid(row=1, column=2, sticky="nsew")
+        ttk.Button(btns, text=">>", command=lambda: self._move_list_items(self.eir_avail_list, self.eir_inclu_list)).pack(pady=4)
+        ttk.Button(btns, text="<<", command=lambda: self._move_list_items(self.eir_inclu_list, self.eir_avail_list)).pack(pady=4)
+        comp_body.columnconfigure(0, weight=1)
+        comp_body.columnconfigure(2, weight=1)
+        comp_footer = ttk.Frame(comp)
+        comp_footer.pack(fill="x", padx=8, pady=6)
+        ttk.Label(comp_footer, text="Title:").pack(side="left")
+        self.eir_title_var = tk.StringVar(value="EIR Document")
+        ttk.Entry(comp_footer, textvariable=self.eir_title_var, width=26).pack(side="left", padx=(4,10))
+        ttk.Label(comp_footer, text="Version:").pack(side="left")
+        self.eir_ver_var = tk.StringVar(value="1.0")
+        ttk.Entry(comp_footer, textvariable=self.eir_ver_var, width=10).pack(side="left", padx=(4,10))
+        ttk.Button(comp_footer, text="Instantiate", command=lambda: self._instantiate_document('EIR')).pack(side="left")
+
+        # Assign & Execute
+        ass = ttk.Frame(nb)
+        nb.add(ass, text="🎯 Assign & Execute")
+        run_bar = ttk.Frame(ass)
+        run_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('EIR')).pack(side="left")
+        a_cols = ("Clause", "Owner", "Due", "Check", "Status")
+        self.eir_assign_tree = ttk.Treeview(ass, columns=a_cols, show="headings", height=7)
+        for c in a_cols:
+            self.eir_assign_tree.heading(c, text=c)
+            self.eir_assign_tree.column(c, width=140)
+        self.eir_assign_tree.pack(fill="both", expand=True, padx=8, pady=6)
+
+        # Publish
+        pub = ttk.Frame(nb)
+        nb.add(pub, text="📤 Publish & Sign-off")
+        pub_bar = ttk.Frame(pub)
+        pub_bar.pack(fill="x", padx=8, pady=6)
+        ttk.Label(pub_bar, text="Change note:").pack(side="left")
+        self.eir_note_var = tk.StringVar()
+        ttk.Entry(pub_bar, textvariable=self.eir_note_var, width=60).pack(side="left", padx=(4,10))
+        ttk.Button(pub_bar, text="Publish DOCX", command=lambda: self._publish_document('EIR')).pack(side="left")
         
     def on_project_changed(self, new_project):
         """Handle project selection change"""
@@ -2809,206 +2791,259 @@ class DocumentManagementTab:
     def refresh_all_documents(self):
         """Refresh all document lists for current project"""
         if self.current_project:
-            self.refresh_documents('BEP')
-            self.refresh_documents('PIR')
-            self.refresh_documents('EIR')
-            
-    def import_document(self, doc_type):
-        """Import a document template"""
+            self._refresh_library('BEP')
+            self._refresh_library('PIR')
+            self._refresh_library('EIR')
+    
+    # 4-Pillar functionality methods
+    def _refresh_library(self, doc_type):
+        """Refresh library for specified document type"""
         try:
-            filetypes = [
-                ('All Documents', '*.*'),
-                ('Word Documents', '*.docx'),
-                ('Excel Files', '*.xlsx'),
-                ('PDF Files', '*.pdf')
-            ]
+            # Import doc_services if available
+            try:
+                from backend.documents import services as doc_services
+            except ImportError:
+                doc_services = None
             
-            file_path = filedialog.askopenfilename(
-                title=f"Import {doc_type} Template",
-                filetypes=filetypes
-            )
-            
-            if file_path:
-                # Here you would implement the actual import logic
-                messagebox.showinfo("Import", f"{doc_type} template imported successfully!")
-                self.refresh_documents(doc_type)
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to import {doc_type} template: {str(e)}")
-            
-    def export_document(self, doc_type):
-        """Export a document template"""
-        try:
-            # Get selected document from appropriate tree
-            tree = getattr(self, f"{doc_type.lower()}_library_tree")
-            selected = tree.selection()
-            
-            if not selected:
-                messagebox.showwarning("Selection", f"Please select a {doc_type} document to export.")
+            if doc_services is None:
                 return
                 
-            filetypes = [
-                ('Word Documents', '*.docx'),
-                ('Excel Files', '*.xlsx'),
-                ('PDF Files', '*.pdf')
-            ]
+            # Get the appropriate tree widget
+            tree = getattr(self, f"{doc_type.lower()}_lib_tree")
             
-            file_path = filedialog.asksaveasfilename(
-                title=f"Export {doc_type} Document",
-                filetypes=filetypes,
-                defaultextension='.docx'
-            )
-            
-            if file_path:
-                # Here you would implement the actual export logic
-                messagebox.showinfo("Export", f"{doc_type} document exported successfully!")
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to export {doc_type} document: {str(e)}")
-            
-    def refresh_documents(self, doc_type):
-        """Refresh document list for specified type"""
-        try:
             # Clear existing items
-            tree = getattr(self, f"{doc_type.lower()}_library_tree")
-            for item in tree.get_children():
-                tree.delete(item)
+            for i in tree.get_children():
+                tree.delete(i)
                 
-            wip_tree = getattr(self, f"{doc_type.lower()}_wip_tree")
-            for item in wip_tree.get_children():
-                wip_tree.delete(item)
-            
-            if not self.current_project:
+            # Connect and get library data
+            conn = doc_services.ensure_ready()
+            if not conn:
                 return
                 
-            # Here you would implement the actual database query to get documents
-            # For now, adding sample data
-            sample_docs = [
-                (f"Standard {doc_type} Template", "Template", "v1.0", "2024-01-15", "Active"),
-                (f"Project {doc_type} v2", "Project", "v2.1", "2024-01-20", "Draft"),
-                (f"Custom {doc_type}", "Custom", "v1.5", "2024-01-25", "Review")
+            rows = doc_services.list_library(conn, doc_type)
+            for r in rows:
+                tree.insert('', 'end', values=[r.get('code'), r.get('title'), r.get('body_md')])
+                
+            # Also populate available list
+            avail_list = getattr(self, f"{doc_type.lower()}_avail_list")
+            avail_list.delete(0, tk.END)
+            for r in rows:
+                avail_list.insert(tk.END, r.get('title', ''))
+                
+            conn.close()
+            
+        except Exception as e:
+            print(f"Error refreshing {doc_type} library: {e}")
+    
+    def _seed_wip(self, doc_type):
+        """Seed WIP with sample data for document type"""
+        try:
+            from backend.documents import services as doc_services
+        except ImportError:
+            doc_services = None
+            
+        if doc_services is None:
+            messagebox.showerror("Module", "Document services not available")
+            return
+            
+        try:
+            conn = doc_services.ensure_ready()
+            if not conn:
+                messagebox.showerror("DB", "Cannot connect to DB")
+                return
+                
+            import json, os
+            path = os.path.join(os.getcwd(), 'templates', f'{doc_type.lower()}_seed.json')
+            
+            # If seed file doesn't exist, create a basic one
+            if not os.path.exists(path):
+                seed_data = {
+                    "clauses": [
+                        {"code": f"{doc_type}001", "title": f"Basic {doc_type} Template", "body": f"Standard {doc_type} template content"},
+                        {"code": f"{doc_type}002", "title": f"Advanced {doc_type} Template", "body": f"Advanced {doc_type} template content"}
+                    ]
+                }
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(seed_data, f, indent=2)
+            
+            with open(path, 'r', encoding='utf-8') as f:
+                seed = json.load(f)
+                
+            doc_services.import_library_seed(conn, doc_type, seed, template_name='WIP', version='1.0', jurisdiction='Generic')
+            conn.close()
+            self._refresh_library(doc_type)
+            messagebox.showinfo("Seed", f"Seeded {doc_type} library")
+            
+        except Exception as e:
+            messagebox.showerror("Seed", str(e))
+    
+    def _on_lib_select(self, doc_type, event):
+        """Handle library tree selection"""
+        try:
+            tree = getattr(self, f"{doc_type.lower()}_lib_tree")
+            preview = getattr(self, f"{doc_type.lower()}_lib_preview")
+            
+            selection = tree.selection()
+            if selection:
+                item = tree.item(selection[0])
+                values = item['values']
+                if len(values) >= 3:
+                    # Show body text in preview
+                    preview.delete(1.0, tk.END)
+                    preview.insert(1.0, values[2])  # Body column
+                    
+        except Exception as e:
+            print(f"Error in {doc_type} library selection: {e}")
+    
+    def _add_selected_to_compose(self, doc_type):
+        """Add selected library item to compose"""
+        try:
+            tree = getattr(self, f"{doc_type.lower()}_lib_tree")
+            inclu_list = getattr(self, f"{doc_type.lower()}_inclu_list")
+            
+            selection = tree.selection()
+            if selection:
+                item = tree.item(selection[0])
+                values = item['values']
+                if values:
+                    inclu_list.insert(tk.END, values[1])  # Title
+                    messagebox.showinfo("Added", f"Added '{values[1]}' to composition")
+                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add to composition: {e}")
+    
+    def _move_list_items(self, from_list, to_list):
+        """Move selected items between lists"""
+        try:
+            selection = from_list.curselection()
+            if selection:
+                # Get selected items
+                items = [from_list.get(i) for i in selection]
+                
+                # Add to destination list
+                for item in items:
+                    to_list.insert(tk.END, item)
+                
+                # Remove from source list (in reverse order to maintain indices)
+                for i in reversed(selection):
+                    from_list.delete(i)
+                    
+        except Exception as e:
+            print(f"Error moving list items: {e}")
+    
+    def _instantiate_document(self, doc_type):
+        """Create a new document instance"""
+        try:
+            from backend.documents import services as doc_services
+        except ImportError:
+            doc_services = None
+            
+        if doc_services is None:
+            messagebox.showerror("Module", "Document services not available")
+            return
+            
+        try:
+            title_var = getattr(self, f"{doc_type.lower()}_title_var")
+            ver_var = getattr(self, f"{doc_type.lower()}_ver_var")
+            inclu_list = getattr(self, f"{doc_type.lower()}_inclu_list")
+            
+            title = title_var.get()
+            version = ver_var.get()
+            
+            if not title:
+                messagebox.showwarning("Input", "Please enter a document title")
+                return
+                
+            # Get included items
+            included_items = list(inclu_list.get(0, tk.END))
+            
+            conn = doc_services.ensure_ready()
+            if not conn:
+                messagebox.showerror("DB", "Cannot connect to DB")
+                return
+                
+            # Create document (simplified - would need proper implementation)
+            doc_id = doc_services.create_document(conn, doc_type, title, version, included_items)
+            conn.close()
+            
+            messagebox.showinfo("Success", f"Created {doc_type} document: {title} v{version}")
+            self._refresh_library(doc_type)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to instantiate {doc_type} document: {e}")
+    
+    def _run_checks(self, doc_type):
+        """Run checks for document type"""
+        try:
+            assign_tree = getattr(self, f"{doc_type.lower()}_assign_tree")
+            
+            # Clear existing items
+            for item in assign_tree.get_children():
+                assign_tree.delete(item)
+                
+            # Add sample check items
+            sample_checks = [
+                ("Safety Requirements", "Safety Team", "2024-02-01", "Pending", "Not Started"),
+                ("Technical Standards", "Engineering", "2024-02-15", "In Progress", "50%"),
+                ("Quality Assurance", "QA Team", "2024-02-20", "Completed", "100%")
             ]
             
-            for doc in sample_docs:
-                tree.insert("", "end", text=doc[0], values=doc[1:])
+            for check in sample_checks:
+                assign_tree.insert("", "end", values=check)
                 
-            # Sample WIP documents
-            wip_docs = [
-                (f"{doc_type}_Working_Copy", "User", "2024-01-26 14:30", "In Progress"),
-                (f"{doc_type}_Review_Draft", "Manager", "2024-01-25 16:45", "Under Review")
-            ]
+            messagebox.showinfo("Checks", f"Refreshed {doc_type} checks")
             
-            for wip in wip_docs:
-                wip_tree.insert("", "end", text=wip[0], values=wip[1:])
-                
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to refresh {doc_type} documents: {str(e)}")
-            
-    def create_new_document(self, doc_type):
-        """Create a new document"""
+            messagebox.showerror("Error", f"Failed to run {doc_type} checks: {e}")
+    
+    def _publish_document(self, doc_type):
+        """Publish document"""
         try:
-            if not self.current_project:
-                messagebox.showwarning("Project Required", "Please select a project first.")
+            from backend.documents import services as doc_services
+        except ImportError:
+            doc_services = None
+            
+        if doc_services is None:
+            messagebox.showerror("Module", "Document services not available")
+            return
+            
+        try:
+            note_var = getattr(self, f"{doc_type.lower()}_note_var")
+            change_note = note_var.get()
+            
+            if not change_note:
+                messagebox.showwarning("Input", "Please enter a change note")
                 return
                 
-            # Here you would implement document creation logic
-            messagebox.showinfo("Create", f"New {doc_type} document creation started!")
-            self.refresh_documents(doc_type)
+            # Simplified publishing process
+            messagebox.showinfo("Published", f"{doc_type} document published with note: {change_note}")
+            note_var.set("")  # Clear the note
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to create {doc_type} document: {str(e)}")
-            
-    def edit_document(self, doc_type):
-        """Edit selected document"""
-        try:
-            tree = getattr(self, f"{doc_type.lower()}_library_tree")
-            selected = tree.selection()
-            
-            if not selected:
-                messagebox.showwarning("Selection", f"Please select a {doc_type} document to edit.")
-                return
-                
-            # Here you would implement document editing logic
-            messagebox.showinfo("Edit", f"{doc_type} document editing started!")
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to edit {doc_type} document: {str(e)}")
-            
-    def duplicate_document(self, doc_type):
-        """Duplicate selected document"""
-        try:
-            tree = getattr(self, f"{doc_type.lower()}_library_tree")
-            selected = tree.selection()
-            
-            if not selected:
-                messagebox.showwarning("Selection", f"Please select a {doc_type} document to duplicate.")
-                return
-                
-            # Here you would implement document duplication logic
-            messagebox.showinfo("Duplicate", f"{doc_type} document duplicated successfully!")
-            self.refresh_documents(doc_type)
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to duplicate {doc_type} document: {str(e)}")
-            
-    def approve_document(self, doc_type):
-        """Approve document for publishing"""
-        try:
-            wip_tree = getattr(self, f"{doc_type.lower()}_wip_tree")
-            selected = wip_tree.selection()
-            
-            if not selected:
-                messagebox.showwarning("Selection", f"Please select a {doc_type} document to approve.")
-                return
-                
-            # Here you would implement document approval logic
-            messagebox.showinfo("Approve", f"{doc_type} document approved for publishing!")
-            self.refresh_documents(doc_type)
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to approve {doc_type} document: {str(e)}")
-            
-    def send_for_review(self, doc_type):
-        """Send document for review"""
-        try:
-            tree = getattr(self, f"{doc_type.lower()}_library_tree")
-            selected = tree.selection()
-            
-            if not selected:
-                messagebox.showwarning("Selection", f"Please select a {doc_type} document to send for review.")
-                return
-                
-            # Here you would implement review workflow logic
-            messagebox.showinfo("Review", f"{doc_type} document sent for review!")
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to send {doc_type} document for review: {str(e)}")
-            
-    def generate_report(self, doc_type):
-        """Generate document report"""
-        try:
-            if not self.current_project:
-                messagebox.showwarning("Project Required", "Please select a project first.")
-                return
-                
-            # Here you would implement report generation logic
-            messagebox.showinfo("Report", f"{doc_type} document report generated!")
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to generate {doc_type} report: {str(e)}")
+            messagebox.showerror("Error", f"Failed to publish {doc_type} document: {e}")
 
 class ProjectSetupTab:
     """Project Setup and Management Interface - For creating and managing projects"""
     
     def __init__(self, parent_notebook):
+        print("🔄 ProjectSetupTab: Starting initialization...")
         self.frame = ttk.Frame(parent_notebook)
         parent_notebook.add(self.frame, text="🏗️ Project Setup")
+        print("✅ ProjectSetupTab: Frame created and added to notebook")
         
+        print("🔄 ProjectSetupTab: Setting up UI...")
         self.setup_ui()
+        print("✅ ProjectSetupTab: UI setup completed")
+        
+        print("🔄 ProjectSetupTab: Refreshing data...")
         self.refresh_data()
+        print("✅ ProjectSetupTab: Data refresh completed")
         
         # Register for project change notifications
+        print("🔄 ProjectSetupTab: Registering for project notifications...")
         project_notification_system.register_observer(self)
+        print("✅ ProjectSetupTab: Initialization completed successfully")
     
     def setup_ui(self):
         """Set up the project setup interface"""
@@ -3027,7 +3062,7 @@ class ProjectSetupTab:
         
         ttk.Label(selection_frame, text="Current Project:", font=("Arial", 10, "bold")).pack(side="left")
         self.project_var = tk.StringVar()
-        self.project_combo = ttk.Combobox(selection_frame, textvariable=self.project_var, width=40, state="readonly")
+        self.project_combo = ttk.Combobox(selection_frame, textvariable=self.project_var, width=50)
         self.project_combo.pack(side="left", padx=(10, 0))
         self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
         
@@ -3074,7 +3109,8 @@ class ProjectSetupTab:
             ("📁 Configure File Paths", self.configure_paths, "Set model and IFC file locations"),
             ("🔄 Extract Files from Desktop Connector", self.extract_acc_files, "Extract files from ACC Desktop Connector"),
             ("🔄 Refresh Project Data", self.refresh_data, "Reload project information from database"),
-            ("📊 View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
+            ("� Debug Dropdown", self.debug_dropdown, "Debug project dropdown issues"),
+            ("�📊 View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
             ("🗑️ Archive Project", self.archive_project, "Archive completed or cancelled project")
         ]
         
@@ -3161,19 +3197,82 @@ class ProjectSetupTab:
     def refresh_data(self):
         """Refresh project data and update displays"""
         try:
-            # Load all projects using existing database function
+            print("🔄 ProjectSetupTab: Starting refresh_data...")
+            
+            # Get projects with explicit debug output
             projects = get_projects()
-            project_names = [f"{row[0]} - {row[1]}" for row in projects]
-            self.project_combo['values'] = project_names
+            print(f"✅ ProjectSetupTab: Found {len(projects)} projects")
             
-            # Update project info display
+            # Format project values
+            project_values = [f"{p[0]} - {p[1]}" for p in projects]
+            
+            # Set dropdown values
+            self.project_combo['values'] = project_values
+            
+            if project_values:
+                print(f"� ProjectSetupTab: First project: {project_values[0]}")
+                # Set first project as default
+                self.project_combo.set(project_values[0])
+                print(f"✅ ProjectSetupTab: Set default selection to: {project_values[0]}")
+            else:
+                print("❌ ProjectSetupTab: No projects found!")
+            
+            # Restore update methods
             self.update_project_info(projects)
-            
-            # Update recent activity
             self.update_recent_activity()
             
+            print("✅ ProjectSetupTab: refresh_data completed successfully")
+            
         except Exception as e:
+            print(f"❌ ProjectSetupTab: Error in refresh_data: {e}")
+            import traceback
+            traceback.print_exc()
             messagebox.showerror("Error", f"Failed to refresh project data: {str(e)}")
+            print(f"❌ ProjectSetupTab: Error in refresh_data: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Failed to refresh project data: {str(e)}")
+
+    def debug_dropdown(self):
+        """Debug method to test dropdown functionality"""
+        try:
+            from tkinter import messagebox
+            
+            # Test database connection
+            projects = get_projects()
+            
+            # Show results
+            msg = f"🔍 DROPDOWN DEBUG RESULTS:\n\n"
+            msg += f"Projects found: {len(projects)}\n"
+            
+            if projects:
+                msg += f"First 3 projects:\n"
+                for i, p in enumerate(projects[:3]):
+                    msg += f"  {i+1}. ID:{p[0]} - Name:{p[1]}\n"
+                
+                # Test dropdown values
+                current_values = self.project_combo['values']
+                msg += f"\nDropdown currently has: {len(current_values)} values\n"
+                
+                if current_values:
+                    msg += f"First dropdown value: {current_values[0]}\n"
+                
+                msg += f"Current selection: '{self.project_combo.get()}'\n"
+                
+                # Try to manually set values
+                project_values = [f"{p[0]} - {p[1]}" for p in projects]
+                self.project_combo['values'] = project_values
+                if project_values:
+                    self.project_combo.set(project_values[0])
+                
+                msg += f"\n✅ Manually updated dropdown with {len(project_values)} projects"
+            else:
+                msg += "❌ No projects found in database!"
+            
+            messagebox.showinfo("Dropdown Debug", msg)
+            
+        except Exception as e:
+            messagebox.showerror("Debug Error", f"Error during debug: {str(e)}")
 
     def generate_reviews_from_services(self):
         """Generate review cycles based on ProjectServices for the selected project."""
@@ -3690,23 +3789,7 @@ class ProjectSetupTab:
             return
         messagebox.showinfo("Extract Files", "ACC file extraction would start here")
     
-    def refresh_data(self):
-        """Refresh project data"""
-        try:
-            # Reload projects list
-            projects = get_projects()
-            current_selection = self.project_var.get()
-            
-            # Update project dropdown
-            self.project_dropdown['values'] = [f"{p[0]} - {p[1]}" for p in projects]
-            
-            # Maintain current selection if it still exists
-            if current_selection in self.project_dropdown['values']:
-                self.project_var.set(current_selection)
-            
-            messagebox.showinfo("Refresh", "Project data refreshed successfully")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to refresh data: {str(e)}")
+    
     
     def view_dashboard(self):
         """Open project dashboard"""
