@@ -1,0 +1,65 @@
+{
+  "template": "WIP BEP Seed",
+  "version": "1.0",
+  "jurisdiction": "Generic",
+  "sections": [
+    {
+      "code": "1",
+      "title": "Introduction",
+      "body_md": "Overview of BIM Execution Plan",
+      "clauses": [
+        {"code": "1.1", "title": "BIM Goals & Objectives", "body_md": "State goals and measurable objectives."},
+        {"code": "1.2", "title": "Purpose", "body_md": "Purpose of the BEP within the project."},
+        {"code": "1.3", "title": "Project Particulars", "body_md": "Project name, code, team, and contacts."},
+        {"code": "1.4", "title": "Milestones", "body_md": "Key milestones and dates."},
+        {"code": "1.5", "title": "Planned Information Model Uses", "body_md": "Intended BIM uses and outcomes."}
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Project Roles & Responsibilities",
+      "clauses": [
+        {"code": "2.1", "title": "Roles", "body_md": "List roles and responsibilities."}
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Collaboration Procedures",
+      "clauses": [
+        {"code": "3.1", "title": "Information Management", "body_md": "Information manager duties."},
+        {"code": "3.2.1", "title": "CDEs - Procore Transmission", "body_md": "Transmission procedures for Procore.", "optional": true},
+        {"code": "3.2.2", "title": "CDEs - ACC Publish/Share/Consume", "body_md": "Publish/share/consume rules for ACC."}
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Information Exchange",
+      "clauses": [
+        {"code": "4.2.1", "title": "Exchange Deliverables & Schedule", "body_md": "Deliverable formats and schedule."}
+      ]
+    },
+    {
+      "code": "5",
+      "title": "Virtual Coordination & Issue Identification",
+      "clauses": [
+        {"code": "5.2", "title": "Revizto Issue Tracking", "body_md": "Rules for closing issues before publish."}
+      ]
+    },
+    {
+      "code": "7",
+      "title": "LOD & Modelling Requirements",
+      "clauses": [
+        {"code": "7.1", "title": "General Standards", "body_md": "General modelling standards."},
+        {"code": "7.2", "title": "Discipline LODs", "body_md": "LOD per discipline."}
+      ]
+    },
+    {
+      "code": "12",
+      "title": "File Naming Conventions",
+      "clauses": [
+        {"code": "12.1", "title": "Naming Rules", "body_md": "Regex and view checks for naming."}
+      ]
+    }
+  ]
+}
+

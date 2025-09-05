@@ -1025,18 +1025,20 @@ def get_contractual_links(project_id, review_cycle_id=None):
 
 
 def get_review_cycles(project_id):
-    """Return review cycles for the given project."""
+    """Return review cycles for the given project from ServiceReviews table."""
     conn = connect_to_db()
     if conn is None:
         return []
     try:
         cursor = conn.cursor()
         cursor.execute(
-            f"""
-            SELECT {S.ReviewCycles.REVIEW_CYCLE_ID}, {S.ReviewCycles.STAGE_ID}, {S.ReviewCycles.START_DATE}, {S.ReviewCycles.END_DATE}, {S.ReviewCycles.NUM_REVIEWS}
-            FROM {S.ReviewCycles.TABLE}
-            WHERE {S.ReviewCycles.PROJECT_ID} = ?
-            ORDER BY {S.ReviewCycles.REVIEW_CYCLE_ID};
+            """
+            SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date, 
+                   sr.due_date, sr.status, sr.disciplines
+            FROM ServiceReviews sr
+            LEFT JOIN ProjectServices ps ON sr.service_id = ps.service_id
+            WHERE ps.project_id = ?
+            ORDER BY sr.planned_date, sr.cycle_no;
             """,
             (project_id,),
         )

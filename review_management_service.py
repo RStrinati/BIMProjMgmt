@@ -288,27 +288,38 @@ class ReviewManagementService:
     
     def create_service_review(self, review_data: Dict) -> int:
         """Create a service review cycle"""
-        query = """
-        INSERT INTO ServiceReviews (
-            service_id, cycle_no, planned_date, due_date, disciplines,
-            deliverables, status, weight_factor
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        
-        params = (
-            review_data['service_id'],
-            review_data['cycle_no'],
-            review_data['planned_date'],
-            review_data['due_date'],
-            review_data['disciplines'],
-            review_data['deliverables'],
-            review_data['status'],
-            review_data['weight_factor']
-        )
-        
-        self.cursor.execute(query, params)
-        self.db.commit()
-        return self.cursor.lastrowid
+        try:
+            query = """
+            INSERT INTO ServiceReviews (
+                service_id, cycle_no, planned_date, due_date, disciplines,
+                deliverables, status, weight_factor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """
+            
+            params = (
+                review_data['service_id'],
+                review_data['cycle_no'],
+                review_data['planned_date'],
+                review_data['due_date'],
+                review_data['disciplines'],
+                review_data['deliverables'],
+                review_data['status'],
+                review_data['weight_factor']
+            )
+            
+            self.cursor.execute(query, params)
+            
+            # Get the last inserted ID
+            self.cursor.execute("SELECT SCOPE_IDENTITY()")
+            review_id = self.cursor.fetchone()[0]
+            
+            self.db.commit()
+            return int(review_id) if review_id else 0
+            
+        except Exception as e:
+            print(f"Error creating service review: {e}")
+            self.db.rollback()
+            return 0
     
     def mark_review_issued(self, review_id: int, evidence_link: str = None) -> bool:
         """Mark a review as report issued"""
@@ -428,7 +439,184 @@ class ReviewManagementService:
         columns = [desc[0] for desc in self.cursor.description]
         return [dict(zip(columns, row)) for row in rows]
     
-    def get_service_reviews(self, service_id: int) -> List[Dict]:
+    def get_project_review_stats(self, project_id: int) -> Dict:
+        """Get review statistics for a project"""
+        try:
+            # Get total services
+            self.cursor.execute("SELECT COUNT(*) FROM ProjectServices WHERE project_id = ?", (project_id,))
+            total_services = self.cursor.fetchone()[0]
+            
+            # Get total reviews
+            total_reviews_query = """
+            SELECT COUNT(*) FROM ServiceReviews sr
+            JOIN ProjectServices ps ON ps.service_id = sr.service_id
+            WHERE ps.project_id = ?
+            """
+            self.cursor.execute(total_reviews_query, (project_id,))
+            total_reviews = self.cursor.fetchone()[0] or 0
+            
+            # Get completed reviews
+            completed_reviews_query = """
+            SELECT COUNT(*) FROM ServiceReviews sr
+            JOIN ProjectServices ps ON ps.service_id = sr.service_id
+            WHERE ps.project_id = ? AND sr.status = 'completed'
+            """
+            self.cursor.execute(completed_reviews_query, (project_id,))
+            completed_reviews = self.cursor.fetchone()[0] or 0
+            
+            # Get active reviews
+            active_reviews_query = """
+            SELECT COUNT(*) FROM ServiceReviews sr
+            JOIN ProjectServices ps ON ps.service_id = sr.service_id
+            WHERE ps.project_id = ? AND sr.status IN ('planned', 'in_progress')
+            """
+            self.cursor.execute(active_reviews_query, (project_id,))
+            active_reviews = self.cursor.fetchone()[0] or 0
+            
+            return {
+                'total_services': total_services,
+                'total_reviews': total_reviews,
+                'completed_reviews': completed_reviews,
+                'active_reviews': active_reviews
+            }
+            
+        except Exception as e:
+            print(f"Error getting project review stats: {e}")
+            return {
+                'total_services': 0,
+                'total_reviews': 0,
+                'completed_reviews': 0,
+                'active_reviews': 0
+            }
+    
+    def generate_service_reviews(self, project_id: int) -> List[Dict]:
+        """Generate review cycles from project services"""
+        try:
+            reviews_created = []
+            
+            # Get project services
+            services = self.get_project_services(project_id)
+            
+            for service in services:
+                service_id = service['service_id']
+                unit_type = service.get('unit_type', '')
+                unit_qty = service.get('unit_qty', 1)
+                
+                # Only create reviews for review-type services
+                if unit_type == 'review' and unit_qty > 0:
+                    # Use default dates if not specified
+                    from datetime import datetime, timedelta
+                    start_date = datetime.now()
+                    end_date = start_date + timedelta(days=30 * unit_qty)  # Assume monthly spacing
+                    
+                    cycles = self.generate_review_cycles(
+                        service_id=service_id,
+                        unit_qty=unit_qty,
+                        start_date=start_date,
+                        end_date=end_date,
+                        cadence='weekly'
+                    )
+                    reviews_created.extend(cycles)
+            
+            return reviews_created
+            
+        except Exception as e:
+            print(f"Error generating service reviews: {e}")
+            return []
+    
+    def generate_stage_schedule_new(self, project_id: int, stages: List[Dict]) -> bool:
+        """Generate review schedule from stage definitions using modern schema"""
+        try:
+            reviews_created = 0
+            
+            for stage in stages:
+                stage_name = stage.get('stage_name', 'Unknown Stage')
+                start_date = stage.get('start_date')
+                end_date = stage.get('end_date') 
+                num_reviews = int(stage.get('num_reviews', 0))
+                frequency = stage.get('frequency', 'weekly')
+                
+                # Convert dates if they're strings
+                if isinstance(start_date, str):
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d')
+                
+                if num_reviews <= 0:
+                    continue
+                
+                # Create a virtual service for this stage
+                service_data = {
+                    'project_id': project_id,
+                    'phase': stage_name,
+                    'service_code': 'STAGE_REVIEW',
+                    'service_name': f'{stage_name} Reviews',
+                    'unit_type': 'review',
+                    'unit_qty': num_reviews,
+                    'unit_rate': 0.0,
+                    'lump_sum_fee': 0.0,
+                    'agreed_fee': 0.0,
+                    'bill_rule': 'milestone',
+                    'notes': f'Auto-generated review service for {stage_name} stage'
+                }
+                
+                service_id = self.create_project_service(service_data)
+                
+                if service_id:
+                    # Generate review cycles for this service
+                    cycles = self.generate_review_cycles(
+                        service_id=service_id,
+                        unit_qty=num_reviews,
+                        start_date=start_date,
+                        end_date=end_date,
+                        cadence=frequency,
+                        disciplines=stage_name
+                    )
+                    reviews_created += len(cycles)
+            
+            return reviews_created > 0
+            
+        except Exception as e:
+            print(f"Error generating stage schedule: {e}")
+            return False
+    
+    def get_service_reviews(self, project_id: int = None, cycle_id: str = None) -> List[Dict]:
+        """Get service reviews for a project or specific cycle"""
+        try:
+            if project_id and cycle_id:
+                # Get reviews for specific project and cycle
+                query = """
+                SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date as due_date,
+                       sr.status, 'Unassigned' as assignee, 0 as progress, sr.evidence_links
+                FROM ServiceReviews sr
+                JOIN ProjectServices ps ON ps.service_id = sr.service_id
+                WHERE ps.project_id = ? AND sr.cycle_no = ?
+                ORDER BY sr.planned_date
+                """
+                self.cursor.execute(query, (project_id, cycle_id))
+            elif project_id:
+                # Get all reviews for project
+                query = """
+                SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date as due_date,
+                       sr.status, 'Unassigned' as assignee, 0 as progress, sr.evidence_links
+                FROM ServiceReviews sr
+                JOIN ProjectServices ps ON ps.service_id = sr.service_id
+                WHERE ps.project_id = ?
+                ORDER BY sr.planned_date
+                """
+                self.cursor.execute(query, (project_id,))
+            else:
+                return []
+            
+            rows = self.cursor.fetchall()
+            columns = [desc[0] for desc in self.cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+            
+        except Exception as e:
+            print(f"Error getting service reviews: {e}")
+            return []
+    
+    def get_service_reviews_old(self, service_id: int) -> List[Dict]:
         """Get all reviews for a service"""
         query = """
         SELECT review_id, service_id, cycle_no, planned_date, due_date,
@@ -617,6 +805,52 @@ class ReviewManagementService:
         except Exception as e:
             print(f"Error updating service progress: {e}")
             return 0.0
+    
+    def delete_all_project_reviews(self, project_id: int) -> Dict[str, int]:
+        """Delete all reviews and auto-generated services for a project"""
+        try:
+            # Get count before deletion
+            count_reviews_query = """
+            SELECT COUNT(*) FROM ServiceReviews sr
+            JOIN ProjectServices ps ON ps.service_id = sr.service_id
+            WHERE ps.project_id = ?
+            """
+            self.cursor.execute(count_reviews_query, (project_id,))
+            review_count = self.cursor.fetchone()[0]
+            
+            count_services_query = """
+            SELECT COUNT(*) FROM ProjectServices 
+            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
+            """
+            self.cursor.execute(count_services_query, (project_id,))
+            service_count = self.cursor.fetchone()[0]
+            
+            # Delete reviews (CASCADE should handle this, but be explicit)
+            delete_reviews_query = """
+            DELETE sr FROM ServiceReviews sr
+            JOIN ProjectServices ps ON ps.service_id = sr.service_id
+            WHERE ps.project_id = ?
+            """
+            self.cursor.execute(delete_reviews_query, (project_id,))
+            
+            # Delete auto-generated services
+            delete_services_query = """
+            DELETE FROM ProjectServices 
+            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
+            """
+            self.cursor.execute(delete_services_query, (project_id,))
+            
+            self.db.commit()
+            
+            return {
+                'reviews_deleted': review_count,
+                'services_deleted': service_count
+            }
+            
+        except Exception as e:
+            print(f"Error deleting all project reviews: {e}")
+            self.db.rollback()
+            return {'reviews_deleted': 0, 'services_deleted': 0}
 
 
 class ClaimExporter:
@@ -656,4 +890,61 @@ class ClaimExporter:
             
         except Exception as e:
             print(f"Error exporting to CSV: {e}")
+            return False
+    
+    def generate_stage_schedule(self, project_id: int, stages: List[Dict]) -> bool:
+        """Generate review schedule from stage definitions using modern schema"""
+        try:
+            reviews_created = 0
+            
+            for stage in stages:
+                stage_name = stage.get('stage_name', 'Unknown Stage')
+                start_date = stage.get('start_date')
+                end_date = stage.get('end_date') 
+                num_reviews = int(stage.get('num_reviews', 0))
+                frequency = stage.get('frequency', 'weekly')
+                
+                # Convert dates if they're strings
+                if isinstance(start_date, str):
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d')
+                
+                if num_reviews <= 0:
+                    continue
+                
+                # Create a virtual service for this stage
+                service_data = {
+                    'project_id': project_id,
+                    'phase': stage_name,
+                    'service_code': 'STAGE_REVIEW',
+                    'service_name': f'{stage_name} Reviews',
+                    'unit_type': 'review',
+                    'unit_qty': num_reviews,
+                    'unit_rate': 0.0,
+                    'status': 'active'
+                }
+                
+                service_id = self.create_project_service(service_data)
+                
+                if service_id:
+                    # Generate review cycles for this service
+                    cycles = self.generate_review_cycles(
+                        service_id=service_id,
+                        unit_qty=num_reviews,
+                        start_date=start_date,
+                        end_date=end_date,
+                        cadence=frequency,
+                        disciplines=stage_name
+                    )
+                    reviews_created += len(cycles)
+            
+            return reviews_created > 0
+            
+        except Exception as e:
+            print(f"Error generating stage schedule: {e}")
+            return False
+            
+        except Exception as e:
+            print(f"Error generating stage schedule: {e}")
             return False
