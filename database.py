@@ -1,3 +1,4 @@
+import logging
 import pyodbc
 import os
 import pandas as pd
@@ -5,6 +6,8 @@ from datetime import datetime, timedelta
 
 from config import Config
 from constants import schema as S
+
+logger = logging.getLogger(__name__)
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""

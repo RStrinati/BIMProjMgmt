@@ -10,6 +10,7 @@ from tkinter import ttk, messagebox
 import zipfile
 import tempfile
 import shutil
+import logging
 from database import get_acc_folder_path, log_acc_import, connect_to_db
 
 from config import Config
@@ -18,6 +19,7 @@ ACC_DB = Config.ACC_DB
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 LOG_FILE = "acc_import_summary.txt"
+logger = logging.getLogger(__name__)
 DRY_RUN = False  # Set to True for testing without SQL execution
 
 def timestamp():
@@ -59,10 +61,10 @@ def get_column_sizes(cursor, table_name):
     return {row[0]: row[1] for row in cursor.fetchall()}
 
 def log(message):
-    timestamped = f"[{timestamp()}] {message}"
-    print(timestamped)
+    """Log to standard logger and persist to the ACC summary file with a timestamp."""
+    logger.info(message)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(timestamped + "\n")
+        f.write(f"[{timestamp()}] {message}\n")
         
 def parse_excel_like_time(val):
     # Try Excel-style time parsing (e.g. "32:21.0" = 32 minutes 21 seconds)

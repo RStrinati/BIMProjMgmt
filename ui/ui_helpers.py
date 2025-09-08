@@ -2,6 +2,7 @@
 
 from tkinter import ttk
 import tkinter as tk
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 def create_labeled_entry(parent, label_text, pack=True):
     """Create a labeled entry field.
@@ -98,4 +99,40 @@ def create_scrollable_frame(parent, scroll_x=False, scroll_y=True):
     scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
     return scrollable
+
+
+# Additional small helpers used across tabs
+
+def clear_treeview(tree: ttk.Treeview) -> None:
+    """Efficiently remove all rows from a Treeview."""
+    children = tree.get_children()
+    if children:
+        tree.delete(*children)
+
+
+def format_id_name_list(rows: Sequence[Tuple[object, object]]) -> List[str]:
+    """Format (id, name) pairs into 'id - name' display strings for Comboboxes."""
+    values: List[str] = []
+    for _id, name in rows:
+        try:
+            values.append(f"{int(_id)} - {name}")
+        except Exception:
+            values.append(f"{_id} - {name}")
+    return values
+
+
+def parse_id_from_display(value: str) -> Optional[int]:
+    """Extract the integer id from a 'id - name' style string."""
+    if not value or " - " not in value:
+        return None
+    head = value.split(" - ", 1)[0].strip()
+    try:
+        return int(head)
+    except ValueError:
+        return None
+
+
+def set_combo_from_pairs(combo: ttk.Combobox, rows: Sequence[Tuple[object, object]]) -> None:
+    """Set combobox values from (id, name) pairs using the standard display format."""
+    combo["values"] = format_id_name_list(rows)
 
