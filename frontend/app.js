@@ -1,4 +1,287 @@
-const { useEffect, useState } = React;
+const { useEffect, useState, useMemo } = React;
+const {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tabs,
+  Tab,
+  Box,
+  Button,
+} = MaterialUI;
+
+// --- Reviews Module (new) ---
+function ReviewsPlanning() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [stages, setStages] = useState([]);
+  const [cycles, setCycles] = useState([]);
+  const [form, setForm] = useState({ stage: '', start: '', end: '', reviews: 4, frequency: 'weekly' });
+
+  useEffect(() => {
+    fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([]));
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) { setStages([]); setCycles([]); return; }
+    fetch(`/api/project_services/${projectId}`).then(r=>r.ok?r.json():[]).then(setStages).catch(()=>setStages([]));
+    fetch(`/api/reviews/${projectId}`).then(r=>r.ok?r.json():[]).then(setCycles).catch(()=>setCycles([]));
+  }, [projectId]);
+
+  const addStage = () => {
+    if (!projectId || !form.stage || !form.start || !form.end) return;
+    // POST to backend (placeholder)
+    fetch('/api/stages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...form, project_id: projectId }) })
+      .then(()=> fetch(`/api/project_services/${projectId}`).then(r=>r.json()).then(setStages))
+      .catch(()=>{});
+  };
+
+  const generateCycles = () => {
+    if (!projectId) return;
+    fetch(`/api/generate_review_cycles/${projectId}`, { method: 'POST' })
+      .then(()=> fetch(`/api/reviews/${projectId}`).then(r=>r.json()).then(setCycles))
+      .catch(()=>{});
+  };
+
+  return (
+    <div>
+      <h3>Reviews • Planning</h3>
+      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
+        <FormControl size="small">
+          <InputLabel>Project</InputLabel>
+          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
+            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <TextField size="small" label="Stage Name" value={form.stage} onChange={e=>setForm(f=>({...f, stage:e.target.value}))} />
+        <TextField size="small" label="Start" type="date" InputLabelProps={{shrink:true}} value={form.start} onChange={e=>setForm(f=>({...f, start:e.target.value}))} />
+        <TextField size="small" label="End" type="date" InputLabelProps={{shrink:true}} value={form.end} onChange={e=>setForm(f=>({...f, end:e.target.value}))} />
+        <TextField size="small" label="# Reviews" type="number" value={form.reviews} onChange={e=>setForm(f=>({...f, reviews:e.target.value}))} />
+        <FormControl size="small">
+          <InputLabel>Frequency</InputLabel>
+          <Select value={form.frequency} label="Frequency" onChange={e=>setForm(f=>({...f, frequency:e.target.value}))}>
+            <MenuItem value="weekly">Weekly</MenuItem>
+            <MenuItem value="bi-weekly">Bi-weekly</MenuItem>
+            <MenuItem value="monthly">Monthly</MenuItem>
+            <MenuItem value="milestone-based">Milestone-based</MenuItem>
+          </Select>
+        </FormControl>
+        <Button variant="contained" size="small" onClick={addStage}>Add Stage</Button>
+        <Button variant="outlined" size="small" onClick={generateCycles}>Generate Cycles</Button>
+      </div>
+
+      <h4 style={{ marginTop:'1rem' }}>Stages</h4>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell>Stage</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Reviews</TableCell><TableCell>Frequency</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {stages.map(s=> (
+              <TableRow key={s.id || s.stage}>
+                <TableCell>{s.stage || s.service_name}</TableCell>
+                <TableCell>{s.start || s.start_date}</TableCell>
+                <TableCell>{s.end || s.end_date}</TableCell>
+                <TableCell>{s.reviews || s.num_reviews}</TableCell>
+                <TableCell>{s.frequency || s.frequency_type}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <h4 style={{ marginTop:'1rem' }}>Review Cycles</h4>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell>ID</TableCell><TableCell>Stage</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Reviews</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {cycles.map(c=> (
+              <TableRow key={c.review_cycle_id}>
+                <TableCell>{c.review_cycle_id}</TableCell>
+                <TableCell>{c.stage_id}</TableCell>
+                <TableCell>{c.start_date}</TableCell>
+                <TableCell>{c.end_date}</TableCell>
+                <TableCell>{c.num_reviews}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+}
+
+function ReviewsTracking() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [cycleId, setCycleId] = useState('');
+  const [cycles, setCycles] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [folderPath, setFolderPath] = useState('');
+
+  useEffect(()=>{ fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([])); },[]);
+  useEffect(()=>{
+    if (!projectId) { setCycles([]); setRows([]); return; }
+    fetch(`/api/cycle_ids/${projectId}`).then(r=>r.ok?r.json():[]).then(list=>{ setCycles(list); setCycleId(list[0]||''); }).catch(()=>setCycles([]));
+  }, [projectId]);
+  useEffect(()=>{
+    if (!projectId || !cycleId) { setRows([]); return; }
+    fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`).then(r=>r.ok?r.json():[]).then(setRows).catch(()=>setRows([]));
+  }, [projectId, cycleId]);
+
+  const saveFolder = (reviewId) => {
+    // Placeholder: send folderPath to backend for reviewId
+    fetch(`/api/review_folder/${reviewId}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ folder_path: folderPath })})
+      .then(()=> alert('Folder saved'))
+      .catch(()=>{});
+  };
+
+  return (
+    <div>
+      <h3>Reviews • Tracking</h3>
+      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
+        <FormControl size="small">
+          <InputLabel>Project</InputLabel>
+          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
+            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        {!!cycles.length && (
+          <FormControl size="small">
+            <InputLabel>Cycle</InputLabel>
+            <Select value={cycleId} label="Cycle" onChange={e=>setCycleId(e.target.value)}>
+              {cycles.map(c=> <MenuItem key={c} value={c}>{c}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+        <TextField size="small" label="Review Folder" value={folderPath} onChange={e=>setFolderPath(e.target.value)} style={{ minWidth: 300 }} />
+      </div>
+
+      <TableContainer component={Paper} style={{ marginTop:'1rem' }}>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell>Review ID</TableCell><TableCell>Service</TableCell><TableCell>Date</TableCell><TableCell>Status</TableCell><TableCell>Assignee</TableCell><TableCell>Actions</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {rows.map(r=> (
+              <TableRow key={r.schedule_id}>
+                <TableCell>{r.schedule_id}</TableCell>
+                <TableCell>{r.service_name || r.service || ''}</TableCell>
+                <TableCell>{r.review_date || r.planned_start}</TableCell>
+                <TableCell>{r.status || ''}</TableCell>
+                <TableCell>{r.assignee || ''}</TableCell>
+                <TableCell>
+                  <Button size="small" onClick={()=>saveFolder(r.schedule_id)}>Save Folder</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+}
+
+function ReviewsServices() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [services, setServices] = useState([]);
+
+  useEffect(()=>{ fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([])); },[]);
+  useEffect(()=>{
+    if (!projectId) { setServices([]); return; }
+    fetch(`/api/services/${projectId}`).then(r=>r.ok?r.json():[]).then(setServices).catch(()=>setServices([]));
+  }, [projectId]);
+
+  const addService = () => {
+    const name = prompt('Service name'); if (!name) return;
+    fetch('/api/services', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ project_id: projectId, service_name: name }) })
+      .then(()=> fetch(`/api/services/${projectId}`).then(r=>r.json()).then(setServices));
+  };
+
+  return (
+    <div>
+      <h3>Reviews • Services</h3>
+      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
+        <FormControl size="small">
+          <InputLabel>Project</InputLabel>
+          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
+            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button size="small" variant="contained" onClick={addService}>Add Service</Button>
+      </div>
+      <TableContainer component={Paper} style={{ marginTop:'1rem' }}>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell>Service</TableCell><TableCell>Description</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {services.map(s=> (
+              <TableRow key={s.service_id || s.id}>
+                <TableCell>{s.service_name || s.name}</TableCell>
+                <TableCell>{s.description || ''}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+}
+
+function ReviewsKanban() {
+  const [columns, setColumns] = useState({
+    todo: [{ id: 1, title: 'Define BEP' }],
+    scheduled: [{ id: 2, title: 'Cycle 1 setup' }],
+    inreview: [{ id: 3, title: 'Review #123' }],
+    issued: [],
+    actioned: [],
+  });
+  return (
+    <div>
+      <h3>Reviews • Kanban</h3>
+      <div style={{ display:'flex', gap:'1rem' }}>
+        {Object.entries(columns).map(([key, cards]) => (
+          <div key={key} style={{ background:'#fafafa', border:'1px solid #ddd', padding:'0.5rem', width:220 }}>
+            <h4 style={{ textTransform:'capitalize' }}>{key}</h4>
+            {cards.map(c => <div key={c.id} style={{ background:'#fff', border:'1px solid #ccc', padding:'0.5rem', marginBottom:'0.5rem' }}>{c.title}</div>)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReviewsPage() {
+  const [tab, setTab] = useState(0);
+  return (
+    <div>
+      <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+        <Tab label="Planning" />
+        <Tab label="Tracking" />
+        <Tab label="Services" />
+        <Tab label="Kanban" />
+      </Tabs>
+      <Box sx={{ p: 2 }}>
+        {tab === 0 && <ReviewsPlanning />}
+        {tab === 1 && <ReviewsTracking />}
+        {tab === 2 && <ReviewsServices />}
+        {tab === 3 && <ReviewsKanban />}
+      </Box>
+    </div>
+  );
+}
 
 function ReviewTasks() {
   const [projects, setProjects] = useState([]);
@@ -327,15 +610,14 @@ function ProjectsView() {
 
 
 function App() {
-  const [view, setView] = useState('review');
+  const [view, setView] = useState('reviews');
   return (
     <div>
-      <div>
-        <button onClick={() => setView('review')}>Review Tasks</button>
-        <button onClick={() => setView('cycles')}>Review Cycles</button>
-        <button onClick={() => setView('projects')}>Projects</button>
+      <div style={{ marginBottom:'1rem' }}>
+        <Button size="small" variant={view==='reviews'?'contained':'outlined'} onClick={()=>setView('reviews')}>Reviews</Button>
+        <Button size="small" variant={view==='projects'?'contained':'outlined'} onClick={()=>setView('projects')} style={{ marginLeft: 8 }}>Projects</Button>
       </div>
-      {view === 'review' ? <ReviewTasks /> : view === 'cycles' ? <ReviewCycles /> : <ProjectsView />}
+      {view === 'reviews' ? <ReviewsPage /> : <ProjectsView />}
     </div>
   );
 }
