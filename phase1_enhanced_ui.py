@@ -956,117 +956,171 @@ class ReviewManagementTab:
         ttk.Button(service_buttons_frame, text="Delete Service", command=self.delete_service).pack(side=tk.LEFT, padx=5)
         ttk.Button(service_buttons_frame, text="Generate Reviews", command=self.generate_reviews_from_services).pack(side=tk.LEFT, padx=5)
     
+
     def setup_review_planning_tab(self):
-        """Setup the Review Planning & Scheduling tab"""
+        """Setup the Review Planning & Scheduling tab with column layout."""
         planning_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(planning_frame, text="📅 Review Planning")
-        
-        # Stage Planning Frame
-        stage_frame = ttk.LabelFrame(planning_frame, text="🏗️ Stage Review Planning", padding=10)
-        stage_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Stage input fields
+        self.sub_notebook.add(planning_frame, text="?? Review Planning")
+
+        layout = ttk.Panedwindow(planning_frame, orient=tk.HORIZONTAL)
+        layout.pack(fill=tk.BOTH, expand=True)
+
+        context_column = ttk.Frame(layout, padding=10)
+        layout.add(context_column, weight=1)
+
+        workbench_column = ttk.Frame(layout, padding=10)
+        layout.add(workbench_column, weight=3)
+
+        insights_column = ttk.Frame(layout, padding=10)
+        layout.add(insights_column, weight=1)
+
+        # === Context Column ===
+        context_frame = ttk.LabelFrame(context_column, text="?? Project Context", padding=10)
+        context_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            context_frame,
+            text="Capture key milestone notes or coordination focus areas for this review cycle.",
+            wraplength=220
+        ).pack(anchor="w")
+
+        self.context_notes_text = tk.Text(context_frame, height=8, wrap="word")
+        self.context_notes_text.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        self.context_notes_text.insert("1.0", "Notes for design managers, discipline leads, or client feedback...")
+
+        cadence_frame = ttk.LabelFrame(context_column, text="?? Cadence Defaults", padding=10)
+        cadence_frame.pack(fill=tk.X, expand=False, pady=(12, 0))
+
+        ttk.Label(cadence_frame, text="Default Start Date:").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
+        self.review_start_date = DateEntry(cadence_frame, width=14, date_pattern='yyyy-mm-dd')
+        self.review_start_date.grid(row=0, column=1, sticky="w", pady=2)
+
+        ttk.Label(cadence_frame, text="Default Frequency:").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
+        self.default_frequency_var = tk.StringVar(value="weekly")
+        ttk.Combobox(
+            cadence_frame,
+            textvariable=self.default_frequency_var,
+            values=["weekly", "bi-weekly", "monthly", "as-required"],
+            state="readonly",
+            width=12
+        ).grid(row=1, column=1, sticky="w", pady=2)
+
+        ttk.Label(cadence_frame, text="Default Review Count:").grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
+        self.default_review_count_var = tk.StringVar(value="4")
+        ttk.Entry(cadence_frame, textvariable=self.default_review_count_var, width=6).grid(row=2, column=1, sticky="w", pady=2)
+
+        for col in range(2):
+            cadence_frame.columnconfigure(col, weight=1)
+
+        # === Workbench Column ===
+        stage_frame = ttk.LabelFrame(workbench_column, text="??? Stage Review Planning", padding=10)
+        stage_frame.pack(fill=tk.X, expand=False)
+
         input_frame = ttk.Frame(stage_frame)
         input_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(input_frame, text="Stage:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+
+        ttk.Label(input_frame, text="Stage:").grid(row=0, column=0, sticky=tk.W, padx=(0, 6))
         self.stage_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.stage_var, width=20).grid(row=0, column=1, padx=(0, 10))
-        
-        ttk.Label(input_frame, text="Start Date:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
-        self.stage_start_date = DateEntry(input_frame, width=12, background='darkblue',
-                                        foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
-        self.stage_start_date.grid(row=0, column=3, padx=(0, 10))
-        
-        ttk.Label(input_frame, text="End Date:").grid(row=0, column=4, sticky=tk.W, padx=(0, 5))
-        self.stage_end_date = DateEntry(input_frame, width=12, background='darkblue',
-                                      foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
-        self.stage_end_date.grid(row=0, column=5, padx=(0, 10))
-        
-        ttk.Label(input_frame, text="Reviews:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Entry(input_frame, textvariable=self.stage_var, width=24).grid(row=0, column=1, sticky="w", padx=(0, 12))
+
+        ttk.Label(input_frame, text="Start Date:").grid(row=0, column=2, sticky=tk.W, padx=(0, 6))
+        self.stage_start_date = DateEntry(input_frame, width=12, date_pattern='yyyy-mm-dd')
+        self.stage_start_date.grid(row=0, column=3, sticky="w", padx=(0, 12))
+
+        ttk.Label(input_frame, text="End Date:").grid(row=0, column=4, sticky=tk.W, padx=(0, 6))
+        self.stage_end_date = DateEntry(input_frame, width=12, date_pattern='yyyy-mm-dd')
+        self.stage_end_date.grid(row=0, column=5, sticky="w")
+
+        ttk.Label(input_frame, text="Reviews:").grid(row=1, column=0, sticky=tk.W, padx=(0, 6), pady=(6, 0))
         self.stage_reviews_var = tk.StringVar(value="4")
-        ttk.Entry(input_frame, textvariable=self.stage_reviews_var, width=10).grid(row=1, column=1, padx=(0, 10))
-        
-        ttk.Label(input_frame, text="Frequency:").grid(row=1, column=2, sticky=tk.W, padx=(0, 5))
+        ttk.Entry(input_frame, textvariable=self.stage_reviews_var, width=10).grid(row=1, column=1, sticky="w", padx=(0, 12), pady=(6, 0))
+
+        ttk.Label(input_frame, text="Frequency:").grid(row=1, column=2, sticky=tk.W, padx=(0, 6), pady=(6, 0))
         self.stage_freq_var = tk.StringVar(value="weekly")
-        freq_combo = ttk.Combobox(input_frame, textvariable=self.stage_freq_var, width=15, state="readonly")
-        freq_combo['values'] = ["weekly", "bi-weekly", "monthly", "as-required"]
-        freq_combo.grid(row=1, column=3, padx=(0, 10))
-        
-        # Stage buttons
+        ttk.Combobox(
+            input_frame,
+            textvariable=self.stage_freq_var,
+            values=["weekly", "bi-weekly", "monthly", "as-required"],
+            state="readonly",
+            width=15
+        ).grid(row=1, column=3, sticky="w", padx=(0, 12), pady=(6, 0))
+
         stage_btn_frame = ttk.Frame(input_frame)
-        stage_btn_frame.grid(row=1, column=4, columnspan=2, sticky=tk.W, padx=10)
-        
-        ttk.Button(stage_btn_frame, text="Add Stage", command=self.add_stage).pack(side=tk.LEFT, padx=5)
-        ttk.Button(stage_btn_frame, text="Delete Stage", command=self.delete_stage).pack(side=tk.LEFT, padx=5)
-        ttk.Button(stage_btn_frame, text="Load from Services", command=self.load_stages_from_services).pack(side=tk.LEFT, padx=5)
-        ttk.Button(stage_btn_frame, text="Generate Schedule", command=self.generate_stage_schedule).pack(side=tk.LEFT, padx=5)
-        
-        # Stages treeview
+        stage_btn_frame.grid(row=1, column=4, columnspan=2, sticky=tk.W, padx=6, pady=(6, 0))
+        ttk.Button(stage_btn_frame, text="Add Stage", command=self.add_stage).pack(side=tk.LEFT, padx=4)
+        ttk.Button(stage_btn_frame, text="Delete Stage", command=self.delete_stage).pack(side=tk.LEFT, padx=4)
+        ttk.Button(stage_btn_frame, text="Load from Services", command=self.load_stages_from_services).pack(side=tk.LEFT, padx=4)
+        ttk.Button(stage_btn_frame, text="Generate Schedule", command=self.generate_stage_schedule).pack(side=tk.LEFT, padx=4)
+
+        for col in range(6):
+            input_frame.columnconfigure(col, weight=1)
+
         stage_columns = ("Stage", "Start Date", "End Date", "Reviews", "Frequency", "Status")
         self.stages_tree = ttk.Treeview(stage_frame, columns=stage_columns, show="headings", height=6)
-        
         for col in stage_columns:
             self.stages_tree.heading(col, text=col)
             self.stages_tree.column(col, width=120, anchor="w")
-        
-        self.stages_tree.pack(fill=tk.X, pady=10)
-        
-        # Review Cycles Frame
-        cycles_frame = ttk.LabelFrame(planning_frame, text="🔄 Review Cycles", padding=10)
-        cycles_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Cycle filters
+        self.stages_tree.pack(fill=tk.BOTH, expand=True)
+
+        cycles_frame = ttk.LabelFrame(workbench_column, text="?? Review Cycles", padding=10)
+        cycles_frame.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
+
         filter_frame = ttk.Frame(cycles_frame)
         filter_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(filter_frame, text="Cycle:").pack(side=tk.LEFT, padx=(0, 5))
+
+        ttk.Label(filter_frame, text="Cycle:").pack(side=tk.LEFT, padx=(0, 6))
         self.cycle_filter_var = tk.StringVar()
-        self.cycle_filter_combo = ttk.Combobox(filter_frame, textvariable=self.cycle_filter_var, width=20, state="readonly")
-        self.cycle_filter_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self.cycle_filter_combo = ttk.Combobox(filter_frame, textvariable=self.cycle_filter_var, width=22, state="readonly")
+        self.cycle_filter_combo.pack(side=tk.LEFT, padx=(0, 12))
         self.cycle_filter_combo.bind('<<ComboboxSelected>>', self.on_cycle_filter_changed)
-        
-        ttk.Label(filter_frame, text="Status:").pack(side=tk.LEFT, padx=(0, 5))
+
+        ttk.Label(filter_frame, text="Status:").pack(side=tk.LEFT, padx=(0, 6))
         self.status_filter_var = tk.StringVar()
         status_filter = ttk.Combobox(filter_frame, textvariable=self.status_filter_var, width=15, state="readonly")
         status_filter['values'] = ["All", "planned", "in_progress", "completed", "on_hold"]
-        status_filter.pack(side=tk.LEFT, padx=(0, 10))
         status_filter.set("All")
-        
-        ttk.Button(filter_frame, text="Refresh Cycles", command=self.refresh_cycles).pack(side=tk.LEFT, padx=10)
-        
-        # Review cycle action buttons
-        review_actions_frame = ttk.Frame(cycles_frame)
-        review_actions_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(review_actions_frame, text="Edit Review", command=self.edit_review_cycle).pack(side=tk.LEFT, padx=5)
-        ttk.Button(review_actions_frame, text="Delete Review", command=self.delete_review_cycle).pack(side=tk.LEFT, padx=5)
-        ttk.Button(review_actions_frame, text="Mark as Issued", command=self.mark_review_issued).pack(side=tk.LEFT, padx=5)
-        ttk.Button(review_actions_frame, text="Delete All Reviews", command=self.delete_all_reviews).pack(side=tk.LEFT, padx=5)
-        
-        # Cycles treeview container
-        treeview_frame = ttk.Frame(cycles_frame)
-        treeview_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Cycles treeview
+        status_filter.pack(side=tk.LEFT, padx=(0, 12))
+
+        ttk.Button(filter_frame, text="Refresh Cycles", command=self.refresh_cycles).pack(side=tk.LEFT)
+
+        actions_frame = ttk.Frame(cycles_frame)
+        actions_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Button(actions_frame, text="Edit Review", command=self.edit_review_cycle).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions_frame, text="Delete Review", command=self.delete_review_cycle).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions_frame, text="Mark as Issued", command=self.mark_review_issued).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions_frame, text="Delete All Reviews", command=self.delete_all_reviews).pack(side=tk.LEFT, padx=4)
+
+        tree_frame = ttk.Frame(cycles_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+
         cycle_columns = ("Review ID", "Cycle", "Planned Start", "Planned End", "Actual Start", "Actual End", "Status", "Stage", "Reviewer", "Notes")
-        self.cycles_tree = ttk.Treeview(treeview_frame, columns=cycle_columns, show="headings", height=8)
-        
+        self.cycles_tree = ttk.Treeview(tree_frame, columns=cycle_columns, show="headings", height=8)
         for col in cycle_columns:
             self.cycles_tree.heading(col, text=col)
-            if col == "Review ID":
-                self.cycles_tree.column(col, width=80, anchor="w")
-            else:
-                self.cycles_tree.column(col, width=100, anchor="w")
-        
-        cycles_v_scroll = ttk.Scrollbar(treeview_frame, orient=tk.VERTICAL, command=self.cycles_tree.yview)
-        cycles_h_scroll = ttk.Scrollbar(treeview_frame, orient=tk.HORIZONTAL, command=self.cycles_tree.xview)
+            width = 80 if col == "Review ID" else 110
+            self.cycles_tree.column(col, width=width, anchor="w")
+        cycles_v_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.cycles_tree.yview)
+        cycles_h_scroll = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.cycles_tree.xview)
         self.cycles_tree.configure(yscrollcommand=cycles_v_scroll.set, xscrollcommand=cycles_h_scroll.set)
-        
-        # Use pack instead of grid to avoid conflicts
         self.cycles_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         cycles_v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-    
+        cycles_h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # === Insights Column ===
+        insights_frame = ttk.LabelFrame(insights_column, text="?? Review Insights", padding=10)
+        insights_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            insights_frame,
+            text="Visual summaries and KPIs will appear here in the next iteration.",
+            wraplength=220
+        ).pack(anchor="w")
+
+        self.insights_placeholder = tk.Listbox(insights_frame, height=8)
+        self.insights_placeholder.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        self.insights_placeholder.insert(tk.END, "• Upcoming deliverable focus")
+        self.insights_placeholder.insert(tk.END, "• High-risk stages")
+        self.insights_placeholder.insert(tk.END, "• Review volume by discipline")
     def setup_review_tracking_tab(self):
         """Setup the Review Execution & Tracking tab"""
         tracking_frame = ttk.Frame(self.sub_notebook)
