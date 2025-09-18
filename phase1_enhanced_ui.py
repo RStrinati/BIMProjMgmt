@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 1 Enhanced UI Module
 Enhanced task management, milestone tracking, and resource allocation interface
 Includes existing daily workflow components: ACC folder management, data import, and issue management
@@ -73,6 +73,15 @@ class ProjectNotificationSystem:
                 except Exception as e:
                     logger.error("Error notifying observer %s: %s", observer, e)
     
+    def notify_project_list_changed(self):
+        """Notify all registered tabs that the project list has changed"""
+        for observer in self.observers:
+            try:
+                if hasattr(observer, 'on_project_list_changed'):
+                    observer.on_project_list_changed()
+            except Exception as e:
+                logger.error("Error notifying observer %s: %s", observer, e)
+    
     def get_current_project(self):
         """Get the currently selected project"""
         return self.current_project
@@ -86,7 +95,7 @@ class EnhancedTaskManagementTab:
     
     def __init__(self, parent_notebook):
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="📋 Enhanced Tasks")
+        parent_notebook.add(self.frame, text="?? Enhanced Tasks")
         
         self.task_mgr = EnhancedTaskManager()
         self.resource_mgr = ResourceManager()
@@ -258,12 +267,12 @@ class EnhancedTaskManagementTab:
         for task in tasks:
             # Determine progress bar color based on health
             health_colors = {
-                'Complete': '🟢',
-                'On Track': '🟡',
-                'Due Soon': '🟠',
-                'Overdue': '🔴'
+                'Complete': '??',
+                'On Track': '??',
+                'Due Soon': '??',
+                'Overdue': '??'
             }
-            health_icon = health_colors.get(task['health_status'], '⚪')
+            health_icon = health_colors.get(task['health_status'], '?')
             
             # Format progress display
             progress_display = f"{task['progress_percentage']}%"
@@ -401,7 +410,7 @@ class ResourceManagementTab:
     
     def __init__(self, parent_notebook):
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="👥 Resources")
+        parent_notebook.add(self.frame, text="?? Resources")
         
         self.resource_mgr = ResourceManager()
         
@@ -504,15 +513,15 @@ class ResourceManagementTab:
         
         # Status colors
         status_colors = {
-            'Overallocated': '🔴',
-            'High': '🟠',
-            'Medium': '🟡',
-            'Low': '🟢'
+            'Overallocated': '??',
+            'High': '??',
+            'Medium': '??',
+            'Low': '??'
         }
         
         # Populate tree
         for resource in resources:
-            status_icon = status_colors.get(resource['workload_status'], '⚪')
+            status_icon = status_colors.get(resource['workload_status'], '?')
             
             self.resource_tree.insert("", "end",
                                     text=str(resource['user_id']),
@@ -552,7 +561,7 @@ class ResourceManagementTab:
         if available:
             result_text = f"Found {len(available)} available resources:\n\n"
             for resource in available[:5]:  # Show top 5
-                result_text += f"👤 {resource['name']} ({resource['role_level']})\n"
+                result_text += f"?? {resource['name']} ({resource['role_level']})\n"
                 result_text += f"   Utilization: {resource['utilization_percentage']:.1f}%\n"
                 result_text += f"   Available: {resource['available_hours']:.1f} hours\n"
                 if resource['skills']:
@@ -593,7 +602,7 @@ class ACCFolderManagementTab:
     
     def __init__(self, parent_notebook):
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="📂 ACC Folders")
+        parent_notebook.add(self.frame, text="?? ACC Folders")
         
         self.setup_ui()
         self.refresh_data()
@@ -748,7 +757,7 @@ class ACCFolderManagementTab:
         logs = get_acc_import_logs(pid)
         if logs:
             for folder_name, date, summary in logs:
-                self.log_listbox.insert(tk.END, f"✅ {folder_name} @ {date.strftime('%Y-%m-%d %H:%M')}")
+                self.log_listbox.insert(tk.END, f"? {folder_name} @ {date.strftime('%Y-%m-%d %H:%M')}")
         else:
             self.log_listbox.insert(tk.END, "No previous ACC imports found.")
     
@@ -796,7 +805,7 @@ class ACCFolderManagementTab:
             conn = connect_to_db("acc_data_schema")
             if conn is None:
                 self.preview_text.delete(1.0, tk.END)
-                self.preview_text.insert(1.0, "❌ Cannot connect to acc_data_schema database")
+                self.preview_text.insert(1.0, "? Cannot connect to acc_data_schema database")
                 return
             
             cursor = conn.cursor()
@@ -833,7 +842,7 @@ class ACCFolderManagementTab:
                 
         except Exception as e:
             self.preview_text.delete(1.0, tk.END)
-            self.preview_text.insert(1.0, f"❌ Error querying issues data: {str(e)}")
+            self.preview_text.insert(1.0, f"? Error querying issues data: {str(e)}")
         finally:
             if conn:
                 conn.close()
@@ -856,20 +865,29 @@ class ACCFolderManagementTab:
         if self.project_var.get() != new_project:
             self.project_var.set(new_project)
             self.refresh_data()
+    
+    def on_project_list_changed(self):
+        """Handle notification that the project list has changed"""
+        self.refresh_data()
 
 class ReviewManagementTab:
     """Enhanced Review Management Interface with Service Templates and Advanced Planning"""
     
     def __init__(self, parent_notebook):
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="📋 Review Management")
+        parent_notebook.add(self.frame, text="?? Review Management")
         
         self.current_project_id = None
         self.current_cycle_id = None
         self.review_service = None
+        self.auto_complete_candidates = []
         
         self.setup_ui()
         self.refresh_data()
+        
+        # Initialize background sync for automatic updates
+        self._last_services_signature = ""
+        self.frame.after(5000, self.start_background_sync)  # Start after 5 seconds
         
         # Register for project change notifications
         project_notification_system.register_observer(self)
@@ -895,10 +913,10 @@ class ReviewManagementTab:
     def setup_service_template_tab(self):
         """Setup the Service Templates and Project Services tab"""
         service_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(service_frame, text="🛠️ Service Setup")
+        self.sub_notebook.add(service_frame, text="??? Service Setup")
         
         # Project Selection Frame
-        project_frame = ttk.LabelFrame(service_frame, text="📁 Project Selection", padding=10)
+        project_frame = ttk.LabelFrame(service_frame, text="?? Project Selection", padding=10)
         project_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(project_frame, text="Project:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
@@ -908,7 +926,7 @@ class ReviewManagementTab:
         self.project_combo.bind('<<ComboboxSelected>>', self.on_project_selected)
         
         # Service Template Frame
-        template_frame = ttk.LabelFrame(service_frame, text="📋 Service Templates", padding=10)
+        template_frame = ttk.LabelFrame(service_frame, text="?? Service Templates", padding=10)
         template_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Template selection
@@ -923,17 +941,25 @@ class ReviewManagementTab:
         ttk.Button(template_frame, text="Clear All Services", command=self.clear_services).grid(row=0, column=4, padx=5)
         
         # Current Project Services Frame
-        services_frame = ttk.LabelFrame(service_frame, text="🔧 Current Project Services", padding=10)
+        services_frame = ttk.LabelFrame(service_frame, text="?? Current Project Services", padding=10)
         services_frame.pack(fill=tk.BOTH, expand=True)
         
         # Services treeview
-        service_columns = ("Service ID", "Phase", "Service Code", "Service Name", "Unit Type", "Qty", "Rate", "Fee", "Status")
+        service_columns = ("Service ID", "Phase", "Service Code", "Service Name", "Unit Type", "Qty", "Rate", "Fee", "Status", "Start", "End", "Frequency")
         self.services_tree = ttk.Treeview(services_frame, columns=service_columns, show="headings", height=8)
         
         for col in service_columns:
             self.services_tree.heading(col, text=col)
-            width = 80 if col in ["Service ID", "Qty", "Rate"] else 120
+            if col in ["Service ID", "Qty"]:
+                width = 80
+            elif col in ["Rate", "Fee"]:
+                width = 100
+            elif col in ["Start", "End", "Frequency"]:
+                width = 110
+            else:
+                width = 150
             self.services_tree.column(col, width=width, anchor="w")
+
         
         # Scrollbars for services
         services_v_scroll = ttk.Scrollbar(services_frame, orient=tk.VERTICAL, command=self.services_tree.yview)
@@ -1013,54 +1039,30 @@ class ReviewManagementTab:
             cadence_frame.columnconfigure(col, weight=1)
 
         # === Workbench Column ===
-        stage_frame = ttk.LabelFrame(workbench_column, text="??? Stage Review Planning", padding=10)
-        stage_frame.pack(fill=tk.X, expand=False)
+        service_frame = ttk.LabelFrame(workbench_column, text="?? Service Review Planning", padding=10)
+        service_frame.pack(fill=tk.X, expand=False)
 
-        input_frame = ttk.Frame(stage_frame)
-        input_frame.pack(fill=tk.X, pady=(0, 10))
+        # Info label explaining the purpose
+        info_label = ttk.Label(service_frame, text="Services are managed in the Service Setup tab. This view shows service review planning details.", 
+                              foreground="blue", font=("Arial", 9, "italic"))
+        info_label.pack(anchor="w", pady=(0, 10))
 
-        ttk.Label(input_frame, text="Stage:").grid(row=0, column=0, sticky=tk.W, padx=(0, 6))
-        self.stage_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.stage_var, width=24).grid(row=0, column=1, sticky="w", padx=(0, 12))
+        # Service review planning treeview - shows services with review details
+        service_columns = ("Stage", "Start Date", "Expected End Date", "Review Count", "Frequency", "Status (%)")
+        self.services_review_tree = ttk.Treeview(service_frame, columns=service_columns, show="headings", height=8)
+        for col in service_columns:
+            self.services_review_tree.heading(col, text=col)
+            width = 100 if col in ["Review Count", "Status (%)"] else 120
+            self.services_review_tree.column(col, width=width, anchor="w")
+        self.services_review_tree.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(input_frame, text="Start Date:").grid(row=0, column=2, sticky=tk.W, padx=(0, 6))
-        self.stage_start_date = DateEntry(input_frame, width=12, date_pattern='yyyy-mm-dd')
-        self.stage_start_date.grid(row=0, column=3, sticky="w", padx=(0, 12))
-
-        ttk.Label(input_frame, text="End Date:").grid(row=0, column=4, sticky=tk.W, padx=(0, 6))
-        self.stage_end_date = DateEntry(input_frame, width=12, date_pattern='yyyy-mm-dd')
-        self.stage_end_date.grid(row=0, column=5, sticky="w")
-
-        ttk.Label(input_frame, text="Reviews:").grid(row=1, column=0, sticky=tk.W, padx=(0, 6), pady=(6, 0))
-        self.stage_reviews_var = tk.StringVar(value="4")
-        ttk.Entry(input_frame, textvariable=self.stage_reviews_var, width=10).grid(row=1, column=1, sticky="w", padx=(0, 12), pady=(6, 0))
-
-        ttk.Label(input_frame, text="Frequency:").grid(row=1, column=2, sticky=tk.W, padx=(0, 6), pady=(6, 0))
-        self.stage_freq_var = tk.StringVar(value="weekly")
-        ttk.Combobox(
-            input_frame,
-            textvariable=self.stage_freq_var,
-            values=["weekly", "bi-weekly", "monthly", "as-required"],
-            state="readonly",
-            width=15
-        ).grid(row=1, column=3, sticky="w", padx=(0, 12), pady=(6, 0))
-
-        stage_btn_frame = ttk.Frame(input_frame)
-        stage_btn_frame.grid(row=1, column=4, columnspan=2, sticky=tk.W, padx=6, pady=(6, 0))
-        ttk.Button(stage_btn_frame, text="Add Stage", command=self.add_stage).pack(side=tk.LEFT, padx=4)
-        ttk.Button(stage_btn_frame, text="Delete Stage", command=self.delete_stage).pack(side=tk.LEFT, padx=4)
-        ttk.Button(stage_btn_frame, text="Load from Services", command=self.load_stages_from_services).pack(side=tk.LEFT, padx=4)
-        ttk.Button(stage_btn_frame, text="Generate Schedule", command=self.generate_stage_schedule).pack(side=tk.LEFT, padx=4)
-
-        for col in range(6):
-            input_frame.columnconfigure(col, weight=1)
-
-        stage_columns = ("Stage", "Start Date", "End Date", "Reviews", "Frequency", "Status")
-        self.stages_tree = ttk.Treeview(stage_frame, columns=stage_columns, show="headings", height=6)
-        for col in stage_columns:
-            self.stages_tree.heading(col, text=col)
-            self.stages_tree.column(col, width=120, anchor="w")
-        self.stages_tree.pack(fill=tk.BOTH, expand=True)
+        # Refresh button for service review planning
+        refresh_btn_frame = ttk.Frame(service_frame)
+        refresh_btn_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(refresh_btn_frame, text="Refresh Service Planning", 
+                  command=self.load_services_for_review_planning).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(refresh_btn_frame, text="Generate Reviews", 
+                  command=self.generate_reviews_from_services_planning).pack(side=tk.LEFT)
 
         cycles_frame = ttk.LabelFrame(workbench_column, text="?? Review Cycles", padding=10)
         cycles_frame.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
@@ -1071,6 +1073,8 @@ class ReviewManagementTab:
         ttk.Label(filter_frame, text="Cycle:").pack(side=tk.LEFT, padx=(0, 6))
         self.cycle_filter_var = tk.StringVar()
         self.cycle_filter_combo = ttk.Combobox(filter_frame, textvariable=self.cycle_filter_var, width=22, state="readonly")
+        self.cycle_filter_combo['values'] = ["All Cycles"]
+        self.cycle_filter_combo.set("All Cycles")
         self.cycle_filter_combo.pack(side=tk.LEFT, padx=(0, 12))
         self.cycle_filter_combo.bind('<<ComboboxSelected>>', self.on_cycle_filter_changed)
 
@@ -1080,6 +1084,7 @@ class ReviewManagementTab:
         status_filter['values'] = ["All", "planned", "in_progress", "completed", "on_hold"]
         status_filter.set("All")
         status_filter.pack(side=tk.LEFT, padx=(0, 12))
+        status_filter.bind('<<ComboboxSelected>>', lambda _event: self.refresh_cycles())
 
         ttk.Button(filter_frame, text="Refresh Cycles", command=self.refresh_cycles).pack(side=tk.LEFT)
 
@@ -1088,12 +1093,14 @@ class ReviewManagementTab:
         ttk.Button(actions_frame, text="Edit Review", command=self.edit_review_cycle).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions_frame, text="Delete Review", command=self.delete_review_cycle).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions_frame, text="Mark as Issued", command=self.mark_review_issued).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions_frame, text="Mark as Completed", command=self.mark_review_completed).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions_frame, text="Confirm Due Reviews", command=self.confirm_due_reviews).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions_frame, text="Delete All Reviews", command=self.delete_all_reviews).pack(side=tk.LEFT, padx=4)
 
         tree_frame = ttk.Frame(cycles_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        cycle_columns = ("Review ID", "Cycle", "Planned Start", "Planned End", "Actual Start", "Actual End", "Status", "Stage", "Reviewer", "Notes")
+        cycle_columns = ("Review ID", "Cycle", "Meeting Date", "Due Date", "Actual Start", "Actual End", "Status", "Stage", "Reviewer", "Notes")
         self.cycles_tree = ttk.Treeview(tree_frame, columns=cycle_columns, show="headings", height=8)
         for col in cycle_columns:
             self.cycles_tree.heading(col, text=col)
@@ -1124,10 +1131,10 @@ class ReviewManagementTab:
     def setup_review_tracking_tab(self):
         """Setup the Review Execution & Tracking tab"""
         tracking_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(tracking_frame, text="📊 Review Tracking")
+        self.sub_notebook.add(tracking_frame, text="?? Review Tracking")
         
         # Summary Frame
-        summary_frame = ttk.LabelFrame(tracking_frame, text="📈 Project Summary", padding=10)
+        summary_frame = ttk.LabelFrame(tracking_frame, text="?? Project Summary", padding=10)
         summary_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Summary fields
@@ -1152,33 +1159,33 @@ class ReviewManagementTab:
             summary_frame.columnconfigure(i*2+1, weight=1)
         
         # Action Buttons Frame
-        action_frame = ttk.LabelFrame(tracking_frame, text="🔧 Review Actions", padding=10)
+        action_frame = ttk.LabelFrame(tracking_frame, text="?? Review Actions", padding=10)
         action_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Button row 1
         button_frame1 = ttk.Frame(action_frame)
         button_frame1.pack(fill=tk.X, pady=(0, 5))
         
-        ttk.Button(button_frame1, text="📅 Submit Schedule", 
+        ttk.Button(button_frame1, text="?? Submit Schedule", 
                   command=self.submit_schedule).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame1, text="📊 Launch Gantt Chart", 
+        ttk.Button(button_frame1, text="?? Launch Gantt Chart", 
                   command=self.launch_gantt).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame1, text="🔗 View Contract Links", 
+        ttk.Button(button_frame1, text="?? View Contract Links", 
                   command=self.show_contract_links).pack(side=tk.LEFT, padx=(0, 5))
         
         # Button row 2  
         button_frame2 = ttk.Frame(action_frame)
         button_frame2.pack(fill=tk.X)
         
-        ttk.Button(button_frame2, text="📤 Open Revizto Exporter", 
+        ttk.Button(button_frame2, text="?? Open Revizto Exporter", 
                   command=self.open_revizto_exporter).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame2, text="📋 Update Review Status", 
+        ttk.Button(button_frame2, text="?? Update Review Status", 
                   command=self.update_review_status).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame2, text="🔄 Refresh All Data", 
+        ttk.Button(button_frame2, text="?? Refresh All Data", 
                   command=self.refresh_data).pack(side=tk.LEFT, padx=(0, 5))
         
         # Review Tasks Frame
-        tasks_frame = ttk.LabelFrame(tracking_frame, text="📝 Active Review Tasks", padding=10)
+        tasks_frame = ttk.LabelFrame(tracking_frame, text="?? Active Review Tasks", padding=10)
         tasks_frame.pack(fill=tk.BOTH, expand=True)
         
         # Tasks treeview
@@ -1208,10 +1215,10 @@ class ReviewManagementTab:
     def setup_billing_tab(self):
         """Setup the Billing & Progress tab"""
         billing_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(billing_frame, text="💰 Billing")
+        self.sub_notebook.add(billing_frame, text="?? Billing")
         
         # Billing Claims Frame
-        claims_frame = ttk.LabelFrame(billing_frame, text="💳 Billing Claims", padding=10)
+        claims_frame = ttk.LabelFrame(billing_frame, text="?? Billing Claims", padding=10)
         claims_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
         # Claims treeview
@@ -1225,7 +1232,7 @@ class ReviewManagementTab:
         self.claims_tree.pack(fill=tk.BOTH, expand=True)
         
         # Service Progress Frame
-        progress_frame = ttk.LabelFrame(billing_frame, text="📊 Service Progress & Billing", padding=10)
+        progress_frame = ttk.LabelFrame(billing_frame, text="?? Service Progress & Billing", padding=10)
         progress_frame.pack(fill=tk.BOTH, expand=True)
         
         # Progress treeview
@@ -1258,8 +1265,9 @@ class ReviewManagementTab:
                 template_list = [f"{t['name']} ({t['sector']})" for t in templates]
                 self.template_combo['values'] = template_list
             
-            if project_list and not self.project_var.get():
-                self.project_combo.current(0)
+            if project_list:
+                if not self.project_var.get():
+                    self.project_combo.current(0)
                 self.on_project_selected()
                 
         except Exception as e:
@@ -1273,18 +1281,21 @@ class ReviewManagementTab:
                 return
             
             self.current_project_id = int(selected.split(" - ")[0])
+            self.current_cycle_id = None
+            if hasattr(self, 'cycle_filter_var'):
+                self.cycle_filter_var.set("All Cycles")
             
             # Initialize review service with database connection
             try:
                 db_conn = connect_to_db()
                 if db_conn:
                     self.review_service = ReviewManagementService(db_conn)
-                    print(f"✅ Review service initialized for project {self.current_project_id}")
+                    print(f"? Review service initialized for project {self.current_project_id}")
                 else:
-                    print("❌ Failed to connect to database for review service")
+                    print("? Failed to connect to database for review service")
                     self.review_service = None
             except Exception as e:
-                print(f"❌ Error initializing review service: {e}")
+                print(f"? Error initializing review service: {e}")
                 self.review_service = None
             
             # Load cycles for this project
@@ -1298,11 +1309,21 @@ class ReviewManagementTab:
             # Load project summary
             self.load_project_summary()
             
+            # Load billing overview
+            self.load_billing_data()
+            
             # Refresh review cycles
             self.refresh_cycles()
             
+            # Load services for review planning view
+            self.load_services_for_review_planning()
+            
             # Check if we should auto-populate stages from services
             self.check_auto_populate_stages()
+            
+            # NOTE: Removed automatic sync of stages and cycles on project change
+            # Users can manually trigger this via "Load Stages from Services" button
+            # self.auto_update_stages_and_cycles()
             
             # Notify other tabs
             project_notification_system.notify_project_changed(selected)
@@ -1334,11 +1355,253 @@ class ReviewManagementTab:
             
             if len(phases) > 0:
                 # Show info tooltip that stages can be loaded
-                print(f"📋 Found {len(phases)} phases in project services. Use 'Load from Services' to auto-populate stages.")
+                print(f"?? Found {len(phases)} phases in project services. Use 'Load from Services' to auto-populate stages.")
             
         except Exception as e:
             print(f"Error checking auto-populate stages: {e}")
     
+    def auto_update_stages_and_cycles(self, force_update=False):
+        """Automatically update stages and review cycles when services change"""
+        try:
+            if not self.current_project_id or not self.review_service:
+                return
+
+            # Get current project services
+            services = self.review_service.get_project_services(self.current_project_id)
+            if not services:
+                return
+
+            # Check if stages should be auto-updated
+            should_update_stages = force_update
+
+            # If stages tree is empty, ask user if they want to auto-populate from services
+            if not self.stages_tree.get_children():
+                result = messagebox.askyesno(
+                    "Auto-Populate Stages",
+                    f"Found {len(services)} services for this project, but no stages are defined.\n\n"
+                    "Would you like to automatically create stages based on the service phases and dates?"
+                )
+                if result:
+                    should_update_stages = True
+                    print("📋 Auto-populating empty stages from services...")
+                else:
+                    print("📋 User declined auto-population of stages")
+
+            # Update stages if needed
+            if should_update_stages:
+                self.auto_sync_stages_from_services(services, silent=True)
+
+            # Check if review cycles need updating
+            review_services = [s for s in services if s.get('unit_type') == 'review']
+            if review_services:
+                # Get current review cycles count
+                if hasattr(self.review_service, 'get_service_reviews'):
+                    current_cycles = self.review_service.get_service_reviews(self.current_project_id)
+                else:
+                    current_cycles = []
+
+                # Calculate expected cycles from review services
+                expected_cycles = sum(s.get('unit_qty', 0) for s in review_services)
+
+                # Ask user before auto-generating review cycles
+                if expected_cycles > len(current_cycles):
+                    missing_cycles = expected_cycles - len(current_cycles)
+                    result = messagebox.askyesno(
+                        "Auto-Generate Review Cycles",
+                        f"Found {len(review_services)} services that generate reviews.\n"
+                        f"Current reviews: {len(current_cycles)}, Expected: {expected_cycles}\n"
+                        f"Missing: {missing_cycles} review cycles\n\n"
+                        "Would you like to automatically generate the missing review cycles?"
+                    )
+                    if result:
+                        print("🔄 Auto-updating review cycles from services...")
+                        self.auto_sync_review_cycles_from_services(services)
+                    else:
+                        print("🔄 User declined auto-generation of review cycles")
+                else:
+                    print(f"📊 Review cycles in sync: Current={len(current_cycles)}, Expected={expected_cycles}")
+            else:
+                print("📊 No review services found - no review cycles to generate")
+
+        except Exception as e:
+            print(f"Error in auto_update_stages_and_cycles: {e}")
+    
+    def auto_sync_stages_from_services(self, services, silent=False):
+        """Automatically sync stages based on service phases with individual service dates"""
+        try:
+            # Clear existing stages if not silent mode
+            if not silent:
+                for item in self.stages_tree.get_children():
+                    self.stages_tree.delete(item)
+            
+            # Create stage entries for each service individually
+            stages_created = 0
+            for service in services:
+                phase = service.get('phase', '').strip()
+                if not phase:
+                    continue
+                    
+                # Get service dates and frequency
+                service_start = service.get('schedule_start')
+                service_end = service.get('schedule_end')
+                service_frequency = service.get('schedule_frequency', '').strip()
+                
+                # Handle different date formats
+                start_date = None
+                end_date = None
+                
+                if service_start:
+                    if isinstance(service_start, str):
+                        try:
+                            start_date = datetime.strptime(service_start, '%Y-%m-%d').date()
+                        except ValueError:
+                            pass
+                    elif hasattr(service_start, 'date') and callable(getattr(service_start, 'date')):
+                        start_date = service_start.date()
+                    elif hasattr(service_start, 'year'):  # Already a date object
+                        start_date = service_start
+                
+                if service_end:
+                    if isinstance(service_end, str):
+                        try:
+                            end_date = datetime.strptime(service_end, '%Y-%m-%d').date()
+                        except ValueError:
+                            pass
+                    elif hasattr(service_end, 'date') and callable(getattr(service_end, 'date')):
+                        end_date = service_end.date()
+                    elif hasattr(service_end, 'year'):  # Already a date object
+                        end_date = service_end
+                
+                # Use service frequency or determine from phase/service name
+                if service_frequency:
+                    frequency = service_frequency
+                else:
+                    frequency = "weekly"
+                    if "initiation" in phase.lower() or "setup" in phase.lower():
+                        frequency = "as-required"
+                    elif "handover" in phase.lower() or "completion" in phase.lower():
+                        frequency = "as-required"
+                    elif "construction" in phase.lower():
+                        frequency = "weekly"
+                    elif "design" in phase.lower() or "documentation" in phase.lower():
+                        frequency = "bi-weekly"
+                
+                # Calculate review count from service
+                reviews = service.get('unit_qty', 1) if service.get('unit_type') == 'review' else 1
+                reviews = max(1, reviews)
+                
+                # Use actual dates if available, otherwise skip this service
+                if start_date and end_date:
+                    # Create stage name from phase and service details
+                    service_code = service.get('service_code', '')
+                    service_name = service.get('service_name', '')
+                    stage_name = f"{phase}"
+                    if service_code and service_name:
+                        stage_name = f"{phase} - {service_code}"
+                    
+                    # Check if stage already exists (in silent mode)
+                    stage_exists = False
+                    if silent:
+                        for item in self.stages_tree.get_children():
+                            values = self.stages_tree.item(item)['values']
+                            if values and values[0] == stage_name:
+                                stage_exists = True
+                                break
+                    
+                    if not stage_exists:
+                        # Insert new stage with actual service dates and frequency
+                        self.stages_tree.insert("", tk.END, values=(
+                            stage_name,
+                            start_date.strftime('%Y-%m-%d'),
+                            end_date.strftime('%Y-%m-%d'), 
+                            reviews,
+                            frequency,
+                            1  # Service count
+                        ))
+                        stages_created += 1
+            
+            if not silent:
+                print(f"📋 Synced {stages_created} stages from individual services with actual dates and frequencies")
+                
+        except Exception as e:
+            print(f"Error in auto_sync_stages_from_services: {e}")
+    
+    def auto_sync_review_cycles_from_services(self, services):
+        """Generate review cycles based on services with review unit type"""
+        try:
+            # Find services that should generate reviews
+            review_services = [s for s in services if s.get('unit_type') == 'review']
+
+            if not review_services:
+                print("📊 No review services found - no review cycles to generate")
+                return
+
+            print(f"🔄 Generating review cycles from {len(review_services)} review services...")
+            reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
+
+            if reviews_created:
+                print(f"✅ Generated {len(reviews_created)} review cycles")
+                # Refresh the UI
+                self.refresh_cycles()
+                self.load_billing_data()
+            else:
+                print("⚠️ No review cycles were generated")
+
+        except Exception as e:
+            print(f"Error in auto_sync_review_cycles_from_services: {e}")
+    
+    def start_background_sync(self):
+        """Start background sync mechanism for automatic updates"""
+        try:
+            # Check for updates every 60 seconds (reduced frequency to avoid conflicts)
+            if hasattr(self, 'current_project_id') and self.current_project_id:
+                # Only do a light check, not full regeneration
+                self.check_service_changes_and_update()
+            
+            # Schedule next check (increased to 60 seconds)
+            self.frame.after(60000, self.start_background_sync)  # 60 seconds
+            
+        except Exception as e:
+            print(f"Error in background sync: {e}")
+            # Schedule next check even if there was an error
+            self.frame.after(60000, self.start_background_sync)
+    
+    def check_service_changes_and_update(self):
+        """Check for service changes and update if needed"""
+        try:
+            if not self.current_project_id or not self.review_service:
+                return False
+                
+            # Get current services hash for change detection
+            services = self.review_service.get_project_services(self.current_project_id)
+            
+            # Create a more comprehensive signature including dates and frequency
+            services_signature = str(len(services))
+            review_services = [s for s in services if s.get('unit_type') == 'review']
+            for service in review_services:
+                services_signature += str(service.get('unit_qty', 0))
+                services_signature += str(service.get('schedule_start', ''))
+                services_signature += str(service.get('schedule_end', ''))
+                services_signature += str(service.get('schedule_frequency', ''))
+            
+            # Compare with stored signature
+            if not hasattr(self, '_last_services_signature'):
+                self._last_services_signature = services_signature
+                return False
+                
+            if self._last_services_signature != services_signature:
+                print(f"🔍 Service changes detected (dates/frequency/quantity), light sync...")
+                # Only regenerate review cycles if needed, don't modify stages automatically
+                self.auto_sync_review_cycles_from_services(services)
+                self._last_services_signature = services_signature
+                return True
+                
+            return False
+            
+        except Exception as e:
+            print(f"Error checking service changes: {e}")
+            return False
+
     def load_template(self):
         """Load and display selected template"""
         try:
@@ -1383,7 +1646,7 @@ class ReviewManagementTab:
             
             # Services tab
             services_frame = ttk.Frame(details_notebook)
-            details_notebook.add(services_frame, text="📋 Services")
+            details_notebook.add(services_frame, text="?? Services")
             
             columns = ("Phase", "Service Code", "Service Name", "Unit Type", "Units", "Rate/Fee")
             tree = ttk.Treeview(services_frame, columns=columns, show="headings")
@@ -1408,7 +1671,7 @@ class ReviewManagementTab:
             
             # Phases analysis tab
             phases_frame = ttk.Frame(details_notebook)
-            details_notebook.add(phases_frame, text="🏗️ Phases Preview")
+            details_notebook.add(phases_frame, text="??? Phases Preview")
             
             # Analyze phases
             phases_analysis = {}
@@ -1461,7 +1724,7 @@ class ReviewManagementTab:
             
             # Info label
             info_label = ttk.Label(phases_frame, 
-                text="💡 These phases will become review stages when template is applied",
+                text="?? These phases will become review stages when template is applied",
                 font=('TkDefaultFont', 9, 'italic'))
             info_label.pack(pady=5)
             
@@ -1492,6 +1755,10 @@ class ReviewManagementTab:
                     messagebox.showinfo("Success", f"Applied template successfully. {len(services)} services created.")
                     self.load_project_services()
                     
+                    # Automatically update stages and cycles after applying template
+                    print("🔄 Auto-updating stages and cycles after applying template...")
+                    self.auto_update_stages_and_cycles(force_update=True)
+                    
                     # Ask if user wants to auto-populate stages from the new services
                     auto_stages = messagebox.askyesno("Auto-populate Stages", 
                         "Would you like to automatically create review stages from the service phases?")
@@ -1511,17 +1778,41 @@ class ReviewManagementTab:
     def load_project_services(self):
         """Load project services into the services tree"""
         try:
+            # Prevent concurrent refreshes
+            if hasattr(self, '_refreshing_services') and self._refreshing_services:
+                return
+            self._refreshing_services = True
+            
             # Clear existing services
             for item in self.services_tree.get_children():
                 self.services_tree.delete(item)
-            
+
             if not self.current_project_id or not self.review_service:
+                self._refreshing_services = False
                 return
-            
+
             # Get project services
             services = self.review_service.get_project_services(self.current_project_id)
-            
+
             for service in services:
+                start_date = service.get('schedule_start')
+                end_date = service.get('schedule_end')
+                frequency = service.get('schedule_frequency') or ''
+
+                if hasattr(start_date, 'strftime'):
+                    start_display = start_date.strftime('%Y-%m-%d')
+                elif start_date:
+                    start_display = str(start_date)
+                else:
+                    start_display = ''
+
+                if hasattr(end_date, 'strftime'):
+                    end_display = end_date.strftime('%Y-%m-%d')
+                elif end_date:
+                    end_display = str(end_date)
+                else:
+                    end_display = ''
+
                 values = (
                     service.get('service_id', ''),
                     service.get('phase', ''),
@@ -1531,12 +1822,18 @@ class ReviewManagementTab:
                     service.get('unit_qty', 0),
                     f"${service.get('unit_rate', 0):,.2f}",
                     f"${service.get('agreed_fee', 0):,.2f}",
-                    service.get('status', 'active')
+                    service.get('status', 'active'),
+                    start_display,
+                    end_display,
+                    frequency
                 )
                 self.services_tree.insert("", tk.END, values=values)
-                
+            
+            self._refreshing_services = False
+
         except Exception as e:
             print(f"Error loading project services: {e}")
+            self._refreshing_services = False
     
     def generate_reviews_from_services(self):
         """Generate review cycles from current project services"""
@@ -1549,17 +1846,34 @@ class ReviewManagementTab:
                 messagebox.showerror("Error", "Review service not initialized")
                 return
             
-            # Confirm action
-            result = messagebox.askyesno("Confirm", "Generate review cycles based on project services?")
-            if not result:
-                return
+            # Check if there are already review cycles to avoid conflicts
+            existing_cycles = self.review_service.get_service_reviews(self.current_project_id)
+            if existing_cycles:
+                result = messagebox.askyesno("Confirm", 
+                    f"There are {len(existing_cycles)} existing review cycles. "
+                    "This will delete all existing cycles and regenerate them based on current services. "
+                    "Continue?")
+                if not result:
+                    return
+            else:
+                # Confirm action for new generation
+                result = messagebox.askyesno("Confirm", "Generate review cycles based on project services?")
+                if not result:
+                    return
             
             # Generate reviews
             reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
             
             if reviews_created:
                 messagebox.showinfo("Success", f"Generated {len(reviews_created)} review cycles from services")
+                self.load_billing_data()
                 self.refresh_cycles()
+                
+                # Update stages to ensure they're in sync (but don't trigger another auto-update)
+                print("🔄 Updating stages after manual review generation...")
+                services = self.review_service.get_project_services(self.current_project_id)
+                if services:
+                    self.auto_sync_stages_from_services(services, silent=True)
             else:
                 messagebox.showwarning("Info", "No reviews generated. Check if services are properly configured.")
                 
@@ -1567,7 +1881,7 @@ class ReviewManagementTab:
             messagebox.showerror("Error", f"Error generating reviews: {e}")
     
     def load_stages_from_services(self):
-        """Load stages from current project services phases"""
+        """Load stages from current project services with actual dates"""
         try:
             if not self.current_project_id:
                 messagebox.showwarning("Warning", "Please select a project first")
@@ -1584,88 +1898,176 @@ class ReviewManagementTab:
                 messagebox.showwarning("Warning", "No services found for this project. Please apply a service template first.")
                 return
             
-            # Extract unique phases
-            phases = {}
-            for service in services:
-                phase = service.get('phase', '').strip()
-                if phase and phase not in phases:
-                    # Try to extract default review count from service
-                    default_reviews = service.get('unit_qty', 4) if service.get('unit_type') == 'review' else 1
-                    
-                    # Determine frequency based on phase name
-                    frequency = "weekly"
-                    if "initiation" in phase.lower() or "setup" in phase.lower():
-                        frequency = "as-required"
-                    elif "handover" in phase.lower() or "completion" in phase.lower():
-                        frequency = "as-required"
-                    elif "construction" in phase.lower():
-                        frequency = "weekly"
-                    elif "design" in phase.lower() or "documentation" in phase.lower():
-                        frequency = "bi-weekly"
-                    
-                    phases[phase] = {
-                        'reviews': default_reviews,
-                        'frequency': frequency,
-                        'services': []
-                    }
-                
-                # Group services by phase
-                if phase:
-                    phases[phase]['services'].append(service)
-            
-            if not phases:
-                messagebox.showwarning("Warning", "No phases found in project services")
-                return
-            
             # Ask user if they want to replace existing stages
             if self.stages_tree.get_children():
-                result = messagebox.askyesno("Confirm", "This will replace existing stages with phases from services. Continue?")
+                result = messagebox.askyesno("Confirm", "This will replace existing stages with services from the current project. Continue?")
                 if not result:
                     return
-                
-                # Clear existing stages
-                for item in self.stages_tree.get_children():
-                    self.stages_tree.delete(item)
             
-            # Add phases as stages with intelligent defaults
-            today = datetime.now()
-            phase_duration_days = 30  # Default phase duration
+            # Use the corrected auto_sync method to populate stages with actual service dates
+            print(f"🔄 Loading stages from services for project {self.current_project_id}...")
+            self.auto_sync_stages_from_services(services, silent=False)
             
-            current_date = today
-            for i, (phase, data) in enumerate(phases.items()):
-                start_date = current_date
-                end_date = start_date + timedelta(days=phase_duration_days)
-                
-                # Adjust duration based on phase type and review count
-                if data['reviews'] > 10:  # Construction phases typically have more reviews
-                    phase_duration_days = max(60, data['reviews'] * 7)  # Weekly reviews
-                elif "initiation" in phase.lower() or "setup" in phase.lower():
-                    phase_duration_days = 14  # Shorter setup phases
-                elif "handover" in phase.lower():
-                    phase_duration_days = 21  # Handover phases
-                else:
-                    phase_duration_days = 30  # Default
-                
-                end_date = start_date + timedelta(days=phase_duration_days)
-                
-                # Add to tree
-                values = (
-                    phase,
-                    start_date.strftime('%Y-%m-%d'),
-                    end_date.strftime('%Y-%m-%d'),
-                    str(data['reviews']),
-                    data['frequency'],
-                    "planned"
-                )
-                self.stages_tree.insert("", tk.END, values=values)
-                
-                # Next phase starts after current phase ends
-                current_date = end_date + timedelta(days=1)
+            # Automatically trigger review cycle update
+            print("🔄 Auto-updating review cycles after loading stages from services...")
+            self.auto_sync_review_cycles_from_services(services)
             
-            messagebox.showinfo("Success", f"Loaded {len(phases)} stages from project services")
+            messagebox.showinfo("Success", f"Loaded {len(self.stages_tree.get_children())} stages from project services with actual dates and frequencies")
             
         except Exception as e:
             messagebox.showerror("Error", f"Error loading stages from services: {e}")
+            print(f"Error in load_stages_from_services: {e}")
+    
+    def load_services_for_review_planning(self):
+        """Load services for review planning view"""
+        try:
+            # Clear existing services
+            for item in self.services_review_tree.get_children():
+                self.services_review_tree.delete(item)
+
+            if not self.current_project_id or not self.review_service:
+                return
+
+            # Get project services
+            services = self.review_service.get_project_services(self.current_project_id)
+
+            for service in services:
+                # Extract service data
+                stage = service.get('phase', '')
+                start_date = service.get('schedule_start')
+                end_date = service.get('schedule_end')
+                frequency = service.get('schedule_frequency', '')
+                unit_type = service.get('unit_type', '')
+                unit_qty = service.get('unit_qty', 0)
+
+                # Format dates
+                if hasattr(start_date, 'strftime'):
+                    start_display = start_date.strftime('%Y-%m-%d')
+                elif start_date:
+                    start_display = str(start_date)
+                else:
+                    start_display = ''
+
+                if hasattr(end_date, 'strftime'):
+                    end_display = end_date.strftime('%Y-%m-%d')
+                elif end_date:
+                    end_display = str(end_date)
+                else:
+                    end_display = ''
+
+                # Determine review count based on unit type
+                if unit_type == 'review':
+                    review_count = str(unit_qty)
+                else:
+                    # For other unit types, calculate based on duration and frequency
+                    review_count = self._calculate_review_count(start_date, end_date, frequency)
+
+                # Calculate completion percentage (placeholder - would need actual progress data)
+                # For now, show 0% or get from service status
+                status_percent = "0%"  # TODO: Calculate actual completion percentage
+
+                values = (stage, start_display, end_display, review_count, frequency, status_percent)
+                self.services_review_tree.insert("", tk.END, values=values)
+
+        except Exception as e:
+            print(f"Error loading services for review planning: {e}")
+    
+    def generate_reviews_from_services_planning(self):
+        """Generate review cycles from services shown in the review planning view"""
+        try:
+            if not self.current_project_id:
+                messagebox.showwarning("Warning", "Please select a project first")
+                return
+            
+            if not self.review_service:
+                messagebox.showerror("Error", "Review service not initialized")
+                return
+            
+            # Check if there are services to generate reviews from
+            services = self.review_service.get_project_services(self.current_project_id)
+            if not services:
+                messagebox.showwarning("Warning", "No services found for this project")
+                return
+            
+            # Check if there are already review cycles to avoid conflicts
+            existing_cycles = self.review_service.get_service_reviews(self.current_project_id)
+            if existing_cycles:
+                result = messagebox.askyesno("Confirm", 
+                    f"There are {len(existing_cycles)} existing review cycles. "
+                    "This will delete all existing cycles and regenerate them based on current services. "
+                    "Continue?")
+                if not result:
+                    return
+            else:
+                # Confirm action for new generation
+                result = messagebox.askyesno("Confirm", 
+                    f"Generate review cycles for {len(services)} services? "
+                    "This will create review schedules based on each service's duration and frequency.")
+                if not result:
+                    return
+            
+            # Generate reviews
+            reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
+            
+            if reviews_created:
+                messagebox.showinfo("Success", 
+                    f"Generated {len(reviews_created)} review cycles from {len(services)} services")
+                
+                # Refresh all relevant data
+                self.load_services_for_review_planning()  # Refresh the service planning view
+                self.load_billing_data()  # Refresh billing data
+                self.refresh_cycles()  # Refresh review cycles
+                
+                # Update stages to ensure they're in sync
+                print("🔄 Updating stages after review generation...")
+                if services:
+                    self.auto_sync_stages_from_services(services, silent=True)
+            else:
+                messagebox.showwarning("Info", "No reviews generated. Check if services are properly configured.")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error generating reviews from services: {e}")
+    
+    def _calculate_review_count(self, start_date, end_date, frequency):
+        """Calculate review count based on service duration and frequency"""
+        try:
+            if not start_date or not end_date or not frequency:
+                return "0"
+
+            # Convert dates if needed
+            if isinstance(start_date, str):
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+            elif hasattr(start_date, 'date'):
+                start = start_date.date()
+            else:
+                start = start_date
+
+            if isinstance(end_date, str):
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            elif hasattr(end_date, 'date'):
+                end = end_date.date()
+            else:
+                end = end_date
+
+            # Calculate duration in days
+            duration_days = (end - start).days
+
+            # Calculate review count based on frequency
+            if frequency == 'weekly':
+                weeks = duration_days / 7
+                return str(max(1, int(weeks)))
+            elif frequency == 'bi-weekly':
+                biweeks = duration_days / 14
+                return str(max(1, int(biweeks)))
+            elif frequency == 'monthly':
+                months = duration_days / 30
+                return str(max(1, int(months)))
+            else:
+                return "1"  # Default for as-required or unknown
+
+        except Exception as e:
+            print(f"Error calculating review count: {e}")
+            return "1"
     
     def add_stage(self):
         """Add a new stage to the stage planning"""
@@ -1688,6 +2090,10 @@ class ReviewManagementTab:
             self.stage_var.set("")
             self.stage_reviews_var.set("4")
             
+            # Automatically update review cycles after adding stage
+            print("🔄 Auto-updating review cycles after adding stage...")
+            self.auto_update_stages_and_cycles()
+            
         except Exception as e:
             messagebox.showerror("Error", f"Error adding stage: {e}")
     
@@ -1701,6 +2107,10 @@ class ReviewManagementTab:
             
             for item in selection:
                 self.stages_tree.delete(item)
+            
+            # Automatically update review cycles after deleting stage
+            print("🔄 Auto-updating review cycles after deleting stage...")
+            self.auto_update_stages_and_cycles()
                 
         except Exception as e:
             messagebox.showerror("Error", f"Error deleting stage: {e}")
@@ -1726,7 +2136,7 @@ class ReviewManagementTab:
                     }
                     stages.append(stage_data)
             
-            print(f"🔍 Found {len(stages)} stages to process")
+            print(f"?? Found {len(stages)} stages to process")
             for stage in stages:
                 print(f"  - Stage: {stage['stage_name']}, Reviews: {stage['num_reviews']}, Dates: {stage['start_date']} to {stage['end_date']}")
             
@@ -1739,88 +2149,221 @@ class ReviewManagementTab:
                 messagebox.showerror("Error", "Review service not initialized")
                 return
             
-            print(f"📅 Generating schedule for project {self.current_project_id}")
+            print(f"?? Generating schedule for project {self.current_project_id}")
             result = self.review_service.generate_stage_schedule_new(self.current_project_id, stages)
             
             if result:
-                print("✅ Stage review schedule generated successfully")
+                print("? Stage review schedule generated successfully")
                 messagebox.showinfo("Success", "Stage review schedule generated successfully")
                 self.refresh_cycles()
             else:
-                print("❌ Failed to generate stage schedule")
+                print("? Failed to generate stage schedule")
                 messagebox.showerror("Error", "Failed to generate stage schedule")
                 
         except Exception as e:
-            print(f"❌ Error generating stage schedule: {e}")
+            print(f"? Error generating stage schedule: {e}")
             messagebox.showerror("Error", f"Error generating stage schedule: {e}")
     
     def refresh_cycles(self):
         """Refresh the review cycles display"""
         try:
-            # Clear existing cycles
             for item in self.cycles_tree.get_children():
                 self.cycles_tree.delete(item)
-            
+
             if not self.current_project_id:
                 return
-            
-            # Get review cycles from database
+
+            self.auto_complete_candidates = []
             cycles = get_review_cycles(self.current_project_id)
-            
+            available_cycles = []
+
+            selected_status = "all"
+            if hasattr(self, 'status_filter_var'):
+                selected_status = (self.status_filter_var.get() or "All").lower()
+
+            selected_cycle = None
+            if hasattr(self, 'cycle_filter_var'):
+                raw_cycle = self.cycle_filter_var.get()
+                if raw_cycle not in ("All Cycles", "", None):
+                    selected_cycle = raw_cycle
+
+            today = datetime.now().date()
+            completed_states = {'completed', 'closed', 'cancelled'}
+
             for cycle in cycles:
-                # Format data for UI columns
-                # cycle format: (review_id, service_name, cycle_no, planned_date, due_date, status, disciplines)
-                # UI expects: ("Review ID", "Cycle", "Planned Start", "Planned End", "Actual Start", "Actual End", "Status", "Stage", "Reviewer", "Notes")
-                if len(cycle) >= 6:
-                    formatted_cycle = (
-                        str(cycle[0]),                     # Review ID
-                        f"{cycle[1]} - Cycle {cycle[2]}",  # Cycle (service name + cycle number)
-                        cycle[3] if cycle[3] else "",      # Planned Start
-                        cycle[4] if cycle[4] else "",      # Planned End  
-                        "",                                # Actual Start (empty for now)
-                        "",                                # Actual End (empty for now)
-                        cycle[5] if cycle[5] else "",      # Status
-                        cycle[6] if len(cycle) > 6 and cycle[6] else "All",  # Stage (disciplines)
-                        "",                                # Reviewer (empty for now)
-                        ""                                 # Notes (empty for now)
+                if len(cycle) < 6:
+                    continue
+
+                cycle_no = str(cycle[2])
+                if cycle_no not in available_cycles:
+                    available_cycles.append(cycle_no)
+
+                cycle_status = (cycle[5] or "").lower()
+                if selected_status != 'all' and cycle_status != selected_status:
+                    continue
+
+                if selected_cycle and cycle_no != selected_cycle:
+                    continue
+
+                due_display = cycle[4] or ""
+                due_flag = False
+                if due_display:
+                    try:
+                        # Handle both string and date object types
+                        if isinstance(due_display, str):
+                            due_date = datetime.strptime(due_display, '%Y-%m-%d').date()
+                        elif isinstance(due_display, datetime):
+                            due_date = due_display.date()
+                        else:
+                            due_date = due_display  # Assume it's already a date object
+                        
+                        if due_date <= today and cycle_status not in completed_states:
+                            due_flag = True
+                            
+                            # Automatically update status based on due date
+                            current_status = cycle[5] or ""
+                            if current_status in ['planned', 'in_progress']:
+                                # Update to completed if past due
+                                success = self.review_service.update_review_status_to(cycle[0], 'completed')
+                                if success:
+                                    cycle_status = 'completed'
+                                    # Update the cycle tuple for display
+                                    cycle = list(cycle)
+                                    cycle[5] = 'completed'
+                                    cycle = tuple(cycle)
+                        elif due_date <= today + timedelta(days=7) and (cycle[5] or "") == 'planned':
+                            # Update to in_progress if due within 7 days
+                            success = self.review_service.update_review_status_to(cycle[0], 'in_progress')
+                            if success:
+                                cycle_status = 'in_progress'
+                                # Update the cycle tuple for display
+                                cycle = list(cycle)
+                                cycle[5] = 'in_progress'
+                                cycle = tuple(cycle)
+                    except (ValueError, AttributeError):
+                        pass
+
+                notes = "Due for confirmation" if due_flag else ""
+
+                formatted_cycle = (
+                    str(cycle[0]),
+                    f"{cycle[1]} - Cycle {cycle_no}",
+                    cycle[3] or "",
+                    due_display,
+                    "",
+                    "",
+                    cycle[5] or "",
+                    cycle[6] if len(cycle) > 6 and cycle[6] else "All",
+                    "",
+                    notes
+                )
+                self.cycles_tree.insert("", tk.END, values=formatted_cycle)
+
+                if due_flag:
+                    self.auto_complete_candidates.append({
+                        'review_id': cycle[0],
+                        'label': formatted_cycle[1],
+                        'due_date': due_display,
+                        'status': cycle[5] or ''
+                    })
+
+            if hasattr(self, 'cycle_filter_combo'):
+                if available_cycles:
+                    sorted_cycles = sorted(
+                        available_cycles,
+                        key=lambda val: (0, int(val)) if str(val).isdigit() else (1, val)
                     )
-                    self.cycles_tree.insert("", tk.END, values=formatted_cycle)
-                
+                    values = ["All Cycles"] + sorted_cycles
+                else:
+                    values = ["All Cycles"]
+                self.cycle_filter_combo['values'] = values
+
+                if selected_cycle and selected_cycle in available_cycles:
+                    self.cycle_filter_var.set(selected_cycle)
+                else:
+                    self.cycle_filter_var.set("All Cycles")
+                    selected_cycle = None
+
+            self.current_cycle_id = selected_cycle
+            self.load_review_tasks()
         except Exception as e:
             print(f"Error refreshing cycles: {e}")
-    
+
     def load_project_summary(self):
-        """Load project summary information"""
-        try:
-            if not self.current_project_id:
-                return
-            
-            # Get project details
-            project_details = get_project_details(self.current_project_id)
-            if project_details:
-                self.summary_vars["Project Name"].set(project_details.get("project_name", ""))
-                self.summary_vars["Construction Stage"].set(project_details.get("construction_stage", ""))
+            """Load project summary information"""
+            try:
+                if not self.current_project_id:
+                    return
                 
-            # Get review statistics
-            if self.review_service:
-                stats = self.review_service.get_project_review_stats(self.current_project_id)
-                if stats:
-                    self.summary_vars["Total Services"].set(str(stats.get("total_services", 0)))
-                    self.summary_vars["Active Reviews"].set(str(stats.get("active_reviews", 0)))
-                    self.summary_vars["Completed Reviews"].set(str(stats.get("completed_reviews", 0)))
+                # Get project details
+                project_details = get_project_details(self.current_project_id)
+                if project_details:
+                    self.summary_vars["Project Name"].set(project_details.get("project_name", ""))
+                    self.summary_vars["Construction Stage"].set(project_details.get("construction_stage", ""))
                     
-                    # Calculate overall progress
-                    total = stats.get("total_reviews", 0)
-                    completed = stats.get("completed_reviews", 0)
-                    if total > 0:
-                        progress = round((completed / total) * 100, 1)
-                        self.summary_vars["Overall Progress"].set(f"{progress}%")
-                    else:
-                        self.summary_vars["Overall Progress"].set("0%")
-            
+                # Get review statistics
+                if self.review_service:
+                    stats = self.review_service.get_project_review_stats(self.current_project_id)
+                    if stats:
+                        self.summary_vars["Total Services"].set(str(stats.get("total_services", 0)))
+                        self.summary_vars["Active Reviews"].set(str(stats.get("active_reviews", 0)))
+                        self.summary_vars["Completed Reviews"].set(str(stats.get("completed_reviews", 0)))
+                        
+                        # Calculate overall progress
+                        total = stats.get("total_reviews", 0)
+                        completed = stats.get("completed_reviews", 0)
+                        if total > 0:
+                            progress = round((completed / total) * 100, 1)
+                            self.summary_vars["Overall Progress"].set(f"{progress}%")
+                        else:
+                            self.summary_vars["Overall Progress"].set("0%")
+                
+            except Exception as e:
+                print(f"Error loading project summary: {e}")
+
+    def load_billing_data(self):
+        """Load billing claims and service progress for the current project."""
+        try:
+            if not hasattr(self, 'claims_tree') or not hasattr(self, 'progress_tree'):
+                return
+
+            for item in self.claims_tree.get_children():
+                self.claims_tree.delete(item)
+
+            for item in self.progress_tree.get_children():
+                self.progress_tree.delete(item)
+
+            if not self.current_project_id or not self.review_service:
+                return
+
+            claims = self.review_service.get_billing_claims(self.current_project_id)
+            for claim in claims:
+                values = (
+                    claim.get('claim_id', ''),
+                    claim.get('period_start', '') or '',
+                    claim.get('period_end', '') or '',
+                    claim.get('po_ref', '') or '',
+                    claim.get('invoice_ref', '') or '',
+                    claim.get('status', '') or '',
+                    f"${float(claim.get('total_amount', 0) or 0):,.2f}"
+                )
+                self.claims_tree.insert('', tk.END, values=values)
+
+            services = self.review_service.get_service_progress_summary(self.current_project_id)
+            for service in services:
+                values = (
+                    service.get('service_name', ''),
+                    service.get('phase', ''),
+                    f"${float(service.get('agreed_fee', 0) or 0):,.2f}",
+                    f"{float(service.get('progress_pct', 0) or 0):.1f}%",
+                    f"${float(service.get('billed_amount', 0) or 0):,.2f}",
+                    f"${float(service.get('remaining_amount', 0) or 0):,.2f}",
+                    service.get('next_milestone', '')
+                )
+                self.progress_tree.insert('', tk.END, values=values)
         except Exception as e:
-            print(f"Error loading project summary: {e}")
-    
+            print(f"Error loading billing data: {e}")
+
     def add_service(self):
         """Add a new service to the project"""
         try:
@@ -1841,18 +2384,15 @@ class ReviewManagementTab:
     def show_service_dialog(self, service_data=None):
         """Show dialog for adding/editing a service"""
         try:
-            # Create dialog window
             dialog = tk.Toplevel(self.frame)
             dialog.title("Add Service" if not service_data else "Edit Service")
-            dialog.geometry("600x500")
+            dialog.geometry("620x560")
             dialog.transient(self.frame)
             dialog.grab_set()
-            
-            # Service form
+
             form_frame = ttk.LabelFrame(dialog, text="Service Details", padding=10)
             form_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
-            # Form variables
+
             phase_var = tk.StringVar(value=service_data.get('phase', '') if service_data else '')
             service_code_var = tk.StringVar(value=service_data.get('service_code', '') if service_data else '')
             service_name_var = tk.StringVar(value=service_data.get('service_name', '') if service_data else '')
@@ -1862,96 +2402,107 @@ class ReviewManagementTab:
             lump_sum_var = tk.StringVar(value=str(service_data.get('lump_sum_fee', 0)) if service_data else '0')
             bill_rule_var = tk.StringVar(value=service_data.get('bill_rule', 'on_completion') if service_data else 'on_completion')
             notes_var = tk.StringVar(value=service_data.get('notes', '') if service_data else '')
-            
-            # Form fields
+
+            default_start = datetime.today().date()
+            default_end = default_start + timedelta(days=90)
+            if service_data and service_data.get('schedule_start'):
+                try:
+                    default_start = datetime.strptime(str(service_data['schedule_start']), '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            if service_data and service_data.get('schedule_end'):
+                try:
+                    default_end = datetime.strptime(str(service_data['schedule_end']), '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            frequency_default = service_data.get('schedule_frequency', 'weekly') if service_data else 'weekly'
+            frequency_var = tk.StringVar(value=frequency_default)
+
             row = 0
-            
-            # Phase
             ttk.Label(form_frame, text="Phase:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             phase_entry = ttk.Entry(form_frame, textvariable=phase_var, width=40)
             phase_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 10), pady=2)
             row += 1
-            
-            # Service Code
+
             ttk.Label(form_frame, text="Service Code:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             ttk.Entry(form_frame, textvariable=service_code_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Service Name
+
             ttk.Label(form_frame, text="Service Name:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             service_name_entry = ttk.Entry(form_frame, textvariable=service_name_var, width=40)
             service_name_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 10), pady=2)
             row += 1
-            
-            # Unit Type
+
             ttk.Label(form_frame, text="Unit Type:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             unit_type_combo = ttk.Combobox(form_frame, textvariable=unit_type_var, width=20, state="readonly")
             unit_type_combo['values'] = ['lump_sum', 'review', 'audit', 'hourly']
             unit_type_combo.grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Unit Quantity
+
             ttk.Label(form_frame, text="Unit Quantity:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             ttk.Entry(form_frame, textvariable=unit_qty_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Unit Rate
+
             ttk.Label(form_frame, text="Unit Rate ($):").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             ttk.Entry(form_frame, textvariable=unit_rate_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Lump Sum Fee
+
             ttk.Label(form_frame, text="Lump Sum Fee ($):").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             ttk.Entry(form_frame, textvariable=lump_sum_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Bill Rule
+
             ttk.Label(form_frame, text="Bill Rule:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             bill_rule_combo = ttk.Combobox(form_frame, textvariable=bill_rule_var, width=20, state="readonly")
             bill_rule_combo['values'] = ['on_completion', 'per_unit_complete', 'on_setup', 'on_report_issue', 'monthly']
             bill_rule_combo.grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
-            
-            # Notes
+
+            ttk.Label(form_frame, text="Schedule Start:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
+            start_entry = DateEntry(form_frame, width=15, date_pattern='yyyy-mm-dd')
+            start_entry.grid(row=row, column=1, sticky=tk.W, pady=2)
+            start_entry.set_date(default_start)
+            row += 1
+
+            ttk.Label(form_frame, text="Schedule End:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
+            end_entry = DateEntry(form_frame, width=15, date_pattern='yyyy-mm-dd')
+            end_entry.grid(row=row, column=1, sticky=tk.W, pady=2)
+            end_entry.set_date(default_end)
+            row += 1
+
+            ttk.Label(form_frame, text="Review Frequency:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
+            frequency_combo = ttk.Combobox(form_frame, textvariable=frequency_var, width=15, state="readonly")
+            frequency_combo['values'] = ['weekly', 'bi-weekly', 'monthly']
+            frequency_combo.grid(row=row, column=1, sticky=tk.W, pady=2)
+            row += 1
+
             ttk.Label(form_frame, text="Notes:").grid(row=row, column=0, sticky=tk.W+tk.N, padx=(0, 5), pady=2)
             notes_text = tk.Text(form_frame, width=40, height=4)
             notes_text.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 10), pady=2)
             notes_text.insert(tk.END, notes_var.get())
             row += 1
-            
-            # Configure column weights
+
             form_frame.columnconfigure(1, weight=1)
-            
-            # Buttons
+
             button_frame = ttk.Frame(dialog)
             button_frame.pack(fill=tk.X, padx=10, pady=10)
-            
+
             def save_service():
                 try:
-                    # Validate inputs
-                    if not phase_var.get().strip():
-                        messagebox.showerror("Error", "Phase is required")
+                    start_value = start_entry.get_date()
+                    end_value = end_entry.get_date()
+                    if end_value < start_value:
+                        messagebox.showerror("Error", "Schedule end date cannot be before start date")
                         return
-                    
-                    if not service_code_var.get().strip():
-                        messagebox.showerror("Error", "Service Code is required")
-                        return
-                    
-                    if not service_name_var.get().strip():
-                        messagebox.showerror("Error", "Service Name is required")
-                        return
-                    
-                    # Calculate agreed fee
+
                     unit_qty = float(unit_qty_var.get() or 0)
                     unit_rate = float(unit_rate_var.get() or 0)
                     lump_sum = float(lump_sum_var.get() or 0)
-                    
+
                     if unit_type_var.get() == 'lump_sum':
                         agreed_fee = lump_sum
                     else:
                         agreed_fee = unit_qty * unit_rate
-                    
-                    # Create service data
+
                     new_service_data = {
                         'project_id': self.current_project_id,
                         'phase': phase_var.get().strip(),
@@ -1965,31 +2516,71 @@ class ReviewManagementTab:
                         'bill_rule': bill_rule_var.get(),
                         'notes': notes_text.get(1.0, tk.END).strip()
                     }
-                    
-                    # Create the service
-                    service_id = self.review_service.create_project_service(new_service_data)
-                    
-                    if service_id:
-                        messagebox.showinfo("Success", f"Service created successfully with ID: {service_id}")
-                        dialog.destroy()
-                        self.load_project_services()  # Refresh the services list
+
+                    start_str = start_value.strftime('%Y-%m-%d')
+                    end_str = end_value.strftime('%Y-%m-%d')
+                    frequency = frequency_var.get() or 'weekly'
+
+                    if service_data and service_data.get('service_id'):
+                        service_id = int(service_data['service_id'])
+                        new_service_data['status'] = service_data.get('status', 'active')
+                        new_service_data['progress_pct'] = service_data.get('progress_pct')
+                        new_service_data['claimed_to_date'] = service_data.get('claimed_to_date')
+
+                        success = self.review_service.update_project_service(service_id, new_service_data)
+                        if success:
+                            self.review_service.upsert_service_schedule(service_id, start_str, end_str, frequency)
+                            if unit_type_var.get() == 'review':
+                                self.review_service.rebuild_service_reviews(service_id)
+                            else:
+                                self.review_service.delete_service_reviews(service_id)
+                            messagebox.showinfo("Success", "Service updated successfully")
+                            dialog.destroy()
+                        else:
+                            messagebox.showerror("Error", "Failed to update service")
+                            return
                     else:
-                        messagebox.showerror("Error", "Failed to create service")
-                        
-                except ValueError as e:
+                        # Check for duplicate service before inserting
+                        existing_services = self.review_service.get_project_services(self.current_project_id)
+                        duplicate = False
+                        for svc in existing_services:
+                            if (svc.get('service_code', '').strip().lower() == new_service_data['service_code'].strip().lower() and
+                                svc.get('phase', '').strip().lower() == new_service_data['phase'].strip().lower() and
+                                svc.get('service_name', '').strip().lower() == new_service_data['service_name'].strip().lower()):
+                                duplicate = True
+                                break
+                        if duplicate:
+                            messagebox.showerror("Error", "A service with the same code, phase, and name already exists for this project.")
+                            return
+                        service_id = self.review_service.create_project_service(new_service_data)
+                        if service_id:
+                            self.review_service.upsert_service_schedule(service_id, start_str, end_str, frequency)
+                            if unit_type_var.get() == 'review':
+                                self.review_service.rebuild_service_reviews(service_id)
+                            else:
+                                self.review_service.delete_service_reviews(service_id)
+                            messagebox.showinfo("Success", f"Service created successfully with ID: {service_id}")
+                            dialog.destroy()
+                        else:
+                            messagebox.showerror("Error", "Failed to create service")
+                            return
+
+                    self.load_project_services()
+                    self.load_billing_data()
+                    self.refresh_cycles()
+                    
+                    # Automatically update stages and cycles after service modification
+                    # Note: Don't call auto_update_stages_and_cycles here as it might cause refresh conflicts
+                    print("🔄 Service saved successfully - UI refreshed")
+                except ValueError:
                     messagebox.showerror("Error", "Please enter valid numeric values for quantities and fees")
-                except Exception as e:
-                    messagebox.showerror("Error", f"Error saving service: {e}")
-            
-            def cancel():
-                dialog.destroy()
-            
+                except Exception as exc:
+                    messagebox.showerror("Error", f"Error saving service: {exc}")
+
             ttk.Button(button_frame, text="Save", command=save_service).pack(side=tk.RIGHT, padx=5)
-            ttk.Button(button_frame, text="Cancel", command=cancel).pack(side=tk.RIGHT)
-            
-            # Focus on first field
+            ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
+
             phase_entry.focus()
-            
         except Exception as e:
             messagebox.showerror("Error", f"Error showing service dialog: {e}")
     
@@ -1998,31 +2589,34 @@ class ReviewManagementTab:
         try:
             selection = self.services_tree.selection()
             if not selection:
-                messagebox.showwarning("Warning", "Please select a service to edit")
+                messagebox.showerror("Error", "Please select a service to edit")
+                return
+            item = self.services_tree.item(selection[0])
+            service_tuple = item['values'] if 'values' in item else None
+            if not service_tuple or len(service_tuple) < 1 or not self.review_service:
+                messagebox.showerror("Error", "Unable to load service details")
                 return
             
-            # Get selected service data
-            item = self.services_tree.item(selection[0])
-            values = item['values']
+            # Get the service_id from the treeview
+            service_id = service_tuple[0]
+            if not service_id:
+                messagebox.showerror("Error", "Invalid service ID")
+                return
             
-            if len(values) >= 8:
-                service_data = {
-                    'service_id': values[0],
-                    'phase': values[1],
-                    'service_code': values[2],
-                    'service_name': values[3],
-                    'unit_type': values[4],
-                    'unit_qty': values[5],
-                    'unit_rate': float(values[6].replace('$', '').replace(',', '')),
-                    'lump_sum_fee': float(values[7].replace('$', '').replace(',', '')),
-                    'bill_rule': 'on_completion',  # Default
-                    'notes': ''
-                }
-                
-                self.show_service_dialog(service_data)
-            else:
-                messagebox.showerror("Error", "Invalid service data selected")
-                
+            # Load the full service data from database
+            services = self.review_service.get_project_services(self.current_project_id)
+            service_data = None
+            for svc in services:
+                if str(svc.get('service_id', '')) == str(service_id):
+                    service_data = svc
+                    break
+            
+            if not service_data:
+                messagebox.showerror("Error", "Service not found in database")
+                return
+            
+            # Show dialog for editing, passing service_data as dictionary
+            self.show_service_dialog(service_data)
         except Exception as e:
             messagebox.showerror("Error", f"Error editing service: {e}")
     
@@ -2031,58 +2625,82 @@ class ReviewManagementTab:
         try:
             selection = self.services_tree.selection()
             if not selection:
-                messagebox.showwarning("Warning", "Please select a service to delete")
+                messagebox.showerror("Error", "Please select a service to delete")
                 return
-            
-            # Get selected service ID
             item = self.services_tree.item(selection[0])
-            values = item['values']
-            
-            if len(values) >= 1:
-                service_id = values[0]
-                service_name = values[3] if len(values) >= 4 else f"Service {service_id}"
-                
-                # Confirm deletion
-                result = messagebox.askyesno("Confirm Delete", 
-                    f"Are you sure you want to delete the service:\n\n{service_name}\n\nThis action cannot be undone.")
-                
-                if result:
-                    if self.review_service.delete_project_service(service_id):
-                        messagebox.showinfo("Success", "Service deleted successfully")
-                        self.load_project_services()  # Refresh the services list
-                    else:
-                        messagebox.showerror("Error", "Failed to delete service")
-            else:
+            service_data = item['values'] if 'values' in item else None
+            if not service_data or not self.review_service:
                 messagebox.showerror("Error", "Invalid service selected")
-                
+                return
+            # Extract service_id and service_name from service_data
+            # Adjust indices as per your treeview column order
+            service_id = service_data[0] if len(service_data) > 0 else None
+            service_name = service_data[2] if len(service_data) > 2 else ""
+            result = messagebox.askyesno("Confirm Delete", 
+                f"Are you sure you want to delete the service:\n\n{service_name}\n\nThis action cannot be undone.")
+            if result:
+                if self.review_service.delete_project_service(service_id):
+                    messagebox.showinfo("Success", "Service deleted successfully")
+                    self.load_project_services()  # Refresh the services list
+                    print("🔄 Auto-updating stages and cycles after service deletion...")
+                    self.auto_update_stages_and_cycles()
+                else:
+                    messagebox.showerror("Error", "Failed to delete service")
         except Exception as e:
             messagebox.showerror("Error", f"Error deleting service: {e}")
     
     def clear_services(self):
-        """Clear all services for the project"""
+        """Clear all services for the current project"""
         try:
             if not self.current_project_id:
-                messagebox.showwarning("Warning", "Please select a project first")
+                messagebox.showerror("Error", "Please select a project first")
                 return
             
-            result = messagebox.askyesno("Confirm", "Are you sure you want to clear ALL services for this project?")
-            if not result:
-                return
-            
-            if self.review_service:
-                count = self.review_service.clear_all_project_services(self.current_project_id)
-                messagebox.showinfo("Success", f"Cleared {count} services from project")
-                self.load_project_services()
-            else:
+            if not self.review_service:
                 messagebox.showerror("Error", "Review service not initialized")
+                return
+            
+            # Get count of services to confirm
+            services = self.review_service.get_project_services(self.current_project_id)
+            service_count = len(services)
+            
+            if service_count == 0:
+                messagebox.showinfo("Info", "No services to clear")
+                return
+            
+            # Confirm deletion
+            result = messagebox.askyesno("Confirm Clear All Services", 
+                f"Are you sure you want to clear ALL {service_count} services for this project?\n\n"
+                "This will also delete any associated review cycles and schedules.\n\n"
+                "This action cannot be undone.")
+            
+            if result:
+                # Clear all services
+                deleted_count = self.review_service.clear_all_project_services(self.current_project_id)
                 
+                if deleted_count > 0:
+                    messagebox.showinfo("Success", f"Successfully cleared {deleted_count} services")
+                    self.load_project_services()  # Refresh the services list
+                    self.load_billing_data()  # Refresh billing data
+                    self.refresh_cycles()  # Refresh review cycles
+                    
+                    # Automatically update stages and cycles after clearing services
+                    print("🔄 Auto-updating stages and cycles after clearing services...")
+                    self.auto_update_stages_and_cycles()
+                else:
+                    messagebox.showerror("Error", "Failed to clear services")
+                    
         except Exception as e:
             messagebox.showerror("Error", f"Error clearing services: {e}")
     
     def on_cycle_filter_changed(self, event=None):
         """Handle cycle filter change"""
-        self.current_cycle_id = self.cycle_filter_var.get()
-        self.load_review_tasks()
+        selection = self.cycle_filter_var.get()
+        if selection in ("All Cycles", "", None):
+            self.current_cycle_id = None
+        else:
+            self.current_cycle_id = selection
+        self.refresh_cycles()
     
     def load_review_tasks(self):
         """Load review tasks for current project/cycle"""
@@ -2096,8 +2714,11 @@ class ReviewManagementTab:
             
             # Get service reviews
             if self.review_service:
-                reviews = self.review_service.get_service_reviews(self.current_project_id, self.current_cycle_id)
-                
+                if self.current_cycle_id:
+                    reviews = self.review_service.get_service_reviews(self.current_project_id, self.current_cycle_id)
+                else:
+                    reviews = self.review_service.get_service_reviews(self.current_project_id)
+
                 for review in reviews:
                     values = (
                         review.get('review_id', ''),
@@ -2133,7 +2754,116 @@ class ReviewManagementTab:
     
     def update_review_status(self):
         """Update status of selected review"""
-        messagebox.showinfo("Info", "Update Review Status feature - Coming soon!")
+        try:
+            selection = self.cycles_tree.selection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a review to update")
+                return
+            
+            # Get selected review data
+            item = self.cycles_tree.item(selection[0])
+            review_data = item['values']
+            
+            if not review_data:
+                messagebox.showwarning("Warning", "Invalid review selection")
+                return
+            
+            review_id = review_data[0]  # Review ID is first column
+            current_status = review_data[6]  # Status is 7th column (index 6)
+            
+            # Create status update dialog
+            self.show_status_update_dialog(review_id, current_status)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error updating review status: {e}")
+    
+    def show_status_update_dialog(self, review_id, current_status):
+        """Show dialog for updating review status"""
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Update Review Status")
+        dialog.geometry("400x300")
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Main frame
+        main_frame = tk.Frame(dialog, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        tk.Label(main_frame, text=f"Update Status for Review ID: {review_id}", 
+                font=('Arial', 12, 'bold')).pack(pady=(0, 15))
+        
+        # Current status
+        tk.Label(main_frame, text=f"Current Status: {current_status}", 
+                font=('Arial', 10)).pack(pady=(0, 10))
+        
+        # New status selection
+        tk.Label(main_frame, text="New Status:", font=('Arial', 10, 'bold')).pack(anchor='w', pady=(0, 5))
+        
+        status_options = ['planned', 'in_progress', 'completed', 'report_issued', 'closed', 'cancelled']
+        status_var = tk.StringVar(value=current_status)
+        
+        status_combo = ttk.Combobox(main_frame, textvariable=status_var, 
+                                   values=status_options, state='readonly', width=20)
+        status_combo.pack(pady=(0, 15))
+        
+        # Evidence link (optional)
+        tk.Label(main_frame, text="Evidence Link (optional):", font=('Arial', 10)).pack(anchor='w', pady=(0, 5))
+        evidence_var = tk.StringVar()
+        evidence_entry = tk.Entry(main_frame, textvariable=evidence_var, width=40)
+        evidence_entry.pack(pady=(0, 20))
+        
+        # Button frame
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        def update_status():
+            new_status = status_var.get()
+            evidence_link = evidence_var.get().strip() if evidence_var.get().strip() else None
+            
+            if new_status == current_status and not evidence_link:
+                messagebox.showinfo("Info", "No changes to apply")
+                return
+            
+            try:
+                # Update status using review management service
+                if hasattr(self, 'review_service') and self.review_service:
+                    success = self.review_service.update_review_status_to(review_id, new_status, evidence_link)
+                else:
+                    # Create service instance if not available
+                    from review_management_service import ReviewManagementService
+                    db_conn = connect_to_db()
+                    if db_conn:
+                        service = ReviewManagementService(db_conn)
+                        success = service.update_review_status_to(review_id, new_status, evidence_link)
+                    else:
+                        messagebox.showerror("Error", "Could not connect to database")
+                        return
+                
+                if success:
+                    messagebox.showinfo("Success", f"Review status updated to '{new_status}'")
+                    dialog.destroy()
+                    self.refresh_cycles()  # Refresh the cycles display
+                else:
+                    messagebox.showerror("Error", "Failed to update review status")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Error updating status: {e}")
+        
+        def cancel():
+            dialog.destroy()
+        
+        # Buttons
+        tk.Button(button_frame, text="Update", command=update_status, 
+                 bg='#4CAF50', fg='white', padx=20).pack(side=tk.RIGHT, padx=(5, 0))
+        tk.Button(button_frame, text="Cancel", command=cancel, 
+                 padx=20).pack(side=tk.RIGHT)
     
     def submit_schedule(self):
         """Submit review schedule"""
@@ -2353,6 +3083,48 @@ class ReviewManagementTab:
         except Exception as e:
             messagebox.showerror("Error", f"Error marking review as issued: {e}")
     
+    def mark_review_completed(self):
+        """Mark the selected review as completed"""
+        try:
+            selection = self.cycles_tree.selection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a review cycle to mark as completed")
+                return
+            
+            # Get selected review data
+            item = self.cycles_tree.item(selection[0])
+            values = item['values']
+            review_id = values[0]
+            cycle_name = values[1]
+            
+            # Confirm action
+            result = messagebox.askyesno(
+                "Mark as Completed", 
+                f"Mark the following review cycle as completed:\n\n{cycle_name}\n\nThis will update the status to 'completed'."
+            )
+            
+            if result:
+                # Prompt for evidence link (optional)
+                evidence_link = tk.simpledialog.askstring(
+                    "Evidence Link", 
+                    "Enter evidence link (optional):",
+                    initialvalue=""
+                )
+                
+                if self.review_service:
+                    # Use the update_review_status_to method to mark as completed
+                    success = self.review_service.update_review_status_to(review_id, 'completed', evidence_link)
+                    if success:
+                        messagebox.showinfo("Success", "Review marked as completed successfully")
+                        self.refresh_cycles()
+                    else:
+                        messagebox.showerror("Error", "Failed to mark review as completed")
+                else:
+                    messagebox.showerror("Error", "Review service not available")
+                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Error marking review as completed: {e}")
+    
     def show_edit_review_dialog(self, review_id, cycle_name, planned_start, planned_end, status, stage):
         """Show dialog to edit review cycle details"""
         try:
@@ -2376,7 +3148,7 @@ class ReviewManagementTab:
             ttk.Label(main_frame, text=cycle_name, background="lightgray").grid(row=1, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
             
             # Planned start date
-            ttk.Label(main_frame, text="Planned Start:").grid(row=2, column=0, sticky=tk.W, pady=5)
+            ttk.Label(main_frame, text="Meeting Date:").grid(row=2, column=0, sticky=tk.W, pady=5)
             start_date_var = tk.StringVar(value=planned_start)
             start_date_entry = DateEntry(main_frame, textvariable=start_date_var, width=12, 
                                        background='darkblue', foreground='white', 
@@ -2384,7 +3156,7 @@ class ReviewManagementTab:
             start_date_entry.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
             
             # Planned end date
-            ttk.Label(main_frame, text="Planned End:").grid(row=3, column=0, sticky=tk.W, pady=5)
+            ttk.Label(main_frame, text="Due Date:").grid(row=3, column=0, sticky=tk.W, pady=5)
             end_date_var = tk.StringVar(value=planned_end)
             end_date_entry = DateEntry(main_frame, textvariable=end_date_var, width=12,
                                      background='darkblue', foreground='white',
@@ -2534,7 +3306,7 @@ class ReviewManagementTab:
             
             conn.commit()
             
-            print(f"✅ Deleted {reviews_deleted} reviews and {services_deleted} auto-generated services")
+            print(f"? Deleted {reviews_deleted} reviews and {services_deleted} auto-generated services")
             return True
             
         except Exception as e:
@@ -2552,132 +3324,106 @@ class ReviewManagementTab:
             self.project_var.set(new_project)
             self.on_project_selected()
 
-class DocumentManagementTab:
-    """Document Management Interface - For managing BEP, PIR, and EIR documents"""
+    def confirm_due_reviews(self):
+        """Prompt user to confirm auto-completion of due reviews"""
+        try:
+            if not getattr(self, 'auto_complete_candidates', []):
+                messagebox.showinfo("Reviews", "No reviews are awaiting confirmation.")
+                return
+
+            dialog = tk.Toplevel(self.frame)
+            dialog.title("Confirm Due Reviews")
+            dialog.geometry("520x360")
+            dialog.transient(self.frame.winfo_toplevel())
+            dialog.grab_set()
+
+            container = ttk.Frame(dialog, padding=10)
+            container.pack(fill=tk.BOTH, expand=True)
+
+            ttk.Label(
+                container,
+                text="Select the reviews to mark as completed:",
+                font=("Arial", 10, "bold")
+            ).pack(anchor='w', pady=(0, 10))
+
+            vars = []
+            checklist_frame = ttk.Frame(container)
+            checklist_frame.pack(fill=tk.BOTH, expand=True)
+
+            canvas = tk.Canvas(checklist_frame, borderwidth=0, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(checklist_frame, orient=tk.VERTICAL, command=canvas.yview)
+            inner_frame = ttk.Frame(canvas)
+
+            inner_frame.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set, height=220)
+
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            for candidate in self.auto_complete_candidates:
+                var = tk.BooleanVar(value=True)
+                label = f"{candidate['label']} (Due {candidate['due_date'] or 'n/a'})"
+                ttk.Checkbutton(inner_frame, text=label, variable=var).pack(anchor='w', pady=2)
+                vars.append((var, candidate))
+
+            button_frame = ttk.Frame(container)
+            button_frame.pack(fill=tk.X, pady=(12, 0))
+
+            def confirm():
+                if not self.review_service:
+                    dialog.destroy()
+                    return
+                selected_ids = [candidate['review_id'] for var, candidate in vars if var.get()]
+                if selected_ids:
+                    updated = self.review_service.mark_reviews_completed(selected_ids)
+                    messagebox.showinfo("Reviews", f"Marked {updated} review(s) as completed.")
+                dialog.destroy()
+                self.refresh_cycles()
+
+            ttk.Button(button_frame, text="Confirm Completed", command=confirm).pack(side=tk.RIGHT, padx=5)
+            ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error confirming reviews: {e}")
+
+
+class ProjectSetupTab:
+    """Project Setup and Management Interface - For creating and managing projects"""
     
     def __init__(self, parent_notebook):
+        print("?? ProjectSetupTab: Starting initialization...")
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="📄 Documents")
+        parent_notebook.add(self.frame, text="??? Project Setup")
+        print("? ProjectSetupTab: Frame created and added to notebook")
         
-        # Initialize project tracking
-        self.current_project = None
-        
-        # Main container with scrollable content
+        print("?? ProjectSetupTab: Setting up UI...")
         self.setup_ui()
+        print("? ProjectSetupTab: UI setup completed")
+        
+        print("?? ProjectSetupTab: Refreshing data...")
+        self.refresh_data()
+        print("? ProjectSetupTab: Data refresh completed")
         
         # Register for project change notifications
+        print("?? ProjectSetupTab: Registering for project notifications...")
         project_notification_system.register_observer(self)
-        
+        print("? ProjectSetupTab: Initialization completed successfully")
+    
     def setup_ui(self):
-        """Setup the main UI components"""
-        # Create main container
-        main_container = ttk.Frame(self.frame)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        """Set up the project setup interface"""
         
-        # Project status frame
-        project_frame = ttk.LabelFrame(main_container, text="📁 Current Project", padding=10)
-        project_frame.pack(fill=tk.X, pady=(0, 10))
+        # Main container with padding
+        main_frame = ttk.Frame(self.frame)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        self.project_label = ttk.Label(project_frame, text="No project selected", 
-                                     font=('Arial', 10, 'bold'))
-        self.project_label.pack()
+        # ===== TOP SECTION: PROJECT SELECTION =====
+        project_frame = ttk.LabelFrame(main_frame, text="?? Project Selection & Status", padding=15)
+        project_frame.pack(fill="x", pady=(0, 15))
         
-        # Create notebook for document types
-        self.doc_notebook = ttk.Notebook(main_container)
-        self.doc_notebook.pack(fill=tk.BOTH, expand=True)
-        
-        # BEP Tab
-        self.bep_frame = ttk.Frame(self.doc_notebook)
-        self.doc_notebook.add(self.bep_frame, text="📋 BEP (BIM Execution Plan)")
-        self.setup_bep_tab()
-        
-        # PIR Tab
-        self.pir_frame = ttk.Frame(self.doc_notebook)
-        self.doc_notebook.add(self.pir_frame, text="📊 PIR (Project Information Requirements)")
-        self.setup_pir_tab()
-        
-        # EIR Tab
-        self.eir_frame = ttk.Frame(self.doc_notebook)
-        self.doc_notebook.add(self.eir_frame, text="📝 EIR (Employer's Information Requirements)")
-        self.setup_eir_tab()
-        
-    def setup_bep_tab(self):
-        """Setup BEP document management interface"""
-        # Create the 4-pillar structure for BEP documents
-        nb = ttk.Notebook(self.bep_frame)
-        nb.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # Library
-        lib = ttk.Frame(nb)
-        nb.add(lib, text="📚 Library")
-        lib_head = ttk.Frame(lib)
-        lib_head.pack(fill="x", padx=8, pady=6)
-        ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('BEP')).pack(side="left")
-        ttk.Button(lib_head, text="Seed WIP", command=lambda: self._seed_wip('BEP')).pack(side="left", padx=(6,0))
-        lib_body = ttk.Frame(lib)
-        lib_body.pack(fill="both", expand=True, padx=8, pady=6)
-        self.bep_lib_tree = ttk.Treeview(lib_body, columns=("Code","Title","Body"), show="headings", height=8)
-        for col in ("Code","Title","Body"):
-            self.bep_lib_tree.heading(col, text=col)
-            self.bep_lib_tree.column(col, width=240 if col=="Title" else 100)
-        self.bep_lib_tree.pack(side="left", fill="both", expand=True)
-        ttk.Scrollbar(lib_body, orient="vertical", command=self.bep_lib_tree.yview).pack(side="right", fill="y")
-        self.bep_lib_preview = tk.Text(lib, height=6, wrap="word")
-        self.bep_lib_preview.pack(fill="x", padx=8, pady=(0,8))
-        ttk.Button(lib, text="Add Selected to Compose", command=lambda: self._add_selected_to_compose('BEP')).pack(anchor="w", padx=8)
-        self.bep_lib_tree.bind('<<TreeviewSelect>>', lambda e: self._on_lib_select('BEP', e))
-
-        # Compose
-        comp = ttk.Frame(nb)
-        nb.add(comp, text="✏️ Compose")
-        comp_body = ttk.Frame(comp)
-        comp_body.pack(fill="both", expand=True, padx=8, pady=6)
-        ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
-        ttk.Label(comp_body, text="Included").grid(row=0, column=2, sticky="w")
-        self.bep_avail_list = tk.Listbox(comp_body, height=8)
-        self.bep_inclu_list = tk.Listbox(comp_body, height=8)
-        self.bep_avail_list.grid(row=1, column=0, sticky="nsew")
-        btns = ttk.Frame(comp_body)
-        btns.grid(row=1, column=1, padx=6)
-        self.bep_inclu_list.grid(row=1, column=2, sticky="nsew")
-        ttk.Button(btns, text=">>", command=lambda: self._move_list_items(self.bep_avail_list, self.bep_inclu_list)).pack(pady=4)
-        ttk.Button(btns, text="<<", command=lambda: self._move_list_items(self.bep_inclu_list, self.bep_avail_list)).pack(pady=4)
-        comp_body.columnconfigure(0, weight=1)
-        comp_body.columnconfigure(2, weight=1)
-        comp_footer = ttk.Frame(comp)
-        comp_footer.pack(fill="x", padx=8, pady=6)
-        ttk.Label(comp_footer, text="Title:").pack(side="left")
-        self.bep_title_var = tk.StringVar(value="BEP Document")
-        ttk.Entry(comp_footer, textvariable=self.bep_title_var, width=26).pack(side="left", padx=(4,10))
-        ttk.Label(comp_footer, text="Version:").pack(side="left")
-        self.bep_ver_var = tk.StringVar(value="1.0")
-        ttk.Entry(comp_footer, textvariable=self.bep_ver_var, width=10).pack(side="left", padx=(4,10))
-        ttk.Button(comp_footer, text="Instantiate", command=lambda: self._instantiate_document('BEP')).pack(side="left")
-
-        # Assign & Execute
-        ass = ttk.Frame(nb)
-        nb.add(ass, text="🎯 Assign & Execute")
-        run_bar = ttk.Frame(ass)
-        run_bar.pack(fill="x", padx=8, pady=6)
-        ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('BEP')).pack(side="left")
-        a_cols = ("Clause", "Owner", "Due", "Check", "Status")
-        self.bep_assign_tree = ttk.Treeview(ass, columns=a_cols, show="headings", height=7)
-        for c in a_cols:
-            self.bep_assign_tree.heading(c, text=c)
-            self.bep_assign_tree.column(c, width=140)
-        self.bep_assign_tree.pack(fill="both", expand=True, padx=8, pady=6)
-
-        # Publish
-        pub = ttk.Frame(nb)
-        nb.add(pub, text="📤 Publish & Sign-off")
-        pub_bar = ttk.Frame(pub)
-        pub_bar.pack(fill="x", padx=8, pady=6)
-        ttk.Label(pub_bar, text="Change note:").pack(side="left")
-        self.bep_note_var = tk.StringVar()
-        ttk.Entry(pub_bar, textvariable=self.bep_note_var, width=60).pack(side="left", padx=(4,10))
-        ttk.Button(pub_bar, text="Publish DOCX", command=lambda: self._publish_document('BEP')).pack(side="left")
-        
-    def setup_pir_tab(self):
+        # Current project selection
+        selection_frame = ttk.Frame(project_frame)
+        selection_frame.pack(fill="x", pady=(0, 10))
         """Setup PIR document management interface"""
         # Create the 4-pillar structure for PIR documents
         nb = ttk.Notebook(self.pir_frame)
@@ -2685,7 +3431,7 @@ class DocumentManagementTab:
 
         # Library
         lib = ttk.Frame(nb)
-        nb.add(lib, text="📚 Library")
+        nb.add(lib, text="?? Library")
         lib_head = ttk.Frame(lib)
         lib_head.pack(fill="x", padx=8, pady=6)
         ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('PIR')).pack(side="left")
@@ -2705,7 +3451,7 @@ class DocumentManagementTab:
 
         # Compose
         comp = ttk.Frame(nb)
-        nb.add(comp, text="✏️ Compose")
+        nb.add(comp, text="?? Compose")
         comp_body = ttk.Frame(comp)
         comp_body.pack(fill="both", expand=True, padx=8, pady=6)
         ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
@@ -2732,7 +3478,7 @@ class DocumentManagementTab:
 
         # Assign & Execute
         ass = ttk.Frame(nb)
-        nb.add(ass, text="🎯 Assign & Execute")
+        nb.add(ass, text="?? Assign & Execute")
         run_bar = ttk.Frame(ass)
         run_bar.pack(fill="x", padx=8, pady=6)
         ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('PIR')).pack(side="left")
@@ -2745,7 +3491,7 @@ class DocumentManagementTab:
 
         # Publish
         pub = ttk.Frame(nb)
-        nb.add(pub, text="📤 Publish & Sign-off")
+        nb.add(pub, text="?? Publish & Sign-off")
         pub_bar = ttk.Frame(pub)
         pub_bar.pack(fill="x", padx=8, pady=6)
         ttk.Label(pub_bar, text="Change note:").pack(side="left")
@@ -2761,7 +3507,7 @@ class DocumentManagementTab:
 
         # Library
         lib = ttk.Frame(nb)
-        nb.add(lib, text="📚 Library")
+        nb.add(lib, text="?? Library")
         lib_head = ttk.Frame(lib)
         lib_head.pack(fill="x", padx=8, pady=6)
         ttk.Button(lib_head, text="Refresh", command=lambda: self._refresh_library('EIR')).pack(side="left")
@@ -2781,7 +3527,7 @@ class DocumentManagementTab:
 
         # Compose
         comp = ttk.Frame(nb)
-        nb.add(comp, text="✏️ Compose")
+        nb.add(comp, text="?? Compose")
         comp_body = ttk.Frame(comp)
         comp_body.pack(fill="both", expand=True, padx=8, pady=6)
         ttk.Label(comp_body, text="Available").grid(row=0, column=0, sticky="w")
@@ -2808,7 +3554,7 @@ class DocumentManagementTab:
 
         # Assign & Execute
         ass = ttk.Frame(nb)
-        nb.add(ass, text="🎯 Assign & Execute")
+        nb.add(ass, text="?? Assign & Execute")
         run_bar = ttk.Frame(ass)
         run_bar.pack(fill="x", padx=8, pady=6)
         ttk.Button(run_bar, text="Run Checks", command=lambda: self._run_checks('EIR')).pack(side="left")
@@ -2821,7 +3567,7 @@ class DocumentManagementTab:
 
         # Publish
         pub = ttk.Frame(nb)
-        nb.add(pub, text="📤 Publish & Sign-off")
+        nb.add(pub, text="?? Publish & Sign-off")
         pub_bar = ttk.Frame(pub)
         pub_bar.pack(fill="x", padx=8, pady=6)
         ttk.Label(pub_bar, text="Change note:").pack(side="left")
@@ -3078,23 +3824,23 @@ class ProjectSetupTab:
     """Project Setup and Management Interface - For creating and managing projects"""
     
     def __init__(self, parent_notebook):
-        print("🔄 ProjectSetupTab: Starting initialization...")
+        print("?? ProjectSetupTab: Starting initialization...")
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="🏗️ Project Setup")
-        print("✅ ProjectSetupTab: Frame created and added to notebook")
+        parent_notebook.add(self.frame, text="??? Project Setup")
+        print("? ProjectSetupTab: Frame created and added to notebook")
         
-        print("🔄 ProjectSetupTab: Setting up UI...")
+        print("?? ProjectSetupTab: Setting up UI...")
         self.setup_ui()
-        print("✅ ProjectSetupTab: UI setup completed")
+        print("? ProjectSetupTab: UI setup completed")
         
-        print("🔄 ProjectSetupTab: Refreshing data...")
+        print("?? ProjectSetupTab: Refreshing data...")
         self.refresh_data()
-        print("✅ ProjectSetupTab: Data refresh completed")
+        print("? ProjectSetupTab: Data refresh completed")
         
         # Register for project change notifications
-        print("🔄 ProjectSetupTab: Registering for project notifications...")
+        print("?? ProjectSetupTab: Registering for project notifications...")
         project_notification_system.register_observer(self)
-        print("✅ ProjectSetupTab: Initialization completed successfully")
+        print("? ProjectSetupTab: Initialization completed successfully")
     
     def setup_ui(self):
         """Set up the project setup interface"""
@@ -3104,7 +3850,7 @@ class ProjectSetupTab:
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # ===== TOP SECTION: PROJECT SELECTION =====
-        project_frame = ttk.LabelFrame(main_frame, text="📊 Project Selection & Status", padding=15)
+        project_frame = ttk.LabelFrame(main_frame, text="?? Project Selection & Status", padding=15)
         project_frame.pack(fill="x", pady=(0, 15))
         
         # Current project selection
@@ -3147,7 +3893,7 @@ class ProjectSetupTab:
             self.status_labels[field].pack(side="left", padx=(5, 0))
         
         # ===== MIDDLE SECTION: PROJECT ACTIONS =====
-        actions_frame = ttk.LabelFrame(main_frame, text="🚀 Project Actions", padding=15)
+        actions_frame = ttk.LabelFrame(main_frame, text="?? Project Actions", padding=15)
         actions_frame.pack(fill="x", pady=(0, 15))
         
         # Action buttons in a grid
@@ -3155,15 +3901,15 @@ class ProjectSetupTab:
         buttons_frame.pack(fill="x")
         
         action_buttons = [
-            ("🆕 Create New Project", self.create_new_project, "Create a new project"),
-            ("📝 Edit Project Details", self.edit_project_details, "Modify current project information"),
-            ("📁 Configure File Paths", self.configure_paths, "Set model and IFC file locations"),
-            ("� Extract Files from Model Folder", self.extract_model_files, "Extract files from configured model folder"),
-            ("�🔄 Extract Files from Desktop Connector", self.extract_acc_files, "Extract files from ACC Desktop Connector"),
-            ("🔄 Refresh Project Data", self.refresh_data, "Reload project information from database"),
-            ("🔍 Debug Dropdown", self.debug_dropdown, "Debug project dropdown issues"),
-            ("📊 View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
-            ("🗑️ Archive Project", self.archive_project, "Archive completed or cancelled project")
+            ("?? Create New Project", self.create_new_project, "Create a new project"),
+            ("?? Edit Project Details", self.edit_project_details, "Modify current project information"),
+            ("?? Configure File Paths", self.configure_paths, "Set model and IFC file locations"),
+            ("? Extract Files from Model Folder", self.extract_model_files, "Extract files from configured model folder"),
+            ("??? Extract Files from Desktop Connector", self.extract_acc_files, "Extract files from ACC Desktop Connector"),
+            ("?? Refresh Project Data", self.refresh_data, "Reload project information from database"),
+            ("?? Debug Dropdown", self.debug_dropdown, "Debug project dropdown issues"),
+            ("?? View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
+            ("??? Archive Project", self.archive_project, "Archive completed or cancelled project")
         ]
         
         for i, (text, command, tooltip) in enumerate(action_buttons):
@@ -3177,7 +3923,7 @@ class ProjectSetupTab:
             buttons_frame.columnconfigure(i, weight=1)
         
         # ===== BOTTOM SECTION: PROJECT DETAILS =====
-        details_frame = ttk.LabelFrame(main_frame, text="📋 Project Details", padding=15)
+        details_frame = ttk.LabelFrame(main_frame, text="?? Project Details", padding=15)
         details_frame.pack(fill="both", expand=True)
         
         # Create notebook for different detail views
@@ -3186,7 +3932,7 @@ class ProjectSetupTab:
         
         # Overview tab
         overview_frame = ttk.Frame(details_notebook)
-        details_notebook.add(overview_frame, text="📊 Overview")
+        details_notebook.add(overview_frame, text="?? Overview")
         
         # Project info display area
         self.project_info_text = tk.Text(overview_frame, height=8, wrap="word", font=("Courier", 9))
@@ -3198,7 +3944,7 @@ class ProjectSetupTab:
         
         # Recent Activity tab
         activity_frame = ttk.Frame(details_notebook)
-        details_notebook.add(activity_frame, text="📅 Recent Activity")
+        details_notebook.add(activity_frame, text="?? Recent Activity")
         
         self.activity_text = tk.Text(activity_frame, height=8, wrap="word", font=("Courier", 9))
         scrollbar_activity = ttk.Scrollbar(activity_frame, orient="vertical", command=self.activity_text.yview)
@@ -3209,7 +3955,7 @@ class ProjectSetupTab:
 
         # Reviews tab (scheduler)
         reviews_frame = ttk.Frame(details_notebook)
-        details_notebook.add(reviews_frame, text="🗓 Reviews")
+        details_notebook.add(reviews_frame, text="?? Reviews")
 
         reviews_actions = ttk.Frame(reviews_frame)
         reviews_actions.pack(fill="x", pady=(8, 4))
@@ -3249,11 +3995,11 @@ class ProjectSetupTab:
     def refresh_data(self):
         """Refresh project data and update displays"""
         try:
-            print("🔄 ProjectSetupTab: Starting refresh_data...")
+            print("?? ProjectSetupTab: Starting refresh_data...")
             
             # Get projects with explicit debug output
             projects = get_projects()
-            print(f"✅ ProjectSetupTab: Found {len(projects)} projects")
+            print(f"? ProjectSetupTab: Found {len(projects)} projects")
             
             # Format project values
             project_values = [f"{p[0]} - {p[1]}" for p in projects]
@@ -3262,25 +4008,25 @@ class ProjectSetupTab:
             self.project_combo['values'] = project_values
             
             if project_values:
-                print(f"� ProjectSetupTab: First project: {project_values[0]}")
+                print(f"? ProjectSetupTab: First project: {project_values[0]}")
                 # Set first project as default
                 self.project_combo.set(project_values[0])
-                print(f"✅ ProjectSetupTab: Set default selection to: {project_values[0]}")
+                print(f"? ProjectSetupTab: Set default selection to: {project_values[0]}")
             else:
-                print("❌ ProjectSetupTab: No projects found!")
+                print("? ProjectSetupTab: No projects found!")
             
             # Restore update methods
             self.update_project_info(projects)
             self.update_recent_activity()
             
-            print("✅ ProjectSetupTab: refresh_data completed successfully")
+            print("? ProjectSetupTab: refresh_data completed successfully")
             
         except Exception as e:
-            print(f"❌ ProjectSetupTab: Error in refresh_data: {e}")
+            print(f"? ProjectSetupTab: Error in refresh_data: {e}")
             import traceback
             traceback.print_exc()
             messagebox.showerror("Error", f"Failed to refresh project data: {str(e)}")
-            print(f"❌ ProjectSetupTab: Error in refresh_data: {e}")
+            print(f"? ProjectSetupTab: Error in refresh_data: {e}")
             import traceback
             traceback.print_exc()
             messagebox.showerror("Error", f"Failed to refresh project data: {str(e)}")
@@ -3294,7 +4040,7 @@ class ProjectSetupTab:
             projects = get_projects()
             
             # Show results
-            msg = f"🔍 DROPDOWN DEBUG RESULTS:\n\n"
+            msg = f"?? DROPDOWN DEBUG RESULTS:\n\n"
             msg += f"Projects found: {len(projects)}\n"
             
             if projects:
@@ -3317,14 +4063,518 @@ class ProjectSetupTab:
                 if project_values:
                     self.project_combo.set(project_values[0])
                 
-                msg += f"\n✅ Manually updated dropdown with {len(project_values)} projects"
+                msg += f"\n? Manually updated dropdown with {len(project_values)} projects"
             else:
-                msg += "❌ No projects found in database!"
+                msg += "? No projects found in database!"
             
             messagebox.showinfo("Dropdown Debug", msg)
             
         except Exception as e:
             messagebox.showerror("Debug Error", f"Error during debug: {str(e)}")
+
+    def create_new_project(self):
+        """Open create new project dialog"""
+        self.show_project_dialog(mode="create")
+
+    def show_project_dialog(self, mode="create", project_id=None):
+        """Show create/edit project dialog"""
+        
+        # Create dialog window
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Create New Project" if mode == "create" else "Edit Project Details")
+        dialog.geometry("700x600")
+        dialog.resizable(True, True)
+        
+        # Make dialog modal
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (700 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (600 // 2)
+        dialog.geometry(f"700x600+{x}+{y}")
+        
+        # Main container with scrollbar
+        main_canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=main_canvas.yview)
+        scrollable_frame = ttk.Frame(main_canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        )
+        
+        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        main_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Content frame
+        content_frame = ttk.Frame(scrollable_frame)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ttk.Label(content_frame, text="Create New Project" if mode == "create" else "Edit Project Details", 
+                               font=("Arial", 14, "bold"))
+        title_label.pack(pady=(0, 20))
+        
+        # Load existing data if editing
+        existing_data = {}
+        if mode == "edit" and project_id:
+            try:
+                project_details = get_project_details(project_id)
+                folder_path, ifc_folder_path = get_project_folders(project_id)
+                existing_data = {
+                    'name': project_details.get('project_name', ''),
+                    'client_name': project_details.get('client_name', ''),
+                    'status': project_details.get('status', ''),
+                    'priority': project_details.get('priority', ''),
+                    'start_date': project_details.get('start_date', ''),
+                    'end_date': project_details.get('end_date', ''),
+                    'folder_path': folder_path or '',
+                    'ifc_folder_path': ifc_folder_path or ''
+                }
+            except Exception as e:
+                print(f"Error loading project data: {e}")
+        
+        # === BASIC PROJECT INFO ===
+        basic_frame = ttk.LabelFrame(content_frame, text="?? Basic Project Information", padding=15)
+        basic_frame.pack(fill="x", pady=(0, 10))
+        
+        # Project Name
+        ttk.Label(basic_frame, text="Project Name*:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        project_name_var = tk.StringVar(value=existing_data.get('name', ''))
+        project_name_entry = ttk.Entry(basic_frame, textvariable=project_name_var, width=50)
+        project_name_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=5)
+        
+        # Client Selection
+        ttk.Label(basic_frame, text="Client*:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        client_var = tk.StringVar()
+        client_combo = ttk.Combobox(basic_frame, textvariable=client_var, width=30, state="readonly")
+        client_combo.grid(row=1, column=1, sticky="ew", pady=5)
+        
+        # Load clients
+        try:
+            clients = get_available_clients()
+            client_names = [f"{client[0]} - {client[1]}" for client in clients]
+            client_combo['values'] = client_names
+            
+            # Set existing client if editing
+            if existing_data.get('client_name'):
+                for client_option in client_names:
+                    if existing_data['client_name'] in client_option:
+                        client_var.set(client_option)
+                        break
+        except Exception as e:
+            print(f"Error loading clients: {e}")
+        
+        # New Client Button
+        ttk.Button(basic_frame, text="+ New Client", 
+                  command=lambda: self.show_new_client_dialog(client_combo)).grid(row=1, column=2, padx=(10, 0), pady=5)
+        
+        # Project Type
+        ttk.Label(basic_frame, text="Project Type:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
+        project_type_var = tk.StringVar()
+        project_type_combo = ttk.Combobox(basic_frame, textvariable=project_type_var, width=30)
+        project_type_combo.grid(row=2, column=1, sticky="ew", pady=5)
+        project_type_combo['values'] = ["Solar PV", "Wind Farm", "Battery Storage", "Hybrid Project", "Transmission", "Other"]
+        
+        # Area/Size
+        ttk.Label(basic_frame, text="Area (hectares):").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=5)
+        area_var = tk.StringVar()
+        area_entry = ttk.Entry(basic_frame, textvariable=area_var, width=20)
+        area_entry.grid(row=3, column=1, sticky="w", pady=5)
+        
+        # MW Capacity
+        ttk.Label(basic_frame, text="MW Capacity:").grid(row=3, column=2, sticky="w", padx=(20, 10), pady=5)
+        mw_var = tk.StringVar()
+        mw_entry = ttk.Entry(basic_frame, textvariable=mw_var, width=20)
+        mw_entry.grid(row=3, column=3, sticky="w", pady=5)
+        
+        basic_frame.columnconfigure(1, weight=1)
+        
+        # === PROJECT STATUS ===
+        status_frame = ttk.LabelFrame(content_frame, text="?? Project Status & Timeline", padding=15)
+        status_frame.pack(fill="x", pady=(0, 10))
+        
+        # Status
+        ttk.Label(status_frame, text="Status:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        status_var = tk.StringVar(value=existing_data.get('status', 'Planning'))
+        status_combo = ttk.Combobox(status_frame, textvariable=status_var, width=20)
+        status_combo.grid(row=0, column=1, sticky="w", pady=5)
+        status_combo['values'] = ["Planning", "Design", "Construction", "Commissioning", "Operational", "Completed", "On Hold", "Cancelled"]
+        
+        # Priority
+        ttk.Label(status_frame, text="Priority:").grid(row=0, column=2, sticky="w", padx=(20, 10), pady=5)
+        priority_var = tk.StringVar(value=existing_data.get('priority', 'Medium'))
+        priority_combo = ttk.Combobox(status_frame, textvariable=priority_var, width=15)
+        priority_combo.grid(row=0, column=3, sticky="w", pady=5)
+        priority_combo['values'] = ["Low", "Medium", "High", "Critical"]
+        
+        # Start Date
+        ttk.Label(status_frame, text="Start Date:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        start_date_var = tk.StringVar(value=existing_data.get('start_date', ''))
+        start_date_entry = DateEntry(status_frame, textvariable=start_date_var, width=15, date_pattern='yyyy-mm-dd')
+        start_date_entry.grid(row=1, column=1, sticky="w", pady=5)
+        
+        # End Date
+        ttk.Label(status_frame, text="End Date:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
+        end_date_var = tk.StringVar(value=existing_data.get('end_date', ''))
+        end_date_entry = DateEntry(status_frame, textvariable=end_date_var, width=15, date_pattern='yyyy-mm-dd')
+        end_date_entry.grid(row=1, column=3, sticky="w", pady=5)
+        
+        # === LOCATION INFORMATION ===
+        location_frame = ttk.LabelFrame(content_frame, text="?? Location Information", padding=15)
+        location_frame.pack(fill="x", pady=(0, 10))
+        
+        # Address
+        ttk.Label(location_frame, text="Address:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        address_var = tk.StringVar()
+        address_entry = ttk.Entry(location_frame, textvariable=address_var, width=50)
+        address_entry.grid(row=0, column=1, columnspan=3, sticky="ew", pady=5)
+        
+        # City, State, Postcode
+        ttk.Label(location_frame, text="City:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        city_var = tk.StringVar()
+        city_entry = ttk.Entry(location_frame, textvariable=city_var, width=20)
+        city_entry.grid(row=1, column=1, sticky="w", pady=5)
+        
+        ttk.Label(location_frame, text="State:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
+        state_var = tk.StringVar()
+        state_entry = ttk.Entry(location_frame, textvariable=state_var, width=10)
+        state_entry.grid(row=1, column=3, sticky="w", pady=5)
+        
+        ttk.Label(location_frame, text="Postcode:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
+        postcode_var = tk.StringVar()
+        postcode_entry = ttk.Entry(location_frame, textvariable=postcode_var, width=15)
+        postcode_entry.grid(row=2, column=1, sticky="w", pady=5)
+        
+        location_frame.columnconfigure(1, weight=1)
+        
+        # === FILE PATHS ===
+        paths_frame = ttk.LabelFrame(content_frame, text="?? File Paths", padding=15)
+        paths_frame.pack(fill="x", pady=(0, 10))
+        
+        # Model Folder Path
+        ttk.Label(paths_frame, text="Model Folder:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        folder_path_var = tk.StringVar(value=existing_data.get('folder_path', ''))
+        folder_path_entry = ttk.Entry(paths_frame, textvariable=folder_path_var, width=50)
+        folder_path_entry.grid(row=0, column=1, sticky="ew", pady=5)
+        ttk.Button(paths_frame, text="Browse", 
+                  command=lambda: self.browse_folder(folder_path_var)).grid(row=0, column=2, padx=(5, 0), pady=5)
+        
+        # IFC Folder Path
+        ttk.Label(paths_frame, text="IFC Folder:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        ifc_path_var = tk.StringVar(value=existing_data.get('ifc_folder_path', ''))
+        ifc_path_entry = ttk.Entry(paths_frame, textvariable=ifc_path_var, width=50)
+        ifc_path_entry.grid(row=1, column=1, sticky="ew", pady=5)
+        ttk.Button(paths_frame, text="Browse", 
+                  command=lambda: self.browse_folder(ifc_path_var)).grid(row=1, column=2, padx=(5, 0), pady=5)
+        
+        paths_frame.columnconfigure(1, weight=1)
+        
+        # === BUTTONS ===
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(fill="x", pady=(20, 0))
+        
+        def save_project():
+            """Save the project data"""
+            try:
+                # Validate required fields
+                if not project_name_var.get().strip():
+                    messagebox.showerror("Error", "Project name is required")
+                    return
+                
+                if not client_var.get():
+                    messagebox.showerror("Error", "Please select a client")
+                    return
+                
+                # Prepare project data
+                client_id = client_var.get().split(" - ")[0] if client_var.get() else None
+                
+                project_data = {
+                    'name': project_name_var.get().strip(),
+                    'client_id': client_id,
+                    'project_type': project_type_var.get(),
+                    'area': area_var.get(),
+                    'mw_capacity': mw_var.get(),
+                    'status': status_var.get(),
+                    'priority': priority_var.get(),
+                    'start_date': start_date_var.get(),
+                    'end_date': end_date_var.get(),
+                    'address': address_var.get(),
+                    'city': city_var.get(),
+                    'state': state_var.get(),
+                    'postcode': postcode_var.get(),
+                    'folder_path': folder_path_var.get(),
+                    'ifc_folder_path': ifc_path_var.get()
+                }
+                
+                if mode == "create":
+                    success = self.create_project_in_db(project_data)
+                    if success:
+                        messagebox.showinfo("Success", "Project created successfully!")
+                        dialog.destroy()
+                        self.refresh_data()
+                        # Notify all tabs that the project list has changed
+                        project_notification_system.notify_project_list_changed()
+                else:
+                    success = self.update_project_in_db(project_id, project_data)
+                    if success:
+                        messagebox.showinfo("Success", "Project updated successfully!")
+                        dialog.destroy()
+                        self.refresh_data()
+                        
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save project: {str(e)}")
+        
+        # Buttons
+        ttk.Button(button_frame, text="Save", command=save_project).pack(side="right", padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side="right", padx=5)
+        
+        # Focus on project name field
+        project_name_entry.focus()
+    
+    def browse_folder(self, path_var):
+        """Browse for folder and set path variable"""
+        folder = filedialog.askdirectory(title="Select Folder")
+        if folder:
+            path_var.set(folder)
+    
+    def show_new_client_dialog(self, client_combo):
+        """Show dialog to create a new client"""
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Create New Client")
+        dialog.geometry("500x500")
+        dialog.resizable(False, False)
+        
+        # Make dialog modal
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f"500x500+{x}+{y}")
+        
+        # Content frame
+        content_frame = ttk.Frame(dialog)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        ttk.Label(content_frame, text="Create New Client", font=("Arial", 14, "bold")).pack(pady=(0, 20))
+        
+        # Client fields
+        fields_frame = ttk.LabelFrame(content_frame, text="Client Information", padding=15)
+        fields_frame.pack(fill="x", pady=(0, 20))
+        
+        # Variables for client data
+        client_vars = {}
+        
+        # Client Name
+        ttk.Label(fields_frame, text="Client Name*:").grid(row=0, column=0, sticky="w", pady=5)
+        client_vars['name'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['name'], width=40).grid(row=0, column=1, sticky="ew", pady=5)
+        
+        # Contact Name
+        ttk.Label(fields_frame, text="Contact Name:").grid(row=1, column=0, sticky="w", pady=5)
+        client_vars['contact'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['contact'], width=40).grid(row=1, column=1, sticky="ew", pady=5)
+        
+        # Contact Email
+        ttk.Label(fields_frame, text="Contact Email:").grid(row=2, column=0, sticky="w", pady=5)
+        client_vars['email'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['email'], width=40).grid(row=2, column=1, sticky="ew", pady=5)
+        
+        # Contact Phone
+        ttk.Label(fields_frame, text="Contact Phone:").grid(row=3, column=0, sticky="w", pady=5)
+        client_vars['phone'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['phone'], width=40).grid(row=3, column=1, sticky="ew", pady=5)
+        
+        # Address
+        ttk.Label(fields_frame, text="Address:").grid(row=4, column=0, sticky="w", pady=5)
+        client_vars['address'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['address'], width=40).grid(row=4, column=1, sticky="ew", pady=5)
+        
+        # City
+        ttk.Label(fields_frame, text="City:").grid(row=5, column=0, sticky="w", pady=5)
+        client_vars['city'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['city'], width=40).grid(row=5, column=1, sticky="ew", pady=5)
+        
+        # State
+        ttk.Label(fields_frame, text="State:").grid(row=6, column=0, sticky="w", pady=5)
+        client_vars['state'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['state'], width=40).grid(row=6, column=1, sticky="ew", pady=5)
+        
+        # Postcode
+        ttk.Label(fields_frame, text="Postcode:").grid(row=7, column=0, sticky="w", pady=5)
+        client_vars['postcode'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['postcode'], width=40).grid(row=7, column=1, sticky="ew", pady=5)
+        
+        fields_frame.columnconfigure(1, weight=1)
+        
+        def save_client():
+            """Save the new client"""
+            try:
+                if not client_vars['name'].get().strip():
+                    messagebox.showerror("Error", "Client name is required")
+                    return
+                
+                # Prepare client data dictionary as expected by the database function
+                client_data = {
+                    'client_name': client_vars['name'].get().strip(),
+                    'contact_name': client_vars['contact'].get().strip(),
+                    'contact_email': client_vars['email'].get().strip(),
+                    'contact_phone': client_vars['phone'].get().strip(),
+                    'address': client_vars['address'].get().strip(),
+                    'city': client_vars['city'].get().strip(),
+                    'state': client_vars['state'].get().strip(),
+                    'postcode': client_vars['postcode'].get().strip(),
+                    'country': 'Australia'  # Default country
+                }
+                
+                client_id = create_new_client(client_data)
+                
+                if client_id:
+                    messagebox.showinfo("Success", f"Client created successfully! (ID: {client_id})")
+                    # Refresh client combo box
+                    clients = get_available_clients()
+                    client_names = [f"{client[0]} - {client[1]}" for client in clients]
+                    client_combo['values'] = client_names
+                    # Select the new client
+                    new_client_name = client_vars['name'].get().strip()
+                    for client_option in client_names:
+                        if new_client_name in client_option:
+                            client_combo.set(client_option)
+                            break
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", "Failed to create client - check database connection")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to create client: {str(e)}")
+                print(f"Client creation error: {e}")  # For debugging
+        
+        # Buttons frame with better spacing
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        # Create buttons with better styling
+        cancel_btn = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
+        cancel_btn.pack(side="right", padx=5)
+        
+        save_btn = ttk.Button(button_frame, text="?? Save Client", command=save_client)
+        save_btn.pack(side="right", padx=5)
+        
+        # Focus on client name field
+        client_vars['name'].set("")
+        dialog.after(100, lambda: dialog.focus_set())
+    
+    def create_project_in_db(self, project_data):
+        """Create a new project in the database"""
+        try:
+            # First, create the basic project using the existing function
+            basic_success = insert_project(
+                project_data['name'], 
+                project_data.get('folder_path', ''), 
+                project_data.get('ifc_folder_path', '')
+            )
+            
+            if not basic_success:
+                return False
+            
+            # Get the newly created project ID by finding the project with this name
+            projects = get_projects()
+            new_project_id = None
+            for project_id, project_name in projects:
+                if project_name == project_data['name']:
+                    new_project_id = project_id
+                    break
+            
+            if not new_project_id:
+                print(f"? Could not find newly created project: {project_data['name']}")
+                return False
+            
+            # Now update the project with additional details
+            additional_data = {}
+            
+            if project_data.get('client_id'):
+                additional_data['client_id'] = project_data['client_id']
+            if project_data.get('status'):
+                additional_data['status'] = project_data['status']
+            if project_data.get('priority'):
+                additional_data['priority'] = project_data['priority']
+            if project_data.get('start_date'):
+                additional_data['start_date'] = project_data['start_date']
+            if project_data.get('end_date'):
+                additional_data['end_date'] = project_data['end_date']
+                
+            # Update additional fields if we have any
+            if additional_data:
+                from database import update_project_record
+                update_success = update_project_record(new_project_id, additional_data)
+                if update_success:
+                    print(f"? Successfully created and updated project: {project_data['name']} (ID: {new_project_id})")
+                else:
+                    print(f"?? Project created but failed to update additional details for: {project_data['name']}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"? Error creating project: {e}")
+            messagebox.showerror("Database Error", f"Failed to create project: {str(e)}")
+            return False
+    
+    def update_project_in_db(self, project_id, project_data):
+        """Update an existing project in the database"""
+        try:
+            # Map UI fields to database column names
+            db_data = {}
+            
+            # Basic project information
+            if project_data.get('name'):
+                db_data['project_name'] = project_data['name']
+            if project_data.get('client_id'):
+                db_data['client_id'] = project_data['client_id']
+            if project_data.get('status'):
+                db_data['status'] = project_data['status']
+            if project_data.get('priority'):
+                db_data['priority'] = project_data['priority']
+            if project_data.get('start_date'):
+                db_data['start_date'] = project_data['start_date']
+            if project_data.get('end_date'):
+                db_data['end_date'] = project_data['end_date']
+            
+            # Update main project record if we have data to update
+            if db_data:
+                from database import update_project_record
+                success = update_project_record(project_id, db_data)
+
+                if not success:
+                    print(f"Failed to update project record for project {project_id}")
+                    return False
+            
+            # Update folder paths separately using the dedicated function
+            if project_data.get('folder_path') or project_data.get('ifc_folder_path'):
+                from database import update_project_folders
+                folder_success = update_project_folders(
+                    project_id,
+                    models_path=project_data.get('folder_path'),
+                    ifc_path=project_data.get('ifc_folder_path')
+                )
+                if not folder_success:
+                    print(f"Failed to update folder paths for project {project_id}")
+            
+            print(f"? Successfully updated project {project_id}")
+            return True
+            
+        except Exception as e:
+            print(f"? Error updating project {project_id}: {e}")
+            messagebox.showerror("Database Error", f"Failed to update project: {str(e)}")
+            return False
 
     def generate_reviews_from_services(self):
         """Generate review cycles based on ProjectServices for the selected project."""
@@ -3355,9 +4605,15 @@ class ProjectSetupTab:
             end_date = None
             try:
                 if details and details.get('start_date'):
-                    start_date = datetime.strptime(details['start_date'], '%Y-%m-%d').date()
+                    if isinstance(details['start_date'], str):
+                        start_date = datetime.strptime(details['start_date'], '%Y-%m-%d').date()
+                    else:
+                        start_date = details['start_date']  # Already a date object
                 if details and details.get('end_date'):
-                    end_date = datetime.strptime(details['end_date'], '%Y-%m-%d').date()
+                    if isinstance(details['end_date'], str):
+                        end_date = datetime.strptime(details['end_date'], '%Y-%m-%d').date()
+                    else:
+                        end_date = details['end_date']  # Already a date object
             except Exception:
                 start_date = None
                 end_date = None
@@ -3539,12 +4795,12 @@ class ProjectSetupTab:
             
             info_text += "PROJECT DETAILS:\n\n"
             for project_id, project_name, details in project_details_list:
-                info_text += f"🏗️ {project_name} (ID: {project_id})\n"
+                info_text += f"??? {project_name} (ID: {project_id})\n"
                 info_text += f"   Client: {details.get('client_name', 'Not Set')}\n"
                 info_text += f"   Status: {details.get('status', 'Not Set')}\n"
                 info_text += f"   Priority: {details.get('priority', 'Not Set')}\n"
                 if details.get('start_date'):
-                    info_text += f"   Duration: {details.get('start_date')} → {details.get('end_date', 'Open')}\n"
+                    info_text += f"   Duration: {details.get('start_date')} ? {details.get('end_date', 'Open')}\n"
                 if details.get('client_contact'):
                     info_text += f"   Contact: {details.get('client_contact')} ({details.get('contact_email', 'No email')})\n"
                 info_text += "\n"
@@ -3562,10 +4818,10 @@ class ProjectSetupTab:
         activity_text = "RECENT ACTIVITY LOG\n" + "="*50 + "\n\n"
         
         try:
-            activity_text += "📅 Today's Activity:\n"
+            activity_text += "?? Today's Activity:\n"
             activity_text += "  • UI Session Started\n"
             activity_text += "  • Project Database Connected\n"
-            activity_text += "\n📊 Recent Data Operations:\n"
+            activity_text += "\n?? Recent Data Operations:\n"
             activity_text += "  • Project data refreshed\n"
             activity_text += "  • UI components initialized\n"
             
@@ -4007,12 +5263,6 @@ class ProjectSetupTab:
             print(f"Model File Extraction Error: {e}")
             traceback.print_exc()
 
-    def refresh_data(self):
-        """Refresh project data and UI components"""
-        # This can be expanded to refresh specific UI elements
-        # For now, just update the project status or show a refresh message
-        print(f"Data refreshed for project: {self.project_var.get()}")
-
     def extract_acc_files(self):
         """Extract files from ACC Desktop Connector"""
         if not self.project_var.get():
@@ -4288,6 +5538,10 @@ class _DocumentTypeTab:
                 self.current_project_id = int(project_selection.split(" - ")[0])
         except Exception:
             self.current_project_id = None
+    
+    def on_project_list_changed(self):
+        """Handle notification that the project list has changed"""
+        self.refresh_data()
 
     # Library actions
     def _seed_wip(self):
@@ -4517,7 +5771,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 print(f"Error loading project data: {e}")
         
         # === BASIC PROJECT INFO ===
-        basic_frame = ttk.LabelFrame(content_frame, text="📋 Basic Project Information", padding=15)
+        basic_frame = ttk.LabelFrame(content_frame, text="?? Basic Project Information", padding=15)
         basic_frame.pack(fill="x", pady=(0, 10))
         
         # Project Name
@@ -4573,7 +5827,7 @@ class PIRDocumentTab(_DocumentTypeTab):
         basic_frame.columnconfigure(1, weight=1)
         
         # === PROJECT STATUS ===
-        status_frame = ttk.LabelFrame(content_frame, text="📊 Project Status & Timeline", padding=15)
+        status_frame = ttk.LabelFrame(content_frame, text="?? Project Status & Timeline", padding=15)
         status_frame.pack(fill="x", pady=(0, 10))
         
         # Status
@@ -4603,7 +5857,7 @@ class PIRDocumentTab(_DocumentTypeTab):
         end_date_entry.grid(row=1, column=3, sticky="w", pady=5)
         
         # === LOCATION INFORMATION ===
-        location_frame = ttk.LabelFrame(content_frame, text="📍 Location Information", padding=15)
+        location_frame = ttk.LabelFrame(content_frame, text="?? Location Information", padding=15)
         location_frame.pack(fill="x", pady=(0, 10))
         
         # Address
@@ -4631,7 +5885,7 @@ class PIRDocumentTab(_DocumentTypeTab):
         location_frame.columnconfigure(1, weight=1)
         
         # === FILE PATHS ===
-        paths_frame = ttk.LabelFrame(content_frame, text="📁 File Paths", padding=15)
+        paths_frame = ttk.LabelFrame(content_frame, text="?? File Paths", padding=15)
         paths_frame.pack(fill="x", pady=(0, 10))
         
         # Model Folder Path
@@ -4695,6 +5949,8 @@ class PIRDocumentTab(_DocumentTypeTab):
                         messagebox.showinfo("Success", "Project created successfully!")
                         dialog.destroy()
                         self.refresh_data()
+                        # Notify all tabs that the project list has changed
+                        project_notification_system.notify_project_list_changed()
                 else:
                     success = self.update_project_in_db(project_id, project_data)
                     if success:
@@ -4841,7 +6097,7 @@ class PIRDocumentTab(_DocumentTypeTab):
         cancel_btn = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
         cancel_btn.pack(side="right", padx=5)
         
-        save_btn = ttk.Button(button_frame, text="💾 Save Client", command=save_client)
+        save_btn = ttk.Button(button_frame, text="?? Save Client", command=save_client)
         save_btn.pack(side="right", padx=5)
         
         # Focus on client name field
@@ -4870,7 +6126,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                     break
             
             if not new_project_id:
-                print(f"❌ Could not find newly created project: {project_data['name']}")
+                print(f"? Could not find newly created project: {project_data['name']}")
                 return False
             
             # Now update the project with additional details
@@ -4892,14 +6148,14 @@ class PIRDocumentTab(_DocumentTypeTab):
                 from database import update_project_record
                 update_success = update_project_record(new_project_id, additional_data)
                 if update_success:
-                    print(f"✅ Successfully created and updated project: {project_data['name']} (ID: {new_project_id})")
+                    print(f"? Successfully created and updated project: {project_data['name']} (ID: {new_project_id})")
                 else:
-                    print(f"⚠️ Project created but failed to update additional details for: {project_data['name']}")
+                    print(f"?? Project created but failed to update additional details for: {project_data['name']}")
             
             return True
             
         except Exception as e:
-            print(f"❌ Error creating project: {e}")
+            print(f"? Error creating project: {e}")
             messagebox.showerror("Database Error", f"Failed to create project: {str(e)}")
             return False
     
@@ -4943,11 +6199,11 @@ class PIRDocumentTab(_DocumentTypeTab):
                 if not folder_success:
                     print(f"Failed to update folder paths for project {project_id}")
             
-            print(f"✅ Successfully updated project {project_id}")
+            print(f"? Successfully updated project {project_id}")
             return True
             
         except Exception as e:
-            print(f"❌ Error updating project {project_id}: {e}")
+            print(f"? Error updating project {project_id}: {e}")
             messagebox.showerror("Database Error", f"Failed to update project: {str(e)}")
             return False
     
@@ -4986,7 +6242,7 @@ class PIRDocumentTab(_DocumentTypeTab):
             content_frame.columnconfigure(1, weight=1)
             
             # Title
-            title_label = ttk.Label(content_frame, text="📁 Configure File Paths", 
+            title_label = ttk.Label(content_frame, text="?? Configure File Paths", 
                                    font=("Arial", 14, "bold"))
             title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20), sticky="w")
             
@@ -5012,7 +6268,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 if folder_path:
                     model_path_var.set(folder_path)
             
-            ttk.Button(content_frame, text="📁 Browse", 
+            ttk.Button(content_frame, text="?? Browse", 
                       command=browse_model_path).grid(row=2, column=2, padx=(0, 0), pady=5)
             
             # IFC Folder Path
@@ -5031,7 +6287,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 if folder_path:
                     ifc_path_var.set(folder_path)
             
-            ttk.Button(content_frame, text="📁 Browse", 
+            ttk.Button(content_frame, text="?? Browse", 
                       command=browse_ifc_path).grid(row=3, column=2, padx=(0, 0), pady=5)
             
             # Path validation info
@@ -5054,24 +6310,24 @@ class PIRDocumentTab(_DocumentTypeTab):
                 # Validate model path
                 model_path = model_path_var.get().strip()
                 if not model_path:
-                    model_status_var.set("❌ Path not set")
+                    model_status_var.set("? Path not set")
                 elif not os.path.exists(model_path):
-                    model_status_var.set("❌ Path does not exist")
+                    model_status_var.set("? Path does not exist")
                 elif not os.path.isdir(model_path):
-                    model_status_var.set("❌ Not a directory")
+                    model_status_var.set("? Not a directory")
                 else:
-                    model_status_var.set("✅ Valid path")
+                    model_status_var.set("? Valid path")
                 
                 # Validate IFC path
                 ifc_path = ifc_path_var.get().strip()
                 if not ifc_path:
-                    ifc_status_var.set("⚠️ Path not set (optional)")
+                    ifc_status_var.set("?? Path not set (optional)")
                 elif not os.path.exists(ifc_path):
-                    ifc_status_var.set("❌ Path does not exist")
+                    ifc_status_var.set("? Path does not exist")
                 elif not os.path.isdir(ifc_path):
-                    ifc_status_var.set("❌ Not a directory")
+                    ifc_status_var.set("? Not a directory")
                 else:
-                    ifc_status_var.set("✅ Valid path")
+                    ifc_status_var.set("? Valid path")
             
             # Validate paths initially and on changes
             def on_path_change(*args):
@@ -5082,7 +6338,7 @@ class PIRDocumentTab(_DocumentTypeTab):
             validate_paths()  # Initial validation
             
             # Validate button
-            ttk.Button(validation_frame, text="🔍 Validate Paths", 
+            ttk.Button(validation_frame, text="?? Validate Paths", 
                       command=validate_paths).grid(row=0, column=2, rowspan=2, padx=(20, 0))
             
             # Notes section
@@ -5124,7 +6380,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 model_path = model_path_var.get().strip()
                 if model_path and os.path.exists(model_path) and os.path.isdir(model_path):
                     try:
-                        preview_text.insert(tk.END, f"📁 Model Folder Contents: {model_path}\n")
+                        preview_text.insert(tk.END, f"?? Model Folder Contents: {model_path}\n")
                         preview_text.insert(tk.END, "="*60 + "\n\n")
                         
                         items = os.listdir(model_path)
@@ -5133,15 +6389,15 @@ class PIRDocumentTab(_DocumentTypeTab):
                             files = [item for item in items if os.path.isfile(os.path.join(model_path, item))]
                             
                             if folders:
-                                preview_text.insert(tk.END, "📂 Folders:\n")
+                                preview_text.insert(tk.END, "?? Folders:\n")
                                 for folder in sorted(folders):
-                                    preview_text.insert(tk.END, f"  📁 {folder}\n")
+                                    preview_text.insert(tk.END, f"  ?? {folder}\n")
                                 preview_text.insert(tk.END, "\n")
                             
                             if files:
-                                preview_text.insert(tk.END, "📄 Files:\n")
+                                preview_text.insert(tk.END, "?? Files:\n")
                                 for file in sorted(files):
-                                    preview_text.insert(tk.END, f"  📄 {file}\n")
+                                    preview_text.insert(tk.END, f"  ?? {file}\n")
                         else:
                             preview_text.insert(tk.END, "Empty folder")
                             
@@ -5150,7 +6406,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 else:
                     preview_text.insert(tk.END, "No valid model path selected for preview")
             
-            ttk.Button(preview_frame, text="🔄 Refresh Preview", 
+            ttk.Button(preview_frame, text="?? Refresh Preview", 
                       command=update_preview).grid(row=2, column=0, pady=(5, 0), sticky="w")
             
             # Initial preview
@@ -5204,22 +6460,22 @@ class PIRDocumentTab(_DocumentTypeTab):
                         messagebox.showerror("Error", "Failed to save file paths")
                         
                 except Exception as e:
-                    print(f"❌ Error saving paths: {e}")
+                    print(f"? Error saving paths: {e}")
                     messagebox.showerror("Error", f"Failed to save paths: {str(e)}")
             
             def cancel():
                 dialog.destroy()
             
             # Save and Cancel buttons
-            ttk.Button(buttons_frame, text="💾 Save Paths", command=save_paths, 
+            ttk.Button(buttons_frame, text="?? Save Paths", command=save_paths, 
                       style="Accent.TButton").pack(side="left", padx=(0, 10))
-            ttk.Button(buttons_frame, text="❌ Cancel", command=cancel).pack(side="left")
+            ttk.Button(buttons_frame, text="? Cancel", command=cancel).pack(side="left")
             
             # Focus on model path entry
             model_path_entry.focus()
             
         except Exception as e:
-            print(f"❌ Error opening configure paths dialog: {e}")
+            print(f"? Error opening configure paths dialog: {e}")
             messagebox.showerror("Error", f"Failed to open configure paths dialog: {str(e)}")
     
     def extract_acc_files(self):
@@ -5310,7 +6566,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 raise e
                 
         except Exception as e:
-            print(f"❌ Error during file extraction: {e}")
+            print(f"? Error during file extraction: {e}")
             messagebox.showerror("Error", f"File extraction failed: {str(e)}")
     
     def view_dashboard(self):
@@ -5335,7 +6591,7 @@ class PIRDocumentTab(_DocumentTypeTab):
                 return
             
             self.current_project_id = int(selected.split(" - ")[0])
-            print(f"🔍 Loading project data for: {selected}")
+            print(f"?? Loading project data for: {selected}")
             
             # Load project services in scope grid
             self.load_project_scope()
@@ -5391,3 +6647,87 @@ class PIRDocumentTab(_DocumentTypeTab):
         if self.project_var.get() != new_project:
             self.project_var.set(new_project)
             self.on_project_selected_local()
+
+class DocumentManagementTab:
+    """Document Management Interface - For managing BEP, PIR, and EIR documents"""
+    
+    def __init__(self, parent_notebook):
+        self.frame = ttk.Frame(parent_notebook)
+        parent_notebook.add(self.frame, text="📁 Documents")
+        
+        # Initialize project tracking
+        self.current_project = None
+        
+        # Main container with scrollable content
+        self.setup_ui()
+        
+        # Register for project change notifications
+        project_notification_system.register_observer(self)
+        
+    def setup_ui(self):
+        """Setup the main UI components"""
+        # Create main container
+        main_container = ttk.Frame(self.frame)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Project status frame
+        project_frame = ttk.LabelFrame(main_container, text="📊 Current Project", padding=10)
+        project_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.project_label = ttk.Label(project_frame, text="No project selected", 
+                                     font=('Arial', 10, 'bold'))
+        self.project_label.pack()
+        
+        # Create notebook for document types
+        self.doc_notebook = ttk.Notebook(main_container)
+        self.doc_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # BEP Tab
+        self.bep_frame = ttk.Frame(self.doc_notebook)
+        self.doc_notebook.add(self.bep_frame, text="🏗 BEP (BIM Execution Plan)")
+        self.setup_bep_tab()
+        
+        # PIR Tab
+        self.pir_frame = ttk.Frame(self.doc_notebook)
+        self.doc_notebook.add(self.pir_frame, text="📋 PIR (Project Information Requirements)")
+        self.setup_pir_tab()
+        
+        # EIR Tab
+        self.eir_frame = ttk.Frame(self.doc_notebook)
+        self.doc_notebook.add(self.eir_frame, text="📄 EIR (Employer Information Requirements)")
+        self.setup_eir_tab()
+    
+    def setup_bep_tab(self):
+        """Setup the BEP tab"""
+        # Content for BEP tab
+        content_frame = ttk.LabelFrame(self.bep_frame, text="BEP Document Management", padding=10)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Placeholder content
+        ttk.Label(content_frame, text="BEP document management will be implemented here").pack(pady=20)
+    
+    def setup_pir_tab(self):
+        """Setup the PIR tab"""
+        # Content for PIR tab
+        content_frame = ttk.LabelFrame(self.pir_frame, text="PIR Document Management", padding=10)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Placeholder content
+        ttk.Label(content_frame, text="PIR document management will be implemented here").pack(pady=20)
+    
+    def setup_eir_tab(self):
+        """Setup the EIR tab"""
+        # Content for EIR tab
+        content_frame = ttk.LabelFrame(self.eir_frame, text="EIR Document Management", padding=10)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Placeholder content
+        ttk.Label(content_frame, text="EIR document management will be implemented here").pack(pady=20)
+    
+    def on_project_changed(self, new_project):
+        """Handle project change notification from other tabs"""
+        self.current_project = new_project
+        if new_project:
+            self.project_label.config(text=f"Project: {new_project}")
+        else:
+            self.project_label.config(text="No project selected")

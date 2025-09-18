@@ -19,169 +19,375 @@ const {
 } = MaterialUI;
 
 // --- Reviews Module (new) ---
-function ReviewsPlanning() {
+function ReviewPlanningTab() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState('');
-  const [stages, setStages] = useState([]);
-  const [cycles, setCycles] = useState([]);
-  const [form, setForm] = useState({ stage: '', start: '', end: '', reviews: 4, frequency: 'weekly' });
+  const [services, setServices] = useState([]);
+  const [contextNotes, setContextNotes] = useState('Notes for design managers, discipline leads, or client feedback...');
+  const [defaultStartDate, setDefaultStartDate] = useState('');
+  const [defaultFrequency, setDefaultFrequency] = useState('weekly');
+  const [defaultReviewCount, setDefaultReviewCount] = useState('4');
 
   useEffect(() => {
-    fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([]));
+    fetch('/api/projects').then(r => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
   }, []);
 
   useEffect(() => {
-    if (!projectId) { setStages([]); setCycles([]); return; }
-    fetch(`/api/project_services/${projectId}`).then(r=>r.ok?r.json():[]).then(setStages).catch(()=>setStages([]));
-    fetch(`/api/reviews/${projectId}`).then(r=>r.ok?r.json():[]).then(setCycles).catch(()=>setCycles([]));
+    if (!projectId) { setServices([]); return; }
+    fetch(`/api/project_services/${projectId}`).then(r => r.ok ? r.json() : []).then(setServices).catch(() => setServices([]));
   }, [projectId]);
 
-  const addStage = () => {
-    if (!projectId || !form.stage || !form.start || !form.end) return;
-    // POST to backend (placeholder)
-    fetch('/api/stages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...form, project_id: projectId }) })
-      .then(()=> fetch(`/api/project_services/${projectId}`).then(r=>r.json()).then(setStages))
-      .catch(()=>{});
-  };
-
-  const generateCycles = () => {
+  const generateReviewsFromServices = () => {
     if (!projectId) return;
-    fetch(`/api/generate_review_cycles/${projectId}`, { method: 'POST' })
-      .then(()=> fetch(`/api/reviews/${projectId}`).then(r=>r.json()).then(setCycles))
-      .catch(()=>{});
+    fetch(`/api/generate_reviews_from_services/${projectId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: defaultStartDate,
+        frequency: defaultFrequency,
+        review_count: parseInt(defaultReviewCount)
+      })
+    })
+      .then(() => {
+        // Refresh services to show updated review planning
+        fetch(`/api/project_services/${projectId}`).then(r => r.json()).then(setServices);
+      })
+      .catch(() => {});
   };
 
   return (
     <div>
-      <h3>Reviews • Planning</h3>
-      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-        <FormControl size="small">
+      <h3>Review Planning & Scheduling</h3>
+
+      {/* Project Selection */}
+      <div style={{ marginBottom: '1rem' }}>
+        <FormControl size="small" style={{ minWidth: 300 }}>
           <InputLabel>Project</InputLabel>
-          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
-            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          <Select value={projectId} label="Project" onChange={e => setProjectId(e.target.value)}>
+            <MenuItem value=""><em>Select Project</em></MenuItem>
+            {projects.map(p => <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
           </Select>
         </FormControl>
-        <TextField size="small" label="Stage Name" value={form.stage} onChange={e=>setForm(f=>({...f, stage:e.target.value}))} />
-        <TextField size="small" label="Start" type="date" InputLabelProps={{shrink:true}} value={form.start} onChange={e=>setForm(f=>({...f, start:e.target.value}))} />
-        <TextField size="small" label="End" type="date" InputLabelProps={{shrink:true}} value={form.end} onChange={e=>setForm(f=>({...f, end:e.target.value}))} />
-        <TextField size="small" label="# Reviews" type="number" value={form.reviews} onChange={e=>setForm(f=>({...f, reviews:e.target.value}))} />
-        <FormControl size="small">
-          <InputLabel>Frequency</InputLabel>
-          <Select value={form.frequency} label="Frequency" onChange={e=>setForm(f=>({...f, frequency:e.target.value}))}>
-            <MenuItem value="weekly">Weekly</MenuItem>
-            <MenuItem value="bi-weekly">Bi-weekly</MenuItem>
-            <MenuItem value="monthly">Monthly</MenuItem>
-            <MenuItem value="milestone-based">Milestone-based</MenuItem>
-          </Select>
-        </FormControl>
-        <Button variant="contained" size="small" onClick={addStage}>Add Stage</Button>
-        <Button variant="outlined" size="small" onClick={generateCycles}>Generate Cycles</Button>
       </div>
 
-      <h4 style={{ marginTop:'1rem' }}>Stages</h4>
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead><TableRow>
-            <TableCell>Stage</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Reviews</TableCell><TableCell>Frequency</TableCell>
-          </TableRow></TableHead>
-          <TableBody>
-            {stages.map(s=> (
-              <TableRow key={s.id || s.stage}>
-                <TableCell>{s.stage || s.service_name}</TableCell>
-                <TableCell>{s.start || s.start_date}</TableCell>
-                <TableCell>{s.end || s.end_date}</TableCell>
-                <TableCell>{s.reviews || s.num_reviews}</TableCell>
-                <TableCell>{s.frequency || s.frequency_type}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        {/* Context Column */}
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <Paper style={{ padding: '1rem', marginBottom: '1rem' }}>
+            <h4>Project Context</h4>
+            <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '1rem' }}>
+              Capture key milestone notes or coordination focus areas for this review cycle.
+            </p>
+            <TextField
+              multiline
+              rows={8}
+              fullWidth
+              value={contextNotes}
+              onChange={e => setContextNotes(e.target.value)}
+              variant="outlined"
+              size="small"
+            />
+          </Paper>
 
-      <h4 style={{ marginTop:'1rem' }}>Review Cycles</h4>
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead><TableRow>
-            <TableCell>ID</TableCell><TableCell>Stage</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Reviews</TableCell>
-          </TableRow></TableHead>
-          <TableBody>
-            {cycles.map(c=> (
-              <TableRow key={c.review_cycle_id}>
-                <TableCell>{c.review_cycle_id}</TableCell>
-                <TableCell>{c.stage_id}</TableCell>
-                <TableCell>{c.start_date}</TableCell>
-                <TableCell>{c.end_date}</TableCell>
-                <TableCell>{c.num_reviews}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          <Paper style={{ padding: '1rem' }}>
+            <h4>Cadence Defaults</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <TextField
+                label="Default Start Date"
+                type="date"
+                value={defaultStartDate}
+                onChange={e => setDefaultStartDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+              />
+              <FormControl size="small">
+                <InputLabel>Default Frequency</InputLabel>
+                <Select value={defaultFrequency} label="Default Frequency" onChange={e => setDefaultFrequency(e.target.value)}>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                  <MenuItem value="bi-weekly">Bi-weekly</MenuItem>
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                  <MenuItem value="as-required">As Required</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Default Review Count"
+                type="number"
+                value={defaultReviewCount}
+                onChange={e => setDefaultReviewCount(e.target.value)}
+                size="small"
+              />
+            </div>
+          </Paper>
+        </div>
+
+        {/* Workbench Column */}
+        <div style={{ flex: 3 }}>
+          <Paper style={{ padding: '1rem', marginBottom: '1rem' }}>
+            <h4>Service Review Planning</h4>
+            <p style={{ fontSize: '0.9em', color: '#666', fontStyle: 'italic', marginBottom: '1rem' }}>
+              Services are managed in the Service Setup tab. This view shows service review planning details.
+            </p>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={generateReviewsFromServices}
+              disabled={!projectId}
+              style={{ marginBottom: '1rem' }}
+            >
+              Generate Reviews from Services
+            </Button>
+
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Service</TableCell>
+                    <TableCell>Phase</TableCell>
+                    <TableCell>Review Count</TableCell>
+                    <TableCell>Frequency</TableCell>
+                    <TableCell>Start Date</TableCell>
+                    <TableCell>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {services.map(s => (
+                    <TableRow key={s.service_id || s.id}>
+                      <TableCell>{s.service_name || s.name}</TableCell>
+                      <TableCell>{s.phase || 'Design'}</TableCell>
+                      <TableCell>{s.review_count || defaultReviewCount}</TableCell>
+                      <TableCell>{s.frequency || defaultFrequency}</TableCell>
+                      <TableCell>{s.start_date || defaultStartDate}</TableCell>
+                      <TableCell>{s.status || 'Planned'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </div>
+
+        {/* Insights Column */}
+        <div style={{ flex: 1, minWidth: '200px' }}>
+          <Paper style={{ padding: '1rem' }}>
+            <h4>Planning Insights</h4>
+            <div style={{ fontSize: '0.9em', color: '#666' }}>
+              <p><strong>Total Services:</strong> {services.length}</p>
+              <p><strong>Active Reviews:</strong> {services.filter(s => s.status === 'Active').length}</p>
+              <p><strong>Planned Reviews:</strong> {services.filter(s => s.status === 'Planned').length}</p>
+              <p><strong>Completed:</strong> {services.filter(s => s.status === 'Completed').length}</p>
+            </div>
+          </Paper>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ReviewsTracking() {
+function ReviewExecutionTab() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState('');
   const [cycleId, setCycleId] = useState('');
   const [cycles, setCycles] = useState([]);
-  const [rows, setRows] = useState([]);
-  const [folderPath, setFolderPath] = useState('');
+  const [tasks, setTasks] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState(null);
 
-  useEffect(()=>{ fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([])); },[]);
-  useEffect(()=>{
-    if (!projectId) { setCycles([]); setRows([]); return; }
-    fetch(`/api/cycle_ids/${projectId}`).then(r=>r.ok?r.json():[]).then(list=>{ setCycles(list); setCycleId(list[0]||''); }).catch(()=>setCycles([]));
+  useEffect(() => {
+    fetch('/api/projects').then(r => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
+    fetch('/api/users').then(r => r.ok ? r.json() : []).then(setUsers).catch(() => setUsers([]));
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) {
+      setCycles([]);
+      setTasks([]);
+      setReviewSummary(null);
+      return;
+    }
+    fetch(`/api/cycle_ids/${projectId}`).then(r => r.ok ? r.json() : []).then(c => {
+      setCycles(c);
+      setCycleId(c[0] || '');
+    }).catch(() => setCycles([]));
   }, [projectId]);
-  useEffect(()=>{
-    if (!projectId || !cycleId) { setRows([]); return; }
-    fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`).then(r=>r.ok?r.json():[]).then(setRows).catch(()=>setRows([]));
+
+  useEffect(() => {
+    if (!projectId || !cycleId) {
+      setTasks([]);
+      setReviewSummary(null);
+      return;
+    }
+    fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setTasks)
+      .catch(() => setTasks([]));
+
+    fetch(`/api/review_summary?project_id=${projectId}&cycle_id=${cycleId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setReviewSummary)
+      .catch(() => setReviewSummary(null));
   }, [projectId, cycleId]);
 
-  const saveFolder = (reviewId) => {
-    // Placeholder: send folderPath to backend for reviewId
-    fetch(`/api/review_folder/${reviewId}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ folder_path: folderPath })})
-      .then(()=> alert('Folder saved'))
-      .catch(()=>{});
+  const assignUser = (scheduleId, userId) => {
+    fetch(`/api/review_task/${scheduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
+    })
+      .then(() => {
+        // Refresh tasks
+        fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`)
+          .then(r => r.json())
+          .then(setTasks);
+      })
+      .catch(() => {});
+  };
+
+  const updateTaskStatus = (scheduleId, status) => {
+    fetch(`/api/review_task/${scheduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status })
+    })
+      .then(() => {
+        // Refresh tasks and summary
+        fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`)
+          .then(r => r.json())
+          .then(setTasks);
+        fetch(`/api/review_summary?project_id=${projectId}&cycle_id=${cycleId}`)
+          .then(r => r.json())
+          .then(setReviewSummary);
+      })
+      .catch(() => {});
+  };
+
+  const saveFolderPath = (scheduleId, folderPath) => {
+    fetch(`/api/review_task/${scheduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder_path: folderPath })
+    })
+      .then(() => {
+        // Refresh tasks
+        fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cycleId}`)
+          .then(r => r.json())
+          .then(setTasks);
+      })
+      .catch(() => {});
   };
 
   return (
     <div>
-      <h3>Reviews • Tracking</h3>
-      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-        <FormControl size="small">
+      <h3>Review Execution & Tracking</h3>
+
+      {/* Project and Cycle Selection */}
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <FormControl size="small" style={{ minWidth: 300 }}>
           <InputLabel>Project</InputLabel>
-          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
-            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          <Select value={projectId} label="Project" onChange={e => setProjectId(e.target.value)}>
+            <MenuItem value=""><em>Select Project</em></MenuItem>
+            {projects.map(p => <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
           </Select>
         </FormControl>
-        {!!cycles.length && (
-          <FormControl size="small">
+
+        {cycles.length > 0 && (
+          <FormControl size="small" style={{ minWidth: 200 }}>
             <InputLabel>Cycle</InputLabel>
-            <Select value={cycleId} label="Cycle" onChange={e=>setCycleId(e.target.value)}>
-              {cycles.map(c=> <MenuItem key={c} value={c}>{c}</MenuItem>)}
+            <Select value={cycleId} label="Cycle" onChange={e => setCycleId(e.target.value)}>
+              {cycles.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
             </Select>
           </FormControl>
         )}
-        <TextField size="small" label="Review Folder" value={folderPath} onChange={e=>setFolderPath(e.target.value)} style={{ minWidth: 300 }} />
       </div>
 
-      <TableContainer component={Paper} style={{ marginTop:'1rem' }}>
+      {/* Review Summary */}
+      {reviewSummary && (
+        <div style={{ marginBottom: '1rem', display: 'flex', gap: '2rem' }}>
+          <Paper style={{ padding: '1rem', flex: 1 }}>
+            <h4>Review Progress</h4>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9em' }}>
+              <div><strong>Total Tasks:</strong> {reviewSummary.total_tasks || 0}</div>
+              <div><strong>Completed:</strong> {reviewSummary.completed_tasks || 0}</div>
+              <div><strong>In Progress:</strong> {reviewSummary.in_progress_tasks || 0}</div>
+              <div><strong>Pending:</strong> {reviewSummary.pending_tasks || 0}</div>
+            </div>
+          </Paper>
+          <Paper style={{ padding: '1rem', flex: 1 }}>
+            <h4>Cycle Information</h4>
+            <div style={{ fontSize: '0.9em' }}>
+              <div><strong>Cycle:</strong> {cycleId}</div>
+              <div><strong>Start Date:</strong> {reviewSummary.cycle_start || 'N/A'}</div>
+              <div><strong>End Date:</strong> {reviewSummary.cycle_end || 'N/A'}</div>
+            </div>
+          </Paper>
+        </div>
+      )}
+
+      {/* Tasks Table */}
+      <TableContainer component={Paper}>
         <Table size="small">
-          <TableHead><TableRow>
-            <TableCell>Review ID</TableCell><TableCell>Service</TableCell><TableCell>Date</TableCell><TableCell>Status</TableCell><TableCell>Assignee</TableCell><TableCell>Actions</TableCell>
-          </TableRow></TableHead>
+          <TableHead>
+            <TableRow>
+              <TableCell>Task ID</TableCell>
+              <TableCell>Service</TableCell>
+              <TableCell>Review Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Assignee</TableCell>
+              <TableCell>Folder Path</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
-            {rows.map(r=> (
-              <TableRow key={r.schedule_id}>
-                <TableCell>{r.schedule_id}</TableCell>
-                <TableCell>{r.service_name || r.service || ''}</TableCell>
-                <TableCell>{r.review_date || r.planned_start}</TableCell>
-                <TableCell>{r.status || ''}</TableCell>
-                <TableCell>{r.assignee || ''}</TableCell>
+            {tasks.map(task => (
+              <TableRow key={task.schedule_id}>
+                <TableCell>{task.schedule_id}</TableCell>
+                <TableCell>{task.service_name || task.service || ''}</TableCell>
+                <TableCell>{task.review_date || task.planned_start || ''}</TableCell>
                 <TableCell>
-                  <Button size="small" onClick={()=>saveFolder(r.schedule_id)}>Save Folder</Button>
+                  <FormControl size="small" style={{ minWidth: 120 }}>
+                    <Select
+                      value={task.status || 'pending'}
+                      onChange={e => updateTaskStatus(task.schedule_id, e.target.value)}
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="in_progress">In Progress</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                      <MenuItem value="cancelled">Cancelled</MenuItem>
+                    </Select>
+                  </FormControl>
+                </TableCell>
+                <TableCell>
+                  <FormControl size="small" style={{ minWidth: 150 }}>
+                    <Select
+                      value={task.user_id || ''}
+                      onChange={e => assignUser(task.schedule_id, e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value=""><em>Unassigned</em></MenuItem>
+                      {users.map(u => (
+                        <MenuItem key={u.user_id} value={u.user_id}>
+                          {u.user_name || u.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </TableCell>
+                <TableCell>
+                  <TextField
+                    size="small"
+                    value={task.folder_path || ''}
+                    onChange={e => saveFolderPath(task.schedule_id, e.target.value)}
+                    placeholder="Enter folder path..."
+                    style={{ minWidth: 200 }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => saveFolderPath(task.schedule_id, task.folder_path || '')}
+                  >
+                    Save
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -192,45 +398,146 @@ function ReviewsTracking() {
   );
 }
 
-function ReviewsServices() {
+function ServiceSetupTab() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState('');
   const [services, setServices] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
 
-  useEffect(()=>{ fetch('/api/projects').then(r=>r.ok?r.json():[]).then(setProjects).catch(()=>setProjects([])); },[]);
-  useEffect(()=>{
+  useEffect(() => {
+    fetch('/api/projects').then(r => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
+    fetch('/api/service_templates').then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => setTemplates([]));
+  }, []);
+
+  useEffect(() => {
     if (!projectId) { setServices([]); return; }
-    fetch(`/api/services/${projectId}`).then(r=>r.ok?r.json():[]).then(setServices).catch(()=>setServices([]));
+    fetch(`/api/project_services/${projectId}`).then(r => r.ok ? r.json() : []).then(setServices).catch(() => setServices([]));
   }, [projectId]);
 
+  const loadTemplate = () => {
+    if (!selectedTemplate) return;
+    fetch(`/api/service_template/${selectedTemplate}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(templateServices => {
+        // Show preview of services that would be added
+        console.log('Template services:', templateServices);
+      })
+      .catch(() => {});
+  };
+
+  const applyTemplate = () => {
+    if (!projectId || !selectedTemplate) return;
+    fetch(`/api/apply_service_template`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, template_id: selectedTemplate })
+    })
+      .then(() => {
+        fetch(`/api/project_services/${projectId}`).then(r => r.json()).then(setServices);
+      })
+      .catch(() => {});
+  };
+
+  const clearServices = () => {
+    if (!projectId) return;
+    if (!confirm('Are you sure you want to clear all services for this project?')) return;
+    fetch(`/api/clear_project_services/${projectId}`, { method: 'DELETE' })
+      .then(() => setServices([]))
+      .catch(() => {});
+  };
+
   const addService = () => {
-    const name = prompt('Service name'); if (!name) return;
-    fetch('/api/services', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ project_id: projectId, service_name: name }) })
-      .then(()=> fetch(`/api/services/${projectId}`).then(r=>r.json()).then(setServices));
+    const serviceName = prompt('Enter service name:');
+    if (!serviceName || !projectId) return;
+
+    fetch('/api/project_services', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        service_name: serviceName,
+        phase: 'Design',
+        service_code: serviceName.substring(0, 3).toUpperCase(),
+        unit_type: 'LS',
+        quantity: 1,
+        rate: 0,
+        status: 'Active'
+      })
+    })
+      .then(() => {
+        fetch(`/api/project_services/${projectId}`).then(r => r.json()).then(setServices);
+      })
+      .catch(() => {});
   };
 
   return (
     <div>
-      <h3>Reviews • Services</h3>
-      <div style={{ display:'flex', gap:'1rem', alignItems:'center' }}>
-        <FormControl size="small">
+      <h3>Service Setup & Templates</h3>
+
+      {/* Project Selection */}
+      <div style={{ marginBottom: '1rem' }}>
+        <FormControl size="small" style={{ minWidth: 300 }}>
           <InputLabel>Project</InputLabel>
-          <Select value={projectId} label="Project" onChange={e=>setProjectId(e.target.value)} style={{ minWidth: 240 }}>
-            {projects.map(p=> <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          <Select value={projectId} label="Project" onChange={e => setProjectId(e.target.value)}>
+            <MenuItem value=""><em>Select Project</em></MenuItem>
+            {projects.map(p => <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
           </Select>
         </FormControl>
-        <Button size="small" variant="contained" onClick={addService}>Add Service</Button>
       </div>
-      <TableContainer component={Paper} style={{ marginTop:'1rem' }}>
+
+      {/* Service Templates */}
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <FormControl size="small" style={{ minWidth: 250 }}>
+          <InputLabel>Available Templates</InputLabel>
+          <Select value={selectedTemplate} label="Available Templates" onChange={e => setSelectedTemplate(e.target.value)}>
+            <MenuItem value=""><em>Select Template</em></MenuItem>
+            {templates.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button variant="outlined" size="small" onClick={loadTemplate}>Load Template</Button>
+        <Button variant="contained" size="small" onClick={applyTemplate} disabled={!projectId || !selectedTemplate}>Apply to Project</Button>
+        <Button variant="outlined" size="small" color="error" onClick={clearServices} disabled={!projectId}>Clear All Services</Button>
+      </div>
+
+      {/* Current Project Services */}
+      <div style={{ marginBottom: '1rem' }}>
+        <Button variant="contained" size="small" onClick={addService} disabled={!projectId}>Add Service</Button>
+      </div>
+
+      <TableContainer component={Paper}>
         <Table size="small">
-          <TableHead><TableRow>
-            <TableCell>Service</TableCell><TableCell>Description</TableCell>
-          </TableRow></TableHead>
+          <TableHead>
+            <TableRow>
+              <TableCell>Service ID</TableCell>
+              <TableCell>Phase</TableCell>
+              <TableCell>Service Code</TableCell>
+              <TableCell>Service Name</TableCell>
+              <TableCell>Unit Type</TableCell>
+              <TableCell>Qty</TableCell>
+              <TableCell>Rate</TableCell>
+              <TableCell>Fee</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Start</TableCell>
+              <TableCell>End</TableCell>
+              <TableCell>Frequency</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
-            {services.map(s=> (
+            {services.map(s => (
               <TableRow key={s.service_id || s.id}>
+                <TableCell>{s.service_id || s.id}</TableCell>
+                <TableCell>{s.phase || 'Design'}</TableCell>
+                <TableCell>{s.service_code || ''}</TableCell>
                 <TableCell>{s.service_name || s.name}</TableCell>
-                <TableCell>{s.description || ''}</TableCell>
+                <TableCell>{s.unit_type || 'LS'}</TableCell>
+                <TableCell>{s.quantity || 1}</TableCell>
+                <TableCell>${s.rate || 0}</TableCell>
+                <TableCell>${s.fee || 0}</TableCell>
+                <TableCell>{s.status || 'Active'}</TableCell>
+                <TableCell>{s.start_date || ''}</TableCell>
+                <TableCell>{s.end_date || ''}</TableCell>
+                <TableCell>{s.frequency || 'monthly'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -240,24 +547,190 @@ function ReviewsServices() {
   );
 }
 
-function ReviewsKanban() {
-  const [columns, setColumns] = useState({
-    todo: [{ id: 1, title: 'Define BEP' }],
-    scheduled: [{ id: 2, title: 'Cycle 1 setup' }],
-    inreview: [{ id: 3, title: 'Review #123' }],
-    issued: [],
-    actioned: [],
-  });
+function BillingProgressTab() {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState('');
+  const [billingData, setBillingData] = useState([]);
+  const [progressData, setProgressData] = useState([]);
+  const [financialSummary, setFinancialSummary] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/projects').then(r => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) {
+      setBillingData([]);
+      setProgressData([]);
+      setFinancialSummary(null);
+      return;
+    }
+
+    // Fetch billing data
+    fetch(`/api/project_billing/${projectId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setBillingData)
+      .catch(() => setBillingData([]));
+
+    // Fetch progress data
+    fetch(`/api/project_progress/${projectId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setProgressData)
+      .catch(() => setProgressData([]));
+
+    // Fetch financial summary
+    fetch(`/api/project_financial_summary/${projectId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setFinancialSummary)
+      .catch(() => setFinancialSummary(null));
+  }, [projectId]);
+
+  const generateInvoice = (serviceId) => {
+    fetch(`/api/generate_invoice/${serviceId}`, { method: 'POST' })
+      .then(() => {
+        // Refresh billing data
+        fetch(`/api/project_billing/${projectId}`).then(r => r.json()).then(setBillingData);
+        fetch(`/api/project_financial_summary/${projectId}`).then(r => r.json()).then(setFinancialSummary);
+      })
+      .catch(() => {});
+  };
+
+  const markServiceComplete = (serviceId) => {
+    fetch(`/api/service_complete/${serviceId}`, { method: 'PATCH' })
+      .then(() => {
+        // Refresh data
+        fetch(`/api/project_billing/${projectId}`).then(r => r.json()).then(setBillingData);
+        fetch(`/api/project_progress/${projectId}`).then(r => r.json()).then(setProgressData);
+        fetch(`/api/project_financial_summary/${projectId}`).then(r => r.json()).then(setFinancialSummary);
+      })
+      .catch(() => {});
+  };
+
   return (
     <div>
-      <h3>Reviews • Kanban</h3>
-      <div style={{ display:'flex', gap:'1rem' }}>
-        {Object.entries(columns).map(([key, cards]) => (
-          <div key={key} style={{ background:'#fafafa', border:'1px solid #ddd', padding:'0.5rem', width:220 }}>
-            <h4 style={{ textTransform:'capitalize' }}>{key}</h4>
-            {cards.map(c => <div key={c.id} style={{ background:'#fff', border:'1px solid #ccc', padding:'0.5rem', marginBottom:'0.5rem' }}>{c.title}</div>)}
-          </div>
-        ))}
+      <h3>Billing & Progress</h3>
+
+      {/* Project Selection */}
+      <div style={{ marginBottom: '1rem' }}>
+        <FormControl size="small" style={{ minWidth: 300 }}>
+          <InputLabel>Project</InputLabel>
+          <Select value={projectId} label="Project" onChange={e => setProjectId(e.target.value)}>
+            <MenuItem value=""><em>Select Project</em></MenuItem>
+            {projects.map(p => <MenuItem key={p.project_id} value={p.project_id}>{p.project_name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </div>
+
+      {/* Financial Summary */}
+      {financialSummary && (
+        <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
+          <Paper style={{ padding: '1rem', flex: 1 }}>
+            <h4>Financial Summary</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.9em' }}>
+              <div><strong>Total Contract Value:</strong></div>
+              <div>${financialSummary.total_contract_value || 0}</div>
+              <div><strong>Total Billed:</strong></div>
+              <div>${financialSummary.total_billed || 0}</div>
+              <div><strong>Outstanding:</strong></div>
+              <div>${financialSummary.outstanding_amount || 0}</div>
+              <div><strong>Progress (%):</strong></div>
+              <div>{financialSummary.overall_progress || 0}%</div>
+            </div>
+          </Paper>
+          <Paper style={{ padding: '1rem', flex: 1 }}>
+            <h4>Progress Overview</h4>
+            <div style={{ fontSize: '0.9em' }}>
+              <div><strong>Services Completed:</strong> {financialSummary.completed_services || 0} / {financialSummary.total_services || 0}</div>
+              <div><strong>Reviews Completed:</strong> {financialSummary.completed_reviews || 0} / {financialSummary.total_reviews || 0}</div>
+              <div><strong>Invoices Generated:</strong> {financialSummary.total_invoices || 0}</div>
+              <div><strong>Pending Invoices:</strong> {financialSummary.pending_invoices || 0}</div>
+            </div>
+          </Paper>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        {/* Billing Table */}
+        <div style={{ flex: 1 }}>
+          <Paper style={{ padding: '1rem' }}>
+            <h4>Service Billing</h4>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Service</TableCell>
+                    <TableCell>Value</TableCell>
+                    <TableCell>Billed</TableCell>
+                    <TableCell>Outstanding</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {billingData.map(item => (
+                    <TableRow key={item.service_id}>
+                      <TableCell>{item.service_name}</TableCell>
+                      <TableCell>${item.contract_value || 0}</TableCell>
+                      <TableCell>${item.amount_billed || 0}</TableCell>
+                      <TableCell>${item.outstanding || 0}</TableCell>
+                      <TableCell>{item.billing_status || 'Pending'}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => generateInvoice(item.service_id)}
+                          disabled={item.billing_status === 'Completed'}
+                        >
+                          Invoice
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </div>
+
+        {/* Progress Table */}
+        <div style={{ flex: 1 }}>
+          <Paper style={{ padding: '1rem' }}>
+            <h4>Service Progress</h4>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Service</TableCell>
+                    <TableCell>Progress (%)</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Reviews</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {progressData.map(item => (
+                    <TableRow key={item.service_id}>
+                      <TableCell>{item.service_name}</TableCell>
+                      <TableCell>{item.progress_percentage || 0}%</TableCell>
+                      <TableCell>{item.status}</TableCell>
+                      <TableCell>{item.completed_reviews || 0} / {item.total_reviews || 0}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => markServiceComplete(item.service_id)}
+                          disabled={item.status === 'Completed'}
+                        >
+                          Complete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </div>
       </div>
     </div>
   );
@@ -268,200 +741,22 @@ function ReviewsPage() {
   return (
     <div>
       <Tabs value={tab} onChange={(e, v) => setTab(v)}>
-        <Tab label="Planning" />
-        <Tab label="Tracking" />
-        <Tab label="Services" />
-        <Tab label="Kanban" />
+        <Tab label="Service Setup" />
+        <Tab label="Review Planning" />
+        <Tab label="Review Execution & Tracking" />
+        <Tab label="Billing & Progress" />
       </Tabs>
       <Box sx={{ p: 2 }}>
-        {tab === 0 && <ReviewsPlanning />}
-        {tab === 1 && <ReviewsTracking />}
-        {tab === 2 && <ReviewsServices />}
-        {tab === 3 && <ReviewsKanban />}
+        {tab === 0 && <ServiceSetupTab />}
+        {tab === 1 && <ReviewPlanningTab />}
+        {tab === 2 && <ReviewExecutionTab />}
+        {tab === 3 && <BillingProgressTab />}
       </Box>
     </div>
   );
 }
 
-function ReviewTasks() {
-  const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState('');
-  const [cycleId, setCycleId] = useState('');
-  const [cycles, setCycles] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [projectDetails, setProjectDetails] = useState(null);
-  const [reviewSummary, setReviewSummary] = useState(null);
 
-  useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
-      .then(setProjects);
-    fetch('/api/users')
-      .then(res => res.json())
-      .then(setUsers);
-  }, []);
-
-  useEffect(() => {
-    if (projectId) {
-      fetch(`/api/cycle_ids/${projectId}`)
-        .then(res => res.json())
-        .then(c => {
-          setCycles(c);
-          setCycleId(c[0] || '');
-        });
-      fetch(`/api/project/${projectId}`)
-        .then(res => res.json())
-        .then(setProjectDetails);
-      const cid = cycleId || (cycles[0] || 1);
-      fetch(`/api/review_summary?project_id=${projectId}&cycle_id=${cid}`)
-        .then(res => res.json())
-        .then(setReviewSummary);
-      fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cid}`)
-        .then(res => res.json())
-        .then(setTasks);
-    } else {
-      setProjectDetails(null);
-      setReviewSummary(null);
-      setTasks([]);
-      setCycles([]);
-      setCycleId('');
-    }
-  }, [projectId, cycleId]);
-
-  const assignUser = (scheduleId, userId) => {
-    fetch(`/api/review_task/${scheduleId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
-    }).then(() => {
-      // refresh after update
-      const cid = cycleId || (cycles[0] || 1);
-      fetch(`/api/review_tasks?project_id=${projectId}&cycle_id=${cid}`)
-        .then(res => res.json())
-        .then(setTasks);
-    });
-  };
-
-  return (
-    <div>
-      <h2>Review Tasks</h2>
-      <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-        <option value="">Select Project</option>
-        {projects.map(p => (
-          <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
-        ))}
-      </select>
-      {cycles.length > 0 && (
-        <select value={cycleId} onChange={e => setCycleId(e.target.value)} style={{marginLeft:'10px'}}>
-          {cycles.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      )}
-      {projectDetails && (
-        <div style={{marginTop: '10px'}}>
-          <h3>Project Details</h3>
-          <p>Status: {projectDetails.status}</p>
-          <p>Priority: {projectDetails.priority}</p>
-          <p>Start: {projectDetails.start_date}</p>
-          <p>End: {projectDetails.end_date}</p>
-        </div>
-      )}
-
-      {reviewSummary && (
-        <div style={{marginTop: '10px'}}>
-          <h3>Review Summary</h3>
-          <p>Cycle: {reviewSummary.cycle_id}</p>
-          <p>Scoped: {reviewSummary.scoped_reviews}</p>
-          <p>Completed: {reviewSummary.completed_reviews}</p>
-        </div>
-      )}
-
-      <table border="1" cellPadding="4" style={{marginTop: '10px'}}>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Reviewer</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map(t => (
-            <tr key={t.schedule_id}>
-              <td>{t.review_date}</td>
-              <td>
-                <select value={t.user || ''} onChange={e => assignUser(t.schedule_id, e.target.value)}>
-                  <option value="">--</option>
-                  {users.map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td>{t.status || ''}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ReviewCycles() {
-  const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState('');
-  const [cycles, setCycles] = useState([]);
-
-  useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
-      .then(setProjects);
-  }, []);
-
-  useEffect(() => {
-    if (projectId) {
-      fetch(`/api/reviews/${projectId}`)
-        .then(res => res.json())
-        .then(setCycles);
-    } else {
-      setCycles([]);
-    }
-  }, [projectId]);
-
-  return (
-    <div>
-      <h2>Review Cycles</h2>
-      <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-        <option value="">Select Project</option>
-        {projects.map(p => (
-          <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
-        ))}
-      </select>
-      <table border="1" cellPadding="4" style={{marginTop:'10px'}}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Stage</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Reviews</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cycles.map(c => (
-            <tr key={c.review_cycle_id}>
-              <td>{c.review_cycle_id}</td>
-              <td>{c.stage_id}</td>
-              <td>{c.start_date}</td>
-              <td>{c.end_date}</td>
-              <td>{c.num_reviews}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function ProjectsView() {
   const empty = {

@@ -245,6 +245,13 @@ class Tasks:
     CYCLE_ID = "cycle_id"
 
 
+    PRIORITY = "priority"
+    ESTIMATED_HOURS = "estimated_hours"
+    ACTUAL_HOURS = "actual_hours"
+    PREDECESSOR_TASK_ID = "predecessor_task_id"
+    PROGRESS_PERCENTAGE = "progress_percentage"
+    STATUS = "status"
+    DESCRIPTION = "description"
 class Users:
     TABLE = "users"
     ID = "user_id"
@@ -680,3 +687,12 @@ class ServiceReviews:
     WEIGHT_FACTOR = "weight_factor"
     EVIDENCE_LINKS = "evidence_links"
     ACTUAL_ISSUED_AT = "actual_issued_at"
+
+class ServiceScheduleSettings:
+    TABLE = "ServiceScheduleSettings"
+    SERVICE_ID = "service_id"
+    START_DATE = "start_date"
+    END_DATE = "end_date"
+    FREQUENCY = "frequency"
+    AUTO_COMPLETE = "auto_complete"
+    UPDATED_AT = "updated_at"
