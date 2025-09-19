@@ -16,6 +16,11 @@ const {
   Tab,
   Box,
   Button,
+  Grid,
+  Typography,
+  Chip,
+  LinearProgress,
+  Alert,
 } = MaterialUI;
 
 // --- Reviews Module (new) ---
@@ -1013,6 +1018,324 @@ function ProjectsView() {
 }
 
 
+function TaskManagementView() {
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [tasks, setTasks] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  // Task form state
+  const [openDialog, setOpenDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskForm, setTaskForm] = useState({
+    task_name: '',
+    project_id: '',
+    priority: 'Medium',
+    status: 'Not Started',
+    assigned_to: '',
+    start_date: '',
+    end_date: '',
+    estimated_hours: '',
+    description: '',
+  });
+
+  useEffect(() => {
+    fetch('/api/projects').then(r => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
+    fetch('/api/resources').then(r => r.ok ? r.json() : []).then(setResources).catch(() => setResources([]));
+  }, []);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      loadTasks(selectedProjectId);
+    }
+  }, [selectedProjectId]);
+
+  const loadTasks = async (projectId) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/tasks?project_id=${projectId}`);
+      if (response.ok) {
+        const tasksData = await response.json();
+        setTasks(tasksData);
+      }
+    } catch (err) {
+      setError('Failed to load tasks');
+      console.error('Error loading tasks:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitTask = async () => {
+    try {
+      if (!taskForm.task_name.trim()) {
+        setError('Task name is required');
+        return;
+      }
+
+      if (!selectedProjectId) {
+        setError('Please select a project');
+        return;
+      }
+
+      const taskData = {
+        ...taskForm,
+        project_id: selectedProjectId,
+      };
+
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+
+      if (response.ok) {
+        setSuccess('Task created successfully');
+        setTaskForm({
+          task_name: '',
+          project_id: '',
+          priority: 'Medium',
+          status: 'Not Started',
+          assigned_to: '',
+          start_date: '',
+          end_date: '',
+          estimated_hours: '',
+          description: '',
+        });
+        loadTasks(selectedProjectId);
+      } else {
+        setError('Failed to create task');
+      }
+    } catch (err) {
+      setError('Failed to create task');
+      console.error('Error creating task:', err);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Completed': return 'success';
+      case 'In Progress': return 'info';
+      case 'On Hold': return 'warning';
+      case 'Not Started': return 'default';
+      default: return 'default';
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'Critical': 
+      case 'High': return 'error';
+      case 'Medium': return 'warning';
+      case 'Low': return 'success';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <div>
+      <Typography variant="h4" gutterBottom>Task Management</Typography>
+      
+      {/* Project Selection */}
+      <Paper style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <FormControl fullWidth style={{ marginBottom: '1rem' }}>
+          <InputLabel>Select Project</InputLabel>
+          <Select
+            value={selectedProjectId}
+            onChange={e => setSelectedProjectId(e.target.value)}
+            label="Select Project"
+          >
+            {projects.map(project => (
+              <MenuItem key={project.project_id || project.id} value={project.project_id || project.id}>
+                {project.project_name || project.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Paper>
+
+      {/* Task Creation Form */}
+      {selectedProjectId && (
+        <Paper style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <Typography variant="h6" gutterBottom>Create New Task</Typography>
+          
+          {error && <Alert severity="error" style={{ marginBottom: '1rem' }}>{error}</Alert>}
+          {success && <Alert severity="success" style={{ marginBottom: '1rem' }}>{success}</Alert>}
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Task Name"
+                value={taskForm.task_name}
+                onChange={e => setTaskForm(prev => ({ ...prev, task_name: e.target.value }))}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={taskForm.priority}
+                  onChange={e => setTaskForm(prev => ({ ...prev, priority: e.target.value }))}
+                  label="Priority"
+                >
+                  <MenuItem value="Low">Low</MenuItem>
+                  <MenuItem value="Medium">Medium</MenuItem>
+                  <MenuItem value="High">High</MenuItem>
+                  <MenuItem value="Critical">Critical</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={taskForm.status}
+                  onChange={e => setTaskForm(prev => ({ ...prev, status: e.target.value }))}
+                  label="Status"
+                >
+                  <MenuItem value="Not Started">Not Started</MenuItem>
+                  <MenuItem value="In Progress">In Progress</MenuItem>
+                  <MenuItem value="On Hold">On Hold</MenuItem>
+                  <MenuItem value="Completed">Completed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Assigned To</InputLabel>
+                <Select
+                  value={taskForm.assigned_to}
+                  onChange={e => setTaskForm(prev => ({ ...prev, assigned_to: e.target.value }))}
+                  label="Assigned To"
+                >
+                  <MenuItem value="">Unassigned</MenuItem>
+                  {resources.map(resource => (
+                    <MenuItem key={resource.user_id} value={resource.name}>
+                      {resource.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Start Date"
+                type="date"
+                value={taskForm.start_date}
+                onChange={e => setTaskForm(prev => ({ ...prev, start_date: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="End Date"
+                type="date"
+                value={taskForm.end_date}
+                onChange={e => setTaskForm(prev => ({ ...prev, end_date: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Description"
+                value={taskForm.description}
+                onChange={e => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                multiline
+                rows={3}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="contained"
+                onClick={handleSubmitTask}
+              >
+                Create Task
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
+
+      {/* Task List */}
+      {selectedProjectId && (
+        <Paper style={{ padding: '1rem' }}>
+          <Typography variant="h6" gutterBottom>Project Tasks</Typography>
+          
+          {loading && <LinearProgress style={{ marginBottom: '1rem' }} />}
+          
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Task Name</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Progress</TableCell>
+                  <TableCell>Assigned To</TableCell>
+                  <TableCell>Due Date</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tasks.map(task => (
+                  <TableRow key={task.task_id}>
+                    <TableCell>
+                      <Typography variant="body2" style={{ fontWeight: 'bold' }}>
+                        {task.task_name}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {task.description}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={task.priority}
+                        color={getPriorityColor(task.priority)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={task.status}
+                        color={getStatusColor(task.status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box style={{ minWidth: 100 }}>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={task.progress_percentage || 0} 
+                          style={{ marginBottom: '0.25rem' }}
+                        />
+                        <Typography variant="caption">
+                          {task.progress_percentage || 0}%
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{task.assigned_to || 'Unassigned'}</TableCell>
+                    <TableCell>
+                      {task.end_date ? new Date(task.end_date).toLocaleDateString() : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+    </div>
+  );
+}
+
+
 function App() {
   const [view, setView] = useState('reviews');
   return (
@@ -1020,8 +1343,11 @@ function App() {
       <div style={{ marginBottom:'1rem' }}>
         <Button size="small" variant={view==='reviews'?'contained':'outlined'} onClick={()=>setView('reviews')}>Reviews</Button>
         <Button size="small" variant={view==='projects'?'contained':'outlined'} onClick={()=>setView('projects')} style={{ marginLeft: 8 }}>Projects</Button>
+        <Button size="small" variant={view==='tasks'?'contained':'outlined'} onClick={()=>setView('tasks')} style={{ marginLeft: 8 }}>Tasks</Button>
       </div>
-      {view === 'reviews' ? <ReviewsPage /> : <ProjectsView />}
+      {view === 'reviews' ? <ReviewsPage /> : 
+       view === 'projects' ? <ProjectsView /> :
+       view === 'tasks' ? <TaskManagementView /> : <ReviewsPage />}
     </div>
   );
 }

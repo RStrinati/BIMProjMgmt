@@ -37,6 +37,20 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
+# Serve React app
+@app.route('/')
+def serve_react_app():
+    return app.send_static_file('index.html')
+
+# Serve React app for all non-API routes (SPA routing)
+@app.route('/<path:path>')
+def serve_react_routes(path):
+    if path.startswith('api/'):
+        return {'error': 'API endpoint not found'}, 404
+    if path.startswith('src/') or path.endswith('.js') or path.endswith('.css'):
+        return app.send_static_file(path)
+    return app.send_static_file('index.html')
+
 
 @app.route('/api/projects', methods=['GET', 'POST'])
 def api_projects():
@@ -333,11 +347,234 @@ def api_update_bep_status_endpoint():
     return jsonify({'success': bool(success)})
 
 
-@app.route('/')
-def serve_index():
-    """Serve the React frontend."""
-    return send_from_directory(app.static_folder, 'index.html')
+
+
+@app.route('/api/projects/<int:project_id>', methods=['PATCH'])
+def api_update_project(project_id):
+    """Update project details - enhanced for React frontend"""
+    body = request.get_json() or {}
+    
+    # Update project details
+    success = update_project_details(
+        project_id,
+        body.get('start_date'),
+        body.get('end_date'),
+        body.get('status'),
+        body.get('priority'),
+    )
+    
+    # Update folder paths if provided
+    if any(key in body for key in ['folder_path', 'ifc_folder_path', 'data_export_path']):
+        update_project_folders(
+            project_id,
+            body.get('folder_path'),
+            body.get('data_export_path'),
+            body.get('ifc_folder_path'),
+        )
+    
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
+
+
+@app.route('/api/project_details/<int:project_id>', methods=['GET'])
+def api_get_project_details_enhanced(project_id):
+    """Get enhanced project details for React frontend"""
+    try:
+        details = get_project_details(project_id)
+        if details is None:
+            return jsonify({'error': 'project not found'}), 404
+        
+        # Get folder information
+        folder_info = get_project_folders(project_id)
+        
+        # Combine details
+        enhanced_details = {
+            **details,
+            'folder_path': folder_info[0] if folder_info and folder_info[0] else '',
+            'ifc_folder_path': folder_info[1] if folder_info and folder_info[1] else '',
+        }
+        
+        return jsonify(enhanced_details)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+def api_dashboard_stats():
+    """Get dashboard statistics"""
+    try:
+        projects = get_projects_full()
+        
+        stats = {
+            'total_projects': len(projects),
+            'active_projects': len([p for p in projects if p.get('status') == 'Active']),
+            'completed_projects': len([p for p in projects if p.get('status') == 'Completed']),
+            'pending_tasks': 0,  # This would require task counting logic
+            'completed_tasks': 0,  # This would require task counting logic
+        }
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/project_bookmarks/<int:project_id>', methods=['GET', 'POST'])
+def api_project_bookmarks_enhanced(project_id):
+    """Enhanced project bookmarks API"""
+    if request.method == 'GET':
+        try:
+            bookmarks = get_project_bookmarks(project_id)
+            return jsonify(bookmarks or [])
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            body = request.get_json() or {}
+            success = add_bookmark(
+                project_id,
+                body.get('title', ''),
+                body.get('url', ''),
+                body.get('description', ''),
+                body.get('category', 'General')
+            )
+            if success:
+                return jsonify({'success': True}), 201
+            return jsonify({'success': False}), 500
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bookmark/<int:bookmark_id>', methods=['PATCH', 'DELETE'])
+def api_bookmark_operations(bookmark_id):
+    """Bookmark operations - update and delete"""
+    if request.method == 'PATCH':
+        try:
+            body = request.get_json() or {}
+            success = update_bookmark(
+                bookmark_id,
+                body.get('title'),
+                body.get('url'),
+                body.get('description'),
+                body.get('category')
+            )
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            success = delete_bookmark(bookmark_id)
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
+# Task Management API Endpoints
+
+@app.route('/api/tasks', methods=['GET'])
+def api_get_tasks():
+    """Get tasks for a project"""
+    project_id = request.args.get('project_id')
+    if not project_id:
+        return jsonify({'error': 'project_id required'}), 400
+    
+    # For now, return mock data until we implement the full task system
+    mock_tasks = [
+        {
+            'task_id': 1,
+            'task_name': 'Design Review Phase 1',
+            'project_id': project_id,
+            'priority': 'High',
+            'status': 'In Progress',
+            'progress_percentage': 75,
+            'assigned_to': 'John Doe',
+            'start_date': '2024-01-15',
+            'end_date': '2024-01-30',
+            'estimated_hours': 40,
+            'description': 'Complete architectural design review'
+        },
+        {
+            'task_id': 2,
+            'task_name': 'Structural Analysis',
+            'project_id': project_id,
+            'priority': 'Medium',
+            'status': 'Not Started',
+            'progress_percentage': 0,
+            'assigned_to': 'Jane Smith',
+            'start_date': '2024-02-01',
+            'end_date': '2024-02-15',
+            'estimated_hours': 60,
+            'description': 'Perform structural calculations and analysis'
+        }
+    ]
+    
+    return jsonify(mock_tasks)
+
+
+@app.route('/api/tasks', methods=['POST'])
+def api_create_task():
+    """Create a new task"""
+    body = request.get_json() or {}
+    
+    required_fields = ['task_name', 'project_id']
+    if not all(field in body for field in required_fields):
+        return jsonify({'error': 'task_name and project_id are required'}), 400
+    
+    # For now, return success - would integrate with EnhancedTaskManager
+    task_data = {
+        'task_id': 999,  # Mock ID
+        'success': True,
+        **body
+    }
+    
+    return jsonify(task_data), 201
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['PATCH'])
+def api_update_task(task_id):
+    """Update a task"""
+    body = request.get_json() or {}
+    
+    # For now, return success - would integrate with task update logic
+    return jsonify({'success': True, 'task_id': task_id})
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_task(task_id):
+    """Delete a task"""
+    # For now, return success - would integrate with task deletion logic
+    return jsonify({'success': True})
+
+
+@app.route('/api/task_dependencies/<int:task_id>', methods=['GET'])
+def api_get_task_dependencies(task_id):
+    """Get task dependencies"""
+    # Mock dependency data
+    dependencies = [
+        {'predecessor_id': 1, 'successor_id': task_id, 'dependency_type': 'finish_to_start'}
+    ]
+    return jsonify(dependencies)
+
+
+@app.route('/api/resources', methods=['GET'])
+def api_get_resources():
+    """Get available resources/users for task assignment"""
+    # This would typically come from the users table
+    try:
+        users = get_users_list()
+        resources = [{'user_id': uid, 'name': name, 'available': True} for uid, name in users]
+        return jsonify(resources)
+    except Exception as e:
+        # Return mock data if database not available
+        mock_resources = [
+            {'user_id': 1, 'name': 'John Doe', 'available': True},
+            {'user_id': 2, 'name': 'Jane Smith', 'available': True},
+            {'user_id': 3, 'name': 'Mike Johnson', 'available': False},
+        ]
+        return jsonify(mock_resources)
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
