@@ -184,6 +184,13 @@ class Projects:
     PRIORITY = "priority"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+    # New fields added for enhanced project creation
+    AREA_HECTARES = "area_hectares"
+    MW_CAPACITY = "mw_capacity"
+    ADDRESS = "address"
+    CITY = "city"
+    STATE = "state"
+    POSTCODE = "postcode"
 
 
 class ReviewCycles:
@@ -209,6 +216,15 @@ class ReviewCycles:
     NUM_REVIEWS = "num_reviews"
     CREATED_BY = "created_by"
 
+
+class ProjectBookmarks:
+    TABLE = "project_bookmarks"
+    BOOKMARK_ID = "bookmark_id"
+    PROJECT_ID = "project_id"
+    TITLE = "title"
+    URL = "url"
+    DESCRIPTION = "description"
+    CREATED_AT = "created_at"
 
 class ReviewStages:
     TABLE = "ReviewStages"
@@ -252,6 +268,8 @@ class Tasks:
     PROGRESS_PERCENTAGE = "progress_percentage"
     STATUS = "status"
     DESCRIPTION = "description"
+    TASK_TYPE = "task_type"
+    REVIEW_ID = "review_id"
 class Users:
     TABLE = "users"
     ID = "user_id"
@@ -695,4 +713,15 @@ class ServiceScheduleSettings:
     END_DATE = "end_date"
     FREQUENCY = "frequency"
     AUTO_COMPLETE = "auto_complete"
+    UPDATED_AT = "updated_at"
+
+class ProjectBookmarks:
+    TABLE = "ProjectBookmarks"
+    ID = "bookmark_id"
+    PROJECT_ID = "project_id"
+    NAME = "name"
+    URL = "url"
+    DESCRIPTION = "description"
+    CATEGORY = "category"
+    CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"

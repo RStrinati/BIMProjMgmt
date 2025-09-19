@@ -32,10 +32,10 @@ class EnhancedTaskManager:
                 INSERT INTO tasks (
                     task_name, project_id, start_date, end_date, assigned_to, 
                     priority, estimated_hours, predecessor_task_id, progress_percentage,
-                    description, status, created_at, updated_at
+                    description, status, task_type, review_id, created_at, updated_at
                 ) 
                 OUTPUT INSERTED.task_id
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE())
             """, (
                 task_data['task_name'],
                 task_data['project_id'],
@@ -47,7 +47,9 @@ class EnhancedTaskManager:
                 task_data.get('predecessor_task_id'),
                 task_data.get('progress_percentage', 0),
                 task_data.get('description', ''),
-                task_data.get('status', 'Not Started')
+                task_data.get('status', 'Not Started'),
+                task_data.get('task_type', 'General'),
+                task_data.get('review_id')
             ))
             
             task_id = cursor.fetchone()[0]
@@ -201,8 +203,138 @@ class EnhancedTaskManager:
             ]
             
         except Exception as e:
-            print(f"❌ Error getting task hierarchy: {e}")
+            print(f"❌ Error getting project task hierarchy: {e}")
             return []
+        finally:
+            conn.close()
+    
+    def get_project_tasks(self, project_id: int) -> List[Dict]:
+        """Get all tasks for a project with assigned user names"""
+        conn = self.get_connection()
+        if not conn:
+            return []
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    t.task_id, t.task_name, t.start_date, t.end_date, 
+                    t.estimated_hours, t.actual_hours, t.progress_percentage,
+                    t.priority, t.status, t.predecessor_task_id, t.description,
+                    t.task_type, t.review_id, t.cycle_id,
+                    u.name as assigned_to_name, u.user_id as assigned_to,
+                    CASE 
+                        WHEN t.end_date < GETDATE() AND t.progress_percentage < 100 THEN 'Overdue'
+                        WHEN t.end_date <= DATEADD(day, 3, GETDATE()) AND t.progress_percentage < 100 THEN 'Warning'
+                        WHEN t.progress_percentage = 100 THEN 'Complete'
+                        ELSE 'Healthy'
+                    END as health_status
+                FROM tasks t
+                LEFT JOIN users u ON t.assigned_to = u.user_id
+                WHERE t.project_id = ?
+                ORDER BY t.start_date, t.task_id
+            """, (project_id,))
+            
+            tasks = cursor.fetchall()
+            
+            return [
+                {
+                    'task_id': task.task_id,
+                    'task_name': task.task_name,
+                    'start_date': task.start_date,
+                    'end_date': task.end_date,
+                    'estimated_hours': task.estimated_hours or 0,
+                    'actual_hours': task.actual_hours or 0,
+                    'progress_percentage': task.progress_percentage or 0,
+                    'priority': task.priority,
+                    'status': task.status,
+                    'predecessor_task_id': task.predecessor_task_id,
+                    'description': task.description,
+                    'task_type': task.task_type,
+                    'review_id': task.review_id,
+                    'cycle_id': task.cycle_id,
+                    'assigned_to': task.assigned_to,
+                    'assigned_to_name': task.assigned_to_name,
+                    'health_status': task.health_status
+                } for task in tasks
+            ]
+            
+        except Exception as e:
+            print(f"❌ Error getting project tasks: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def get_tasks_by_review(self, review_id: int) -> List[Dict]:
+        """Get all tasks associated with a specific review"""
+        conn = self.get_connection()
+        if not conn:
+            return []
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    t.task_id, t.task_name, t.start_date, t.end_date, 
+                    t.estimated_hours, t.actual_hours, t.progress_percentage,
+                    t.priority, t.status, t.description, t.task_type,
+                    u.name as assigned_to_name, u.user_id as assigned_to
+                FROM tasks t
+                LEFT JOIN users u ON t.assigned_to = u.user_id
+                WHERE t.review_id = ?
+                ORDER BY t.start_date, t.task_id
+            """, (review_id,))
+            
+            tasks = cursor.fetchall()
+            
+            return [
+                {
+                    'task_id': task.task_id,
+                    'task_name': task.task_name,
+                    'start_date': task.start_date,
+                    'end_date': task.end_date,
+                    'estimated_hours': task.estimated_hours or 0,
+                    'actual_hours': task.actual_hours or 0,
+                    'progress_percentage': task.progress_percentage or 0,
+                    'priority': task.priority,
+                    'status': task.status,
+                    'description': task.description,
+                    'task_type': task.task_type,
+                    'assigned_to': task.assigned_to,
+                    'assigned_to_name': task.assigned_to_name
+                } for task in tasks
+            ]
+            
+        except Exception as e:
+            print(f"❌ Error getting tasks by review: {e}")
+            return []
+        finally:
+            conn.close()
+    
+    def assign_review_tasks_to_user(self, review_id: int, user_id: int) -> bool:
+        """Assign all tasks for a review to a specific user"""
+        conn = self.get_connection()
+        if not conn:
+            return False
+        
+        try:
+            cursor = conn.cursor()
+            
+            # Update all tasks for this review
+            cursor.execute("""
+                UPDATE tasks 
+                SET assigned_to = ?, updated_at = GETDATE()
+                WHERE review_id = ?
+            """, (user_id, review_id))
+            
+            conn.commit()
+            print(f"✅ Assigned all tasks for review {review_id} to user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error assigning review tasks: {e}")
+            conn.rollback()
+            return False
         finally:
             conn.close()
     
@@ -370,25 +502,21 @@ class ResourceManager:
         try:
             cursor = conn.cursor()
             
-            # Base query for resource utilization
+            # Base query for resource utilization (simplified without task_assignments table)
             query = """
                 SELECT 
                     u.user_id, u.name, u.role_level, u.weekly_capacity_hours,
                     u.department, u.skills,
-                    COUNT(ta.assignment_id) as active_assignments,
-                    SUM(ta.allocated_hours) as allocated_hours,
-                    SUM(t.estimated_hours) as total_estimated_hours,
-                    SUM(t.actual_hours) as total_actual_hours,
-                    AVG(CAST(t.progress_percentage as FLOAT)) as avg_task_progress
+                    0 as active_assignments,
+                    0 as allocated_hours,
+                    0 as total_estimated_hours,
+                    0 as total_actual_hours,
+                    0 as avg_task_progress
                 FROM users u
-                LEFT JOIN task_assignments ta ON u.user_id = ta.user_id AND ta.is_active = 1
-                LEFT JOIN tasks t ON ta.task_id = t.task_id 
-                    AND t.status NOT IN ('Complete', 'Cancelled')
-                    AND t.start_date <= ? AND t.end_date >= ?
                 WHERE u.is_active = 1
             """
             
-            params = [end_date, start_date]
+            params = []
             
             if user_id:
                 query += " AND u.user_id = ?"

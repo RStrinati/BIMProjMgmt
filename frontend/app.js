@@ -466,7 +466,9 @@ function ServiceSetupTab() {
       })
     })
       .then(() => {
-        fetch(`/api/project_services/${projectId}`).then(r => r.json()).then(setServices);
+        fetch(`/api/project_services/${projectId}`)
+          .then(r => r.json())
+          .then(setServices);
       })
       .catch(() => {});
   };
@@ -736,6 +738,91 @@ function BillingProgressTab() {
   );
 }
 
+function ProjectBookmarksTab({ projectId }) {
+  const [bookmarks, setBookmarks] = React.useState([]);
+  const [title, setTitle] = React.useState("");
+  const [url, setUrl] = React.useState("");
+  const [desc, setDesc] = React.useState("");
+
+  React.useEffect(() => {
+    if (projectId) {
+      fetch(`/api/project/${projectId}/bookmarks`)
+        .then(res => res.json())
+        .then(setBookmarks);
+    } else {
+      setBookmarks([]);
+    }
+  }, [projectId]);
+
+  const addBookmark = () => {
+    if (!title || !url) return;
+    fetch(`/api/project/${projectId}/bookmarks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, url, description: desc })
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          setTitle("");
+          setUrl("");
+          setDesc("");
+          fetch(`/api/project/${projectId}/bookmarks`)
+            .then(res => res.json())
+            .then(setBookmarks);
+        }
+      });
+  };
+
+  const deleteBookmark = (bookmarkId) => {
+    fetch(`/api/project/${projectId}/bookmarks/${bookmarkId}`, {
+      method: "DELETE"
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          setBookmarks(bookmarks.filter(b => b.bookmark_id !== bookmarkId));
+        }
+      });
+  };
+
+  return (
+    <div>
+      <h3>Project Bookmarks</h3>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" style={{ width: 120 }} />
+        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="URL" style={{ width: 220 }} />
+        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" style={{ width: 140 }} />
+        <button onClick={addBookmark}>Add</button>
+      </div>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Title</TableCell>
+              <TableCell>URL</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell>Created</TableCell>
+              <TableCell>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {bookmarks.map(b => (
+              <TableRow key={b.bookmark_id}>
+                <TableCell>{b.title}</TableCell>
+                <TableCell><a href={b.url} target="_blank" rel="noopener noreferrer">{b.url}</a></TableCell>
+                <TableCell>{b.description}</TableCell>
+                <TableCell>{b.created_at}</TableCell>
+                <TableCell><button onClick={() => deleteBookmark(b.bookmark_id)}>Delete</button></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+}
+
 function ReviewsPage() {
   const [tab, setTab] = useState(0);
   return (
@@ -786,6 +873,7 @@ function ProjectsView() {
   const [form, setForm] = useState(empty);
   const [showForm, setShowForm] = useState(false);
   const [refs, setRefs] = useState({});
+  const [tab, setTab] = useState(0);
 
   const refresh = () => {
     fetch('/api/projects').then(res => res.json()).then(setProjects);
@@ -836,69 +924,90 @@ function ProjectsView() {
     </select>
   );
 
+  const selectedProjectId = form.project_id || (projects[0] && projects[0].project_id);
+
   return (
     <div>
-      <button onClick={() => setShowForm(!showForm)}>New Project</button>
-      {showForm && (
-        <div className="new-project-form" style={{ marginTop: '10px' }}>
-          <input placeholder="Project Name" name="project_name" value={form.project_name} onChange={handleChange} />
-          {renderSelect(form.client_id, refs.clients || [], v => setForm({ ...form, client_id: v }))}
-          {renderSelect(form.type_id, refs.project_types || [], v => setForm({ ...form, type_id: v }))}
-          {renderSelect(form.sector_id, refs.sectors || [], v => setForm({ ...form, sector_id: v }))}
-          {renderSelect(form.method_id, refs.delivery_methods || [], v => setForm({ ...form, method_id: v }))}
-          {renderSelect(form.phase_id, refs.project_phases || [], v => setForm({ ...form, phase_id: v }))}
-          {renderSelect(form.stage_id, refs.construction_stages || [], v => setForm({ ...form, stage_id: v }))}
-          <input placeholder="Project Manager" name="project_manager" value={form.project_manager} onChange={handleChange} />
-          <input placeholder="Internal Lead" name="internal_lead" value={form.internal_lead} onChange={handleChange} />
-          <input placeholder="Contract Number" name="contract_number" value={form.contract_number} onChange={handleChange} />
-          <input placeholder="Contract Value" name="contract_value" value={form.contract_value} onChange={handleChange} />
-          <input placeholder="Agreed Fee" name="agreed_fee" value={form.agreed_fee} onChange={handleChange} />
-          <input placeholder="Payment Terms" name="payment_terms" value={form.payment_terms} onChange={handleChange} />
-          <input placeholder="Folder Path" name="folder_path" value={form.folder_path} onChange={handleChange} />
-          <input placeholder="IFC Folder Path" name="ifc_folder_path" value={form.ifc_folder_path} onChange={handleChange} />
-          <input placeholder="Data Export Folder" name="data_export_folder" value={form.data_export_folder} onChange={handleChange} />
-          <input type="date" name="start_date" value={form.start_date} onChange={handleChange} />
-          <input type="date" name="end_date" value={form.end_date} onChange={handleChange} />
-          {renderSelect(form.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => setForm({ ...form, status: v }))}
-          {renderSelect(form.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => setForm({ ...form, priority: v }))}
-          <button onClick={createProject}>Save</button>
-        </div>
-      )}
+      <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+        <Tab label="Project Details" />
+        <Tab label="Bookmarks" />
+        <Tab label="Service Setup" />
+        <Tab label="Review Planning" />
+        <Tab label="Review Execution & Tracking" />
+        <Tab label="Billing & Progress" />
+      </Tabs>
+      <Box sx={{ p: 2 }}>
+        {tab === 0 && (
+          <div>
+            <button onClick={() => setShowForm(!showForm)}>New Project</button>
+            {showForm && (
+              <div className="new-project-form" style={{ marginTop: '10px' }}>
+                <input placeholder="Project Name" name="project_name" value={form.project_name} onChange={handleChange} />
+                {renderSelect(form.client_id, refs.clients || [], v => setForm({ ...form, client_id: v }))}
+                {renderSelect(form.type_id, refs.project_types || [], v => setForm({ ...form, type_id: v }))}
+                {renderSelect(form.sector_id, refs.sectors || [], v => setForm({ ...form, sector_id: v }))}
+                {renderSelect(form.method_id, refs.delivery_methods || [], v => setForm({ ...form, method_id: v }))}
+                {renderSelect(form.phase_id, refs.project_phases || [], v => setForm({ ...form, phase_id: v }))}
+                {renderSelect(form.stage_id, refs.construction_stages || [], v => setForm({ ...form, stage_id: v }))}
+                <input placeholder="Project Manager" name="project_manager" value={form.project_manager} onChange={handleChange} />
+                <input placeholder="Internal Lead" name="internal_lead" value={form.internal_lead} onChange={handleChange} />
+                <input placeholder="Contract Number" name="contract_number" value={form.contract_number} onChange={handleChange} />
+                <input placeholder="Contract Value" name="contract_value" value={form.contract_value} onChange={handleChange} />
+                <input placeholder="Agreed Fee" name="agreed_fee" value={form.agreed_fee} onChange={handleChange} />
+                <input placeholder="Payment Terms" name="payment_terms" value={form.payment_terms} onChange={handleChange} />
+                <input placeholder="Folder Path" name="folder_path" value={form.folder_path} onChange={handleChange} />
+                <input placeholder="IFC Folder Path" name="ifc_folder_path" value={form.ifc_folder_path} onChange={handleChange} />
+                <input placeholder="Data Export Folder" name="data_export_folder" value={form.data_export_folder} onChange={handleChange} />
+                <input type="date" name="start_date" value={form.start_date} onChange={handleChange} />
+                <input type="date" name="end_date" value={form.end_date} onChange={handleChange} />
+                {renderSelect(form.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => setForm({ ...form, status: v }))}
+                {renderSelect(form.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => setForm({ ...form, priority: v }))}
+                <button onClick={createProject}>Save</button>
+              </div>
+            )}
 
-      <table border="1" cellPadding="4" style={{ marginTop: '10px' }}>
-        <thead>
-          <tr>
-            <th>Project Name</th>
-            <th>Client</th>
-            <th>Project Type</th>
-            <th>Sector</th>
-            <th>Delivery Method</th>
-            <th>Phase</th>
-            <th>Stage</th>
-            <th>Project Manager</th>
-            <th>Internal Lead</th>
-            <th>Status</th>
-            <th>Priority</th>
-          </tr>
-        </thead>
-        <tbody>
-          {projects.map(p => (
-            <tr key={p.project_id}>
-              <td><input value={p.project_name || ''} onChange={e => updateProject(p.project_id, 'project_name', e.target.value)} /></td>
-              <td>{renderSelect(p.client_id, refs.clients || [], v => updateProject(p.project_id, 'client_id', v))}</td>
-              <td>{renderSelect(p.type_id, refs.project_types || [], v => updateProject(p.project_id, 'type_id', v))}</td>
-              <td>{renderSelect(p.sector_id, refs.sectors || [], v => updateProject(p.project_id, 'sector_id', v))}</td>
-              <td>{renderSelect(p.method_id, refs.delivery_methods || [], v => updateProject(p.project_id, 'method_id', v))}</td>
-              <td>{renderSelect(p.phase_id, refs.project_phases || [], v => updateProject(p.project_id, 'phase_id', v))}</td>
-              <td>{renderSelect(p.stage_id, refs.construction_stages || [], v => updateProject(p.project_id, 'stage_id', v))}</td>
-              <td><input value={p.project_manager || ''} onChange={e => updateProject(p.project_id, 'project_manager', e.target.value)} /></td>
-              <td><input value={p.internal_lead || ''} onChange={e => updateProject(p.project_id, 'internal_lead', e.target.value)} /></td>
-              <td>{renderSelect(p.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => updateProject(p.project_id, 'status', v))}</td>
-              <td>{renderSelect(p.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => updateProject(p.project_id, 'priority', v))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            <table border="1" cellPadding="4" style={{ marginTop: '10px' }}>
+              <thead>
+                <tr>
+                  <th>Project Name</th>
+                  <th>Client</th>
+                  <th>Project Type</th>
+                  <th>Sector</th>
+                  <th>Delivery Method</th>
+                  <th>Phase</th>
+                  <th>Stage</th>
+                  <th>Project Manager</th>
+                  <th>Internal Lead</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map(p => (
+                  <tr key={p.project_id}>
+                    <td><input value={p.project_name || ''} onChange={e => updateProject(p.project_id, 'project_name', e.target.value)} /></td>
+                    <td>{renderSelect(p.client_id, refs.clients || [], v => updateProject(p.project_id, 'client_id', v))}</td>
+                    <td>{renderSelect(p.type_id, refs.project_types || [], v => updateProject(p.project_id, 'type_id', v))}</td>
+                    <td>{renderSelect(p.sector_id, refs.sectors || [], v => updateProject(p.project_id, 'sector_id', v))}</td>
+                    <td>{renderSelect(p.method_id, refs.delivery_methods || [], v => updateProject(p.project_id, 'method_id', v))}</td>
+                    <td>{renderSelect(p.phase_id, refs.project_phases || [], v => updateProject(p.project_id, 'phase_id', v))}</td>
+                    <td>{renderSelect(p.stage_id, refs.construction_stages || [], v => updateProject(p.project_id, 'stage_id', v))}</td>
+                    <td><input value={p.project_manager || ''} onChange={e => updateProject(p.project_id, 'project_manager', e.target.value)} /></td>
+                    <td><input value={p.internal_lead || ''} onChange={e => updateProject(p.project_id, 'internal_lead', e.target.value)} /></td>
+                    <td>{renderSelect(p.status, [{ name: 'Planning' }, { name: 'Active' }, { name: 'On Hold' }, { name: 'Complete' }], v => updateProject(p.project_id, 'status', v))}</td>
+                    <td>{renderSelect(p.priority, [{ name: 'Low' }, { name: 'Medium' }, { name: 'High' }], v => updateProject(p.project_id, 'priority', v))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {tab === 1 && <ProjectBookmarksTab projectId={selectedProjectId} />}
+        {tab === 2 && <ServiceSetupTab />}
+        {tab === 3 && <ReviewPlanningTab />}
+        {tab === 4 && <ReviewExecutionTab />}
+        {tab === 5 && <BillingProgressTab />}
+      </Box>
     </div>
   );
 }

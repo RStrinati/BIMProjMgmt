@@ -25,6 +25,7 @@ def main():
             ReviewManagementTab,
             DocumentManagementTab,
             ProjectSetupTab,
+            ProjectBookmarksTab,
         )
 
         # Create main window
@@ -54,6 +55,9 @@ def main():
 
         logger.info("Creating Document Management tab...")
         DocumentManagementTab(notebook)
+
+        logger.info("Creating Project Bookmarks tab...")
+        ProjectBookmarksTab(notebook)
 
         logger.info("UI initialized successfully! Starting main loop...")
         root.mainloop()

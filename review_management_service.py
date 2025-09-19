@@ -1818,742 +1818,196 @@ class ReviewManagementService:
             print(f"Error generating stage schedule: {e}")
 
             return False
-
     
-
-    def get_service_reviews(self, project_id: int = None, cycle_id: str = None) -> List[Dict]:
-
-        """Get service reviews for a project or specific cycle"""
-
+    def get_project_reviews(self, project_id: int) -> List[Dict]:
+        """Get all reviews for a project"""
         try:
-
-            if project_id and cycle_id:
-
-                # Get reviews for specific project and cycle
-
-                query = """
-
-                SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date as due_date,
-
-                       sr.status, 'Unassigned' as assignee, 0 as progress, sr.evidence_links
-
-                FROM ServiceReviews sr
-
-                JOIN ProjectServices ps ON ps.service_id = sr.service_id
-
-                WHERE ps.project_id = ? AND sr.cycle_no = ?
-
-                ORDER BY sr.planned_date
-
-                """
-
-                self.cursor.execute(query, (project_id, cycle_id))
-
-            elif project_id:
-
-                # Get all reviews for project
-
-                query = """
-
-                SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date as due_date,
-
-                       sr.status, 'Unassigned' as assignee, 0 as progress, sr.evidence_links
-
-                FROM ServiceReviews sr
-
-                JOIN ProjectServices ps ON ps.service_id = sr.service_id
-
-                WHERE ps.project_id = ?
-
-                ORDER BY sr.planned_date
-
-                """
-
-                self.cursor.execute(query, (project_id,))
-
-            else:
-
-                return []
-
+            self.cursor.execute("""
+                SELECT 
+                    rs.schedule_id, rs.review_date, rs.assigned_to, rs.status,
+                    rs.cycle_id, rs.is_within_license_period, rs.is_blocked,
+                    u.name as assigned_name,
+                    c.cycle_number
+                FROM ReviewSchedule rs
+                LEFT JOIN users u ON rs.assigned_to = u.user_id
+                LEFT JOIN project_review_cycles c ON rs.cycle_id = c.cycle_id
+                WHERE rs.project_id = ?
+                ORDER BY rs.review_date
+            """, (project_id,))
             
-
-            rows = self.cursor.fetchall()
-
-            columns = [desc[0] for desc in self.cursor.description]
-
-            return [dict(zip(columns, row)) for row in rows]
-
+            reviews = self.cursor.fetchall()
             
-
+            return [
+                {
+                    'schedule_id': review.schedule_id,
+                    'review_date': review.review_date,
+                    'assigned_to': review.assigned_to,
+                    'assigned_name': review.assigned_name,
+                    'status': review.status,
+                    'cycle_id': review.cycle_id,
+                    'cycle_number': review.cycle_number,
+                    'is_within_license_period': review.is_within_license_period,
+                    'is_blocked': review.is_blocked
+                } for review in reviews
+            ]
+            
         except Exception as e:
-
-            print(f"Error getting service reviews: {e}")
-
+            print(f"Error getting project reviews: {e}")
             return []
-
     
-
-    def get_service_reviews_old(self, service_id: int) -> List[Dict]:
-
-        """Get all reviews for a service"""
-
-        query = """
-
-        SELECT review_id, service_id, cycle_no, planned_date, due_date,
-
-               disciplines, deliverables, status, weight_factor,
-
-               evidence_links, actual_issued_at
-
-        FROM ServiceReviews 
-
-        WHERE service_id = ?
-
-        ORDER BY cycle_no
-
-        """
-
-        
-
-        self.cursor.execute(query, (service_id,))
-
-        rows = self.cursor.fetchall()
-
-        
-
-        columns = [desc[0] for desc in self.cursor.description]
-
-        return [dict(zip(columns, row)) for row in rows]
-
-    
-
-    def get_last_claimed_percentage(self, service_id: int, exclude_claim_id: int = None) -> float:
-
-        """Get the last claimed percentage for a service"""
-
-        query = """
-
-        SELECT curr_pct 
-
-        FROM BillingClaimLines bcl
-
-        JOIN BillingClaims bc ON bc.claim_id = bcl.claim_id
-
-        WHERE bcl.service_id = ?
-
-        """
-
-        params = [service_id]
-
-        
-
-        if exclude_claim_id:
-
-            query += " AND bcl.claim_id != ?"
-
-            params.append(exclude_claim_id)
-
-        
-
-        query += " ORDER BY bc.created_at DESC LIMIT 1"
-
-        
-
-        self.cursor.execute(query, params)
-
-        result = self.cursor.fetchone()
-
-        return result[0] if result else 0.0
-
-    
-
-    def load_template(self, template_name: str) -> Dict:
-
-        """Load service template from JSON file"""
-
+    def get_review_details(self, review_id: int) -> Optional[Dict]:
+        """Get detailed information for a specific review"""
         try:
-
-            templates_path = os.path.join(os.path.dirname(__file__), 'templates', 'service_templates.json')
-
-            with open(templates_path, 'r', encoding='utf-8') as f:
-
-                data = json.load(f)
-
+            self.cursor.execute("""
+                SELECT 
+                    rs.schedule_id, rs.project_id, rs.review_date, rs.assigned_to, 
+                    rs.status, rs.cycle_id, rs.is_within_license_period, rs.is_blocked,
+                    rs.manual_override,
+                    u.name as assigned_name,
+                    p.project_name,
+                    c.cycle_number
+                FROM ReviewSchedule rs
+                LEFT JOIN users u ON rs.assigned_to = u.user_id
+                LEFT JOIN projects p ON rs.project_id = p.project_id
+                LEFT JOIN project_review_cycles c ON rs.cycle_id = c.cycle_id
+                WHERE rs.schedule_id = ?
+            """, (review_id,))
             
-
-            for template in data['templates']:
-
-                if template['name'] == template_name:
-
-                    return template
-
+            review = self.cursor.fetchone()
             
-
+            if review:
+                return {
+                    'schedule_id': review.schedule_id,
+                    'project_id': review.project_id,
+                    'project_name': review.project_name,
+                    'review_date': review.review_date,
+                    'assigned_to': review.assigned_to,
+                    'assigned_name': review.assigned_name,
+                    'status': review.status,
+                    'cycle_id': review.cycle_id,
+                    'cycle_number': review.cycle_number,
+                    'is_within_license_period': review.is_within_license_period,
+                    'is_blocked': review.is_blocked,
+                    'manual_override': review.manual_override
+                }
             return None
-
             
-
+        except Exception as e:
+            print(f"Error getting review details: {e}")
+            return None
+    
+    def update_review_assignment(self, review_id: int, user_id: int) -> bool:
+        """Update the assigned user for a review"""
+        try:
+            self.cursor.execute("""
+                UPDATE ReviewSchedule 
+                SET assigned_to = ?, manual_override = 1
+                WHERE schedule_id = ?
+            """, (user_id, review_id))
+            
+            self.db.commit()
+            print(f"✅ Review {review_id} assigned to user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"Error updating review assignment: {e}")
+            self.db.rollback()
+            return False
+    
+    def get_project_details(self, project_id: int) -> Optional[Dict]:
+        """Get project details including manager and lead"""
+        try:
+            self.cursor.execute("""
+                SELECT 
+                    p.project_id, p.project_name, p.project_manager, p.internal_lead,
+                    pm.name as project_manager_name, il.name as internal_lead_name
+                FROM projects p
+                LEFT JOIN users pm ON p.project_manager = pm.user_id
+                LEFT JOIN users il ON p.internal_lead = il.user_id
+                WHERE p.project_id = ?
+            """, (project_id,))
+            
+            project = self.cursor.fetchone()
+            
+            if project:
+                return {
+                    'project_id': project.project_id,
+                    'project_name': project.project_name,
+                    'project_manager': project.project_manager,
+                    'project_manager_name': project.project_manager_name,
+                    'internal_lead': project.internal_lead,
+                    'internal_lead_name': project.internal_lead_name
+                }
+            return None
+            
+        except Exception as e:
+            print(f"Error getting project details: {e}")
+            return None
         except Exception as e:
 
-            print(f"Error loading template: {e}")
+            print(f"Error generating stage schedule: {e}")
 
-            return None
+            return False
 
-    
+    def get_service_reviews(self, project_id: int, cycle_id: int = None) -> List[Dict]:
+        """Get review cycles for a project, optionally filtered by cycle_id"""
+        try:
+            if cycle_id:
+                # Get reviews for a specific cycle
+                self.cursor.execute("""
+                    SELECT DISTINCT c.cycle_id, c.cycle_number, c.planned_start_date, c.actual_start_date,
+                           c.planned_end_date, c.actual_end_date, c.status
+                    FROM project_review_cycles c
+                    WHERE c.project_id = ? AND c.cycle_id = ?
+                    ORDER BY c.cycle_number
+                """, (project_id, cycle_id))
+            else:
+                # Get all review cycles for the project
+                self.cursor.execute("""
+                    SELECT c.cycle_id, c.cycle_number, c.planned_start_date, c.actual_start_date,
+                           c.planned_end_date, c.actual_end_date, c.status
+                    FROM project_review_cycles c
+                    WHERE c.project_id = ?
+                    ORDER BY c.cycle_number
+                """, (project_id,))
+            
+            cycles = self.cursor.fetchall()
+            return [
+                {
+                    'cycle_id': cycle.cycle_id,
+                    'cycle_number': cycle.cycle_number,
+                    'planned_start_date': cycle.planned_start_date,
+                    'actual_start_date': cycle.actual_start_date,
+                    'planned_end_date': cycle.planned_end_date,
+                    'actual_end_date': cycle.actual_end_date,
+                    'status': cycle.status
+                }
+                for cycle in cycles
+            ]
+        except Exception as e:
+            print(f"Error getting service reviews: {e}")
+            return []
 
     def get_available_templates(self) -> List[Dict]:
-
-        """Get list of available service templates"""
-
+        """Get available review templates"""
         try:
-
-            templates_path = os.path.join(os.path.dirname(__file__), 'templates', 'service_templates.json')
-
-            with open(templates_path, 'r', encoding='utf-8') as f:
-
-                data = json.load(f)
-
+            self.cursor.execute("""
+                SELECT template_id, name, sector, description
+                FROM review_templates
+                ORDER BY sector, name
+            """)
             
-
-            return [{'name': t['name'], 'sector': t['sector'], 'notes': t.get('notes', '')} 
-
-                   for t in data['templates']]
-
-            
-
-        except Exception as e:
-
-            print(f"Error getting templates: {e}")
-
-            return []
-
-    
-
-    def delete_project_service(self, service_id: int) -> bool:
-
-        """Delete a specific project service"""
-
-        try:
-
-            query = "DELETE FROM ProjectServices WHERE service_id = ?"
-
-            self.cursor.execute(query, (service_id,))
-
-            self.db.commit()
-
-            
-
-            # Check if any rows were affected
-
-            return self.cursor.rowcount > 0
-
-            
-
-        except Exception as e:
-
-            print(f"Error deleting service: {e}")
-
-            return False
-
-    
-
-    def clear_all_project_services(self, project_id: int) -> int:
-
-        """Clear all services for a project"""
-
-        try:
-
-            # Get count before deletion for confirmation
-
-            count_query = "SELECT COUNT(*) FROM ProjectServices WHERE project_id = ?"
-
-            self.cursor.execute(count_query, (project_id,))
-
-            count = self.cursor.fetchone()[0]
-
-            
-
-            # Delete all services for the project
-
-            delete_query = "DELETE FROM ProjectServices WHERE project_id = ?"
-
-            self.cursor.execute(delete_query, (project_id,))
-
-            self.db.commit()
-
-            
-
-            return count
-
-            
-
-        except Exception as e:
-
-            print(f"Error clearing services: {e}")
-
-            return 0
-
-    
-
-    def update_project_service(self, service_id: int, service_data: Dict) -> bool:
-
-        """Update a project service with new data"""
-
-        try:
-
-            query = """
-
-            UPDATE ProjectServices SET
-
-                phase = ?, service_code = ?, service_name = ?, unit_type = ?,
-
-                unit_qty = ?, unit_rate = ?, lump_sum_fee = ?, agreed_fee = ?,
-
-                bill_rule = ?, status = ?, progress_pct = ?, claimed_to_date = ?,
-
-                notes = ?, updated_at = GETDATE()
-
-            WHERE service_id = ?
-
-            """
-
-            
-
-            params = (
-
-                service_data.get('phase'),
-
-                service_data.get('service_code'),
-
-                service_data.get('service_name'),
-
-                service_data.get('unit_type'),
-
-                service_data.get('unit_qty'),
-
-                service_data.get('unit_rate'),
-
-                service_data.get('lump_sum_fee'),
-
-                service_data.get('agreed_fee'),
-
-                service_data.get('bill_rule'),
-
-                service_data.get('status'),
-
-                service_data.get('progress_pct'),
-
-                service_data.get('claimed_to_date'),
-
-                service_data.get('notes'),
-
-                service_id
-
-            )
-
-            
-
-            self.cursor.execute(query, params)
-
-            self.db.commit()
-
-            
-
-            # Check if any rows were affected
-
-            return self.cursor.rowcount > 0
-
-            
-
-        except Exception as e:
-
-            print(f"Error updating service: {e}")
-
-            return False
-
-    
-
-    def update_service_progress(self, service_id: int) -> float:
-
-        """Update and return service progress percentage"""
-
-        try:
-
-            # Get service details
-
-            query = "SELECT unit_type FROM ProjectServices WHERE service_id = ?"
-
-            self.cursor.execute(query, (service_id,))
-
-            result = self.cursor.fetchone()
-
-            
-
-            if not result:
-
-                return 0.0
-
-            
-
-            unit_type = result[0]
-
-            progress_pct = 0.0
-
-            
-
-            if unit_type == 'review':
-
-                # Calculate based on completed reviews
-
-                query = """
-
-                SELECT 
-
-                    SUM(CASE WHEN status IN ('report_issued', 'closed') THEN weight_factor ELSE 0 END) as completed,
-
-                    SUM(weight_factor) as total
-
-                FROM ServiceReviews 
-
-                WHERE service_id = ?
-
-                """
-
-                self.cursor.execute(query, (service_id,))
-
-                result = self.cursor.fetchone()
-
-                
-
-                if result and result[1] > 0:
-
-                    progress_pct = (result[0] / result[1]) * 100
-
-            
-
-            elif unit_type == 'audit':
-
-                # Check if deliverable is issued
-
-                query = """
-
-                SELECT COUNT(*) FROM ServiceDeliverables 
-
-                WHERE service_id = ? AND status = 'issued'
-
-                """
-
-                self.cursor.execute(query, (service_id,))
-
-                result = self.cursor.fetchone()
-
-                progress_pct = 100.0 if result and result[0] > 0 else 0.0
-
-            
-
-            # Update progress in database
-
-            query = "UPDATE ProjectServices SET progress_pct = ? WHERE service_id = ?"
-
-            self.cursor.execute(query, (progress_pct, service_id))
-
-            self.db.commit()
-
-            
-
-            return progress_pct
-
-            
-
-        except Exception as e:
-
-            print(f"Error updating service progress: {e}")
-
-            return 0.0
-
-    
-
-    def delete_all_project_reviews(self, project_id: int) -> Dict[str, int]:
-
-        """Delete all reviews and auto-generated services for a project"""
-
-        try:
-
-            # Get count before deletion
-
-            count_reviews_query = """
-
-            SELECT COUNT(*) FROM ServiceReviews sr
-
-            JOIN ProjectServices ps ON ps.service_id = sr.service_id
-
-            WHERE ps.project_id = ?
-
-            """
-
-            self.cursor.execute(count_reviews_query, (project_id,))
-
-            review_count = self.cursor.fetchone()[0]
-
-            
-
-            count_services_query = """
-
-            SELECT COUNT(*) FROM ProjectServices 
-
-            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
-
-            """
-
-            self.cursor.execute(count_services_query, (project_id,))
-
-            service_count = self.cursor.fetchone()[0]
-
-            
-
-            # Delete reviews (CASCADE should handle this, but be explicit)
-
-            delete_reviews_query = """
-
-            DELETE sr FROM ServiceReviews sr
-
-            JOIN ProjectServices ps ON ps.service_id = sr.service_id
-
-            WHERE ps.project_id = ?
-
-            """
-
-            self.cursor.execute(delete_reviews_query, (project_id,))
-
-            
-
-            # Delete auto-generated services
-
-            delete_services_query = """
-
-            DELETE FROM ProjectServices 
-
-            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
-
-            """
-
-            self.cursor.execute(delete_services_query, (project_id,))
-
-            
-
-            self.db.commit()
-
-            
-
-            return {
-
-                'reviews_deleted': review_count,
-
-                'services_deleted': service_count
-
-            }
-
-            
-
-        except Exception as e:
-
-            print(f"Error deleting all project reviews: {e}")
-
-            self.db.rollback()
-
-            return {'reviews_deleted': 0, 'services_deleted': 0}
-
-
-
-
-
-class ClaimExporter:
-
-    """Export claims to various formats"""
-
-    
-
-    @staticmethod
-
-    def export_to_csv(claim_data: Dict, filepath: str) -> bool:
-
-        """Export claim to CSV format"""
-
-        try:
-
-            import csv
-
-            
-
-            with open(filepath, 'w', newline='') as csvfile:
-
-                writer = csv.writer(csvfile)
-
-                
-
-                # Header
-
-                writer.writerow(['Stage/Phase', 'Service', 'Previous %', 'Current %', 
-
-                               'Delta %', 'Amount This Claim'])
-
-                
-
-                # Lines
-
-                for line in claim_data.get('lines', []):
-
-                    delta = line['curr_pct'] - line['prev_pct']
-
-                    writer.writerow([
-
-                        line['stage_label'],
-
-                        line.get('service_name', ''),
-
-                        f"{line['prev_pct']:.2f}%",
-
-                        f"{line['curr_pct']:.2f}%",
-
-                        f"{delta:.2f}%",
-
-                        f"${line['amount_this_claim']:,.2f}"
-
-                    ])
-
-                
-
-                # Total
-
-                writer.writerow([])
-
-                writer.writerow(['TOTAL', '', '', '', '', 
-
-                               f"${claim_data.get('total_amount', 0):,.2f}"])
-
-            
-
-            return True
-
-            
-
-        except Exception as e:
-
-            print(f"Error exporting to CSV: {e}")
-
-            return False
-
-    
-
-    def generate_stage_schedule(self, project_id: int, stages: List[Dict]) -> bool:
-
-        """Generate review schedule from stage definitions using modern schema"""
-
-        try:
-
-            reviews_created = 0
-
-            
-
-            for stage in stages:
-
-                stage_name = stage.get('stage_name', 'Unknown Stage')
-
-                start_date = stage.get('start_date')
-
-                end_date = stage.get('end_date') 
-
-                num_reviews = int(stage.get('num_reviews', 0))
-
-                frequency = stage.get('frequency', 'weekly')
-
-                
-
-                # Convert dates if they're strings
-
-                if isinstance(start_date, str):
-
-                    start_date = datetime.strptime(start_date, '%Y-%m-%d')
-
-                if isinstance(end_date, str):
-
-                    end_date = datetime.strptime(end_date, '%Y-%m-%d')
-
-                
-
-                if num_reviews <= 0:
-
-                    continue
-
-                
-
-                # Create a virtual service for this stage
-
-                service_data = {
-
-                    'project_id': project_id,
-
-                    'phase': stage_name,
-
-                    'service_code': 'STAGE_REVIEW',
-
-                    'service_name': f'{stage_name} Reviews',
-
-                    'unit_type': 'review',
-
-                    'unit_qty': num_reviews,
-
-                    'unit_rate': 0.0,
-
-                    'status': 'active'
-
+            templates = self.cursor.fetchall()
+            return [
+                {
+                    'template_id': template.template_id,
+                    'name': template.name,
+                    'sector': template.sector,
+                    'description': template.description
                 }
-
-                
-
-                service_id = self.create_project_service(service_data)
-
-                
-
-                if service_id:
-
-                    # Generate review cycles for this service
-
-                    cycles = self.generate_review_cycles(
-
-                        service_id=service_id,
-
-                        unit_qty=num_reviews,
-
-                        start_date=start_date,
-
-                        end_date=end_date,
-
-                        cadence=frequency,
-
-                        disciplines=stage_name
-
-                    )
-
-                    reviews_created += len(cycles)
-
-            
-
-            return reviews_created > 0
-
-            
-
+                for template in templates
+            ]
         except Exception as e:
-
-            print(f"Error generating stage schedule: {e}")
-
-            return False
-
-            
-
-        except Exception as e:
-
-            print(f"Error generating stage schedule: {e}")
-
-            return False
+            print(f"Error getting available templates: {e}")
+            return []
 

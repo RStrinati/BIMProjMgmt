@@ -1378,6 +1378,175 @@ def get_available_clients():
         conn.close()
 
 
+def get_available_project_types():
+    """Return list of all available project types."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ProjectTypes.TYPE_ID}, {S.ProjectTypes.TYPE_NAME}
+            FROM dbo.{S.ProjectTypes.TABLE}
+            ORDER BY {S.ProjectTypes.TYPE_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching project types: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_available_sectors():
+    """Return list of all available sectors."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.Sectors.SECTOR_ID}, {S.Sectors.SECTOR_NAME}
+            FROM dbo.{S.Sectors.TABLE}
+            ORDER BY {S.Sectors.SECTOR_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching sectors: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_available_delivery_methods():
+    """Return list of all available delivery methods."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.DeliveryMethods.DELIVERY_METHOD_ID}, {S.DeliveryMethods.DELIVERY_METHOD_NAME}
+            FROM dbo.{S.DeliveryMethods.TABLE}
+            ORDER BY {S.DeliveryMethods.DELIVERY_METHOD_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching delivery methods: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_available_construction_phases():
+    """Return list of all available construction phases."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ProjectPhases.PROJECT_PHASE_ID}, {S.ProjectPhases.PROJECT_PHASE_NAME}
+            FROM dbo.{S.ProjectPhases.TABLE}
+            ORDER BY {S.ProjectPhases.PROJECT_PHASE_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching construction phases: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_available_construction_stages():
+    """Return list of all available construction stages."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ConstructionStages.CONSTRUCTION_STAGE_ID}, {S.ConstructionStages.CONSTRUCTION_STAGE_NAME}
+            FROM dbo.{S.ConstructionStages.TABLE}
+            ORDER BY {S.ConstructionStages.CONSTRUCTION_STAGE_NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching construction stages: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_available_users():
+    """Return list of all available users for project managers and leads."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.Users.ID}, {S.Users.NAME}, {S.Users.EMAIL}
+            FROM dbo.{S.Users.TABLE}
+            ORDER BY {S.Users.NAME};
+            """
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Error fetching users: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def insert_client(client_data):
+    """Insert a new client into the database."""
+    conn = connect_to_db("ProjectManagement")
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            INSERT INTO {S.Clients.TABLE} (
+                {S.Clients.CLIENT_NAME}, {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
+                {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS}, {S.Clients.CITY},
+                {S.Clients.STATE}, {S.Clients.POSTCODE}, {S.Clients.COUNTRY}
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                client_data.get('name', ''),
+                client_data.get('contact_name', ''),
+                client_data.get('contact_email', ''),
+                client_data.get('contact_phone', ''),
+                client_data.get('address', ''),
+                client_data.get('city', ''),
+                client_data.get('state', ''),
+                client_data.get('postcode', ''),
+                client_data.get('country', '')
+            )
+        )
+        conn.commit()
+        print(f"✅ Client '{client_data.get('name')}' created successfully")
+        return True
+    except Exception as e:
+        print(f"❌ Error creating client: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 def assign_client_to_project(project_id, client_id):
     """Assign a client to a project by updating the project's client_id."""
     conn = connect_to_db("ProjectManagement")
@@ -1495,6 +1664,9 @@ def insert_project_full(data):
             S.Projects.CONTRACT_VALUE,
             S.Projects.AGREED_FEE,
             S.Projects.PRIORITY,
+            # New numeric fields added for enhanced project creation
+            S.Projects.AREA_HECTARES,
+            S.Projects.MW_CAPACITY,
         }
 
         values = []
@@ -1543,6 +1715,235 @@ def update_project_record(project_id, data):
     finally:
         conn.close()
         
+# ===================== Project Bookmarks Functions =====================
+
+def get_project_bookmarks(project_id):
+    """Get all bookmarks for a specific project."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ProjectBookmarks.ID}, {S.ProjectBookmarks.NAME}, 
+                   {S.ProjectBookmarks.URL}, {S.ProjectBookmarks.DESCRIPTION}, 
+                   {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.CREATED_AT}
+            FROM {S.ProjectBookmarks.TABLE} 
+            WHERE {S.ProjectBookmarks.PROJECT_ID} = ?
+            ORDER BY {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.NAME}
+            """,
+            (project_id,)
+        )
+        bookmarks = []
+        for row in cursor.fetchall():
+            bookmarks.append({
+                'id': row[0],
+                'name': row[1],
+                'url': row[2],
+                'description': row[3],
+                'category': row[4],
+                'created_at': row[5]
+            })
+        return bookmarks
+    except Exception as e:
+        print(f"❌ Error fetching bookmarks: {e}")
+        return []
+    finally:
+        conn.close()
+
+def add_bookmark(project_id, name, url, description="", category="General"):
+    """Add a new bookmark for a project."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        cursor.execute(
+            f"""
+            INSERT INTO {S.ProjectBookmarks.TABLE} (
+                {S.ProjectBookmarks.PROJECT_ID}, {S.ProjectBookmarks.NAME}, 
+                {S.ProjectBookmarks.URL}, {S.ProjectBookmarks.DESCRIPTION}, 
+                {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.CREATED_AT}
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (project_id, name, url, description, category, created_at)
+        )
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error adding bookmark: {e}")
+        return False
+    finally:
+        conn.close()
+
+def update_bookmark(bookmark_id, name=None, url=None, description=None, category=None):
+    """Update an existing bookmark."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Build dynamic update query
+        update_fields = {}
+        if name is not None:
+            update_fields[S.ProjectBookmarks.NAME] = name
+        if url is not None:
+            update_fields[S.ProjectBookmarks.URL] = url
+        if description is not None:
+            update_fields[S.ProjectBookmarks.DESCRIPTION] = description
+        if category is not None:
+            update_fields[S.ProjectBookmarks.CATEGORY] = category
+            
+        if not update_fields:
+            return False
+            
+        set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+        values = list(update_fields.values()) + [bookmark_id]
+        
+        cursor.execute(
+            f"UPDATE {S.ProjectBookmarks.TABLE} SET {set_clause} WHERE {S.ProjectBookmarks.ID} = ?",
+            values
+        )
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating bookmark: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_bookmark(bookmark_id):
+    """Delete a bookmark by ID."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"DELETE FROM {S.ProjectBookmarks.TABLE} WHERE {S.ProjectBookmarks.ID} = ?",
+            (bookmark_id,)
+        )
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error deleting bookmark: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_bookmark_categories(project_id):
+    """Get distinct categories for a project's bookmarks."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT DISTINCT {S.ProjectBookmarks.CATEGORY}
+            FROM {S.ProjectBookmarks.TABLE} 
+            WHERE {S.ProjectBookmarks.PROJECT_ID} = ?
+            ORDER BY {S.ProjectBookmarks.CATEGORY}
+            """,
+            (project_id,)
+        )
+        categories = [row[0] for row in cursor.fetchall()]
+        return categories
+    except Exception as e:
+        print(f"❌ Error fetching bookmark categories: {e}")
+        return []
+    finally:
+        conn.close()
+        
+def delete_project(project_id):
+    """Delete a project and all related data from the database."""
+    conn = connect_to_db()
+    if conn is None:
+        print("❌ Database connection failed.")
+        return False
+
+    try:
+        cursor = conn.cursor()
+        
+        # Delete in order of dependencies (child tables first)
+        
+        # Project-specific documents and clauses
+        cursor.execute(f"DELETE FROM {S.ProjectClauses.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectSections.TABLE} ps INNER JOIN {S.ProjectDocuments.TABLE} pd ON ps.{S.ProjectSections.PROJECT_DOCUMENT_ID} = pd.{S.ProjectDocuments.PROJECT_DOCUMENT_ID} WHERE {S.ProjectClauses.TABLE}.{S.ProjectClauses.PROJECT_SECTION_ID} = ps.{S.ProjectSections.PROJECT_SECTION_ID} AND pd.{S.ProjectDocuments.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectSections.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectDocuments.TABLE} pd WHERE {S.ProjectSections.TABLE}.{S.ProjectSections.PROJECT_DOCUMENT_ID} = pd.{S.ProjectDocuments.PROJECT_DOCUMENT_ID} AND pd.{S.ProjectDocuments.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.DocumentRevisions.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectDocuments.TABLE} pd WHERE {S.DocumentRevisions.TABLE}.{S.DocumentRevisions.PROJECT_DOCUMENT_ID} = pd.{S.ProjectDocuments.PROJECT_DOCUMENT_ID} AND pd.{S.ProjectDocuments.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.PublishedFiles.TABLE} WHERE EXISTS (SELECT 1 FROM {S.DocumentRevisions.TABLE} dr INNER JOIN {S.ProjectDocuments.TABLE} pd ON dr.{S.DocumentRevisions.PROJECT_DOCUMENT_ID} = pd.{S.ProjectDocuments.PROJECT_DOCUMENT_ID} WHERE {S.PublishedFiles.TABLE}.{S.PublishedFiles.REVISION_ID} = dr.{S.DocumentRevisions.REVISION_ID} AND pd.{S.ProjectDocuments.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectDocuments.TABLE} WHERE {S.ProjectDocuments.PROJECT_ID} = ?", (project_id,))
+        
+        # Clause assignments
+        cursor.execute(f"DELETE FROM {S.ClauseAssignments.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectClauses.TABLE} pc INNER JOIN {S.ProjectSections.TABLE} ps ON pc.{S.ProjectClauses.PROJECT_SECTION_ID} = ps.{S.ProjectSections.PROJECT_SECTION_ID} INNER JOIN {S.ProjectDocuments.TABLE} pd ON ps.{S.ProjectSections.PROJECT_DOCUMENT_ID} = pd.{S.ProjectDocuments.PROJECT_DOCUMENT_ID} WHERE {S.ClauseAssignments.TABLE}.{S.ClauseAssignments.PROJECT_CLAUSE_ID} = pc.{S.ProjectClauses.PROJECT_CLAUSE_ID} AND pd.{S.ProjectDocuments.PROJECT_ID} = ?)", (project_id,))
+        
+        # Service-related data
+        cursor.execute(f"DELETE FROM {S.ServiceReviews.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectServices.TABLE} ps WHERE ps.{S.ProjectServices.SERVICE_ID} = {S.ServiceReviews.TABLE}.{S.ServiceReviews.SERVICE_ID} AND ps.{S.ProjectServices.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ServiceScheduleSettings.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectServices.TABLE} ps WHERE ps.{S.ProjectServices.SERVICE_ID} = {S.ServiceScheduleSettings.TABLE}.{S.ServiceScheduleSettings.SERVICE_ID} AND ps.{S.ProjectServices.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ServiceDeliverables.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ProjectServices.TABLE} ps WHERE ps.{S.ProjectServices.SERVICE_ID} = {S.ServiceDeliverables.TABLE}.{S.ServiceDeliverables.SERVICE_ID} AND ps.{S.ProjectServices.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectServices.TABLE} WHERE {S.ProjectServices.PROJECT_ID} = ?", (project_id,))
+        
+        # Billing data
+        cursor.execute(f"DELETE FROM {S.BillingClaimLines.TABLE} WHERE EXISTS (SELECT 1 FROM {S.BillingClaims.TABLE} bc WHERE {S.BillingClaimLines.TABLE}.{S.BillingClaimLines.CLAIM_ID} = bc.{S.BillingClaims.CLAIM_ID} AND bc.{S.BillingClaims.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.BillingClaims.TABLE} WHERE {S.BillingClaims.PROJECT_ID} = ?", (project_id,))
+        
+        # Review and task data
+        cursor.execute(f"DELETE FROM {S.ReviewAssignments.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ReviewSchedule.TABLE} rs WHERE {S.ReviewAssignments.TABLE}.{S.ReviewAssignments.SCHEDULE_ID} = rs.{S.ReviewSchedule.SCHEDULE_ID} AND rs.{S.ReviewSchedule.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewTasks.TABLE} WHERE EXISTS (SELECT 1 FROM {S.ReviewSchedule.TABLE} rs WHERE {S.ReviewTasks.TABLE}.{S.ReviewTasks.SCHEDULE_ID} = rs.{S.ReviewSchedule.SCHEDULE_ID} AND rs.{S.ReviewSchedule.PROJECT_ID} = ?)", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewSchedule.TABLE} WHERE {S.ReviewSchedule.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewSchedules.TABLE} WHERE {S.ReviewSchedules.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewCycleDetails.TABLE} WHERE {S.ReviewCycleDetails.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewStages.TABLE} WHERE {S.ReviewStages.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ReviewParameters.TABLE} WHERE {S.ReviewParameters.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ContractualLinks.TABLE} WHERE {S.ContractualLinks.PROJECT_ID} = ?", (project_id,))
+        
+        # Project phases and reviews
+        cursor.execute(f"DELETE FROM {S.ProjectReviews.TABLE} WHERE {S.ProjectReviews.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectReviewCycles.TABLE} WHERE {S.ProjectReviewCycles.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectHolds.TABLE} WHERE {S.ProjectHolds.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ProjectBEPSections.TABLE} WHERE {S.ProjectBEPSections.PROJECT_ID} = ?", (project_id,))
+        
+        # BEP approvals
+        cursor.execute(f"DELETE FROM {S.BEPApprovals.TABLE} WHERE {S.BEPApprovals.PROJECT_ID} = ?", (project_id,))
+        
+        # Tasks
+        cursor.execute(f"DELETE FROM {S.Tasks.TABLE} WHERE {S.Tasks.PROJECT_ID} = ?", (project_id,))
+        
+        # Bookmarks
+        cursor.execute(f"DELETE FROM {S.ProjectBookmarks.TABLE} WHERE {S.ProjectBookmarks.PROJECT_ID} = ?", (project_id,))
+        
+        # ACC and document data
+        cursor.execute(f"DELETE FROM {S.ACCImportLogs.TABLE} WHERE {S.ACCImportLogs.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ACCImportFolders.TABLE} WHERE {S.ACCImportFolders.PROJECT_ID} = ?", (project_id,))
+        cursor.execute(f"DELETE FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?", (project_id,))
+        
+        # Finally, delete the project itself
+        cursor.execute(f"DELETE FROM {S.Projects.TABLE} WHERE {S.Projects.ID} = ?", (project_id,))
+        
+        conn.commit()
+        print(f"✅ Project {project_id} and all related data deleted successfully.")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error deleting project {project_id}: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     conn = connect_to_db()
     if conn:
