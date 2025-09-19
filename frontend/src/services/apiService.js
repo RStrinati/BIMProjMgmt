@@ -179,6 +179,39 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Task Management
+  async getTasks(projectId) {
+    return this.request(`/tasks?project_id=${projectId}`);
+  }
+
+  async createTask(taskData) {
+    return this.request('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async updateTask(taskId, taskData) {
+    return this.request(`/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async deleteTask(taskId) {
+    return this.request(`/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getTaskDependencies(taskId) {
+    return this.request(`/task_dependencies/${taskId}`);
+  }
+
+  async getResources() {
+    return this.request('/resources');
+  }
 }
 
 export const apiService = new ApiService();

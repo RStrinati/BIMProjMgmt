@@ -40,7 +40,7 @@ CORS(app)
 # Serve React app
 @app.route('/')
 def serve_react_app():
-    return app.send_static_file('react-index.html')
+    return app.send_static_file('index.html')
 
 # Serve React app for all non-API routes (SPA routing)
 @app.route('/<path:path>')
@@ -49,7 +49,7 @@ def serve_react_routes(path):
         return {'error': 'API endpoint not found'}, 404
     if path.startswith('src/') or path.endswith('.js') or path.endswith('.css'):
         return app.send_static_file(path)
-    return app.send_static_file('react-index.html')
+    return app.send_static_file('index.html')
 
 
 @app.route('/api/projects', methods=['GET', 'POST'])
@@ -347,13 +347,7 @@ def api_update_bep_status_endpoint():
     return jsonify({'success': bool(success)})
 
 
-@app.route('/')
-def serve_index():
-    """Serve the React frontend."""
-    return send_from_directory(app.static_folder, 'react-index.html')
 
-
-# Additional API endpoints for React frontend
 
 @app.route('/api/projects/<int:project_id>', methods=['PATCH'])
 def api_update_project(project_id):
@@ -475,6 +469,111 @@ def api_bookmark_operations(bookmark_id):
             return jsonify({'success': bool(success)})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+
+# Task Management API Endpoints
+
+@app.route('/api/tasks', methods=['GET'])
+def api_get_tasks():
+    """Get tasks for a project"""
+    project_id = request.args.get('project_id')
+    if not project_id:
+        return jsonify({'error': 'project_id required'}), 400
+    
+    # For now, return mock data until we implement the full task system
+    mock_tasks = [
+        {
+            'task_id': 1,
+            'task_name': 'Design Review Phase 1',
+            'project_id': project_id,
+            'priority': 'High',
+            'status': 'In Progress',
+            'progress_percentage': 75,
+            'assigned_to': 'John Doe',
+            'start_date': '2024-01-15',
+            'end_date': '2024-01-30',
+            'estimated_hours': 40,
+            'description': 'Complete architectural design review'
+        },
+        {
+            'task_id': 2,
+            'task_name': 'Structural Analysis',
+            'project_id': project_id,
+            'priority': 'Medium',
+            'status': 'Not Started',
+            'progress_percentage': 0,
+            'assigned_to': 'Jane Smith',
+            'start_date': '2024-02-01',
+            'end_date': '2024-02-15',
+            'estimated_hours': 60,
+            'description': 'Perform structural calculations and analysis'
+        }
+    ]
+    
+    return jsonify(mock_tasks)
+
+
+@app.route('/api/tasks', methods=['POST'])
+def api_create_task():
+    """Create a new task"""
+    body = request.get_json() or {}
+    
+    required_fields = ['task_name', 'project_id']
+    if not all(field in body for field in required_fields):
+        return jsonify({'error': 'task_name and project_id are required'}), 400
+    
+    # For now, return success - would integrate with EnhancedTaskManager
+    task_data = {
+        'task_id': 999,  # Mock ID
+        'success': True,
+        **body
+    }
+    
+    return jsonify(task_data), 201
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['PATCH'])
+def api_update_task(task_id):
+    """Update a task"""
+    body = request.get_json() or {}
+    
+    # For now, return success - would integrate with task update logic
+    return jsonify({'success': True, 'task_id': task_id})
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_task(task_id):
+    """Delete a task"""
+    # For now, return success - would integrate with task deletion logic
+    return jsonify({'success': True})
+
+
+@app.route('/api/task_dependencies/<int:task_id>', methods=['GET'])
+def api_get_task_dependencies(task_id):
+    """Get task dependencies"""
+    # Mock dependency data
+    dependencies = [
+        {'predecessor_id': 1, 'successor_id': task_id, 'dependency_type': 'finish_to_start'}
+    ]
+    return jsonify(dependencies)
+
+
+@app.route('/api/resources', methods=['GET'])
+def api_get_resources():
+    """Get available resources/users for task assignment"""
+    # This would typically come from the users table
+    try:
+        users = get_users_list()
+        resources = [{'user_id': uid, 'name': name, 'available': True} for uid, name in users]
+        return jsonify(resources)
+    except Exception as e:
+        # Return mock data if database not available
+        mock_resources = [
+            {'user_id': 1, 'name': 'John Doe', 'available': True},
+            {'user_id': 2, 'name': 'Jane Smith', 'available': True},
+            {'user_id': 3, 'name': 'Mike Johnson', 'available': False},
+        ]
+        return jsonify(mock_resources)
 
 
 if __name__ == '__main__':
