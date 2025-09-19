@@ -37,6 +37,20 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
+# Serve React app
+@app.route('/')
+def serve_react_app():
+    return app.send_static_file('react-index.html')
+
+# Serve React app for all non-API routes (SPA routing)
+@app.route('/<path:path>')
+def serve_react_routes(path):
+    if path.startswith('api/'):
+        return {'error': 'API endpoint not found'}, 404
+    if path.startswith('src/') or path.endswith('.js') or path.endswith('.css'):
+        return app.send_static_file(path)
+    return app.send_static_file('react-index.html')
+
 
 @app.route('/api/projects', methods=['GET', 'POST'])
 def api_projects():
@@ -336,8 +350,132 @@ def api_update_bep_status_endpoint():
 @app.route('/')
 def serve_index():
     """Serve the React frontend."""
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(app.static_folder, 'react-index.html')
+
+
+# Additional API endpoints for React frontend
+
+@app.route('/api/projects/<int:project_id>', methods=['PATCH'])
+def api_update_project(project_id):
+    """Update project details - enhanced for React frontend"""
+    body = request.get_json() or {}
+    
+    # Update project details
+    success = update_project_details(
+        project_id,
+        body.get('start_date'),
+        body.get('end_date'),
+        body.get('status'),
+        body.get('priority'),
+    )
+    
+    # Update folder paths if provided
+    if any(key in body for key in ['folder_path', 'ifc_folder_path', 'data_export_path']):
+        update_project_folders(
+            project_id,
+            body.get('folder_path'),
+            body.get('data_export_path'),
+            body.get('ifc_folder_path'),
+        )
+    
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
+
+
+@app.route('/api/project_details/<int:project_id>', methods=['GET'])
+def api_get_project_details_enhanced(project_id):
+    """Get enhanced project details for React frontend"""
+    try:
+        details = get_project_details(project_id)
+        if details is None:
+            return jsonify({'error': 'project not found'}), 404
+        
+        # Get folder information
+        folder_info = get_project_folders(project_id)
+        
+        # Combine details
+        enhanced_details = {
+            **details,
+            'folder_path': folder_info[0] if folder_info and folder_info[0] else '',
+            'ifc_folder_path': folder_info[1] if folder_info and folder_info[1] else '',
+        }
+        
+        return jsonify(enhanced_details)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+def api_dashboard_stats():
+    """Get dashboard statistics"""
+    try:
+        projects = get_projects_full()
+        
+        stats = {
+            'total_projects': len(projects),
+            'active_projects': len([p for p in projects if p.get('status') == 'Active']),
+            'completed_projects': len([p for p in projects if p.get('status') == 'Completed']),
+            'pending_tasks': 0,  # This would require task counting logic
+            'completed_tasks': 0,  # This would require task counting logic
+        }
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/project_bookmarks/<int:project_id>', methods=['GET', 'POST'])
+def api_project_bookmarks_enhanced(project_id):
+    """Enhanced project bookmarks API"""
+    if request.method == 'GET':
+        try:
+            bookmarks = get_project_bookmarks(project_id)
+            return jsonify(bookmarks or [])
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            body = request.get_json() or {}
+            success = add_bookmark(
+                project_id,
+                body.get('title', ''),
+                body.get('url', ''),
+                body.get('description', ''),
+                body.get('category', 'General')
+            )
+            if success:
+                return jsonify({'success': True}), 201
+            return jsonify({'success': False}), 500
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bookmark/<int:bookmark_id>', methods=['PATCH', 'DELETE'])
+def api_bookmark_operations(bookmark_id):
+    """Bookmark operations - update and delete"""
+    if request.method == 'PATCH':
+        try:
+            body = request.get_json() or {}
+            success = update_bookmark(
+                bookmark_id,
+                body.get('title'),
+                body.get('url'),
+                body.get('description'),
+                body.get('category')
+            )
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            success = delete_bookmark(bookmark_id)
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
