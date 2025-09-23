@@ -1,4 +1,4 @@
-from check_schema import (
+from scripts.check_schema import (
     load_required_schema,
     table_to_class,
     column_to_const,

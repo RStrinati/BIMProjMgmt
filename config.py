@@ -10,6 +10,7 @@ except ModuleNotFoundError:
     pass
 
 class Config:
+    # SQL Server DB config
     DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
     DB_SERVER = os.getenv("DB_SERVER", "P-NB-USER-028\\SQLEXPRESS")
     DB_USER = os.getenv("DB_USER", "admin02")
@@ -18,8 +19,26 @@ class Config:
     PROJECT_MGMT_DB = os.getenv("PROJECT_MGMT_DB", "ProjectManagement")
     ACC_DB = os.getenv("ACC_DB", "acc_data_schema")
     REVIT_HEALTH_DB = os.getenv("REVIT_HEALTH_DB", "RevitHealthCheckDB")
+    REVIZTO_DB = os.getenv("REVIZTO_DB", "ReviztoData")
+
+    # External Service Endpoints
+    ACC_SERVICE_URL = os.getenv("ACC_SERVICE_URL", "http://localhost:4000/api/v1")
+    REVIZTO_SERVICE_URL = os.getenv("REVIZTO_SERVICE_URL", "http://localhost:5000/api/v1")
+
+    # Service Auth Tokens (managed by token broker)
+    ACC_SERVICE_TOKEN = os.getenv("ACC_SERVICE_TOKEN", "")
+    REVIZTO_SERVICE_TOKEN = os.getenv("REVIZTO_SERVICE_TOKEN", "")
+
+    # Logging
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    LOG_JSON = os.getenv("LOG_JSON", "true").lower() == "true"
 
 # Provide module-level aliases for backwards compatibility with code that
 # imports configuration values directly from this module.
 ACC_DB = Config.ACC_DB
 REVIT_HEALTH_DB = Config.REVIT_HEALTH_DB
+REVIZTO_DB = Config.REVIZTO_DB
+ACC_SERVICE_URL = Config.ACC_SERVICE_URL
+REVIZTO_SERVICE_URL = Config.REVIZTO_SERVICE_URL
+ACC_SERVICE_TOKEN = Config.ACC_SERVICE_TOKEN
+REVIZTO_SERVICE_TOKEN = Config.REVIZTO_SERVICE_TOKEN

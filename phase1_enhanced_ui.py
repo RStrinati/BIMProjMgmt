@@ -1,187 +1,792 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
-from tkcalendar import DateEntry
-from datetime import datetime, timedelta
-import threading
+from tkinter import ttk, messagebox, filedialog
 import os
-import pandas as pd
+import time
+import csv
+from datetime import datetime, timedelta
 import logging
 import webbrowser
-from phase1_enhanced_database import (
-    EnhancedTaskManager, MilestoneManager, ResourceManager, ProjectTemplateManager
-)
+import threading
+
+# Set up logger
+logger = logging.getLogger(__name__)
+
+# Import required modules
 from database import (
-    get_projects, get_users_list, save_acc_folder_path, get_acc_folder_path,
-    get_acc_import_logs, connect_to_db, insert_project, get_cycle_ids,
-    get_review_summary, get_project_details, get_project_folders,
-    get_review_cycles, get_review_schedule, update_client_info,
-    get_available_clients, assign_client_to_project, create_new_client,
-    update_project_details, update_project_folders, get_project_review_progress,
-    get_review_tasks, get_contractual_links, get_project_bookmarks, add_bookmark,
-    update_bookmark, delete_bookmark, get_bookmark_categories
+    get_projects, save_acc_folder_path, get_acc_folder_path,
+    connect_to_db, get_acc_import_logs, get_project_details,
+    get_project_folders, delete_project, get_available_clients,
+    get_review_cycles, get_cycle_ids, get_users_list,
+    get_bookmark_categories, get_project_bookmarks, add_bookmark,
+    update_bookmark, delete_bookmark, get_contractual_links,
+    update_project_folders, insert_files_into_tblACCDocs
 )
 from review_management_service import ReviewManagementService
-try:
-    from backend.documents import services as doc_services
-    from backend.documents import runner as doc_runner
-except Exception:
-    doc_services = None
-    doc_runner = None
-from constants import schema as S
-from ui.ui_helpers import (
-    create_labeled_entry,
-    create_labeled_combobox,
-    create_horizontal_button_group,
-    clear_treeview,
-    format_id_name_list,
-    parse_id_from_display,
-    set_combo_from_pairs,
-)
+from handlers.acc_handler import run_acc_import
 from ui.tooltips import CreateToolTip
-from acc_handler import run_acc_import
-from review_handler import submit_review_schedule, generate_stage_review_schedule
+from handlers.review_handler import submit_review_schedule
+from ui.ui_helpers import (
+    set_combo_from_pairs, parse_id_from_display, clear_treeview,
+    format_id_name_list
+)
+from phase1_enhanced_database import ResourceManager
+from tkcalendar import DateEntry
+from constants import schema as S
 
+# Simple notification system stub
 class ProjectNotificationSystem:
-    """Centralized project change notification system"""
-    
     def __init__(self):
         self.observers = []
-        self.current_project = None
     
     def register_observer(self, observer):
-        """Register a tab to receive project change notifications"""
         if observer not in self.observers:
             self.observers.append(observer)
     
-    def unregister_observer(self, observer):
-        """Unregister a tab from receiving notifications"""
-        if observer in self.observers:
-            self.observers.remove(observer)
-    
     def notify_project_changed(self, project_selection):
-        """Notify all registered tabs that the project has changed"""
-        if project_selection != self.current_project:
-            self.current_project = project_selection
-            for observer in self.observers:
-                try:
-                    if hasattr(observer, 'on_project_changed'):
-                        observer.on_project_changed(project_selection)
-                except Exception as e:
-                    logger.error("Error notifying observer %s: %s", observer, e)
+        for observer in self.observers:
+            if hasattr(observer, 'on_project_changed'):
+                observer.on_project_changed(project_selection)
     
     def notify_project_list_changed(self):
-        """Notify all registered tabs that the project list has changed"""
         for observer in self.observers:
-            try:
-                if hasattr(observer, 'on_project_list_changed'):
-                    observer.on_project_list_changed()
-            except Exception as e:
-                logger.error("Error notifying observer %s: %s", observer, e)
-    
-    def get_current_project(self):
-        """Get the currently selected project"""
-        return self.current_project
+            if hasattr(observer, 'on_project_list_changed'):
+                observer.on_project_list_changed()
 
-# Global project notification system
 project_notification_system = ProjectNotificationSystem()
-logger = logging.getLogger(__name__)
+
+class ProjectSetupTab:
+    def __init__(self, parent_notebook):
+        self.frame = ttk.Frame(parent_notebook)
+        parent_notebook.add(self.frame, text="Project Setup")
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Set up the project setup interface"""
+        # Main container with padding
+        main_frame = ttk.Frame(self.frame)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # ===== TOP SECTION: PROJECT SELECTION =====
+        project_frame = ttk.LabelFrame(main_frame, text="Project Selection & Status", padding=15)
+        project_frame.pack(fill="x", pady=(0, 15))
+
+        # Current project selection
+        selection_frame = ttk.Frame(project_frame)
+        selection_frame.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(selection_frame, text="Current Project:", font=("Arial", 10, "bold")).pack(side="left")
+        self.project_var = tk.StringVar()
+        self.project_combo = ttk.Combobox(selection_frame, textvariable=self.project_var, width=50)
+        self.project_combo.pack(side="left", padx=(10, 0))
+        self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
+
+        # Folder path display
+        ttk.Label(selection_frame, text="Desktop Connector Folder:", font=("Arial", 10)).pack(side="left", padx=(20, 0))
+        self.folder_path_var = tk.StringVar()
+        self.folder_path_entry = ttk.Entry(selection_frame, textvariable=self.folder_path_var, width=40, state="readonly")
+        self.folder_path_entry.pack(side="left", padx=(10, 0))
+
+        # Project status display
+        status_frame = ttk.Frame(project_frame)
+        status_frame.pack(fill="x")
+
+        # Left column - basic info
+        left_status = ttk.Frame(status_frame)
+        left_status.pack(side="left", fill="both", expand=True)
+
+        self.status_labels = {}
+        basic_fields = ["Client", "Status", "Priority", "Start Date", "End Date"]
+        for i, field in enumerate(basic_fields):
+            row_frame = ttk.Frame(left_status)
+            row_frame.pack(fill="x", pady=2)
+            ttk.Label(row_frame, text=f"{field}:", width=12, anchor="w").pack(side="left")
+            self.status_labels[field] = ttk.Label(row_frame, text="Not Selected", foreground="gray")
+            self.status_labels[field].pack(side="left", padx=(5, 0))
+
+        # Right column - file paths
+        right_status = ttk.Frame(status_frame)
+        right_status.pack(side="right", fill="both", expand=True)
+
+        path_fields = ["Model Path", "IFC Path"]
+        for i, field in enumerate(path_fields):
+            row_frame = ttk.Frame(right_status)
+            row_frame.pack(fill="x", pady=2)
+            ttk.Label(row_frame, text=f"{field}:", width=12, anchor="w").pack(side="left")
+            self.status_labels[field] = ttk.Label(row_frame, text="Not Configured", foreground="gray", wraplength=300)
+            self.status_labels[field].pack(side="left", padx=(5, 0))
+
+        # ===== MIDDLE SECTION: PROJECT ACTIONS =====
+        actions_frame = ttk.LabelFrame(main_frame, text="Project Actions", padding=15)
+        actions_frame.pack(fill="x", pady=(0, 15))
+
+        # Action buttons in a grid
+        buttons_frame = ttk.Frame(actions_frame)
+        buttons_frame.pack(fill="x")
+
+        action_buttons = [
+            ("Create New Project", self.create_new_project, "Create a new project"),
+            ("Edit Project Details", self.edit_project_details, "Modify current project information"),
+            ("Delete Project", self.delete_project, "Permanently delete the selected project and all related data"),
+            ("Configure File Paths", self.configure_paths, "Set model and IFC file locations"),
+            ("Extract Files from Model Folder", self.extract_model_files, "Extract files from configured model folder"),
+            ("Extract Files from Desktop Connector", self.extract_acc_files, "Extract files from ACC Desktop Connector"),
+            ("Refresh Project Data", self.refresh_data, "Reload project information from handlers.database"),
+            ("Debug Dropdown", self.debug_dropdown, "Debug project dropdown issues"),
+            ("View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
+            ("Archive Project", self.archive_project, "Archive completed or cancelled project")
+        ]
+
+        for i, (text, command, tooltip) in enumerate(action_buttons):
+            row = i // 3
+            col = i % 3
+            btn = ttk.Button(buttons_frame, text=text, command=command, width=25)
+            btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
+
+        # Configure grid weights
+        for i in range(3):
+            buttons_frame.columnconfigure(i, weight=1)
+
+        # ===== BOTTOM SECTION: PROJECT DETAILS =====
+        details_frame = ttk.LabelFrame(main_frame, text="Project Details", padding=15)
+        details_frame.pack(fill="both", expand=True)
+
+        # Simple project details content
+        ttk.Label(details_frame, text="Project information will be displayed here",
+                 font=("Arial", 12)).pack(pady=50)
+
+        # Initialize and load projects
+        self.refresh_projects()
+
+    def on_project_selected(self, event=None):
+        """Handle project selection from dropdown"""
+        project_selection = self.project_var.get()
+        if project_selection and ' - ' in project_selection:
+            project_id = project_selection.split(' - ')[0].strip()
+            project_name = project_selection.split(' - ')[1].strip()
+            
+            # Update folder path
+            try:
+                folder_path = get_acc_folder_path(project_id)
+                self.folder_path_var.set(folder_path if folder_path else "Not configured")
+            except Exception as e:
+                print(f"Error getting folder path: {e}")
+                self.folder_path_var.set("Error loading path")
+            
+            # Update project status
+            self.update_project_status(project_name)
+            
+            # Notify other tabs about project change
+            project_notification_system.notify_project_changed(project_selection)
+
+    def update_project_status(self, project_name):
+        """Update the status display for selected project"""
+        try:
+            # Get project details from database
+            project_selection = self.project_var.get()
+            if project_selection and ' - ' in project_selection:
+                project_id = project_selection.split(' - ')[0].strip()
+                
+                # Try to get project details
+                try:
+                    project_details = get_project_details(project_id)
+                    if project_details:
+                        # Update status labels with real data
+                        self.status_labels["Client"].config(text=project_details.get('client_name', 'Unknown'), foreground="black")
+                        self.status_labels["Status"].config(text=project_details.get('status', 'Unknown'), foreground="black")
+                        self.status_labels["Priority"].config(text=project_details.get('priority', 'Normal'), foreground="black")
+                        self.status_labels["Start Date"].config(text=str(project_details.get('start_date', 'Not set')), foreground="black")
+                        self.status_labels["End Date"].config(text=str(project_details.get('end_date', 'Not set')), foreground="black")
+                        
+                        # Try to get project folders
+                        try:
+                            folders = get_project_folders(project_id)
+                            if folders:
+                                self.status_labels["Model Path"].config(text=folders.get('model_path', 'Not configured'), foreground="black")
+                                self.status_labels["IFC Path"].config(text=folders.get('ifc_path', 'Not configured'), foreground="black")
+                            else:
+                                self.status_labels["Model Path"].config(text="Not configured", foreground="gray")
+                                self.status_labels["IFC Path"].config(text="Not configured", foreground="gray")
+                        except Exception as e:
+                            print(f"Error getting project folders: {e}")
+                            self.status_labels["Model Path"].config(text="Error loading", foreground="red")
+                            self.status_labels["IFC Path"].config(text="Error loading", foreground="red")
+                    else:
+                        # No project details found - show basic info
+                        self.status_labels["Client"].config(text="Data unavailable", foreground="gray")
+                        self.status_labels["Status"].config(text="Active", foreground="black")
+                        self.status_labels["Priority"].config(text="Normal", foreground="black")
+                        self.status_labels["Start Date"].config(text="Not set", foreground="gray")
+                        self.status_labels["End Date"].config(text="Not set", foreground="gray")
+                        self.status_labels["Model Path"].config(text="Not configured", foreground="gray")
+                        self.status_labels["IFC Path"].config(text="Not configured", foreground="gray")
+                except Exception as e:
+                    print(f"Error getting project details: {e}")
+                    # Show basic info on error
+                    self.status_labels["Client"].config(text="Data unavailable", foreground="gray")
+                    self.status_labels["Status"].config(text="Active", foreground="black")
+                    self.status_labels["Priority"].config(text="Normal", foreground="black")
+                    self.status_labels["Start Date"].config(text="Not set", foreground="gray")
+                    self.status_labels["End Date"].config(text="Not set", foreground="gray")
+                    self.status_labels["Model Path"].config(text="Not configured", foreground="gray")
+                    self.status_labels["IFC Path"].config(text="Not configured", foreground="gray")
+            else:
+                # Clear all status labels
+                for field in ["Client", "Status", "Priority", "Start Date", "End Date", "Model Path", "IFC Path"]:
+                    self.status_labels[field].config(text="Not selected", foreground="gray")
+                    
+        except Exception as e:
+            print(f"Error updating project status: {e}")
+            # Clear status labels on error
+            for label in self.status_labels.values():
+                label.config(text="Error", foreground="red")
+
+    def refresh_projects(self):
+        """Load available projects into the dropdown"""
+        try:
+            print("Loading projects from database...")
+            projects = get_projects()
+            project_list = []
+            
+            if projects:
+                for project in projects:
+                    if isinstance(project, dict):
+                        project_id = project.get('id', '')
+                        project_name = project.get('name', '')
+                        if project_id and project_name:
+                            project_list.append(f"{project_id} - {project_name}")
+                    elif isinstance(project, tuple) and len(project) >= 2:
+                        project_list.append(f"{project[0]} - {project[1]}")
+                
+                print(f"Found {len(project_list)} projects")
+                self.project_combo['values'] = project_list
+                
+                if project_list:
+                    self.project_combo.set(project_list[0])
+                    self.on_project_selected()
+                else:
+                    self.project_combo.set("No projects found")
+            else:
+                print("No projects returned from database")
+                self.project_combo['values'] = ["No projects available"]
+                self.project_combo.set("No projects available")
+                
+        except Exception as e:
+            print(f"Error loading projects: {e}")
+            self.project_combo['values'] = ["Error loading projects"]
+            self.project_combo.set("Error loading projects")
+            messagebox.showerror("Error", f"Failed to load projects: {e}")
+
+    def configure_paths(self):
+        """Configure Desktop Connector folder path for selected project"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+            
+        project_id = project_selection.split(' - ')[0].strip()
+        project_name = project_selection.split(' - ')[1].strip()
+        
+        print(f"Configuring path for Project ID: {project_id}, Name: {project_name}")
+        
+        # Ask user to select Desktop Connector folder
+        folder_path = filedialog.askdirectory(
+            title=f"Select Desktop Connector Folder for {project_name}",
+            initialdir=os.path.expanduser("~")
+        )
+        
+        if folder_path:
+            print(f"Selected folder path: {folder_path}")
+            try:
+                # Save the folder path to database
+                success = save_acc_folder_path(project_id, folder_path)
+                print(f"Save result: {success}")
+                
+                if success:
+                    self.folder_path_var.set(folder_path)
+                    messagebox.showinfo("Success", f"Desktop Connector folder configured:\n{folder_path}")
+                    
+                    # Test retrieval immediately
+                    retrieved_path = get_acc_folder_path(project_id)
+                    print(f"Retrieved path verification: {retrieved_path}")
+                    
+                    if retrieved_path != folder_path:
+                        print(f"WARNING: Retrieved path doesn't match saved path!")
+                        print(f"Saved: {folder_path}")
+                        print(f"Retrieved: {retrieved_path}")
+                else:
+                    messagebox.showerror("Error", "Failed to save folder path to database")
+            except Exception as e:
+                print(f"Error saving folder path: {e}")
+                messagebox.showerror("Error", f"Failed to save folder path: {e}")
+        else:
+            print("No folder selected")
+
+    def extract_acc_files(self):
+        """Extract Desktop Connector folder contents and override SQL data"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+            
+        project_id = project_selection.split(' - ')[0].strip()
+        project_name = project_selection.split(' - ')[1].strip()
+        
+        # Get the configured folder path
+        try:
+            print(f"Getting folder path for project ID: {project_id}")
+            folder_path = get_acc_folder_path(project_id)
+            print(f"Retrieved folder path: {folder_path}")
+            
+            if not folder_path:
+                print("No folder path found in database")
+                result = messagebox.askyesno("Configure Path", 
+                    "No Desktop Connector folder configured for this project.\n\n"
+                    "Would you like to configure it now?")
+                if result:
+                    self.configure_paths()
+                return
+                
+            if not os.path.exists(folder_path):
+                print(f"Folder path does not exist: {folder_path}")
+                messagebox.showerror("Error", f"Desktop Connector folder does not exist:\n{folder_path}\n\nPlease configure a valid path.")
+                return
+            
+            # Confirm extraction - this will override existing data
+            confirm = messagebox.askyesno(
+                "Confirm Extraction", 
+                f"This will extract all files from the Desktop Connector folder and override existing data in the database for project '{project_name}'.\n\nDo you want to continue?"
+            )
+            
+            if not confirm:
+                return
+            
+            # Show progress dialog and perform extraction
+            self._perform_desktop_connector_extraction(project_id, project_name, folder_path)
+            
+        except Exception as e:
+            print(f"Error extracting Desktop Connector files: {e}")
+            messagebox.showerror("Error", f"Failed to extract Desktop Connector files: {e}")
+
+    def _perform_desktop_connector_extraction(self, project_id, project_name, folder_path):
+        """Perform the Desktop Connector folder extraction with progress tracking"""
+        # Create progress window
+        progress_window = tk.Toplevel(self.frame)
+        progress_window.title("Extracting Desktop Connector Data")
+        progress_window.geometry("500x200")
+        progress_window.transient(self.frame)
+        progress_window.grab_set()
+        
+        # Center the window
+        progress_window.geometry("+%d+%d" % (
+            self.frame.winfo_rootx() + 100,
+            self.frame.winfo_rooty() + 100
+        ))
+        
+        # Progress frame
+        progress_frame = ttk.Frame(progress_window, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(progress_frame, text=f"Extracting data for: {project_name}", 
+                               font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 15))
+        
+        # Status label
+        status_label = ttk.Label(progress_frame, text="Scanning Desktop Connector folder...")
+        status_label.pack(pady=(0, 10))
+        
+        # Progress bar
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100)
+        progress_bar.pack(fill=tk.X, pady=(0, 10))
+        
+        # Progress text
+        progress_text = ttk.Label(progress_frame, text="Initializing...")
+        progress_text.pack()
+        
+        def extraction_thread():
+            """Run extraction in separate thread"""
+            try:
+                # Step 1: Scan for files and collect metadata
+                status_label.config(text="Scanning folder structure...")
+                progress_window.update()
+                
+                files_found = []
+                total_files_scanned = 0
+                
+                for root, dirs, files in os.walk(folder_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        
+                        try:
+                            # Get file stats
+                            stat = os.stat(file_path)
+                            file_size_bytes = stat.st_size
+                            file_size_kb = file_size_bytes / 1024
+                            date_modified = datetime.fromtimestamp(stat.st_mtime)
+                            
+                            # Normalize file path for database storage (use forward slashes)
+                            normalized_path = file_path.replace('\\', '/')
+                            
+                            # Ensure the path isn't too long for database field
+                            if len(normalized_path) > 500:  # Assuming max field length
+                                print(f"Warning: File path too long, truncating: {normalized_path}")
+                                normalized_path = normalized_path[:500]
+                            
+                            # Ensure file name isn't too long
+                            file_name_clean = file
+                            if len(file_name_clean) > 255:  # Assuming max field length
+                                print(f"Warning: File name too long, truncating: {file_name_clean}")
+                                file_name_clean = file_name_clean[:255]
+                            
+                            # Determine file type
+                            file_ext = os.path.splitext(file)[1].lower()
+                            if file_ext in ['.dwg', '.dxf']:
+                                file_type = 'CAD'
+                            elif file_ext in ['.rvt', '.rfa', '.rte']:
+                                file_type = 'Revit'
+                            elif file_ext in ['.ifc', '.ifczip']:
+                                file_type = 'IFC'
+                            elif file_ext in ['.pdf']:
+                                file_type = 'PDF'
+                            elif file_ext in ['.doc', '.docx', '.txt']:
+                                file_type = 'Document'
+                            elif file_ext in ['.xls', '.xlsx', '.csv']:
+                                file_type = 'Spreadsheet'
+                            elif file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']:
+                                file_type = 'Image'
+                            elif file_ext in ['.zip', '.rar', '.7z']:
+                                file_type = 'Archive'
+                            else:
+                                file_type = 'Other'
+                            
+                            # Store file metadata
+                            files_found.append({
+                                'file_name': file_name_clean,
+                                'file_path': normalized_path,
+                                'date_modified': date_modified,
+                                'file_type': file_type,
+                                'file_size_kb': file_size_kb
+                            })
+                            
+                            total_files_scanned += 1
+                            
+                        except Exception as e:
+                            print(f"Warning: Could not process file {file_path}: {str(e)}")
+                
+                if not files_found:
+                    status_label.config(text="No files found in Desktop Connector folder")
+                    progress_text.config(text="Complete")
+                    time.sleep(2)
+                    progress_window.destroy()
+                    messagebox.showinfo("No Files", "No files found in the Desktop Connector folder.")
+                    return
+                
+                progress_var.set(20)
+                progress_text.config(text=f"20% - Found {len(files_found)} files")
+                progress_window.update()
+                
+                # Step 2: Connect to database
+                status_label.config(text="Connecting to database...")
+                progress_window.update()
+                
+                from database import connect_to_db
+                conn = connect_to_db()
+                if not conn:
+                    raise Exception("Failed to connect to database")
+                
+                progress_var.set(30)
+                progress_text.config(text="30% - Database connected")
+                progress_window.update()
+                
+                # Step 3: Clear existing project files (override)
+                status_label.config(text="Clearing existing file records...")
+                progress_window.update()
+                
+                cursor = conn.cursor()
+                
+                # Import schema constants
+                from constants import schema as S
+                
+                # Clear existing records for this project
+                cursor.execute(f"DELETE FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?", (project_id,))
+                conn.commit()
+                
+                progress_var.set(40)
+                progress_text.config(text="40% - Existing records cleared")
+                progress_window.update()
+                
+                # Step 4: Insert file metadata into tblACCDocs
+                total_files = len(files_found)
+                
+                for i, file_info in enumerate(files_found):
+                    status_label.config(text=f"Processing: {file_info['file_name']}")
+                    progress_window.update()
+                    
+                    try:
+                        # Debug: Print file info
+                        print(f"Inserting file: {file_info['file_name']}")
+                        print(f"File path: {file_info['file_path']}")
+                        print(f"File type: {file_info['file_type']}")
+                        print(f"File size: {file_info['file_size_kb']} KB")
+                        print(f"Project ID: {project_id}")
+                        
+                        # Build the SQL statement
+                        sql_statement = f"""
+                            INSERT INTO {S.ACCDocs.TABLE} 
+                            ({S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, {S.ACCDocs.DATE_MODIFIED}, 
+                             {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB}, {S.ACCDocs.CREATED_AT}, {S.ACCDocs.PROJECT_ID})
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """
+                        
+                        print(f"SQL Statement: {sql_statement}")
+                        
+                        # Insert file metadata into tblACCDocs
+                        cursor.execute(sql_statement, (
+                            file_info['file_name'],
+                            file_info['file_path'],
+                            file_info['date_modified'],
+                            file_info['file_type'],
+                            round(file_info['file_size_kb'], 2),  # Round to 2 decimal places
+                            datetime.now(),
+                            int(project_id)  # Ensure project_id is integer
+                        ))
+                        
+                        print(f"Successfully inserted: {file_info['file_name']}")
+                        
+                        # Update progress
+                        file_progress = 40 + ((i + 1) / total_files) * 50
+                        progress_var.set(file_progress)
+                        progress_text.config(text=f"{file_progress:.0f}% - {i + 1}/{total_files} files")
+                        progress_window.update()
+                        
+                    except Exception as e:
+                        print(f"ERROR: Failed to insert file {file_info['file_name']}: {str(e)}")
+                        print(f"File info: {file_info}")
+                        # Continue with next file instead of stopping
+                        continue
+                
+                # Step 5: Finalize
+                conn.commit()
+                conn.close()
+                
+                progress_var.set(100)
+                progress_text.config(text="100% - Complete")
+                status_label.config(text="File extraction completed successfully!")
+                progress_window.update()
+                
+                time.sleep(2)
+                progress_window.destroy()
+                
+                # Show success message
+                messagebox.showinfo("Success", 
+                    f"Successfully extracted metadata for {total_files} files from Desktop Connector folder.\n\n"
+                    f"Project: {project_name}\n"
+                    f"Files processed: {total_files}\n"
+                    f"Data updated in tblACCDocs table")
+                
+                # Refresh the project data in UI
+                self.refresh_projects()
+                
+            except Exception as e:
+                progress_window.destroy()
+                print(f"Desktop Connector extraction failed: {str(e)}")
+                messagebox.showerror("Extraction Failed", f"Failed to extract Desktop Connector data:\n{str(e)}")
+        
+        # Start extraction in thread
+        thread = threading.Thread(target=extraction_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def refresh_data(self):
+        """Refresh all project data"""
+        try:
+            self.refresh_projects()
+            messagebox.showinfo("Success", "Project data refreshed successfully")
+        except Exception as e:
+            print(f"Error refreshing data: {e}")
+            messagebox.showerror("Error", f"Failed to refresh data: {e}")
+
+    def debug_dropdown(self):
+        """Debug project dropdown issues"""
+        try:
+            print("=== Project Dropdown Debug ===")
+            projects = get_projects()
+            print(f"Raw projects data: {projects}")
+            print(f"Projects type: {type(projects)}")
+            
+            if projects:
+                print(f"Number of projects: {len(projects)}")
+                for i, project in enumerate(projects):
+                    print(f"Project {i}: {project} (type: {type(project)})")
+            else:
+                print("No projects found")
+                
+            current_values = self.project_combo['values']
+            print(f"Current combo values: {current_values}")
+            print(f"Current selection: {self.project_var.get()}")
+            print("=== End Debug ===")
+            
+            messagebox.showinfo("Debug", f"Debug info printed to console.\nCurrent projects: {len(projects) if projects else 0}")
+            
+        except Exception as e:
+            print(f"Error in debug: {e}")
+            messagebox.showerror("Error", f"Debug failed: {e}")
+
+    # Additional methods for other functionality
+    def create_new_project(self):
+        """Open create new project dialog"""
+        # This would open a dialog to create a new project
+        # For now, show placeholder
+        messagebox.showinfo("Info", "Create New Project functionality will be implemented in future version")
+
+    def edit_project_details(self):
+        """Open edit project details dialog"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        messagebox.showinfo("Info", "Edit Project Details functionality will be implemented in future version")
+
+    def delete_project(self):
+        """Delete selected project"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        messagebox.showinfo("Info", "Delete Project functionality will be implemented in future version")
+
+    def extract_model_files(self):
+        """Extract files from model folder"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        messagebox.showinfo("Info", "Extract Model Files functionality will be implemented in future version")
+
+    def view_dashboard(self):
+        """Open project dashboard"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        messagebox.showinfo("Info", "Project Dashboard functionality will be implemented in future version")
+
+    def archive_project(self):
+        """Archive selected project"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        messagebox.showinfo("Info", "Archive Project functionality will be implemented in future version")
 
 class EnhancedTaskManagementTab:
     """Enhanced task management interface with dependencies and progress tracking"""
     
     def __init__(self, parent_notebook):
+        import tkinter as tk
+        from tkinter import ttk, messagebox, filedialog
+        from database import get_projects, save_acc_folder_path, get_acc_folder_path, insert_files_into_tblACCDocs
+        
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="?? Enhanced Tasks")
-        
-        self.task_mgr = EnhancedTaskManager()
-        self.resource_mgr = ResourceManager()
-        
-        self.setup_ui()
-        self.refresh_data()
-        
-        # Register for project change notifications
-        project_notification_system.register_observer(self)
-    
-    def setup_ui(self):
-            """Setup the enhanced task management UI"""
+        parent_notebook.add(self.frame, text="?? Task Management")
+
+
+        class NestedProjectSetupTab:
+            def __init__(self, parent):
+                self.frame = ttk.Frame(parent)
+                self.project_var = tk.StringVar()
+                self.acc_path_var = tk.StringVar()
+                self.status_var = tk.StringVar()
+                self.setup_ui()
+
+            def setup_ui(self):
+                # Project selection
+                project_frame = ttk.Frame(self.frame)
+                project_frame.pack(fill=tk.X, padx=10, pady=5)
+                ttk.Label(project_frame, text="Select Project:").pack(side=tk.LEFT)
+                self.project_combo = ttk.Combobox(project_frame, textvariable=self.project_var, state="readonly")
+                self.project_combo.pack(side=tk.LEFT, padx=5)
+                self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
+                self.refresh_projects()
+
+                # ACC folder path configuration
+                path_frame = ttk.Frame(self.frame)
+                path_frame.pack(fill=tk.X, padx=10, pady=5)
+                ttk.Label(path_frame, text="ACC Folder Path:").pack(side=tk.LEFT)
+                self.acc_path_entry = ttk.Entry(path_frame, textvariable=self.acc_path_var, width=50)
+                self.acc_path_entry.pack(side=tk.LEFT, padx=5)
+                self.acc_path_button = ttk.Button(path_frame, text="Configure Path", command=self.configure_paths)
+                self.acc_path_button.pack(side=tk.LEFT, padx=5)
+
+                # Status label
+                status_frame = ttk.Frame(self.frame)
+                status_frame.pack(fill=tk.X, padx=10, pady=5)
+                self.status_label = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
+                self.status_label.pack(side=tk.LEFT)
+
+                # Extract files button
+                extract_frame = ttk.Frame(self.frame)
+                extract_frame.pack(fill=tk.X, padx=10, pady=5)
+                self.extract_button = ttk.Button(extract_frame, text="Extract ACC Files", command=self.extract_acc_files)
+                self.extract_button.pack(side=tk.LEFT)
+
+            def refresh_projects(self):
+                projects = get_projects()
+                self.project_combo['values'] = [f"{p['ProjectID']} - {p['ProjectName']}" for p in projects]
+                if projects:
+                    self.project_combo.current(0)
+                    self.on_project_selected()
+
+            def on_project_selected(self, event=None):
+                selected = self.project_var.get()
+                if '-' in selected:
+                    project_id = selected.split('-')[0].strip()
+                    folder_path = get_acc_folder_path(project_id)
+                    self.acc_path_var.set(folder_path if folder_path else "")
+                    self.status_var.set(f"Selected Project: {selected}")
+                else:
+                    messagebox.showerror("Error", "Invalid project selection format")
+
+            def configure_paths(self):
+                selected = self.project_var.get()
+                if '-' not in selected:
+                    messagebox.showwarning("Warning", "Please select a project first")
+                    return
+                project_id = selected.split('-')[0].strip()
+                folder_path = filedialog.askdirectory(title="Select Desktop Connector Folder")
+                if not folder_path:
+                    messagebox.showwarning("Warning", "No folder selected")
+                    return
+                save_acc_folder_path(project_id, folder_path)
+                self.acc_path_var.set(folder_path)
+                self.status_var.set(f"Configured folder for project {project_id}")
+                messagebox.showinfo("Success", f"Desktop Connector folder path saved for project {project_id}")
+
+            def extract_acc_files(self):
+                selected = self.project_var.get()
+                if '-' not in selected:
+                    messagebox.showwarning("Warning", "Please select a project first")
+                    return
+                project_id = selected.split('-')[0].strip()
+                folder_path = self.acc_path_var.get()
+                if not folder_path:
+                    messagebox.showwarning("Warning", "No folder path configured")
+                    return
+                try:
+                    count = insert_files_into_tblACCDocs(project_id, folder_path)
+                    self.status_var.set(f"Extracted {count} files for project {project_id}")
+                    messagebox.showinfo("Success", f"Extracted {count} files for project {project_id}")
+                except Exception as e:
+                    self.status_var.set(f"Error extracting files: {e}")
+                    messagebox.showerror("Error", f"Failed to extract files: {e}")
             
-            # Main container with scrollbar
-            main_canvas = tk.Canvas(self.frame)
-            scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=main_canvas.yview)
-            scrollable_frame = ttk.Frame(main_canvas)
+            # Create scrollable frame for task management
+            from ui.ui_helpers import create_scrollable_frame
+            scrollable_frame = create_scrollable_frame(self.frame)
             
-            scrollable_frame.bind(
-                "<Configure>",
-                lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
-            )
-            
-            main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-            main_canvas.configure(yscrollcommand=scrollbar.set)
-            
-            main_canvas.pack(side="left", fill="both", expand=True)
-            scrollbar.pack(side="right", fill="y")
-            
-            # === Project Selection ===
-            project_frame = ttk.LabelFrame(scrollable_frame, text="Project Selection", padding=10)
-            project_frame.pack(fill="x", padx=10, pady=5)
-            
-            ttk.Label(project_frame, text="Select Project:").grid(row=0, column=0, sticky="w", padx=5)
-            self.project_var = tk.StringVar()
-            self.project_combo = ttk.Combobox(project_frame, textvariable=self.project_var, width=50)
-            self.project_combo.grid(row=0, column=1, padx=5, sticky="ew")
-            self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected_local)
-            
-            project_frame.columnconfigure(1, weight=1)
-            
-            # === Task Creation ===
-            task_create_frame = ttk.LabelFrame(scrollable_frame, text="Create New Task", padding=10)
-            task_create_frame.pack(fill="x", padx=10, pady=5)
-            
-            # Task details
-            ttk.Label(task_create_frame, text="Task Name:").grid(row=0, column=0, sticky="w", padx=5)
-            self.task_name_entry = ttk.Entry(task_create_frame, width=40)
-            self.task_name_entry.grid(row=0, column=1, padx=5, sticky="ew")
-            
-            ttk.Label(task_create_frame, text="Priority:").grid(row=0, column=2, sticky="w", padx=5)
-            self.priority_var = tk.StringVar(value="Medium")
-            priority_combo = ttk.Combobox(task_create_frame, textvariable=self.priority_var, 
-                                        values=["Low", "Medium", "High", "Critical"], width=10)
-            priority_combo.grid(row=0, column=3, padx=5)
-            
-            ttk.Label(task_create_frame, text="Start Date:").grid(row=1, column=0, sticky="w", padx=5)
-            self.start_date_entry = DateEntry(task_create_frame, width=12, date_pattern='yyyy-mm-dd')
-            self.start_date_entry.grid(row=1, column=1, padx=5, sticky="w")
-            
-            ttk.Label(task_create_frame, text="End Date:").grid(row=1, column=2, sticky="w", padx=5)
-            self.end_date_entry = DateEntry(task_create_frame, width=12, date_pattern='yyyy-mm-dd')
-            self.end_date_entry.grid(row=1, column=3, padx=5, sticky="w")
-            
-            ttk.Label(task_create_frame, text="Estimated Hours:").grid(row=2, column=0, sticky="w", padx=5)
-            self.estimated_hours_entry = ttk.Entry(task_create_frame, width=10)
-            self.estimated_hours_entry.grid(row=2, column=1, padx=5, sticky="w")
-            
-            ttk.Label(task_create_frame, text="Assigned To:").grid(row=2, column=2, sticky="w", padx=5)
-            self.assigned_to_var = tk.StringVar()
-            self.assigned_to_combo = ttk.Combobox(task_create_frame, textvariable=self.assigned_to_var, width=20)
-            self.assigned_to_combo.grid(row=2, column=3, padx=5)
-            
-            ttk.Label(task_create_frame, text="Predecessor Task:").grid(row=3, column=0, sticky="w", padx=5)
-            self.predecessor_var = tk.StringVar()
-            self.predecessor_combo = ttk.Combobox(task_create_frame, textvariable=self.predecessor_var, width=40)
-            self.predecessor_combo.grid(row=3, column=1, columnspan=2, padx=5, sticky="ew")
-            
-            ttk.Label(task_create_frame, text="Description:").grid(row=4, column=0, sticky="nw", padx=5)
-            self.description_text = tk.Text(task_create_frame, height=3, width=40)
-            self.description_text.grid(row=4, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
-            
-            # Create task button
-            create_btn = ttk.Button(task_create_frame, text="Create Task", command=self.create_task)
-            create_btn.grid(row=5, column=0, columnspan=4, pady=10)
-            
-            task_create_frame.columnconfigure(1, weight=1)
-            
-            # === Task List and Progress Tracking ===
-            task_list_frame = ttk.LabelFrame(scrollable_frame, text="Project Tasks", padding=10)
+            # Task list frame
+            task_list_frame = ttk.Frame(scrollable_frame)
             task_list_frame.pack(fill="both", expand=True, padx=10, pady=5)
             
             # Task tree view
@@ -1140,6 +1745,7 @@ class ReviewManagementTab:
         try:
             max_utilization = float(self.max_util_var.get()) if hasattr(self, 'max_util_var') else 100
         except Exception:
+            pass
             max_utilization = 80.0
 
         status_colors = {
@@ -1267,7 +1873,7 @@ class ReviewManagementTab:
         """Refresh all data in the tab"""
         try:
             # Initialize review service connection
-            from database import connect_to_db
+            from handlers.database import connect_to_db
             db_conn = connect_to_db()
             if db_conn:
                 self.review_service = ReviewManagementService(db_conn)
@@ -1289,6 +1895,7 @@ class ReviewManagementTab:
                 self.on_project_selected()
                 
         except Exception as e:
+            pass  # Handle the exception or log it as needed
             logger.error("Error refreshing review data: %s", e)
     
     def on_project_selected(self, event=None):
@@ -1465,7 +2072,8 @@ class ReviewManagementTab:
                 print("📊 No review services found - no review cycles to generate")
 
         except Exception as e:
-            print(f"Error in auto_update_stages_and_cycles: {e}")
+            print(f"Error in check_auto_populate_stages: {e}")
+            messagebox.showerror("Error", f"Failed to check auto-populate stages: {e}")
     
     def auto_sync_stages_from_services(self, services, silent=False):
         """Automatically sync stages based on service phases with individual service dates"""
@@ -2644,7 +3252,7 @@ class ReviewManagementTab:
                 messagebox.showerror("Error", "Invalid service ID")
                 return
             
-            # Load the full service data from database
+            # Load the full service data from handlers.database
             services = self.review_service.get_project_services(self.current_project_id)
             service_data = None
             for svc in services:
@@ -2878,7 +3486,7 @@ class ReviewManagementTab:
                     success = self.review_service.update_review_status_to(review_id, new_status, evidence_link)
                 else:
                     # Create service instance if not available
-                    from review_management_service import ReviewManagementService
+                    from handlers.review_management_service import ReviewManagementService
                     db_conn = connect_to_db()
                     if db_conn:
                         service = ReviewManagementService(db_conn)
@@ -2931,7 +3539,7 @@ class ReviewManagementTab:
                 messagebox.showwarning("Warning", "Please select a project first")
                 return
             
-            from gantt_chart import launch_gantt_chart
+            from ui.gantt_chart import launch_gantt_chart
             launch_gantt_chart(self.current_project_id)
             
         except Exception as e:
@@ -3289,7 +3897,7 @@ class ReviewManagementTab:
                 conn.close()
     
     def delete_review_from_database(self, review_id):
-        """Delete review cycle from database"""
+        """Delete review cycle from handlers.database"""
         try:
             conn = connect_to_db()
             if conn is None:
@@ -3305,14 +3913,14 @@ class ReviewManagementTab:
             return cursor.rowcount > 0
             
         except Exception as e:
-            print(f"Error deleting review from database: {e}")
+            print(f"Error deleting review from handlers.database: {e}")
             return False
         finally:
             if conn:
                 conn.close()
     
     def delete_all_reviews_from_database(self):
-        """Delete all review cycles for the current project from database"""
+        """Delete all review cycles for the current project from handlers.database"""
         try:
             conn = connect_to_db()
             if conn is None:
@@ -3351,7 +3959,7 @@ class ReviewManagementTab:
             return True
             
         except Exception as e:
-            print(f"Error deleting all reviews from database: {e}")
+            print(f"Error deleting all reviews from handlers.database: {e}")
             if conn:
                 conn.rollback()
             return False
@@ -3433,7 +4041,7 @@ class ReviewManagementTab:
             messagebox.showerror("Error", f"Error confirming reviews: {e}")
 
 
-class ProjectSetupTab:
+class DuplicateProjectSetupTab:
     """Project Setup and Management Interface - For creating and managing projects"""
     
     def __init__(self, parent_notebook):
@@ -3476,73 +4084,93 @@ class ProjectSetupTab:
         self.project_combo.pack(side="left", padx=(10, 0))
         self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
 
-        # Project status display
-        status_frame = ttk.Frame(project_frame)
-        status_frame.pack(fill="x")
+class NestedProjectSetupTab:
+    def __init__(self, parent):
+        self.frame = ttk.Frame(parent)
+        self.project_var = tk.StringVar()
+        self.acc_path_var = tk.StringVar()
+        self.status_var = tk.StringVar()
+        self.setup_ui()  # Initialize UI components
 
-        # Left column - basic info
-        left_status = ttk.Frame(status_frame)
-        left_status.pack(side="left", fill="both", expand=True)
+        # Project selection
+        project_frame = ttk.Frame(self.frame)
+        project_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(project_frame, text="Select Project:").pack(side=tk.LEFT)
+        self.project_combo = ttk.Combobox(project_frame, textvariable=self.project_var, state="readonly")
+        self.project_combo.pack(side=tk.LEFT, padx=5)
+        self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
+        self.refresh_projects()
 
-        self.status_labels = {}
-        basic_fields = ["Client", "Status", "Priority", "Start Date", "End Date"]
-        for i, field in enumerate(basic_fields):
-            row_frame = ttk.Frame(left_status)
-            row_frame.pack(fill="x", pady=2)
-            ttk.Label(row_frame, text=f"{field}:", width=12, anchor="w").pack(side="left")
-            self.status_labels[field] = ttk.Label(row_frame, text="Not Selected", foreground="gray")
-            self.status_labels[field].pack(side="left", padx=(5, 0))
+        # ACC folder path configuration
+        path_frame = ttk.Frame(self.frame)
+        path_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(path_frame, text="ACC Folder Path:").pack(side=tk.LEFT)
+        self.acc_path_entry = ttk.Entry(path_frame, textvariable=self.acc_path_var, width=50)
+        self.acc_path_entry.pack(side=tk.LEFT, padx=5)
+        self.acc_path_button = ttk.Button(path_frame, text="Configure Path", command=self.configure_paths)
+        self.acc_path_button.pack(side=tk.LEFT, padx=5)
 
-        # Right column - file paths
-        right_status = ttk.Frame(status_frame)
-        right_status.pack(side="right", fill="both", expand=True)
+        # Status label
+        status_frame = ttk.Frame(self.frame)
+        status_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
+        self.status_label.pack(side=tk.LEFT)
 
-        path_fields = ["Model Path", "IFC Path"]
-        for i, field in enumerate(path_fields):
-            row_frame = ttk.Frame(right_status)
-            row_frame.pack(fill="x", pady=2)
-            ttk.Label(row_frame, text=f"{field}:", width=12, anchor="w").pack(side="left")
-            self.status_labels[field] = ttk.Label(row_frame, text="Not Configured", foreground="gray", wraplength=300)
-            self.status_labels[field].pack(side="left", padx=(5, 0))
+        # Extract files button
+        extract_frame = ttk.Frame(self.frame)
+        extract_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.extract_button = ttk.Button(extract_frame, text="Extract ACC Files", command=self.extract_acc_files)
+        self.extract_button.pack(side=tk.LEFT)
 
-        # ===== MIDDLE SECTION: PROJECT ACTIONS =====
-        actions_frame = ttk.LabelFrame(main_frame, text="Project Actions", padding=15)
-        actions_frame.pack(fill="x", pady=(0, 15))
+    def refresh_projects(self):
+        projects = get_projects()
+        self.project_combo['values'] = [f"{p[0]} - {p[1]}" for p in projects]
+        if projects:
+            self.project_combo.current(0)
+            self.on_project_selected()
 
-        # Action buttons in a grid
-        buttons_frame = ttk.Frame(actions_frame)
-        buttons_frame.pack(fill="x")
+    def on_project_selected(self, event=None):
+        selected = self.project_var.get()
+        if '-' in selected:
+            project_id = selected.split('-')[0].strip()
+            folder_path = get_acc_folder_path(project_id)
+            self.acc_path_var.set(folder_path if folder_path else "")
+            self.status_var.set(f"Selected Project: {selected}")
+        else:
+            messagebox.showerror("Error", "Invalid project selection format")
 
-        action_buttons = [
-            ("Create New Project", self.create_new_project, "Create a new project"),
-            ("Edit Project Details", self.edit_project_details, "Modify current project information"),
-            ("Delete Project", self.delete_project, "Permanently delete the selected project and all related data"),
-            ("Configure File Paths", self.configure_paths, "Set model and IFC file locations"),
-            ("Extract Files from Model Folder", self.extract_model_files, "Extract files from configured model folder"),
-            ("Extract Files from Desktop Connector", self.extract_acc_files, "Extract files from ACC Desktop Connector"),
-            ("Refresh Project Data", self.refresh_data, "Reload project information from database"),
-            ("Debug Dropdown", self.debug_dropdown, "Debug project dropdown issues"),
-            ("View Project Dashboard", self.view_dashboard, "Open comprehensive project overview"),
-            ("Archive Project", self.archive_project, "Archive completed or cancelled project")
-        ]
+    def configure_paths(self):
+        selected = self.project_var.get()
+        if '-' not in selected:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        project_id = selected.split('-')[0].strip()
+        folder_path = filedialog.askdirectory(title="Select Desktop Connector Folder")
+        if not folder_path:
+            messagebox.showwarning("Warning", "No folder selected")
+            return
+        save_acc_folder_path(project_id, folder_path)
+        self.acc_path_var.set(folder_path)
+        self.status_var.set(f"Configured folder for project {project_id}")
+        messagebox.showinfo("Success", f"Desktop Connector folder path saved for project {project_id}")
 
-        for i, (text, command, tooltip) in enumerate(action_buttons):
-            row = i // 3
-            col = i % 3
-            btn = ttk.Button(buttons_frame, text=text, command=command, width=25)
-            btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
-
-        # Configure grid weights
-        for i in range(3):
-            buttons_frame.columnconfigure(i, weight=1)
-
-        # ===== BOTTOM SECTION: PROJECT DETAILS =====
-        details_frame = ttk.LabelFrame(main_frame, text="Project Details", padding=15)
-        details_frame.pack(fill="both", expand=True)
-
-        # Simple project details content
-        ttk.Label(details_frame, text="Project information will be displayed here",
-                 font=("Arial", 12)).pack(pady=50)
+    def extract_acc_files(self):
+        selected = self.project_var.get()
+        if '-' not in selected:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        project_id = selected.split('-')[0].strip()
+        folder_path = self.acc_path_var.get()
+        if not folder_path:
+            messagebox.showwarning("Warning", "No folder path configured")
+            return
+        try:
+            count = insert_files_into_tblACCDocs(project_id, folder_path)
+            self.status_var.set(f"Extracted {count} files for project {project_id}")
+            messagebox.showinfo("Success", f"Extracted {count} files for project {project_id}")
+        except Exception as e:
+            self.status_var.set(f"Error extracting files: {e}")
+            messagebox.showerror("Error", f"Failed to extract files: {e}")
 
     def on_project_selected(self, event=None):
         """Handle project selection from dropdown"""
@@ -3618,12 +4246,34 @@ class ProjectSetupTab:
         self.show_project_dialog(mode="edit", project_id=project_id)
 
     def configure_paths(self):
-        """Configure file paths for the current project"""
+        """Configure Desktop Connector folder path for the current project"""
         if not self.project_var.get():
             messagebox.showwarning("Warning", "Please select a project first")
             return
-        # TODO: Implement path configuration dialog
-        messagebox.showinfo("Info", "Path configuration not yet implemented")
+        # Parse project ID
+        project_selection = self.project_var.get()
+        if " - " in project_selection:
+            project_id_str, _ = project_selection.split(" - ", 1)
+            try:
+                project_id = int(project_id_str)
+            except ValueError:
+                messagebox.showerror("Error", "Invalid project selection format")
+                return
+        else:
+            messagebox.showerror("Error", "Invalid project selection format")
+            return
+
+        # Ask user for folder (Desktop Connector)
+        folder_path = filedialog.askdirectory(title="Select Desktop Connector Folder")
+        if not folder_path:
+            messagebox.showwarning("Warning", "No folder selected")
+            return
+
+        # Save to database
+        from database import save_acc_folder_path
+        save_acc_folder_path(project_id, folder_path)
+        self.folder_path_var.set(folder_path)
+        messagebox.showinfo("Success", f"Desktop Connector folder path saved for project {project_id}")
 
     def extract_model_files(self):
         """Extract files from configured model folder"""
@@ -3631,12 +4281,43 @@ class ProjectSetupTab:
         messagebox.showinfo("Info", "Model file extraction not yet implemented")
 
     def extract_acc_files(self):
-        """Extract files from ACC Desktop Connector"""
-        # TODO: Implement ACC file extraction
-        messagebox.showinfo("Info", "ACC file extraction not yet implemented")
+        """Extract files from Desktop Connector folder and save to SQL database"""
+        if not self.project_var.get():
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        project_selection = self.project_var.get()
+        if " - " in project_selection:
+            project_id_str, _ = project_selection.split(" - ", 1)
+            try:
+                project_id = int(project_id_str)
+            except ValueError:
+                messagebox.showerror("Error", "Invalid project selection format")
+                return
+        else:
+            messagebox.showerror("Error", "Invalid project selection format")
+            return
+
+        from database import get_acc_folder_path, insert_files_into_tblACCDocs
+        folder_path = get_acc_folder_path(project_id)
+        if not folder_path:
+            messagebox.showwarning("Warning", "No Desktop Connector folder path configured for this project")
+            return
+        if not os.path.exists(folder_path):
+            messagebox.showerror("Error", f"Folder path does not exist: {folder_path}")
+            return
+
+        # Extract files and insert into database
+        try:
+            result = insert_files_into_tblACCDocs(project_id, folder_path)
+            if result:
+                messagebox.showinfo("Success", f"Files extracted and stored for Project ID {project_id}.")
+            else:
+                messagebox.showerror("Error", "No files found or failed to insert.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error during extraction: {e}")
 
     def refresh_data(self):
-        """Reload project information from database"""
+        """Reload project information from handlers.database"""
         try:
             # Refresh project list
             self.load_projects()
@@ -3649,82 +4330,49 @@ class ProjectSetupTab:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to refresh data: {e}")
 
-    def debug_dropdown(self):
-        """Debug project dropdown issues"""
-        project_count = len(self.project_combo['values']) if self.project_combo['values'] else 0
-        current_selection = self.project_var.get()
-        messagebox.showinfo("Debug Info", f"Projects in dropdown: {project_count}\nCurrent selection: '{current_selection}'")
+    def setup_ui(self):
+        # Initialize status labels dictionary
+        self.status_labels = {}
+        
+        # Project selection
+        project_frame = ttk.Frame(self.frame)
+        project_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(project_frame, text="Select Project:").pack(side=tk.LEFT)
+        self.project_var = tk.StringVar()
+        self.project_combo = ttk.Combobox(project_frame, textvariable=self.project_var, state="readonly")
+        self.project_combo.pack(side=tk.LEFT, padx=5)
+        self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
+        
+        # Status display labels
+        status_fields = ["Client", "Status", "Priority", "Start Date", "End Date", "Model Path", "IFC Path"]
+        for field in status_fields:
+            self.status_labels[field] = ttk.Label(self.frame, text=f"{field}: Not Selected", foreground="gray")
+            self.status_labels[field].pack(fill=tk.X, padx=10, pady=2)
+        
+        self.refresh_projects()
 
-    def view_dashboard(self):
-        """Open comprehensive project overview"""
-        # TODO: Implement project dashboard
-        messagebox.showinfo("Info", "Project dashboard not yet implemented")
+        # ACC folder path configuration
+        path_frame = ttk.Frame(self.frame)
+        path_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(path_frame, text="ACC Folder Path:").pack(side=tk.LEFT)
+        self.acc_path_var = tk.StringVar()
+        self.acc_path_entry = ttk.Entry(path_frame, textvariable=self.acc_path_var, width=50)
+        self.acc_path_entry.pack(side=tk.LEFT, padx=5)
+        self.acc_path_button = ttk.Button(path_frame, text="Configure Path", command=self.configure_paths)
+        self.acc_path_button.pack(side=tk.LEFT, padx=5)
 
-    def archive_project(self):
-        """Archive completed or cancelled project"""
-        if not self.project_var.get():
-            messagebox.showwarning("Warning", "Please select a project first")
-            return
-        # TODO: Implement project archiving
-        messagebox.showinfo("Info", "Project archiving not yet implemented")
+        # Status label
+        status_frame = ttk.Frame(self.frame)
+        status_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.status_var = tk.StringVar()
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
+        self.status_label.pack(side=tk.LEFT)
 
-    def delete_project(self):
-        """Delete the selected project and all related data"""
-        if not self.project_var.get():
-            messagebox.showwarning("Warning", "Please select a project first")
-            return
-        
-        project_selection = self.project_var.get()
-        
-        # Parse project ID and name from "ID - Name" format
-        if " - " in project_selection:
-            project_id_str, project_name = project_selection.split(" - ", 1)
-            try:
-                project_id = int(project_id_str)
-            except ValueError:
-                messagebox.showerror("Error", "Invalid project selection format")
-                return
-        else:
-            messagebox.showerror("Error", "Invalid project selection format")
-            return
-        
-        # Show confirmation dialog
-        confirm_msg = (f"Are you sure you want to delete project '{project_name}'?\n\n"
-                      "This action will permanently delete:\n"
-                      "• All project data and settings\n"
-                      "• All review cycles and schedules\n"
-                      "• All tasks and assignments\n"
-                      "• All documents and clauses\n"
-                      "• All billing and service data\n"
-                      "• All ACC imports and logs\n\n"
-                      "This action cannot be undone!")
-        
-        if not messagebox.askyesno("Confirm Project Deletion", confirm_msg, icon="warning"):
-            return
-        
-        # Additional confirmation
-        confirm_again = messagebox.askyesno("Final Confirmation", 
-                                          f"Type 'YES' to confirm deletion of '{project_name}':")
-        if not confirm_again:
-            return
-        
-        try:
-            from database import delete_project
-            success = delete_project(project_id)
-            
-            if success:
-                messagebox.showinfo("Success", f"Project '{project_name}' has been deleted successfully.")
-                # Clear current selection
-                self.project_var.set("")
-                # Refresh project list
-                self.load_projects()
-                # Notify all tabs that the project list has changed
-                project_notification_system.notify_project_list_changed()
-            else:
-                messagebox.showerror("Error", "Failed to delete project. Please check the logs for details.")
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to delete project: {str(e)}")
+        # Extract files button
+        extract_frame = ttk.Frame(self.frame)
+        extract_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.extract_button = ttk.Button(extract_frame, text="Extract ACC Files", command=self.extract_acc_files)
+        self.extract_button.pack(side=tk.LEFT)
 
     def load_projects(self):
         """Load available projects into the dropdown"""
@@ -4082,7 +4730,7 @@ class ProjectSetupTab:
         def save_client():
             """Save the new client to database"""
             try:
-                from database import create_new_client
+                from handlers.database import create_new_client
                 
                 client_data = {
                     'client_name': client_vars['name'].get().strip(),
@@ -4140,7 +4788,7 @@ class ProjectSetupTab:
     def create_project_in_db(self, project_data):
         """Create a new project in the database with all collected fields"""
         try:
-            from database import insert_project_full
+            from handlers.database import insert_project_full
 
             # Prepare complete project data for insert_project_full
             db_data = {
@@ -4234,7 +4882,7 @@ class DocumentManagementTab:
     def create_project_in_db(self, project_data):
         """Create a new project in the database with all collected fields"""
         try:
-            from database import insert_project_full
+            from handlers.database import insert_project_full
 
             # Prepare complete project data for insert_project_full
             db_data = {
@@ -4314,7 +4962,7 @@ class DocumentManagementTab:
             
             # Update main project record if we have data to update
             if db_data:
-                from database import update_project_record
+                from handlers.database import update_project_record
                 success = update_project_record(project_id, db_data)
 
                 if not success:
@@ -4323,7 +4971,7 @@ class DocumentManagementTab:
             
             # Update folder paths separately using the dedicated function
             if project_data.get('folder_path') or project_data.get('ifc_folder_path'):
-                from database import update_project_folders
+                from handlers.database import update_project_folders
                 folder_success = update_project_folders(
                     project_id,
                     models_path=project_data.get('folder_path'),
@@ -4649,7 +5297,7 @@ class DocumentManagementTab:
                 return
             
             # Import the database function
-            from database import insert_files_into_tblACCDocs
+            from handlers.database import insert_files_into_tblACCDocs
             
             # Show progress dialog
             progress_dialog = tk.Toplevel(self.frame)
@@ -4716,30 +5364,30 @@ class DocumentManagementTab:
         if result:
             messagebox.showinfo("Feature", "Project archiving will be implemented")
     
-    def on_project_selected_local(self, event=None):
-        """Handle local project selection and update scope/schedule"""
-        try:
-            selected = self.project_var.get()
-            if not selected:
-                return
-            
-            self.current_project_id = int(selected.split(" - ")[0])
-            print(f"?? Loading project data for: {selected}")
-            
-            # Load project services in scope grid
-            self.load_project_scope()
-            
-            # Load schedule data
-            self.load_schedule()
-            
-            self.status_var.set(f"Loaded project: {selected.split(' - ')[1]}")
-            
-            # Notify other tabs
-            project_notification_system.notify_project_changed(selected)
-            
-        except Exception as e:
-            print(f"Error loading project: {e}")
-            self.status_var.set(f"Error loading project: {str(e)}")
+    def on_project_selected(self, event=None):
+        """Handle project selection from dropdown"""
+        project_selection = self.project_var.get()
+        if project_selection:
+            # Parse project name from "ID - Name" format
+            if " - " in project_selection:
+                project_id_str, project_name = project_selection.split(" - ", 1)
+                try:
+                    project_id = int(project_id_str)
+                except ValueError:
+                    project_id = None
+            else:
+                project_name = project_selection
+                project_id = None
+
+            # Update status labels
+            self.update_project_status(project_name)
+            # Update folder path display
+            if project_id is not None:
+                from database import get_acc_folder_path
+                folder_path = get_acc_folder_path(project_id)
+                self.folder_path_var.set(folder_path if folder_path else "")
+            # Notify other tabs with the full selection string
+            project_notification_system.notify_project_changed(project_selection)
     
     def load_scope(self):
         """Load scope data for the current project"""

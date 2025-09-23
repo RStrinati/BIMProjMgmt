@@ -3,7 +3,7 @@
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from ideate_health_exporter import export_health_checks_to_sql
+from handlers.ideate_health_exporter import export_health_checks_to_sql
 from database import log_acc_import, get_project_health_files, set_control_file
 
 
@@ -22,11 +22,11 @@ from database import (
     get_acc_import_logs,
     get_last_export_date,
 )
-from process_ifc import process_folder
+from handlers.process_ifc import process_folder
 from ui.tab_review import open_revizto_csharp_app
 
-from acc_handler import run_acc_import
-from rvt_health_importer import import_health_data
+from handlers.acc_handler import run_acc_import
+from handlers.rvt_health_importer import import_health_data
 
 def build_data_imports_tab(tab, status_var):
     # --- Project Selection ---

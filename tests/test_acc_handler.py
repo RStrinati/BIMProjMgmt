@@ -15,7 +15,7 @@ sys.modules.setdefault("tkinter.ttk", tk_mod.ttk)
 sys.modules.setdefault("tkinter.messagebox", tk_mod.messagebox)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from acc_handler import parse_custom_datetime, convert_to_sql_compatible  # noqa: E402
+from handlers.acc_handler import parse_custom_datetime, convert_to_sql_compatible  # noqa: E402
 
 
 def test_parse_custom_datetime_microseconds():

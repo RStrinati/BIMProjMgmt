@@ -1,8 +1,103 @@
+import sys
+import os
 from flask import Flask, jsonify, request, send_from_directory
 from pathlib import Path
 from flask_cors import CORS
+
+import requests
+import logging
+from config import ACC_SERVICE_URL, ACC_SERVICE_TOKEN, REVIZTO_SERVICE_URL, REVIZTO_SERVICE_TOKEN
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from database import (
+    create_service_template,
+    get_service_templates,
+    update_service_template,
+    delete_service_template,
+    get_review_tasks,
+    update_review_task_assignee,
+    get_users_list,
+    get_project_details,
+    update_project_details,
+    update_project_folders,
+    insert_project,
+    insert_files_into_tblACCDocs,
+    get_project_folders,
+    get_review_summary,
+    get_contractual_links,
+    get_cycle_ids,
+    get_review_cycles,
+    create_review_cycle,
+    update_review_cycle,
+    delete_review_cycle,
+    get_review_cycle_tasks,
+    update_review_cycle_task,
+    get_bep_matrix,
+    upsert_bep_section,
+    update_bep_status,
+    get_projects_full,
+    update_project_record,
+    insert_project_full,
+    get_reference_options,
+)
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
+CORS(app)
+
+# --- ServiceTemplates API ---
+@app.route('/api/service_templates', methods=['GET'])
+def api_get_service_templates():
+    templates = get_service_templates()
+    return jsonify(templates)
+
+@app.route('/api/service_templates', methods=['POST'])
+def api_create_service_template():
+    body = request.get_json() or {}
+    required = ['template_name', 'service_type', 'parameters', 'created_by']
+    if not all(body.get(k) for k in required):
+        return jsonify({'error': 'Missing required fields'}), 400
+    success = create_service_template(
+        body['template_name'],
+        body.get('description', ''),
+        body['service_type'],
+        body['parameters'],
+        body['created_by']
+    )
+    if success:
+        return jsonify({'success': True}), 201
+    return jsonify({'success': False}), 500
+
+@app.route('/api/service_templates/<int:template_id>', methods=['PATCH'])
+def api_update_service_template(template_id):
+    body = request.get_json() or {}
+    success = update_service_template(
+        template_id,
+        template_name=body.get('template_name'),
+        description=body.get('description'),
+        service_type=body.get('service_type'),
+        parameters=body.get('parameters'),
+        is_active=body.get('is_active')
+    )
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
+
+@app.route('/api/service_templates/<int:template_id>', methods=['DELETE'])
+def api_delete_service_template(template_id):
+    success = delete_service_template(template_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
+from flask import Flask, jsonify, request, send_from_directory
+from pathlib import Path
+from flask_cors import CORS
+
 import sys
 import os
+import requests
+import logging
+from config import ACC_SERVICE_URL, ACC_SERVICE_TOKEN, REVIZTO_SERVICE_URL, REVIZTO_SERVICE_TOKEN
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import (
@@ -575,6 +670,47 @@ def api_get_resources():
         ]
         return jsonify(mock_resources)
 
+
+
+# --- ACC Service Proxy Endpoints ---
+@app.route('/api/acc/<path:path>', methods=['GET', 'POST', 'PATCH', 'PUT', 'DELETE'])
+def proxy_acc_service(path):
+    """Proxy requests to ACC Node.js service."""
+    method = request.method
+    url = f"{ACC_SERVICE_URL}/{path}"
+    headers = {"Authorization": f"Bearer {ACC_SERVICE_TOKEN}", "Content-Type": "application/json"}
+    try:
+        resp = requests.request(
+            method,
+            url,
+            headers=headers,
+            params=request.args,
+            json=request.get_json(silent=True)
+        )
+        return (resp.content, resp.status_code, resp.headers.items())
+    except Exception as e:
+        logging.exception("ACC proxy error")
+        return jsonify({"error": "ACC service unavailable", "details": str(e)}), 502
+
+# --- Revizto Service Proxy Endpoints ---
+@app.route('/api/revizto/<path:path>', methods=['GET', 'POST', 'PATCH', 'PUT', 'DELETE'])
+def proxy_revizto_service(path):
+    """Proxy requests to Revizto .NET service."""
+    method = request.method
+    url = f"{REVIZTO_SERVICE_URL}/{path}"
+    headers = {"Authorization": f"Bearer {REVIZTO_SERVICE_TOKEN}", "Content-Type": "application/json"}
+    try:
+        resp = requests.request(
+            method,
+            url,
+            headers=headers,
+            params=request.args,
+            json=request.get_json(silent=True)
+        )
+        return (resp.content, resp.status_code, resp.headers.items())
+    except Exception as e:
+        logging.exception("Revizto proxy error")
+        return jsonify({"error": "Revizto service unavailable", "details": str(e)}), 502
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

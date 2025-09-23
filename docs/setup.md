@@ -29,6 +29,11 @@ Set the following variables before running the tools:
 - `PROJECT_MGMT_DB` – default project management database (default `ProjectManagement`)
 - `ACC_DB` – Autodesk Construction Cloud staging database (default `acc_data_schema`)
 - `REVIT_HEALTH_DB` – Revit health check database (default `RevitHealthCheckDB`)
+- `REVIZTO_DB` – Revizto API data database (default `ReviztoData`)
+- `ACC_SERVICE_URL` – ACC Node.js API endpoint (default `http://localhost:4000/api/v1`)
+- `REVIZTO_SERVICE_URL` – Revizto .NET API endpoint (default `http://localhost:5000/api/v1`)
+- `ACC_SERVICE_TOKEN` – ACC API token (managed by token broker)
+- `REVIZTO_SERVICE_TOKEN` – Revizto API token (managed by token broker)
 
 ### Setting Environment Variables
 
@@ -38,6 +43,16 @@ Example .env file:
 
 DB_SERVER=localhost\SQLEXPRESS
 DB_USER=sa
+DB_PASSWORD=1234
+DB_DRIVER=ODBC Driver 18 for SQL Server
+PROJECT_MGMT_DB=ProjectManagement
+ACC_DB=acc_data_schema
+REVIT_HEALTH_DB=RevitHealthCheckDB
+REVIZTO_DB=ReviztoData
+ACC_SERVICE_URL=http://localhost:4000/api/v1
+REVIZTO_SERVICE_URL=http://localhost:5000/api/v1
+ACC_SERVICE_TOKEN=your_acc_token_here
+REVIZTO_SERVICE_TOKEN=your_revizto_token_here
 DB_PASSWORD=1234
 DB_DRIVER=ODBC Driver 18 for SQL Server
 PROJECT_MGMT_DB=ProjectManagement

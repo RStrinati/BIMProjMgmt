@@ -1,0 +1,13 @@
+2025-02-01 11:40:10.279 +11:00 [INF] Starting application
+2025-02-01 11:40:10.330 +11:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-02-01 11:40:10.556 +11:00 [INF] Operation successful: Fetching user licenses (Duration: 226 ms)
+2025-02-01 11:40:10.559 +11:00 [INF] User has 3 licenses.
+2025-02-01 11:40:10.560 +11:00 [INF] Starting operation: Fetching projects for license UUID: a9acd965-e694-4f55-9a1c-3923910c3f93 (Attempt 1/3)
+2025-02-01 11:40:10.671 +11:00 [INF] Operation successful: Fetching projects for license UUID: a9acd965-e694-4f55-9a1c-3923910c3f93 (Duration: 110 ms)
+2025-02-01 11:40:10.673 +11:00 [INF] License a9acd965-e694-4f55-9a1c-3923910c3f93 has 1 projects.
+2025-02-01 11:40:10.673 +11:00 [INF] Starting operation: Fetching projects for license UUID: 949c5f41-a97b-4530-8fb6-b352e3b49546 (Attempt 1/3)
+2025-02-01 11:40:10.798 +11:00 [INF] Operation successful: Fetching projects for license UUID: 949c5f41-a97b-4530-8fb6-b352e3b49546 (Duration: 124 ms)
+2025-02-01 11:40:10.802 +11:00 [INF] License 949c5f41-a97b-4530-8fb6-b352e3b49546 has 1 projects.
+2025-02-01 11:40:10.804 +11:00 [INF] Starting operation: Fetching projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-02-01 11:40:11.286 +11:00 [INF] Operation successful: Fetching projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (Duration: 482 ms)
+2025-02-01 11:40:11.290 +11:00 [INF] License 3575016fd4924d9ab14c6650a3d5719f has 6 projects.

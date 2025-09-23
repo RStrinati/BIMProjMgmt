@@ -1,3 +1,92 @@
+def create_service_template(template_name, description, service_type, parameters, created_by):
+    """Insert a new service template."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            INSERT INTO {S.ServiceTemplates.TABLE} (
+                {S.ServiceTemplates.TEMPLATE_NAME}, {S.ServiceTemplates.DESCRIPTION},
+                {S.ServiceTemplates.SERVICE_TYPE}, {S.ServiceTemplates.PARAMETERS},
+                {S.ServiceTemplates.CREATED_BY}
+            ) VALUES (?, ?, ?, ?, ?);
+            """,
+            (template_name, description, service_type, parameters, created_by)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error creating service template: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_service_templates():
+    """Fetch all service templates."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT {S.ServiceTemplates.ID}, {S.ServiceTemplates.TEMPLATE_NAME}, {S.ServiceTemplates.DESCRIPTION}, {S.ServiceTemplates.SERVICE_TYPE}, {S.ServiceTemplates.PARAMETERS}, {S.ServiceTemplates.CREATED_BY}, {S.ServiceTemplates.CREATED_AT}, {S.ServiceTemplates.IS_ACTIVE} FROM {S.ServiceTemplates.TABLE} WHERE {S.ServiceTemplates.IS_ACTIVE} = 1 ORDER BY {S.ServiceTemplates.ID};"
+        )
+        templates = [dict(
+            id=row[0],
+            template_name=row[1],
+            description=row[2],
+            service_type=row[3],
+            parameters=row[4],
+            created_by=row[5],
+            created_at=row[6],
+            is_active=row[7]
+        ) for row in cursor.fetchall()]
+        return templates
+    except Exception as e:
+        print(f"❌ Error fetching service templates: {e}")
+        return []
+    finally:
+        conn.close()
+
+def update_service_template(template_id, template_name=None, description=None, service_type=None, parameters=None, is_active=None):
+    """Update an existing service template."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        update_fields = {}
+        if template_name is not None:
+            update_fields[S.ServiceTemplates.TEMPLATE_NAME] = template_name
+        if description is not None:
+            update_fields[S.ServiceTemplates.DESCRIPTION] = description
+        if service_type is not None:
+            update_fields[S.ServiceTemplates.SERVICE_TYPE] = service_type
+        if parameters is not None:
+            update_fields[S.ServiceTemplates.PARAMETERS] = parameters
+        if is_active is not None:
+            update_fields[S.ServiceTemplates.IS_ACTIVE] = is_active
+        if not update_fields:
+            return False
+        set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+        values = list(update_fields.values()) + [template_id]
+        cursor.execute(
+            f"UPDATE {S.ServiceTemplates.TABLE} SET {set_clause} WHERE {S.ServiceTemplates.ID} = ?",
+            values
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating service template: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_service_template(template_id):
+    """Soft delete a service template by setting is_active to 0."""
+    return update_service_template(template_id, is_active=0)
 import logging
 import pyodbc
 import os
@@ -506,32 +595,47 @@ def get_last_export_date():
         conn.close()
 
 def save_acc_folder_path(project_id, folder_path):
-    conn = connect_to_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        f"""
-        MERGE INTO {S.ACCImportFolders.TABLE} AS target
-        USING (SELECT ? AS {S.ACCImportFolders.PROJECT_ID}, ? AS {S.ACCImportFolders.ACC_FOLDER_PATH}) AS source
-        ON target.{S.ACCImportFolders.PROJECT_ID} = source.{S.ACCImportFolders.PROJECT_ID}
-        WHEN MATCHED THEN UPDATE SET {S.ACCImportFolders.ACC_FOLDER_PATH} = source.{S.ACCImportFolders.ACC_FOLDER_PATH}
-        WHEN NOT MATCHED THEN INSERT ({S.ACCImportFolders.PROJECT_ID}, {S.ACCImportFolders.ACC_FOLDER_PATH})
-            VALUES (source.{S.ACCImportFolders.PROJECT_ID}, source.{S.ACCImportFolders.ACC_FOLDER_PATH});
-        """,
-        (project_id, folder_path),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = connect_to_db()
+        if not conn:
+            return False
+            
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            MERGE INTO {S.ACCImportFolders.TABLE} AS target
+            USING (SELECT ? AS {S.ACCImportFolders.PROJECT_ID}, ? AS {S.ACCImportFolders.ACC_FOLDER_PATH}) AS source
+            ON target.{S.ACCImportFolders.PROJECT_ID} = source.{S.ACCImportFolders.PROJECT_ID}
+            WHEN MATCHED THEN UPDATE SET {S.ACCImportFolders.ACC_FOLDER_PATH} = source.{S.ACCImportFolders.ACC_FOLDER_PATH}
+            WHEN NOT MATCHED THEN INSERT ({S.ACCImportFolders.PROJECT_ID}, {S.ACCImportFolders.ACC_FOLDER_PATH})
+                VALUES (source.{S.ACCImportFolders.PROJECT_ID}, source.{S.ACCImportFolders.ACC_FOLDER_PATH});
+            """,
+            (project_id, folder_path),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error saving ACC folder path: {e}")
+        return False
 
 def get_acc_folder_path(project_id):
-    conn = connect_to_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        f"SELECT {S.ACCImportFolders.ACC_FOLDER_PATH} FROM {S.ACCImportFolders.TABLE} WHERE {S.ACCImportFolders.PROJECT_ID} = ?",
-        (project_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
-    return row[0] if row else None
+    try:
+        conn = connect_to_db()
+        if not conn:
+            return None
+            
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT {S.ACCImportFolders.ACC_FOLDER_PATH} FROM {S.ACCImportFolders.TABLE} WHERE {S.ACCImportFolders.PROJECT_ID} = ?",
+            (project_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"Error getting ACC folder path: {e}")
+        return None
 
 def log_acc_import(project_id, folder_name, summary):
     conn = connect_to_db()

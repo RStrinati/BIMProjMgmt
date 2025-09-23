@@ -13,8 +13,8 @@ from ui.ui_helpers import (
 )
 from ui.status_bar import update_status
 
-from review_handler import submit_review_schedule, generate_stage_review_schedule
-from gantt_chart import launch_gantt_chart
+from handlers.review_handler import submit_review_schedule, generate_stage_review_schedule
+from ui.gantt_chart import launch_gantt_chart
 from database import (
     get_projects,
     get_cycle_ids,

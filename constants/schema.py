@@ -715,6 +715,19 @@ class ServiceScheduleSettings:
     AUTO_COMPLETE = "auto_complete"
     UPDATED_AT = "updated_at"
 
+
+# ===================== Service Templates =====================
+class ServiceTemplates:
+    TABLE = "ServiceTemplates"
+    ID = "id"
+    TEMPLATE_NAME = "template_name"
+    DESCRIPTION = "description"
+    SERVICE_TYPE = "service_type"
+    PARAMETERS = "parameters"
+    CREATED_BY = "created_by"
+    CREATED_AT = "created_at"
+    IS_ACTIVE = "is_active"
+
 class ProjectBookmarks:
     TABLE = "ProjectBookmarks"
     ID = "bookmark_id"

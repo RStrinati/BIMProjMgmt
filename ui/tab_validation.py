@@ -23,7 +23,7 @@ from database import (
     get_control_file,
     set_control_file,
 )
-from process_ifc import process_folder
+from handlers.process_ifc import process_folder
 
 def build_validation_tab(tab, status_var):
     # --- Project Selection & Control File ---

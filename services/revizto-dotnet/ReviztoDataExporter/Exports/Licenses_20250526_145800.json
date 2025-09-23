@@ -1,0 +1,16 @@
+[
+  {
+    "uuid": "3575016fd4924d9ab14c6650a3d5719f",
+    "name": "IIMBE",
+    "expires": "2028-05-01T00:00:00",
+    "created": "2020-05-01T08:34:04",
+    "region": "us-east-1"
+  },
+  {
+    "uuid": "ad5f9970-76fd-4ace-8471-90b52ee2121f",
+    "name": "Hindmarsh EC6 Project",
+    "expires": "2025-07-31T00:00:00",
+    "created": "2024-07-29T04:46:31",
+    "region": "ap-southeast-2"
+  }
+]
