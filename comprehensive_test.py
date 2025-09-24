@@ -69,7 +69,7 @@ def test_review_generation():
             }
         ]
         
-        result = review_service.generate_stage_schedule(project_id, sample_stages)
+        result = review_service.generate_stage_schedule_new(project_id, sample_stages)
         if result:
             print("✅ Stage schedule generation successful")
         else:

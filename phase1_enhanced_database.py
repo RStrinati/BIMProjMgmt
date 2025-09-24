@@ -505,15 +505,16 @@ class ResourceManager:
             # Base query for resource utilization (simplified without task_assignments table)
             query = """
                 SELECT 
-                    u.user_id, u.name, u.role_level, u.weekly_capacity_hours,
-                    u.department, u.skills,
+                    u.user_id, u.name, u.role as role_level, 
+                    40 as weekly_capacity_hours,  -- Default capacity
+                    'General' as department,      -- Default department
+                    'General' as skills,          -- Default skills
                     0 as active_assignments,
                     0 as allocated_hours,
                     0 as total_estimated_hours,
                     0 as total_actual_hours,
                     0 as avg_task_progress
                 FROM users u
-                WHERE u.is_active = 1
             """
             
             params = []
@@ -522,7 +523,7 @@ class ResourceManager:
                 query += " AND u.user_id = ?"
                 params.append(user_id)
             
-            query += " GROUP BY u.user_id, u.name, u.role_level, u.weekly_capacity_hours, u.department, u.skills"
+            query += " GROUP BY u.user_id, u.name, u.role"
             
             cursor.execute(query, params)
             resources = cursor.fetchall()

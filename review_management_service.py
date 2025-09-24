@@ -20,8 +20,11 @@ from typing import List, Dict, Optional, Tuple
 
 import os
 
-
-
+# Import validation service
+from review_validation import (
+    validate_template, validate_service_data, validate_review_cycle,
+    validate_project_services, validate_billing_claim, sanitize_input
+)
 
 
 class ReviewManagementService:
@@ -378,6 +381,94 @@ class ReviewManagementService:
 
 
 
+    def load_template(self, template_name: str) -> Optional[Dict]:
+
+        """Load a service template by name from templates/service_templates.json"""
+
+        try:
+
+            # Get the path to the templates directory
+
+            template_file = os.path.join(os.path.dirname(__file__), 'templates', 'service_templates.json')
+
+            if not os.path.exists(template_file):
+
+                print(f"Template file not found: {template_file}")
+
+                return None
+
+            # Load and parse the template file
+
+            with open(template_file, 'r', encoding='utf-8') as f:
+
+                data = json.load(f)
+
+            # Find the template by name
+
+            for template in data.get('templates', []):
+
+                if template.get('name') == template_name:
+
+                    # Validate the template before returning
+
+                    validation_errors = validate_template(template)
+
+                    if validation_errors:
+
+                        print(f"Template '{template_name}' has validation errors:")
+
+                        for error in validation_errors:
+
+                            print(f"  - {error}")
+
+                        return None
+
+                    return template
+
+            print(f"Template '{template_name}' not found in templates")
+
+            return None
+
+        except Exception as e:
+
+            print(f"Error loading template '{template_name}': {e}")
+
+            return None
+
+    def get_available_templates(self) -> List[Dict]:
+        """Get list of available service templates from templates/service_templates.json"""
+        try:
+            import json
+            import os
+
+            # Get the path to the templates directory
+            template_file = os.path.join(os.path.dirname(__file__), 'templates', 'service_templates.json')
+
+            if not os.path.exists(template_file):
+                print(f"Template file not found: {template_file}")
+                return []
+
+            # Load and parse the template file
+            with open(template_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Return all templates with basic info
+            templates = []
+            for template in data.get('templates', []):
+                templates.append({
+                    'name': template.get('name', ''),
+                    'sector': template.get('sector', ''),
+                    'description': template.get('notes', '')
+                })
+
+            return templates
+
+        except Exception as e:
+            print(f"Error getting available templates: {e}")
+            return []
+
+
+
     def apply_template(self, project_id: int, template_name: str, overrides: Dict = None) -> List[Dict]:
 
         """Apply service template to project, creating ProjectServices"""
@@ -454,6 +545,18 @@ class ReviewManagementService:
 
                 
 
+                # Validate service data before creation
+
+                validation_errors = validate_service_data(service_data)
+
+                if validation_errors:
+
+                    print(f"Service validation errors for {item['service_code']}: {validation_errors}")
+
+                    continue  # Skip invalid services
+
+                
+
                 service_id = self.create_project_service(service_data)
 
 
@@ -496,6 +599,26 @@ class ReviewManagementService:
     def create_project_service(self, service_data: Dict) -> int:
 
         """Create a new project service"""
+
+        # Validate service data
+
+        validation_errors = validate_service_data(service_data)
+
+        if validation_errors:
+
+            error_msg = f"Service validation failed: {', '.join([str(e) for e in validation_errors])}"
+
+            print(error_msg)
+
+            raise ValueError(error_msg)
+
+        
+
+        # Sanitize input data
+
+        service_data = sanitize_input(service_data)
+
+        
 
         query = """
 
@@ -925,6 +1048,34 @@ class ReviewManagementService:
 
         try:
 
+            # Validate claim data
+
+            claim_data = {
+
+                'project_id': project_id,
+
+                'period_start': period_start.date() if hasattr(period_start, 'date') else period_start,
+
+                'period_end': period_end.date() if hasattr(period_end, 'date') else period_end,
+
+                'po_ref': po_ref
+
+            }
+
+            
+
+            validation_errors = validate_billing_claim(claim_data)
+
+            if validation_errors:
+
+                error_msg = f"Billing claim validation failed: {', '.join([str(e) for e in validation_errors])}"
+
+                print(error_msg)
+
+                raise ValueError(error_msg)
+
+            
+
             # Create claim header
 
             query = """
@@ -1262,6 +1413,62 @@ class ReviewManagementService:
         self.db.commit()
 
 
+
+    def delete_project_service(self, service_id: int) -> bool:
+
+        """Delete a project service and all related data"""
+
+        try:
+
+            from database import delete_project_service
+
+            return delete_project_service(service_id)
+
+        except Exception as e:
+
+            print(f"Error deleting project service: {e}")
+
+            return False
+
+    def clear_all_project_services(self, project_id: int) -> int:
+
+        """Delete all services for a project and return the count of deleted services"""
+
+        try:
+
+            # Get all services for the project
+
+            services = self.get_project_services(project_id)
+
+            deleted_count = 0
+
+            
+
+            # Delete each service individually to ensure proper cleanup
+
+            for service in services:
+
+                service_id = service['service_id']
+
+                if self.delete_project_service(service_id):
+
+                    deleted_count += 1
+
+                else:
+
+                    print(f"Failed to delete service {service_id}")
+
+            
+
+            return deleted_count
+
+            
+
+        except Exception as e:
+
+            print(f"Error clearing all project services: {e}")
+
+            return 0
 
     def rebuild_service_reviews(self, service_id: int) -> bool:
 
@@ -1763,15 +1970,17 @@ class ReviewManagementService:
 
                     'unit_type': 'review',
 
+                    'default_units': num_reviews,
+
                     'unit_qty': num_reviews,
 
-                    'unit_rate': 0.0,
+                    'unit_rate': 100.0,
 
                     'lump_sum_fee': 0.0,
 
                     'agreed_fee': 0.0,
 
-                    'bill_rule': 'milestone',
+                    'bill_rule': 'per_unit_complete',
 
                     'notes': f'Auto-generated review service for {stage_name} stage'
 
@@ -1988,26 +2197,417 @@ class ReviewManagementService:
             print(f"Error getting service reviews: {e}")
             return []
 
-    def get_available_templates(self) -> List[Dict]:
-        """Get available review templates"""
+    # ===== ENHANCED TRACKING METHODS =====
+
+    def get_project_progress_summary(self, project_id: int) -> Dict:
+        """Get comprehensive project progress summary for tracking UI"""
+        try:
+            # Get total reviews count
+            self.cursor.execute("""
+                SELECT COUNT(*) as total_reviews
+                FROM project_review_cycles
+                WHERE project_id = ?
+            """, (project_id,))
+            total_reviews = self.cursor.fetchone().total_reviews
+
+            # Get completed reviews
+            self.cursor.execute("""
+                SELECT COUNT(*) as completed_reviews
+                FROM project_review_cycles
+                WHERE project_id = ? AND status = 'completed'
+            """, (project_id,))
+            completed_reviews = self.cursor.fetchone().completed_reviews
+
+            # Get active reviews
+            self.cursor.execute("""
+                SELECT COUNT(*) as active_reviews
+                FROM project_review_cycles
+                WHERE project_id = ? AND status = 'in_progress'
+            """, (project_id,))
+            active_reviews = self.cursor.fetchone().active_reviews
+
+            # Get overdue reviews
+            self.cursor.execute("""
+                SELECT COUNT(*) as overdue_reviews
+                FROM project_review_cycles
+                WHERE project_id = ? AND due_date < ? AND status != 'completed'
+            """, (project_id, datetime.now().date()))
+            overdue_reviews = self.cursor.fetchone().overdue_reviews
+
+            # Get upcoming reviews (due within 7 days)
+            self.cursor.execute("""
+                SELECT COUNT(*) as upcoming_reviews
+                FROM project_review_cycles
+                WHERE project_id = ? AND due_date BETWEEN ? AND ? AND status != 'completed'
+            """, (project_id, datetime.now().date(), (datetime.now() + timedelta(days=7)).date()))
+            upcoming_reviews = self.cursor.fetchone().upcoming_reviews
+
+            # Calculate overall progress
+            overall_progress = (completed_reviews / total_reviews * 100) if total_reviews > 0 else 0
+
+            return {
+                'total_reviews': total_reviews,
+                'completed_reviews': completed_reviews,
+                'active_reviews': active_reviews,
+                'overdue_reviews': overdue_reviews,
+                'upcoming_reviews': upcoming_reviews,
+                'overall_progress': round(overall_progress, 1)
+            }
+
+        except Exception as e:
+            print(f"Error getting project progress summary: {e}")
+            return {
+                'total_reviews': 0,
+                'completed_reviews': 0,
+                'active_reviews': 0,
+                'overdue_reviews': 0,
+                'upcoming_reviews': 0,
+                'overall_progress': 0
+            }
+
+    def generate_progress_report(self, project_id: int) -> Dict:
+        """Generate detailed progress report for the project"""
+        try:
+            progress_summary = self.get_project_progress_summary(project_id)
+
+            # Get service progress
+            services = self.get_project_services(project_id)
+            service_progress = []
+            for service in services:
+                service_progress.append({
+                    'service_name': service['service_name'],
+                    'phase': service['phase'],
+                    'progress_percentage': service['progress_pct'],
+                    'agreed_fee': service['agreed_fee'],
+                    'completed_value': service['agreed_fee'] * (service['progress_pct'] / 100)
+                })
+
+            # Get recent reviews
+            self.cursor.execute("""
+                SELECT cycle_number, status, due_date, actual_end_date
+                FROM project_review_cycles
+                WHERE project_id = ?
+                ORDER BY cycle_number DESC
+                LIMIT 10
+            """, (project_id,))
+            recent_reviews = self.cursor.fetchall()
+
+            review_status = []
+            for review in recent_reviews:
+                review_status.append({
+                    'cycle': review.cycle_number,
+                    'status': review.status,
+                    'due_date': review.due_date,
+                    'completed_date': review.actual_end_date
+                })
+
+            return {
+                'progress_summary': progress_summary,
+                'service_progress': service_progress,
+                'recent_reviews': review_status,
+                'generated_at': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            print(f"Error generating progress report: {e}")
+            return {'error': str(e)}
+
+    def get_project_milestones(self, project_id: int) -> List[Dict]:
+        """Get project milestones for timeline visualization"""
+        try:
+            milestones = []
+
+            # Get review cycle milestones
+            self.cursor.execute("""
+                SELECT cycle_number, planned_start_date, due_date, status
+                FROM project_review_cycles
+                WHERE project_id = ?
+                ORDER BY cycle_number
+            """, (project_id,))
+            cycles = self.cursor.fetchall()
+
+            for cycle in cycles:
+                # Calculate progress percentage based on status
+                progress_pct = {
+                    'planned': 0,
+                    'in_progress': 50,
+                    'completed': 100,
+                    'on_hold': 25,
+                    'cancelled': 0
+                }.get(cycle.status, 0)
+
+                milestones.append({
+                    'name': f'Cycle {cycle.cycle_number}',
+                    'due_date': cycle.due_date,
+                    'status': cycle.status,
+                    'progress_percentage': progress_pct,
+                    'type': 'review_cycle'
+                })
+
+            # Get service completion milestones
+            services = self.get_project_services(project_id)
+            for service in services:
+                if service['progress_pct'] >= 100:
+                    milestones.append({
+                        'name': f"{service['service_name']} Complete",
+                        'due_date': service.get('end_date'),
+                        'status': 'completed',
+                        'progress_percentage': 100,
+                        'type': 'service_completion'
+                    })
+
+            return sorted(milestones, key=lambda x: x.get('due_date') or datetime.max.date())
+
+        except Exception as e:
+            print(f"Error getting project milestones: {e}")
+            return []
+
+    def get_detailed_tasks(self, project_id: int, filters: Dict = None) -> List[Dict]:
+        """Get detailed task information with filtering"""
+        try:
+            query = """
+                SELECT
+                    r.review_id,
+                    r.cycle_id,
+                    r.planned_date,
+                    r.due_date,
+                    r.actual_start_date,
+                    r.actual_end_date,
+                    r.status,
+                    r.assigned_to,
+                    r.reviewer,
+                    r.notes,
+                    s.service_name,
+                    s.phase,
+                    s.progress_pct,
+                    s.priority,
+                    r.last_updated
+                FROM project_reviews r
+                JOIN project_services s ON r.service_id = s.service_id
+                WHERE s.project_id = ?
+            """
+
+            params = [project_id]
+
+            # Apply filters
+            if filters:
+                if filters.get('status'):
+                    query += " AND r.status = ?"
+                    params.append(filters['status'])
+                if filters.get('assignee'):
+                    query += " AND r.assigned_to = ?"
+                    params.append(filters['assignee'])
+                if filters.get('priority'):
+                    query += " AND s.priority = ?"
+                    params.append(filters['priority'])
+
+                # Due date filters
+                due_filter = filters.get('due_filter')
+                if due_filter == 'today':
+                    query += " AND r.due_date = ?"
+                    params.append(datetime.now().date())
+                elif due_filter == '3days':
+                    query += " AND r.due_date <= ?"
+                    params.append((datetime.now() + timedelta(days=3)).date())
+                elif due_filter == 'week':
+                    query += " AND r.due_date <= ?"
+                    params.append((datetime.now() + timedelta(days=7)).date())
+                elif due_filter == 'overdue':
+                    query += " AND r.due_date < ? AND r.status != 'completed'"
+                    params.append(datetime.now().date())
+
+            query += " ORDER BY r.due_date ASC"
+
+            self.cursor.execute(query, params)
+            tasks = self.cursor.fetchall()
+
+            detailed_tasks = []
+            for task in tasks:
+                # Determine if overdue or due soon
+                is_overdue = False
+                due_soon = False
+                if task.due_date:
+                    days_until_due = (task.due_date - datetime.now().date()).days
+                    is_overdue = days_until_due < 0 and task.status != 'completed'
+                    due_soon = 0 <= days_until_due <= 3 and task.status != 'completed'
+
+                detailed_tasks.append({
+                    'id': task.review_id,
+                    'service_name': task.service_name,
+                    'cycle': task.cycle_id,
+                    'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else None,
+                    'status': task.status,
+                    'assignee': task.assigned_to,
+                    'progress_percentage': task.progress_pct or 0,
+                    'priority': task.priority or 'medium',
+                    'last_update': task.last_updated.isoformat() if task.last_updated else None,
+                    'is_overdue': is_overdue,
+                    'due_soon': due_soon,
+                    'phase': task.phase,
+                    'notes': task.notes
+                })
+
+            return detailed_tasks
+
+        except Exception as e:
+            print(f"Error getting detailed tasks: {e}")
+            return []
+
+    def update_task_status(self, task_id: int, new_status: str, progress_percentage: int = None):
+        """Update task status and progress"""
+        try:
+            # Validate status
+            valid_statuses = ['planned', 'in_progress', 'completed', 'on_hold', 'cancelled']
+            if new_status not in valid_statuses:
+                raise ValueError(f"Invalid status: {new_status}")
+
+            # Update task
+            update_fields = ["status = ?", "last_updated = ?"]
+            params = [new_status, datetime.now()]
+
+            if progress_percentage is not None:
+                update_fields.append("progress_pct = ?")
+                params.append(progress_percentage)
+
+            query = f"""
+                UPDATE project_reviews
+                SET {', '.join(update_fields)}
+                WHERE review_id = ?
+            """
+            params.append(task_id)
+
+            self.cursor.execute(query, params)
+
+            # If completing task, set actual end date
+            if new_status == 'completed':
+                self.cursor.execute("""
+                    UPDATE project_reviews
+                    SET actual_end_date = ?
+                    WHERE review_id = ? AND actual_end_date IS NULL
+                """, (datetime.now().date(), task_id))
+
+            self.db.commit()
+
+        except Exception as e:
+            print(f"Error updating task status: {e}")
+            raise
+
+    def reassign_task(self, task_id: int, new_assignee_id: int):
+        """Reassign task to different user"""
         try:
             self.cursor.execute("""
-                SELECT template_id, name, sector, description
-                FROM review_templates
-                ORDER BY sector, name
-            """)
-            
-            templates = self.cursor.fetchall()
-            return [
-                {
-                    'template_id': template.template_id,
-                    'name': template.name,
-                    'sector': template.sector,
-                    'description': template.description
-                }
-                for template in templates
-            ]
+                UPDATE project_reviews
+                SET assigned_to = ?, last_updated = ?
+                WHERE review_id = ?
+            """, (new_assignee_id, datetime.now(), task_id))
+
+            self.db.commit()
+
         except Exception as e:
-            print(f"Error getting available templates: {e}")
+            print(f"Error reassigning task: {e}")
+            raise
+
+    def add_task_evidence(self, task_id: int, file_path: str):
+        """Add evidence file to task"""
+        try:
+            # Read file content (for small files) or store path
+            if os.path.getsize(file_path) < 1024 * 1024:  # Less than 1MB
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                file_name = os.path.basename(file_path)
+
+                # Store in database (you might want to create an evidence table)
+                # For now, just update notes with evidence reference
+                self.cursor.execute("""
+                    UPDATE project_reviews
+                    SET evidence_links = COALESCE(evidence_links || ';', '') || ?,
+                        last_updated = ?
+                    WHERE review_id = ?
+                """, (f"FILE:{file_name}", datetime.now(), task_id))
+            else:
+                # For large files, just store the path reference
+                self.cursor.execute("""
+                    UPDATE project_reviews
+                    SET evidence_links = COALESCE(evidence_links || ';', '') || ?,
+                        last_updated = ?
+                    WHERE review_id = ?
+                """, (f"PATH:{file_path}", datetime.now(), task_id))
+
+            self.db.commit()
+
+        except Exception as e:
+            print(f"Error adding task evidence: {e}")
+            raise
+
+    def get_task_details(self, task_id: int) -> Dict:
+        """Get detailed information about a specific task"""
+        try:
+            self.cursor.execute("""
+                SELECT
+                    r.*,
+                    s.service_name,
+                    s.phase,
+                    s.agreed_fee,
+                    s.progress_pct as service_progress,
+                    p.project_name
+                FROM project_reviews r
+                JOIN project_services s ON r.service_id = s.service_id
+                JOIN projects p ON s.project_id = p.project_id
+                WHERE r.review_id = ?
+            """, (task_id,))
+
+            task = self.cursor.fetchone()
+            if task:
+                return {
+                    'id': task.review_id,
+                    'service_name': task.service_name,
+                    'phase': task.phase,
+                    'status': task.status,
+                    'assignee': task.assigned_to,
+                    'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else None,
+                    'progress_percentage': task.service_progress or 0,
+                    'priority': getattr(task, 'priority', 'medium'),
+                    'description': task.notes or '',
+                    'evidence_links': task.evidence_links or '',
+                    'project_name': task.project_name,
+                    'agreed_fee': task.agreed_fee,
+                    'planned_date': task.planned_date.strftime('%Y-%m-%d') if task.planned_date else None,
+                    'actual_start_date': task.actual_start_date.strftime('%Y-%m-%d') if task.actual_start_date else None,
+                    'actual_end_date': task.actual_end_date.strftime('%Y-%m-%d') if task.actual_end_date else None
+                }
+            return {}
+
+        except Exception as e:
+            print(f"Error getting task details: {e}")
+            return {}
+
+    def export_task_data(self, project_id: int) -> List[Dict]:
+        """Export task data for external analysis"""
+        try:
+            tasks = self.get_detailed_tasks(project_id)
+
+            # Convert to export format
+            export_data = []
+            for task in tasks:
+                export_data.append({
+                    'Task_ID': task['id'],
+                    'Service_Name': task['service_name'],
+                    'Phase': task['phase'],
+                    'Cycle': task['cycle'],
+                    'Due_Date': task['due_date'],
+                    'Status': task['status'],
+                    'Assignee': task['assignee'],
+                    'Progress_Percentage': task['progress_percentage'],
+                    'Priority': task['priority'],
+                    'Is_Overdue': task['is_overdue'],
+                    'Due_Soon': task['due_soon'],
+                    'Last_Update': task['last_update'],
+                    'Notes': task.get('notes', '')
+                })
+
+            return export_data
+
+        except Exception as e:
+            print(f"Error exporting task data: {e}")
             return []
 

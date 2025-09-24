@@ -110,7 +110,7 @@ def generate_add_column_sql(table: str, columns: List[str]) -> List[str]:
 
 def update_constants_file(missing: Dict[str, List[str]]) -> None:
     """Append missing table/column constants to ``constants/schema.py``."""
-    path = Path(__file__).resolve().parent / "constants" / "schema.py"
+    path = Path(__file__).resolve().parent.parent / "constants" / "schema.py"
     lines = path.read_text().splitlines()
     for table, columns in missing.items():
         class_name = table_to_class(table)

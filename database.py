@@ -1833,7 +1833,8 @@ def get_project_bookmarks(project_id):
             f"""
             SELECT {S.ProjectBookmarks.ID}, {S.ProjectBookmarks.NAME}, 
                    {S.ProjectBookmarks.URL}, {S.ProjectBookmarks.DESCRIPTION}, 
-                   {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.CREATED_AT}
+                   {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.TAGS},
+                   {S.ProjectBookmarks.NOTES}, {S.ProjectBookmarks.CREATED_AT}
             FROM {S.ProjectBookmarks.TABLE} 
             WHERE {S.ProjectBookmarks.PROJECT_ID} = ?
             ORDER BY {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.NAME}
@@ -1848,7 +1849,9 @@ def get_project_bookmarks(project_id):
                 'url': row[2],
                 'description': row[3],
                 'category': row[4],
-                'created_at': row[5]
+                'tags': row[5],
+                'notes': row[6],
+                'created_at': row[7]
             })
         return bookmarks
     except Exception as e:
@@ -1857,7 +1860,7 @@ def get_project_bookmarks(project_id):
     finally:
         conn.close()
 
-def add_bookmark(project_id, name, url, description="", category="General"):
+def add_bookmark(project_id, name, url, description="", category="General", tags="", notes=""):
     """Add a new bookmark for a project."""
     conn = connect_to_db()
     if conn is None:
@@ -1872,10 +1875,11 @@ def add_bookmark(project_id, name, url, description="", category="General"):
             INSERT INTO {S.ProjectBookmarks.TABLE} (
                 {S.ProjectBookmarks.PROJECT_ID}, {S.ProjectBookmarks.NAME}, 
                 {S.ProjectBookmarks.URL}, {S.ProjectBookmarks.DESCRIPTION}, 
-                {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.CREATED_AT}
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                {S.ProjectBookmarks.CATEGORY}, {S.ProjectBookmarks.TAGS},
+                {S.ProjectBookmarks.NOTES}, {S.ProjectBookmarks.CREATED_AT}
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (project_id, name, url, description, category, created_at)
+            (project_id, name, url, description, category, tags, notes, created_at)
         )
         
         conn.commit()
@@ -1886,7 +1890,7 @@ def add_bookmark(project_id, name, url, description="", category="General"):
     finally:
         conn.close()
 
-def update_bookmark(bookmark_id, name=None, url=None, description=None, category=None):
+def update_bookmark(bookmark_id, name=None, url=None, description=None, category=None, tags=None, notes=None):
     """Update an existing bookmark."""
     conn = connect_to_db()
     if conn is None:
@@ -1905,6 +1909,10 @@ def update_bookmark(bookmark_id, name=None, url=None, description=None, category
             update_fields[S.ProjectBookmarks.DESCRIPTION] = description
         if category is not None:
             update_fields[S.ProjectBookmarks.CATEGORY] = category
+        if tags is not None:
+            update_fields[S.ProjectBookmarks.TAGS] = tags
+        if notes is not None:
+            update_fields[S.ProjectBookmarks.NOTES] = notes
             
         if not update_fields:
             return False
@@ -2057,4 +2065,501 @@ if __name__ == "__main__":
         print("❌ Failed to connect.")
 
 
+def delete_project_service(service_id: int) -> bool:
+    """Delete a single project service and all related data"""
+    conn = connect_to_db()
+    if conn is None:
+        return False
 
+    try:
+        cursor = conn.cursor()
+
+        # Delete in order of dependencies (child tables first)
+
+        # Service-related data
+        cursor.execute(f"DELETE FROM {S.ServiceReviews.TABLE} WHERE {S.ServiceReviews.SERVICE_ID} = ?", (service_id,))
+        cursor.execute(f"DELETE FROM {S.ServiceScheduleSettings.TABLE} WHERE {S.ServiceScheduleSettings.SERVICE_ID} = ?", (service_id,))
+        cursor.execute(f"DELETE FROM {S.ServiceDeliverables.TABLE} WHERE {S.ServiceDeliverables.SERVICE_ID} = ?", (service_id,))
+
+        # Finally delete the service itself
+        cursor.execute(f"DELETE FROM {S.ProjectServices.TABLE} WHERE {S.ProjectServices.SERVICE_ID} = ?", (service_id,))
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        print(f"❌ Error deleting project service: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def get_current_month_activities(project_id):
+    """Get current month review activities for a project"""
+    from datetime import datetime
+    conn = connect_to_db()
+    if conn is None:
+        return []
+
+    try:
+        cursor = conn.cursor()
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+
+        # Get reviews scheduled for current month
+        cursor.execute(
+            f"""
+            SELECT rs.{S.ReviewSchedule.REVIEW_DATE}, rs.{S.ReviewSchedule.STATUS},
+                   rcd.{S.ReviewCycleDetails.CONSTRUCTION_STAGE}, rcd.{S.ReviewCycleDetails.REVIEWS_PER_PHASE}
+            FROM {S.ReviewSchedule.TABLE} rs
+            LEFT JOIN {S.ReviewCycleDetails.TABLE} rcd ON rs.{S.ReviewSchedule.CYCLE_ID} = rcd.{S.ReviewCycleDetails.CYCLE_ID}
+            WHERE rs.{S.ReviewSchedule.PROJECT_ID} = ?
+            AND MONTH(rs.{S.ReviewSchedule.REVIEW_DATE}) = ?
+            AND YEAR(rs.{S.ReviewSchedule.REVIEW_DATE}) = ?
+            ORDER BY rs.{S.ReviewSchedule.REVIEW_DATE}
+            """,
+            (project_id, current_month, current_year)
+        )
+
+        activities = []
+        for row in cursor.fetchall():
+            activities.append({
+                'review_date': row[0],
+                'status': row[1] or 'Scheduled',
+                'stage': row[2] or 'Unknown',
+                'reviews_per_phase': row[3] or 1
+            })
+
+        return activities
+    except Exception as e:
+        print(f"❌ Error getting current month activities: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_current_month_billing(project_id):
+    """Get billing amounts due for current month"""
+    from datetime import datetime
+    conn = connect_to_db()
+    if conn is None:
+        return 0
+
+    try:
+        cursor = conn.cursor()
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+
+        # Get billing claims for current month
+        cursor.execute(
+            f"""
+            SELECT SUM(bcl.{S.BillingClaimLines.AMOUNT_THIS_CLAIM})
+            FROM {S.BillingClaims.TABLE} bc
+            JOIN {S.BillingClaimLines.TABLE} bcl ON bc.{S.BillingClaims.CLAIM_ID} = bcl.{S.BillingClaimLines.CLAIM_ID}
+            WHERE bc.{S.BillingClaims.PROJECT_ID} = ?
+            AND MONTH(bc.{S.BillingClaims.PERIOD_END}) = ?
+            AND YEAR(bc.{S.BillingClaims.PERIOD_END}) = ?
+            AND bc.{S.BillingClaims.STATUS} IN ('Pending', 'Approved')
+            """,
+            (project_id, current_month, current_year)
+        )
+
+        result = cursor.fetchone()
+        return result[0] if result[0] else 0
+    except Exception as e:
+        print(f"❌ Error getting current month billing: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_scope_remaining(project_id):
+    """Get remaining scope (upcoming reviews)"""
+    from datetime import datetime
+    conn = connect_to_db()
+    if conn is None:
+        return []
+
+    try:
+        cursor = conn.cursor()
+        today = datetime.now().date()
+
+        # Get upcoming reviews
+        cursor.execute(
+            f"""
+            SELECT rs.{S.ReviewSchedule.REVIEW_DATE}, rcd.{S.ReviewCycleDetails.CONSTRUCTION_STAGE},
+                   rs.{S.ReviewSchedule.STATUS}
+            FROM {S.ReviewSchedule.TABLE} rs
+            LEFT JOIN {S.ReviewCycleDetails.TABLE} rcd ON rs.{S.ReviewSchedule.CYCLE_ID} = rcd.{S.ReviewCycleDetails.CYCLE_ID}
+            WHERE rs.{S.ReviewSchedule.PROJECT_ID} = ?
+            AND rs.{S.ReviewSchedule.REVIEW_DATE} >= ?
+            AND rs.{S.ReviewSchedule.STATUS} NOT IN ('Completed', 'Cancelled')
+            ORDER BY rs.{S.ReviewSchedule.REVIEW_DATE}
+            """,
+            (project_id, today)
+        )
+
+        reviews = []
+        for row in cursor.fetchall():
+            reviews.append({
+                'date': row[0],
+                'stage': row[1] or 'Unknown',
+                'status': row[2] or 'Scheduled'
+            })
+
+        return reviews
+    except Exception as e:
+        print(f"❌ Error getting scope remaining: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_project_completion_estimate(project_id):
+    """Get estimated project completion dates"""
+    conn = connect_to_db()
+    if conn is None:
+        return {'phase_completion': None, 'project_completion': None}
+
+    try:
+        cursor = conn.cursor()
+
+        # Get the latest review cycle details for completion estimates
+        cursor.execute(
+            f"""
+            SELECT TOP 1 rcd.{S.ReviewCycleDetails.PLANNED_COMPLETION_DATE},
+                   p.{S.Projects.END_DATE}
+            FROM {S.ReviewCycleDetails.TABLE} rcd
+            JOIN {S.Projects.TABLE} p ON rcd.{S.ReviewCycleDetails.PROJECT_ID} = p.{S.Projects.ID}
+            WHERE rcd.{S.ReviewCycleDetails.PROJECT_ID} = ?
+            ORDER BY rcd.{S.ReviewCycleDetails.PLANNED_COMPLETION_DATE} DESC
+            """,
+            (project_id,)
+        )
+
+        result = cursor.fetchone()
+        if result:
+            return {
+                'phase_completion': result[0],
+                'project_completion': result[1]
+            }
+        else:
+            # Fallback to project end date
+            cursor.execute(
+                f"SELECT {S.Projects.END_DATE} FROM {S.Projects.TABLE} WHERE {S.Projects.ID} = ?",
+                (project_id,)
+            )
+            result = cursor.fetchone()
+            return {
+                'phase_completion': None,
+                'project_completion': result[0] if result else None
+            }
+    except Exception as e:
+        print(f"❌ Error getting project completion estimate: {e}")
+        return {'phase_completion': None, 'project_completion': None}
+    finally:
+        conn.close()
+
+
+def get_project_details_summary(project_id):
+    """Get comprehensive project details summary for the UI"""
+    from datetime import datetime
+
+    activities = get_current_month_activities(project_id)
+    billing = get_current_month_billing(project_id)
+    scope = get_scope_remaining(project_id)
+    completion = get_project_completion_estimate(project_id)
+
+    # Process activities for current month
+    current_month_reviews = []
+    for activity in activities:
+        if activity['stage'].lower().startswith('phase 7'):
+            current_month_reviews.append(f"{activity['reviews_per_phase']} x Phase 7 coordination reviews")
+
+    # Process scope remaining
+    scope_remaining = []
+    phase_7_count = 0
+    cupix_count = 0
+    pc_report_count = 0
+
+    for review in scope:
+        stage = review['stage'].lower()
+        if 'phase 7' in stage and 'audit' in stage:
+            phase_7_count += 1
+        elif 'cupix' in stage:
+            cupix_count += 1
+        elif 'pc report' in stage or 'progress claim' in stage:
+            pc_report_count += 1
+
+    if phase_7_count > 0:
+        scope_remaining.append(f"{phase_7_count} x Phase 7 audit")
+    if cupix_count > 0:
+        scope_remaining.append(f"{cupix_count} x Cupix Reviews")
+    if pc_report_count > 0:
+        scope_remaining.append(f"{pc_report_count} x PC Report")
+
+    # Format completion dates
+    phase_completion = None
+    project_completion = None
+
+    if completion['phase_completion']:
+        phase_completion = completion['phase_completion'].strftime('%B %Y')
+
+    if completion['project_completion']:
+        project_completion = completion['project_completion'].strftime('%B %Y')
+
+    return {
+        'current_activities': current_month_reviews,
+        'billing_amount': billing,
+        'scope_remaining': scope_remaining,
+        'phase_completion': phase_completion,
+        'project_completion': project_completion
+    }
+
+
+
+
+# ===================== Revizto Extraction Run Functions =====================
+
+def start_revizto_extraction_run(export_folder=None, notes=None):
+    """Start a new Revizto extraction run and return the run_id."""
+    from datetime import datetime
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        # Generate a run_id based on timestamp
+        run_id = f"run_{int(datetime.utcnow().timestamp())}"
+        
+        cursor.execute(
+            f"""
+            INSERT INTO {S.ReviztoExtractionRuns.TABLE} (
+                {S.ReviztoExtractionRuns.RUN_ID},
+                {S.ReviztoExtractionRuns.START_TIME},
+                {S.ReviztoExtractionRuns.STATUS},
+                {S.ReviztoExtractionRuns.EXPORT_FOLDER},
+                {S.ReviztoExtractionRuns.NOTES}
+            ) VALUES (?, GETUTCDATE(), 'running', ?, ?);
+            """,
+            (run_id, export_folder, notes)
+        )
+        
+        conn.commit()
+        return run_id
+    except Exception as e:
+        print(f"❌ Error starting Revizto extraction run: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def complete_revizto_extraction_run(run_id, projects_extracted=0, issues_extracted=0, licenses_extracted=0, status='completed'):
+    """Complete a Revizto extraction run with final statistics."""
+    conn = connect_to_db()
+    if conn is None:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            UPDATE {S.ReviztoExtractionRuns.TABLE}
+            SET {S.ReviztoExtractionRuns.END_TIME} = GETUTCDATE(),
+                {S.ReviztoExtractionRuns.STATUS} = ?,
+                {S.ReviztoExtractionRuns.PROJECTS_EXTRACTED} = ?,
+                {S.ReviztoExtractionRuns.ISSUES_EXTRACTED} = ?,
+                {S.ReviztoExtractionRuns.LICENSES_EXTRACTED} = ?
+            WHERE {S.ReviztoExtractionRuns.RUN_ID} = ?;
+            """,
+            (status, projects_extracted, issues_extracted, licenses_extracted, run_id)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Error completing Revizto extraction run: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_revizto_extraction_runs(limit=50):
+    """Get recent Revizto extraction runs."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ReviztoExtractionRuns.RUN_ID},
+                   {S.ReviztoExtractionRuns.START_TIME},
+                   {S.ReviztoExtractionRuns.END_TIME},
+                   {S.ReviztoExtractionRuns.STATUS},
+                   {S.ReviztoExtractionRuns.PROJECTS_EXTRACTED},
+                   {S.ReviztoExtractionRuns.ISSUES_EXTRACTED},
+                   {S.ReviztoExtractionRuns.LICENSES_EXTRACTED},
+                   {S.ReviztoExtractionRuns.EXPORT_FOLDER},
+                   {S.ReviztoExtractionRuns.NOTES}
+            FROM {S.ReviztoExtractionRuns.TABLE}
+            ORDER BY {S.ReviztoExtractionRuns.START_TIME} DESC
+            OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY;
+            """,
+            (limit,)
+        )
+        runs = []
+        for row in cursor.fetchall():
+            runs.append({
+                'run_id': row[0],
+                'start_time': row[1],
+                'end_time': row[2],
+                'status': row[3],
+                'projects_extracted': row[4] or 0,
+                'issues_extracted': row[5] or 0,
+                'licenses_extracted': row[6] or 0,
+                'export_folder': row[7],
+                'notes': row[8]
+            })
+        return runs
+    except Exception as e:
+        print(f"❌ Error fetching Revizto extraction runs: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_last_revizto_extraction_run():
+    """Get the most recent completed Revizto extraction run."""
+    conn = connect_to_db()
+    if conn is None:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT TOP 1 {S.ReviztoExtractionRuns.RUN_ID},
+                   {S.ReviztoExtractionRuns.START_TIME},
+                   {S.ReviztoExtractionRuns.END_TIME},
+                   {S.ReviztoExtractionRuns.STATUS},
+                   {S.ReviztoExtractionRuns.PROJECTS_EXTRACTED},
+                   {S.ReviztoExtractionRuns.ISSUES_EXTRACTED},
+                   {S.ReviztoExtractionRuns.LICENSES_EXTRACTED},
+                   {S.ReviztoExtractionRuns.EXPORT_FOLDER},
+                   {S.ReviztoExtractionRuns.NOTES}
+            FROM {S.ReviztoExtractionRuns.TABLE}
+            WHERE {S.ReviztoExtractionRuns.STATUS} = 'completed'
+            ORDER BY {S.ReviztoExtractionRuns.START_TIME} DESC;
+            """
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                'run_id': row[0],
+                'start_time': row[1],
+                'end_time': row[2],
+                'status': row[3],
+                'projects_extracted': row[4] or 0,
+                'issues_extracted': row[5] or 0,
+                'licenses_extracted': row[6] or 0,
+                'export_folder': row[7],
+                'notes': row[8]
+            }
+        return None
+    except Exception as e:
+        print(f"❌ Error fetching last Revizto extraction run: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def get_revizto_projects_since_last_run():
+    """Get Revizto projects that have been updated since the last extraction run."""
+    last_run = get_last_revizto_extraction_run()
+    if not last_run or not last_run['end_time']:
+        # If no previous run, return all projects
+        return get_revizto_projects()
+
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.TblReviztoProjects.PROJECT_ID},
+                   {S.TblReviztoProjects.PROJECT_UUID},
+                   {S.TblReviztoProjects.TITLE},
+                   {S.TblReviztoProjects.CREATED},
+                   {S.TblReviztoProjects.UPDATED},
+                   {S.TblReviztoProjects.REGION},
+                   {S.TblReviztoProjects.ARCHIVED},
+                   {S.TblReviztoProjects.FROZEN},
+                   {S.TblReviztoProjects.OWNER_EMAIL}
+            FROM {S.TblReviztoProjects.TABLE}
+            WHERE {S.TblReviztoProjects.UPDATED} > ?
+            ORDER BY {S.TblReviztoProjects.UPDATED} DESC;
+            """,
+            (last_run['end_time'],)
+        )
+        projects = []
+        for row in cursor.fetchall():
+            projects.append({
+                'project_id': row[0],
+                'project_uuid': row[1],
+                'title': row[2],
+                'created': row[3],
+                'updated': row[4],
+                'region': row[5],
+                'archived': row[6],
+                'frozen': row[7],
+                'owner_email': row[8]
+            })
+        return projects
+    except Exception as e:
+        print(f"❌ Error fetching Revizto projects since last run: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_revizto_projects():
+    """Get all Revizto projects."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.TblReviztoProjects.PROJECT_ID},
+                   {S.TblReviztoProjects.PROJECT_UUID},
+                   {S.TblReviztoProjects.TITLE},
+                   {S.TblReviztoProjects.CREATED},
+                   {S.TblReviztoProjects.UPDATED},
+                   {S.TblReviztoProjects.REGION},
+                   {S.TblReviztoProjects.ARCHIVED},
+                   {S.TblReviztoProjects.FROZEN},
+                   {S.TblReviztoProjects.OWNER_EMAIL}
+            FROM {S.TblReviztoProjects.TABLE}
+            ORDER BY {S.TblReviztoProjects.TITLE};
+            """
+        )
+        projects = []
+        for row in cursor.fetchall():
+            projects.append({
+                'project_id': row[0],
+                'project_uuid': row[1],
+                'title': row[2],
+                'created': row[3],
+                'updated': row[4],
+                'region': row[5],
+                'archived': row[6],
+                'frozen': row[7],
+                'owner_email': row[8]
+            })
+        return projects
+    except Exception as e:
+        print(f"❌ Error fetching Revizto projects: {e}")
+        return []
+    finally:
+        conn.close()

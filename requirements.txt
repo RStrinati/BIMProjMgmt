@@ -8,3 +8,4 @@ sqlparse
 tkcalendar
 Flask
 Flask-Cors
+pytest

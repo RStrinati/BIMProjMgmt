@@ -21,11 +21,11 @@ def main():
         from phase1_enhanced_ui import (
             EnhancedTaskManagementTab,
             ResourceManagementTab,
-            ACCFolderManagementTab,
             ReviewManagementTab,
             DocumentManagementTab,
             ProjectSetupTab,
             ProjectBookmarksTab,
+            IssueManagementTab,
         )
 
         # Create main window
@@ -47,8 +47,8 @@ def main():
         logger.info("Creating Resource Management tab...")
         ResourceManagementTab(notebook)
 
-        logger.info("Creating ACC Folder Management tab...")
-        ACCFolderManagementTab(notebook)
+        logger.info("Creating Issue Management tab...")
+        IssueManagementTab(notebook)
 
         logger.info("Creating Review Management tab...")
         ReviewManagementTab(notebook)

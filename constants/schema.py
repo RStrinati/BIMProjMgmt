@@ -428,6 +428,20 @@ class TblUserLicenses:
     ALLOW_API_ACCESS = "allowApiAccess"
     INSERTED_AT = "insertedAt"
 
+
+class ReviztoExtractionRuns:
+    TABLE = "ReviztoExtractionRuns"
+    RUN_ID = "run_id"
+    START_TIME = "start_time"
+    END_TIME = "end_time"
+    STATUS = "status"
+    PROJECTS_EXTRACTED = "projects_extracted"
+    ISSUES_EXTRACTED = "issues_extracted"
+    LICENSES_EXTRACTED = "licenses_extracted"
+    EXPORT_FOLDER = "export_folder"
+    NOTES = "notes"
+
+
 class ControlModels:
     TABLE = "tblControlModels"
     ID = "id"
@@ -728,6 +742,14 @@ class ServiceTemplates:
     CREATED_AT = "created_at"
     IS_ACTIVE = "is_active"
 
+    ID = "ID"
+    TEMPLATENAME = "TemplateName"
+    DESCRIPTION = "Description"
+    SERVICETYPE = "ServiceType"
+    PARAMETERS = "Parameters"
+    CREATEDBY = "CreatedBy"
+    CREATEDAT = "CreatedAt"
+    ISACTIVE = "IsActive"
 class ProjectBookmarks:
     TABLE = "ProjectBookmarks"
     ID = "bookmark_id"
@@ -736,5 +758,7 @@ class ProjectBookmarks:
     URL = "url"
     DESCRIPTION = "description"
     CATEGORY = "category"
+    TAGS = "tags"
+    NOTES = "notes"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"

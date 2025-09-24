@@ -1,3 +1,4 @@
+from ui.tooltips import CreateToolTip
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
@@ -7,11 +8,6 @@ from datetime import datetime, timedelta
 import logging
 import webbrowser
 import threading
-
-# Set up logger
-logger = logging.getLogger(__name__)
-
-# Import required modules
 from database import (
     get_projects, save_acc_folder_path, get_acc_folder_path,
     connect_to_db, get_acc_import_logs, get_project_details,
@@ -19,12 +15,25 @@ from database import (
     get_review_cycles, get_cycle_ids, get_users_list,
     get_bookmark_categories, get_project_bookmarks, add_bookmark,
     update_bookmark, delete_bookmark, get_contractual_links,
-    update_project_folders, insert_files_into_tblACCDocs
+    update_project_folders, insert_files_into_tblACCDocs,
+    start_revizto_extraction_run, complete_revizto_extraction_run,
+    get_revizto_extraction_runs, get_last_revizto_extraction_run
 )
 from review_management_service import ReviewManagementService
 from handlers.acc_handler import run_acc_import
-from ui.tooltips import CreateToolTip
 from handlers.review_handler import submit_review_schedule
+from ui.ui_helpers import (
+    set_combo_from_pairs, parse_id_from_display, clear_treeview,
+    format_id_name_list
+)
+from phase1_enhanced_database import ResourceManager
+from tkcalendar import DateEntry
+from constants import schema as S
+logger = logging.getLogger(__name__)
+
+# Set up logger
+
+# Import required modules
 from ui.ui_helpers import (
     set_combo_from_pairs, parse_id_from_display, clear_treeview,
     format_id_name_list
@@ -37,16 +46,13 @@ from constants import schema as S
 class ProjectNotificationSystem:
     def __init__(self):
         self.observers = []
-    
     def register_observer(self, observer):
         if observer not in self.observers:
             self.observers.append(observer)
-    
     def notify_project_changed(self, project_selection):
         for observer in self.observers:
             if hasattr(observer, 'on_project_changed'):
                 observer.on_project_changed(project_selection)
-    
     def notify_project_list_changed(self):
         for observer in self.observers:
             if hasattr(observer, 'on_project_list_changed'):
@@ -56,6 +62,414 @@ project_notification_system = ProjectNotificationSystem()
 
 class ProjectSetupTab:
     def __init__(self, parent_notebook):
+        self.frame = ttk.Frame(parent_notebook)
+        parent_notebook.add(self.frame, text="Project Setup")
+        self.setup_ui()
+
+    def setup_ui(self):
+        # Main container with padding
+        main_frame = ttk.Frame(self.frame)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # ===== TOP SECTION: PROJECT SELECTION =====
+        project_frame = ttk.LabelFrame(main_frame, text="Project Selection & Status", padding=15)
+        project_frame.pack(fill="x", pady=(0, 15))
+        # Current project selection
+        selection_frame = ttk.Frame(project_frame)
+        selection_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(selection_frame, text="Current Project:", font=("Arial", 10, "bold")).pack(side="left")
+        self.project_var = tk.StringVar()
+        self.project_combo = ttk.Combobox(selection_frame, textvariable=self.project_var, width=50)
+        self.project_combo.pack(side="left", padx=(10, 0))
+        self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected)
+        # Folder path display
+        ttk.Label(selection_frame, text="Desktop Connector Folder:", font=("Arial", 10)).pack(side="left", padx=(20, 0))
+        self.folder_path_var = tk.StringVar()
+        self.folder_path_entry = ttk.Entry(selection_frame, textvariable=self.folder_path_var, width=40, state="readonly")
+        self.folder_path_entry.pack(side="left", padx=(10, 0))
+        # Project status display
+        status_frame = ttk.Frame(project_frame)
+        status_frame.pack(fill="x")
+        # Left column - basic info
+
+    def show_project_dialog(self, mode="create", project_id=None):
+        import tkinter as tk
+        from tkinter import ttk, messagebox
+        from tkcalendar import DateEntry
+        from database import get_project_details, get_project_folders, get_available_clients
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Create New Project" if mode == "create" else "Edit Project Details")
+        dialog.geometry("700x600")
+        dialog.resizable(True, True)
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (700 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (600 // 2)
+        dialog.geometry(f"700x600+{x}+{y}")
+        main_canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=main_canvas.yview)
+        scrollable_frame = ttk.Frame(main_canvas)
+        scrollable_frame.bind("<Configure>", lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all")))
+        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+        main_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        content_frame = ttk.Frame(scrollable_frame)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        title_label = ttk.Label(content_frame, text="Create New Project" if mode == "create" else "Edit Project Details", font=("Arial", 14, "bold"))
+        title_label.pack(pady=(0, 20))
+        existing_data = {}
+        if mode == "edit" and project_id:
+            try:
+                project_details = get_project_details(project_id)
+                folder_path, ifc_folder_path = get_project_folders(project_id)
+                existing_data = {
+                    'name': project_details.get('project_name', ''),
+                    'client_name': project_details.get('client_name', ''),
+                    'status': project_details.get('status', ''),
+                    'priority': project_details.get('priority', ''),
+                    'start_date': project_details.get('start_date', ''),
+                    'end_date': project_details.get('end_date', ''),
+                    'folder_path': folder_path or '',
+                    'ifc_folder_path': ifc_folder_path or ''
+                }
+            except Exception as e:
+                print(f"Error loading project data: {e}")
+        basic_frame = ttk.LabelFrame(content_frame, text="?? Basic Project Information", padding=15)
+        basic_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(basic_frame, text="Project Name*:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        project_name_var = tk.StringVar(value=existing_data.get('name', ''))
+        project_name_entry = ttk.Entry(basic_frame, textvariable=project_name_var, width=50)
+        project_name_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=5)
+        ttk.Label(basic_frame, text="Client*:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        client_var = tk.StringVar()
+        client_combo = ttk.Combobox(basic_frame, textvariable=client_var, width=30, state="readonly")
+        client_combo.grid(row=1, column=1, sticky="ew", pady=5)
+        try:
+            clients = get_available_clients()
+            client_names = [f"{client[0]} - {client[1]}" for client in clients]
+            client_combo['values'] = client_names
+            if existing_data.get('client_name'):
+                for client_option in client_names:
+                    if existing_data['client_name'] in client_option:
+                        client_var.set(client_option)
+                        break
+        except Exception as e:
+            print(f"Error loading clients: {e}")
+        ttk.Button(basic_frame, text="+ New Client", command=lambda: self.show_new_client_dialog(client_combo)).grid(row=1, column=2, padx=(10, 0), pady=5)
+        ttk.Label(basic_frame, text="Project Type:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
+        project_type_var = tk.StringVar()
+        project_type_combo = ttk.Combobox(basic_frame, textvariable=project_type_var, width=30)
+        project_type_combo.grid(row=2, column=1, sticky="ew", pady=5)
+        project_type_combo['values'] = ["Solar PV", "Wind Farm", "Battery Storage", "Hybrid Project", "Transmission", "Other"]
+        ttk.Label(basic_frame, text="Area (hectares):").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=5)
+        area_var = tk.StringVar()
+        area_entry = ttk.Entry(basic_frame, textvariable=area_var, width=20)
+        area_entry.grid(row=3, column=1, sticky="w", pady=5)
+        ttk.Label(basic_frame, text="MW Capacity:").grid(row=3, column=2, sticky="w", padx=(20, 10), pady=5)
+        mw_var = tk.StringVar()
+        mw_entry = ttk.Entry(basic_frame, textvariable=mw_var, width=20)
+        mw_entry.grid(row=3, column=3, sticky="w", pady=5)
+        basic_frame.columnconfigure(1, weight=1)
+        status_frame = ttk.LabelFrame(content_frame, text="?? Project Status & Timeline", padding=15)
+        status_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(status_frame, text="Status:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        status_var = tk.StringVar(value=existing_data.get('status', 'Planning'))
+        status_combo = ttk.Combobox(status_frame, textvariable=status_var, width=20)
+        status_combo.grid(row=0, column=1, sticky="w", pady=5)
+        status_combo['values'] = ["Planning", "Design", "Construction", "Commissioning", "Operational", "Completed", "On Hold", "Cancelled"]
+        ttk.Label(status_frame, text="Priority:").grid(row=0, column=2, sticky="w", padx=(20, 10), pady=5)
+        priority_var = tk.StringVar(value=existing_data.get('priority', 'Medium'))
+        priority_combo = ttk.Combobox(status_frame, textvariable=priority_var, width=15)
+        priority_combo.grid(row=0, column=3, sticky="w", pady=5)
+        priority_combo['values'] = ["Low", "Medium", "High", "Critical"]
+        ttk.Label(status_frame, text="Start Date:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        start_date_var = tk.StringVar(value=existing_data.get('start_date', ''))
+        start_date_entry = DateEntry(status_frame, textvariable=start_date_var, width=15, date_pattern='yyyy-mm-dd')
+        start_date_entry.grid(row=1, column=1, sticky="w", pady=5)
+        ttk.Label(status_frame, text="End Date:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
+        end_date_var = tk.StringVar(value=existing_data.get('end_date', ''))
+        end_date_entry = DateEntry(status_frame, textvariable=end_date_var, width=15, date_pattern='yyyy-mm-dd')
+        end_date_entry.grid(row=1, column=3, sticky="w", pady=5)
+        location_frame = ttk.LabelFrame(content_frame, text="?? Location Information", padding=15)
+        location_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(location_frame, text="Address:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        address_var = tk.StringVar()
+        address_entry = ttk.Entry(location_frame, textvariable=address_var, width=50)
+        address_entry.grid(row=0, column=1, columnspan=3, sticky="ew", pady=5)
+        ttk.Label(location_frame, text="City:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        city_var = tk.StringVar()
+        city_entry = ttk.Entry(location_frame, textvariable=city_var, width=20)
+        city_entry.grid(row=1, column=1, sticky="w", pady=5)
+        ttk.Label(location_frame, text="State:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
+        state_var = tk.StringVar()
+        state_entry = ttk.Entry(location_frame, textvariable=state_var, width=10)
+        state_entry.grid(row=1, column=3, sticky="w", pady=5)
+        ttk.Label(location_frame, text="Postcode:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
+        postcode_var = tk.StringVar()
+        postcode_entry = ttk.Entry(location_frame, textvariable=postcode_var, width=15)
+        postcode_entry.grid(row=2, column=1, sticky="w", pady=5)
+        location_frame.columnconfigure(1, weight=1)
+        paths_frame = ttk.LabelFrame(content_frame, text="?? File Paths", padding=15)
+        paths_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(paths_frame, text="Model Folder:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
+        folder_path_var = tk.StringVar(value=existing_data.get('folder_path', ''))
+        folder_path_entry = ttk.Entry(paths_frame, textvariable=folder_path_var, width=50)
+        folder_path_entry.grid(row=0, column=1, sticky="ew", pady=5)
+        ttk.Button(paths_frame, text="Browse", command=lambda: self.browse_folder(folder_path_var)).grid(row=0, column=2, padx=(5, 0), pady=5)
+        ttk.Label(paths_frame, text="IFC Folder:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        ifc_path_var = tk.StringVar(value=existing_data.get('ifc_folder_path', ''))
+        ifc_path_entry = ttk.Entry(paths_frame, textvariable=ifc_path_var, width=50)
+        ifc_path_entry.grid(row=1, column=1, sticky="ew", pady=5)
+        ttk.Button(paths_frame, text="Browse", command=lambda: self.browse_folder(ifc_path_var)).grid(row=1, column=2, padx=(5, 0), pady=5)
+        paths_frame.columnconfigure(1, weight=1)
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(fill="x", pady=(20, 0))
+        def save_project():
+            try:
+                if not project_name_var.get().strip():
+                    messagebox.showerror("Error", "Project name is required")
+                    return
+                if not client_var.get():
+                    messagebox.showerror("Error", "Please select a client")
+                    return
+                client_id = client_var.get().split(" - ")[0] if client_var.get() else None
+                project_data = {
+                    'name': project_name_var.get().strip(),
+                    'client_id': client_id,
+                    'project_type': project_type_var.get(),
+                    'area': area_var.get(),
+                    'mw_capacity': mw_var.get(),
+                    'status': status_var.get(),
+                    'priority': priority_var.get(),
+                    'start_date': start_date_var.get(),
+                    'end_date': end_date_var.get(),
+                    'address': address_var.get(),
+                    'city': city_var.get(),
+                    'state': state_var.get(),
+                    'postcode': postcode_var.get(),
+                    'folder_path': folder_path_var.get(),
+                    'ifc_folder_path': ifc_path_var.get()
+                }
+                if mode == "create":
+                    success = self.create_project_in_db(project_data)
+                    if success:
+                        messagebox.showinfo("Success", "Project created successfully!")
+                        dialog.destroy()
+                        self.refresh_data()
+                        project_notification_system.notify_project_list_changed()
+                else:
+                    success = self.update_project_in_db(project_id, project_data)
+                    if success:
+                        messagebox.showinfo("Success", "Project updated successfully!")
+                        dialog.destroy()
+                        self.refresh_data()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save project: {str(e)}")
+        ttk.Button(button_frame, text="Save", command=save_project).pack(side="right", padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side="right", padx=5)
+        project_name_entry.focus()
+
+    def show_new_client_dialog(self, client_combo=None):
+        import tkinter as tk
+        from tkinter import ttk, messagebox
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Create New Client")
+        dialog.geometry("500x500")
+        dialog.resizable(False, False)
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f"500x500+{x}+{y}")
+        content_frame = ttk.Frame(dialog)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        title_label = ttk.Label(content_frame, text="Create New Client", font=("Arial", 16, "bold"))
+        title_label.pack(pady=(0, 20))
+        fields_frame = ttk.Frame(content_frame)
+        fields_frame.pack(fill="both", expand=True)
+        fields_frame.columnconfigure(1, weight=1)
+        client_vars = {}
+        ttk.Label(fields_frame, text="Client Name*:").grid(row=0, column=0, sticky="w", pady=5)
+        client_vars['name'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['name'], width=40).grid(row=0, column=1, sticky="ew", pady=5)
+        ttk.Label(fields_frame, text="Contact Name:").grid(row=1, column=0, sticky="w", pady=5)
+        client_vars['contact'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['contact'], width=40).grid(row=1, column=1, sticky="ew", pady=5)
+
+    def show_new_client_dialog(self, client_combo=None):
+        """Show dialog to create a new client"""
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Create New Client")
+        dialog.geometry("500x500")
+        dialog.resizable(False, False)
+        
+        # Make dialog modal
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f"500x500+{x}+{y}")
+        
+        content_frame = ttk.Frame(dialog)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ttk.Label(content_frame, text="Create New Client", font=("Arial", 16, "bold"))
+        title_label.pack(pady=(0, 20))
+        
+        # Form fields
+        fields_frame = ttk.Frame(content_frame)
+        fields_frame.pack(fill="both", expand=True)
+        
+        # Configure grid weights
+        fields_frame.columnconfigure(1, weight=1)
+        
+        # Client variables
+        client_vars = {}
+        
+        # Client Name
+        ttk.Label(fields_frame, text="Client Name*:").grid(row=0, column=0, sticky="w", pady=5)
+        client_vars['name'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['name'], width=40).grid(row=0, column=1, sticky="ew", pady=5)
+        
+        # Contact Name
+        ttk.Label(fields_frame, text="Contact Name:").grid(row=1, column=0, sticky="w", pady=5)
+        client_vars['contact'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['contact'], width=40).grid(row=1, column=1, sticky="ew", pady=5)
+        
+        # Contact Email
+        ttk.Label(fields_frame, text="Contact Email:").grid(row=2, column=0, sticky="w", pady=5)
+        client_vars['email'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['email'], width=40).grid(row=2, column=1, sticky="ew", pady=5)
+        
+        # Contact Phone
+        ttk.Label(fields_frame, text="Contact Phone:").grid(row=3, column=0, sticky="w", pady=5)
+        client_vars['phone'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['phone'], width=40).grid(row=3, column=1, sticky="ew", pady=5)
+        
+        # Address
+        ttk.Label(fields_frame, text="Address:").grid(row=4, column=0, sticky="w", pady=5)
+        client_vars['address'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['address'], width=40).grid(row=4, column=1, sticky="ew", pady=5)
+        
+        # City
+        ttk.Label(fields_frame, text="City:").grid(row=5, column=0, sticky="w", pady=5)
+        client_vars['city'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['city'], width=40).grid(row=5, column=1, sticky="ew", pady=5)
+        
+        # State
+        ttk.Label(fields_frame, text="State:").grid(row=6, column=0, sticky="w", pady=5)
+        client_vars['state'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['state'], width=40).grid(row=6, column=1, sticky="ew", pady=5)
+        
+        # Postcode
+        ttk.Label(fields_frame, text="Postcode:").grid(row=7, column=0, sticky="w", pady=5)
+        client_vars['postcode'] = tk.StringVar()
+        ttk.Entry(fields_frame, textvariable=client_vars['postcode'], width=40).grid(row=7, column=1, sticky="ew", pady=5)
+        
+        def save_client():
+            """Save the new client to database"""
+            try:
+                from database import create_new_client
+                
+                client_data = {
+                    'client_name': client_vars['name'].get().strip(),
+                    'contact_name': client_vars['contact'].get().strip(),
+                    'contact_email': client_vars['email'].get().strip(),
+                    'contact_phone': client_vars['phone'].get().strip(),
+                    'address': client_vars['address'].get().strip(),
+                    'city': client_vars['city'].get().strip(),
+                    'state': client_vars['state'].get().strip(),
+                    'postcode': client_vars['postcode'].get().strip(),
+                    'country': 'Australia',  # Default country
+                }
+                
+                if not client_data['client_name']:
+                    messagebox.showerror("Error", "Client name is required")
+                    return
+                
+                client_id = create_new_client(client_data)
+                
+                if client_id:
+                    messagebox.showinfo("Success", f"Client created successfully! (ID: {client_id})")
+                    # Refresh client combo box
+                    clients = get_available_clients()
+                    client_names = [f"{client[0]} - {client[1]}" for client in clients]
+                    client_combo['values'] = client_names
+                    # Select the new client
+                    new_client_name = client_vars['name'].get().strip()
+                    for client_option in client_names:
+                        if new_client_name in client_option:
+                            client_combo.set(client_option)
+                            break
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", "Failed to create client - check database connection")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to create client: {str(e)}")
+                print(f"Client creation error: {e}")  # For debugging
+        
+        # Buttons frame with better spacing
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        # Create buttons with better styling
+        cancel_btn = ttk.Button(button_frame, text="Cancel", command=dialog.destroy)
+        cancel_btn.pack(side="right", padx=5)
+        
+        save_btn = ttk.Button(button_frame, text="Save Client", command=save_client)
+        save_btn.pack(side="right", padx=5)
+        
+        # Focus on client name field
+        client_vars['name'].set("")
+        dialog.after(100, lambda: dialog.focus_set())
+
+    def create_project_in_db(self, project_data):
+        """Create a new project in the database with all collected fields"""
+        try:
+            from database import insert_project_full
+
+            # Prepare complete project data for insert_project_full
+            db_data = {
+                S.Projects.NAME: project_data['name'],
+                S.Projects.FOLDER_PATH: project_data.get('folder_path', ''),
+                S.Projects.IFC_FOLDER_PATH: project_data.get('ifc_folder_path', ''),
+                S.Projects.START_DATE: project_data.get('start_date', datetime.now().strftime('%Y-%m-%d')),
+                S.Projects.END_DATE: project_data.get('end_date', (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
+            }
+
+            # Add optional fields if provided
+            if project_data.get('client_id'):
+                db_data[S.Projects.CLIENT_ID] = project_data['client_id']
+            if project_data.get('status'):
+                db_data[S.Projects.STATUS] = project_data['status']
+            if project_data.get('priority'):
+                # Map priority strings to numeric values
+                priority_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
+                db_data[S.Projects.PRIORITY] = priority_map.get(project_data['priority'], 2)  # Default to Medium
+            
+            # Insert the project
+            project_id = insert_project_full(db_data)
+            
+            if project_id:
+                messagebox.showinfo("Success", f"Project created successfully! (ID: {project_id})")
+                # Refresh the project list
+                self.load_projects()
+                return project_id
+            else:
+                messagebox.showerror("Error", "Failed to create project")
+                return None
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create project: {str(e)}")
+            print(f"Project creation error: {e}")
+            return None
         self.frame = ttk.Frame(parent_notebook)
         parent_notebook.add(self.frame, text="Project Setup")
         self.setup_ui()
@@ -150,9 +564,8 @@ class ProjectSetupTab:
         details_frame = ttk.LabelFrame(main_frame, text="Project Details", padding=15)
         details_frame.pack(fill="both", expand=True)
 
-        # Simple project details content
-        ttk.Label(details_frame, text="Project information will be displayed here",
-                 font=("Arial", 12)).pack(pady=50)
+        # Create project details display
+        self.create_project_details_display(details_frame)
 
         # Initialize and load projects
         self.refresh_projects()
@@ -174,6 +587,9 @@ class ProjectSetupTab:
             
             # Update project status
             self.update_project_status(project_name)
+            
+            # Update project details
+            self.update_project_details(project_id)
             
             # Notify other tabs about project change
             project_notification_system.notify_project_changed(project_selection)
@@ -200,11 +616,14 @@ class ProjectSetupTab:
                         # Try to get project folders
                         try:
                             folders = get_project_folders(project_id)
-                            if folders:
-                                self.status_labels["Model Path"].config(text=folders.get('model_path', 'Not configured'), foreground="black")
-                                self.status_labels["IFC Path"].config(text=folders.get('ifc_path', 'Not configured'), foreground="black")
+                            if folders and folders[0]:  # Check if folder_path exists
+                                self.status_labels["Model Path"].config(text=folders[0], foreground="black")
                             else:
                                 self.status_labels["Model Path"].config(text="Not configured", foreground="gray")
+
+                            if folders and folders[1]:  # Check if ifc_folder_path exists
+                                self.status_labels["IFC Path"].config(text=folders[1], foreground="black")
+                            else:
                                 self.status_labels["IFC Path"].config(text="Not configured", foreground="gray")
                         except Exception as e:
                             print(f"Error getting project folders: {e}")
@@ -239,6 +658,127 @@ class ProjectSetupTab:
             # Clear status labels on error
             for label in self.status_labels.values():
                 label.config(text="Error", foreground="red")
+
+    def create_project_details_display(self, parent_frame):
+        """Create the project details display with current activities, billing, scope, and completion"""
+        # Create scrollable frame for project details
+        canvas = tk.Canvas(parent_frame)
+        scrollbar = ttk.Scrollbar(parent_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Initialize detail labels
+        self.detail_labels = {}
+
+        # Current activities section
+        activities_frame = ttk.LabelFrame(scrollable_frame, text="Current Activities for Month", padding=10)
+        activities_frame.pack(fill="x", pady=(0, 10))
+
+        self.detail_labels['activities'] = ttk.Label(activities_frame, text="No project selected",
+                                                   font=("Arial", 10), justify="left")
+        self.detail_labels['activities'].pack(anchor="w")
+
+        # Billing section
+        billing_frame = ttk.LabelFrame(scrollable_frame, text="Billing", padding=10)
+        billing_frame.pack(fill="x", pady=(0, 10))
+
+        self.detail_labels['billing'] = ttk.Label(billing_frame, text="No project selected",
+                                                font=("Arial", 10), justify="left")
+        self.detail_labels['billing'].pack(anchor="w")
+
+        # Scope remaining section
+        scope_frame = ttk.LabelFrame(scrollable_frame, text="Scope Remaining", padding=10)
+        scope_frame.pack(fill="x", pady=(0, 10))
+
+        self.detail_labels['scope'] = ttk.Label(scope_frame, text="No project selected",
+                                              font=("Arial", 10), justify="left")
+        self.detail_labels['scope'].pack(anchor="w")
+
+        # Estimated completion section
+        completion_frame = ttk.LabelFrame(scrollable_frame, text="Estimated Project Completion", padding=10)
+        completion_frame.pack(fill="x", pady=(0, 10))
+
+        self.detail_labels['completion'] = ttk.Label(completion_frame, text="No project selected",
+                                                   font=("Arial", 10), justify="left")
+        self.detail_labels['completion'].pack(anchor="w")
+
+        # Start automatic refresh timer (every hour)
+        self.start_auto_refresh()
+
+    def update_project_details(self, project_id):
+        """Update the project details display with current data"""
+        try:
+            from database import get_project_details_summary
+            details = get_project_details_summary(project_id)
+
+            # Update current activities
+            if details['current_activities']:
+                activities_text = "\n".join(f"• {activity}" for activity in details['current_activities'])
+            else:
+                activities_text = "No activities scheduled for this month"
+            self.detail_labels['activities'].config(text=activities_text)
+
+            # Update billing
+            current_month = datetime.now().strftime('%B')
+            if details['billing_amount'] > 0:
+                billing_text = f"${details['billing_amount']:,.0f} to bill for {current_month} ({len(details['current_activities'])}x reviews in {current_month})"
+            else:
+                billing_text = f"No billing due for {current_month}"
+            self.detail_labels['billing'].config(text=billing_text)
+
+            # Update scope remaining
+            if details['scope_remaining']:
+                scope_text = "\n".join(f"• {item}" for item in details['scope_remaining'])
+            else:
+                scope_text = "No remaining scope identified"
+            self.detail_labels['scope'].config(text=scope_text)
+
+            # Update completion estimates
+            completion_lines = []
+            if details['phase_completion']:
+                completion_lines.append(f"Phase 7 completion: {details['phase_completion']}")
+            if details['project_completion']:
+                completion_lines.append(f"Project completion: {details['project_completion']}")
+
+            if completion_lines:
+                completion_text = "\n".join(completion_lines)
+            else:
+                completion_text = "No completion estimates available"
+            self.detail_labels['completion'].config(text=completion_text)
+
+        except Exception as e:
+            print(f"Error updating project details: {e}")
+            for label in self.detail_labels.values():
+                label.config(text="Error loading project details", foreground="red")
+
+    def start_auto_refresh(self):
+        """Start automatic refresh timer for project details"""
+        # Refresh every hour (3600000 milliseconds)
+        self.frame.after(3600000, self.auto_refresh_project_details)
+
+    def auto_refresh_project_details(self):
+        """Automatically refresh project details and schedule next refresh"""
+        try:
+            project_selection = self.project_var.get()
+            if project_selection and ' - ' in project_selection:
+                project_id = project_selection.split(' - ')[0].strip()
+                self.update_project_details(project_id)
+        except Exception as e:
+            print(f"Error in auto refresh: {e}")
+
+        # Schedule next refresh
+        self.frame.after(3600000, self.auto_refresh_project_details)
 
     def refresh_projects(self):
         """Load available projects into the dropdown"""
@@ -636,17 +1176,26 @@ class ProjectSetupTab:
     # Additional methods for other functionality
     def create_new_project(self):
         """Open create new project dialog"""
-        # This would open a dialog to create a new project
-        # For now, show placeholder
-        messagebox.showinfo("Info", "Create New Project functionality will be implemented in future version")
+        self.show_project_dialog(mode="create")
 
     def edit_project_details(self):
         """Open edit project details dialog"""
         project_selection = self.project_var.get()
-        if not project_selection or ' - ' not in project_selection:
+        if not project_selection:
             messagebox.showwarning("Warning", "Please select a project first")
             return
-        messagebox.showinfo("Info", "Edit Project Details functionality will be implemented in future version")
+        # Parse project ID from "ID - Name" format
+        if " - " in project_selection:
+            project_id_str, project_name = project_selection.split(" - ", 1)
+            try:
+                project_id = int(project_id_str)
+            except ValueError:
+                messagebox.showerror("Error", "Invalid project selection format")
+                return
+        else:
+            messagebox.showerror("Error", "Invalid project selection format")
+            return
+        self.show_project_dialog(mode="edit", project_id=project_id)
 
     def delete_project(self):
         """Delete selected project"""
@@ -1468,6 +2017,19 @@ class ReviewManagementTab:
         self.review_service = None
         self.auto_complete_candidates = []
         
+        # Initialize missing UI components to prevent attribute errors
+        self.summary_vars = {
+            "Project Name": tk.StringVar(value=""),
+            "Construction Stage": tk.StringVar(value=""),
+            "Total Services": tk.StringVar(value="0"),
+            "Active Reviews": tk.StringVar(value="0"),
+            "Completed Reviews": tk.StringVar(value="0"),
+            "Overall Progress": tk.StringVar(value="0%")
+        }
+        
+        # Create a placeholder tasks tree (will be properly initialized if needed)
+        self.tasks_tree = None
+        
         # Initialize resource manager
         try:
             from phase1_enhanced_database import ResourceManager
@@ -1607,30 +2169,6 @@ class ReviewManagementTab:
         self.context_notes_text.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         self.context_notes_text.insert("1.0", "Notes for design managers, discipline leads, or client feedback...")
 
-        cadence_frame = ttk.LabelFrame(context_column, text="?? Cadence Defaults", padding=10)
-        cadence_frame.pack(fill=tk.X, expand=False, pady=(12, 0))
-
-        ttk.Label(cadence_frame, text="Default Start Date:").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.review_start_date = DateEntry(cadence_frame, width=14, date_pattern='yyyy-mm-dd')
-        self.review_start_date.grid(row=0, column=1, sticky="w", pady=2)
-
-        ttk.Label(cadence_frame, text="Default Frequency:").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.default_frequency_var = tk.StringVar(value="weekly")
-        ttk.Combobox(
-            cadence_frame,
-            textvariable=self.default_frequency_var,
-            values=["weekly", "bi-weekly", "monthly", "as-required"],
-            state="readonly",
-            width=12
-        ).grid(row=1, column=1, sticky="w", pady=2)
-
-        ttk.Label(cadence_frame, text="Default Review Count:").grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.default_review_count_var = tk.StringVar(value="4")
-        ttk.Entry(cadence_frame, textvariable=self.default_review_count_var, width=6).grid(row=2, column=1, sticky="w", pady=2)
-
-        for col in range(2):
-            cadence_frame.columnconfigure(col, weight=1)
-
         # === Workbench Column ===
         service_frame = ttk.LabelFrame(workbench_column, text="?? Service Review Planning", padding=10)
         service_frame.pack(fill=tk.X, expand=False)
@@ -1722,119 +2260,134 @@ class ReviewManagementTab:
         self.insights_placeholder.insert(tk.END, "• High-risk stages")
         self.insights_placeholder.insert(tk.END, "• Review volume by discipline")
     def setup_review_tracking_tab(self):
-        """Setup the Review Execution & Tracking tab"""
+        """Setup the enhanced Review Execution & Tracking tab with visual progress indicators"""
         tracking_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(tracking_frame, text="?? Review Tracking")
-        
-        # Summary Frame
-        summary_frame = ttk.LabelFrame(tracking_frame, text="?? Project Summary", padding=10)
-        summary_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Summary fields
-        self.summary_vars = {}
-        summary_fields = [
-            ("Project Name", 0, 0), ("Current Cycle", 0, 2),
-            ("Construction Stage", 1, 0), ("License Duration", 1, 2),
-            ("Total Services", 2, 0), ("Active Reviews", 2, 2),
-            ("Completed Reviews", 3, 0), ("Overall Progress", 3, 2)
+        self.sub_notebook.add(tracking_frame, text="📊 Review Tracking")
+
+        # Create main layout with progress overview and detailed tracking
+        main_layout = ttk.Panedwindow(tracking_frame, orient=tk.HORIZONTAL)
+        main_layout.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Left panel - Progress Overview & Milestones
+        overview_panel = ttk.Frame(main_layout)
+        main_layout.add(overview_panel, weight=1)
+
+        # Right panel - Detailed Task Tracking
+        details_panel = ttk.Frame(main_layout)
+        main_layout.add(details_panel, weight=2)
+
+        # === OVERVIEW PANEL ===
+        self.setup_progress_overview(overview_panel)
+        self.setup_milestone_timeline(overview_panel)
+
+        # === DETAILS PANEL ===
+        self.setup_detailed_tracking(details_panel)
+
+        # Initialize progress tracking data
+        self.progress_data = {}
+        self.milestone_data = []
+    
+    def setup_progress_overview(self, parent):
+        """Setup progress overview panel with key metrics and charts"""
+        overview_frame = ttk.LabelFrame(parent, text="Progress Overview", padding=10)
+        overview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        # Create metrics grid
+        metrics_frame = ttk.Frame(overview_frame)
+        metrics_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Key metrics
+        metrics = [
+            ("Total Reviews", "0", "Total number of reviews"),
+            ("Completed", "0", "Reviews marked as completed"),
+            ("In Progress", "0", "Currently active reviews"),
+            ("Overdue", "0", "Reviews past due date")
         ]
 
-        # Define filter variables
-        required_skills = self.skills_entry.get().strip() if hasattr(self, 'skills_entry') else ''
-        role_level = self.role_var.get().strip() if hasattr(self, 'role_var') else ''
-        try:
-            max_utilization = float(self.max_util_var.get()) if hasattr(self, 'max_util_var') else 100
-        except Exception:
-            pass
-            max_utilization = 80.0
+        for i, (label, value, tooltip) in enumerate(metrics):
+            metric_frame = ttk.LabelFrame(metrics_frame, text=label, padding=5)
+            metric_frame.grid(row=0, column=i, padx=5, pady=5, sticky="nsew")
 
-        status_colors = {
-            'Overallocated': '??',
-            'High': '??',
-            'Medium': '??',
-            'Low': '??'
-        }
+            value_label = ttk.Label(metric_frame, text=value, font=("Arial", 16, "bold"))
+            value_label.pack()
 
-        # Get resources and populate tree
-        if self.resource_mgr:
-            resources = self.resource_mgr.get_resource_workload(
-                start_date=datetime.combine(datetime.now(), datetime.min.time()),
-                end_date=datetime.combine(datetime.now() + timedelta(days=30), datetime.min.time())
-            )
-        else:
-            resources = []  # Empty list if resource manager not available
-            
-        # Only try to update tree if it exists
-        if hasattr(self, 'resource_tree'):
-            self.resource_tree.delete(*self.resource_tree.get_children())
-            for resource in resources:
-                status_icon = status_colors.get(resource.get('workload_status', ''), '?')
-                self.resource_tree.insert("", "end", values=(resource.get('user_id', ''), required_skills, role_level, max_utilization))
+            CreateToolTip(metric_frame, tooltip)
 
-        available = self.resource_mgr.find_available_resources(
-            required_skills=required_skills,
-            role_level=role_level,
-            max_utilization=max_utilization
-        ) if self.resource_mgr else []
+        # Progress chart placeholder
+        chart_frame = ttk.LabelFrame(overview_frame, text="Review Progress Chart", padding=10)
+        chart_frame.pack(fill=tk.BOTH, expand=True)
 
-        if available:
-            result_text = f"Found {len(available)} available resources:\n\n"
-            for resource in available[:5]:  # Show top 5
-                result_text += f"?? {resource.get('name', '')} ({resource.get('role_level', '')})\n"
-                result_text += f"   Utilization: {resource.get('utilization_percentage', 0):.1f}%\n"
-                result_text += f"   Available: {resource.get('available_hours', 0):.1f} hours\n"
-                if resource.get('skills', ''):
-                    result_text += f"   Skills: {resource['skills']}\n"
-                result_text += "\n"
-        else:
-            result_text = "No available resources found matching the criteria."
+        ttk.Label(chart_frame, text="Progress visualization will be implemented here\n(Chart showing review completion over time)").pack(expand=True)
 
-        # Show results in a popup
-        result_window = tk.Toplevel(self.frame)
-        result_window.title("Available Resources")
-        result_window.geometry("400x300")
+    def setup_milestone_timeline(self, parent):
+        """Setup milestone timeline panel"""
+        timeline_frame = ttk.LabelFrame(parent, text="Milestone Timeline", padding=10)
+        timeline_frame.pack(fill=tk.BOTH, expand=True)
 
-        text_widget = tk.Text(result_window, wrap=tk.WORD, padx=10, pady=10)
-        text_widget.pack(fill="both", expand=True)
-        text_widget.insert(1.0, result_text)
+        # Timeline controls
+        controls_frame = ttk.Frame(timeline_frame)
+        controls_frame.pack(fill=tk.X, pady=(0, 10))
 
-        # Add button frame below text widget
-        button_frame2 = ttk.Frame(result_window)
-        button_frame2.pack(fill="x", pady=(10, 0))
-        ttk.Button(button_frame2, text="?? Open Revizto Exporter", 
-                command=getattr(self, 'open_revizto_exporter', lambda: None)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame2, text="?? Update Review Status", 
-                command=getattr(self, 'update_review_status', lambda: None)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame2, text="?? Refresh All Data", 
-                command=self.refresh_data).pack(side=tk.LEFT, padx=(0, 5))
-        
-        # Review Tasks Frame
-        tasks_frame = ttk.LabelFrame(tracking_frame, text="?? Active Review Tasks", padding=10)
-        tasks_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Tasks treeview
-        task_columns = ("Review ID", "Service", "Cycle", "Due Date", "Status", "Assignee", "Progress %", "Evidence")
-        self.tasks_tree = ttk.Treeview(tasks_frame, columns=task_columns, show="headings", height=8)
-        
-        for col in task_columns:
-            self.tasks_tree.heading(col, text=col)
-            width = 80 if col in ["Review ID", "Cycle", "Progress %"] else 120
-            self.tasks_tree.column(col, width=width, anchor="w")
-        
-        # Scrollbars for tasks
-        tasks_v_scroll = ttk.Scrollbar(tasks_frame, orient=tk.VERTICAL, command=self.tasks_tree.yview)
-        tasks_h_scroll = ttk.Scrollbar(tasks_frame, orient=tk.HORIZONTAL, command=self.tasks_tree.xview)
-        self.tasks_tree.configure(yscrollcommand=tasks_v_scroll.set, xscrollcommand=tasks_h_scroll.set)
-        
-        self.tasks_tree.grid(row=0, column=0, sticky="nsew")
-        tasks_v_scroll.grid(row=0, column=1, sticky="ns")
-        tasks_h_scroll.grid(row=1, column=0, sticky="ew")
-        
-        tasks_frame.grid_rowconfigure(0, weight=1)
-        tasks_frame.grid_columnconfigure(0, weight=1)
-        
-        # Bind double-click to edit task
-        self.tasks_tree.bind("<Double-1>", self.edit_review_task)
+        ttk.Label(controls_frame, text="Time Range:").pack(side=tk.LEFT, padx=(0, 5))
+        time_range = ttk.Combobox(controls_frame, values=["Last 30 days", "Last 90 days", "Last 6 months", "All time"], state="readonly", width=15)
+        time_range.set("Last 30 days")
+        time_range.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(controls_frame, text="Refresh Timeline").pack(side=tk.LEFT)
+
+        # Timeline visualization placeholder
+        viz_frame = ttk.Frame(timeline_frame)
+        viz_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(viz_frame, text="Timeline visualization will be implemented here\n(Showing key milestones and deadlines)").pack(expand=True)
+
+    def setup_detailed_tracking(self, parent):
+        """Setup detailed tracking panel with task breakdowns"""
+        tracking_frame = ttk.LabelFrame(parent, text="Detailed Task Tracking", padding=10)
+        tracking_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Task filter controls
+        filter_frame = ttk.Frame(tracking_frame)
+        filter_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(filter_frame, text="Filter by:").pack(side=tk.LEFT, padx=(0, 5))
+
+        status_filter = ttk.Combobox(filter_frame, values=["All", "Not Started", "In Progress", "Completed", "Overdue"], state="readonly", width=12)
+        status_filter.set("All")
+        status_filter.pack(side=tk.LEFT, padx=(0, 10))
+
+        priority_filter = ttk.Combobox(filter_frame, values=["All", "High", "Medium", "Low"], state="readonly", width=8)
+        priority_filter.set("All")
+        priority_filter.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(filter_frame, text="Apply Filters").pack(side=tk.LEFT)
+
+        # Task details tree
+        tree_frame = ttk.Frame(tracking_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+
+        columns = ("Task", "Assigned To", "Due Date", "Status", "Progress", "Priority")
+        task_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+
+        for col in columns:
+            task_tree.heading(col, text=col)
+            task_tree.column(col, width=100, anchor="w")
+
+        # Add sample data
+        sample_tasks = [
+            ("Review architectural drawings", "John Smith", "2025-10-01", "In Progress", "75%", "High"),
+            ("Check structural calculations", "Jane Doe", "2025-09-28", "Completed", "100%", "Medium"),
+            ("Verify MEP coordination", "Bob Wilson", "2025-10-05", "Not Started", "0%", "High")
+        ]
+
+        for task in sample_tasks:
+            task_tree.insert("", tk.END, values=task)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=task_tree.yview)
+        task_tree.configure(yscrollcommand=scrollbar.set)
+
+        task_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     
     def setup_billing_tab(self):
         """Setup the Billing & Progress tab"""
@@ -1869,11 +2422,105 @@ class ReviewManagementTab:
         
         self.progress_tree.pack(fill=tk.BOTH, expand=True)
     
+    def safe_format_datetime(self, dt_value):
+        """Safely format datetime value that might be string or datetime object"""
+        if not dt_value:
+            return 'N/A'
+        if isinstance(dt_value, str):
+            try:
+                # Try to parse string as datetime
+                dt_obj = datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except (ValueError, AttributeError):
+                return str(dt_value)
+        elif hasattr(dt_value, 'strftime'):
+            return dt_value.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            return str(dt_value)
+    
+    def refresh_revizto_history(self):
+        """Refresh the Revizto extraction history"""
+        try:
+            # Clear existing data
+            for item in self.revizto_history_tree.get_children():
+                self.revizto_history_tree.delete(item)
+            
+            # Get extraction runs
+            runs = get_revizto_extraction_runs()
+            
+            for run in runs:
+                start_time = self.safe_format_datetime(run['start_time'])
+                end_time = self.safe_format_datetime(run['end_time']) if run['end_time'] else 'Running'
+                
+                # Calculate duration
+                if run['end_time'] and run['start_time']:
+                    try:
+                        # Convert to datetime objects if they are strings
+                        start_dt = run['start_time'] if isinstance(run['start_time'], datetime) else datetime.fromisoformat(str(run['start_time']).replace('Z', '+00:00'))
+                        end_dt = run['end_time'] if isinstance(run['end_time'], datetime) else datetime.fromisoformat(str(run['end_time']).replace('Z', '+00:00'))
+                        duration = str(end_dt - start_dt).split('.')[0]  # Remove microseconds
+                    except (ValueError, TypeError):
+                        duration = 'N/A'
+                else:
+                    duration = 'N/A'
+                
+                self.revizto_history_tree.insert("", tk.END, values=(
+                    run['run_id'],
+                    start_time,
+                    end_time,
+                    run['status'],
+                    run['projects_extracted'],
+                    run['issues_extracted'],
+                    run['licenses_extracted'],
+                    duration
+                ))
+            
+            # Update last run info
+            last_run = get_last_revizto_extraction_run()
+            if last_run:
+                last_run_time = last_run['end_time'] or last_run['start_time']
+                self.last_run_var.set(f"Last run: {last_run_time.strftime('%Y-%m-%d %H:%M:%S')} ({last_run['status']})")
+            else:
+                self.last_run_var.set("No extraction runs found")
+            
+            # Load project changes
+            self.refresh_revizto_changes()
+            
+        except Exception as e:
+            logger.error(f"Error refreshing Revizto history: {e}")
+            messagebox.showerror("Error", f"Failed to refresh extraction history: {e}")
+    
+    def refresh_revizto_changes(self):
+        """Refresh the recent project changes"""
+        try:
+            # Clear existing data
+            for item in self.revizto_changes_tree.get_children():
+                self.revizto_changes_tree.delete(item)
+            
+            # Get projects changed since last run
+            from database import get_revizto_projects_since_last_run
+            changed_projects = get_revizto_projects_since_last_run()
+            
+            for project in changed_projects:
+                status = "Archived" if project['archived'] else ("Frozen" if project['frozen'] else "Active")
+                updated_time = self.safe_format_datetime(project['updated'])
+                
+                self.revizto_changes_tree.insert("", tk.END, values=(
+                    project['project_uuid'],
+                    project['title'],
+                    updated_time,
+                    project['owner_email'],
+                    status
+                ))
+            
+        except Exception as e:
+            logger.error(f"Error refreshing Revizto changes: {e}")
+    
     def refresh_data(self):
         """Refresh all data in the tab"""
         try:
             # Initialize review service connection
-            from handlers.database import connect_to_db
+            from database import connect_to_db
             db_conn = connect_to_db()
             if db_conn:
                 self.review_service = ReviewManagementService(db_conn)
@@ -3354,6 +4001,10 @@ class ReviewManagementTab:
     def load_review_tasks(self):
         """Load review tasks for current project/cycle"""
         try:
+            # Check if tasks_tree exists and is not None
+            if not hasattr(self, 'tasks_tree') or self.tasks_tree is None:
+                return
+                
             # Clear existing tasks
             for item in self.tasks_tree.get_children():
                 self.tasks_tree.delete(item)
@@ -3573,18 +4224,6 @@ class ReviewManagementTab:
             
         except Exception as e:
             messagebox.showerror("Error", f"Error showing contract links: {e}")
-    
-    def open_revizto_exporter(self):
-        """Open Revizto data exporter"""
-        try:
-            exe_path = os.path.abspath("tools/ReviztoDataExporter.exe")
-            if os.path.exists(exe_path):
-                import subprocess
-                subprocess.Popen([exe_path])
-            else:
-                messagebox.showerror("Error", f"Revizto Exporter not found at: {exe_path}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error opening Revizto exporter: {e}")
     
     def edit_review_cycle(self):
         """Edit the selected review cycle"""
@@ -4730,7 +5369,7 @@ class NestedProjectSetupTab:
         def save_client():
             """Save the new client to database"""
             try:
-                from handlers.database import create_new_client
+                from database import create_new_client
                 
                 client_data = {
                     'client_name': client_vars['name'].get().strip(),
@@ -5562,35 +6201,83 @@ class ProjectBookmarksTab:
         bookmarks_frame = ttk.LabelFrame(main_frame, text="Project Bookmarks", padding=10)
         bookmarks_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
+        # Search and Filter Frame
+        search_frame = ttk.LabelFrame(bookmarks_frame, text="Search & Filter", padding=5)
+        search_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Search row
+        search_row = ttk.Frame(search_frame)
+        search_row.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(search_row, text="Search:").pack(side=tk.LEFT, padx=(0, 5))
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, width=30)
+        self.search_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self.search_entry.bind('<KeyRelease>', self.on_search_change)
+        
+        ttk.Label(search_row, text="Category:").pack(side=tk.LEFT, padx=(0, 5))
+        self.category_filter_var = tk.StringVar(value="All")
+        self.category_filter_combo = ttk.Combobox(search_row, textvariable=self.category_filter_var, 
+                                                 width=15, state="readonly")
+        self.category_filter_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self.category_filter_combo.bind("<<ComboboxSelected>>", self.on_filter_change)
+        
+        ttk.Label(search_row, text="Tags:").pack(side=tk.LEFT, padx=(0, 5))
+        self.tags_filter_var = tk.StringVar(value="All")
+        self.tags_filter_combo = ttk.Combobox(search_row, textvariable=self.tags_filter_var, 
+                                             width=15, state="readonly")
+        self.tags_filter_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self.tags_filter_combo.bind("<<ComboboxSelected>>", self.on_filter_change)
+        
+        ttk.Label(search_row, text="Sort by:").pack(side=tk.LEFT, padx=(0, 5))
+        self.sort_var = tk.StringVar(value="Name")
+        self.sort_combo = ttk.Combobox(search_row, textvariable=self.sort_var, 
+                                      values=["Name", "Category", "Created", "URL"], 
+                                      width=10, state="readonly")
+        self.sort_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self.sort_combo.bind("<<ComboboxSelected>>", self.on_filter_change)
+        
+        # Clear filters button
+        ttk.Button(search_row, text="Clear Filters", command=self.clear_filters).pack(side=tk.RIGHT)
+        
         # Toolbar
         toolbar_frame = ttk.Frame(bookmarks_frame)
         toolbar_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Button(toolbar_frame, text="Add Bookmark", command=self.add_bookmark).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="Templates", command=self.show_templates).pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar_frame, text="Edit Bookmark", command=self.edit_bookmark).pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar_frame, text="Delete Bookmark", command=self.delete_bookmark).pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar_frame, text="Open in Browser", command=self.open_bookmark).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="Duplicate", command=self.duplicate_bookmark).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="Import", command=self.import_bookmarks).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="Export", command=self.export_bookmarks).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="Check Links", command=self.check_links).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_frame, text="View Notes", command=self.view_notes).pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar_frame, text="Refresh", command=self.refresh_bookmarks).pack(side=tk.RIGHT, padx=5)
         
         # Bookmarks Treeview
-        columns = ("Name", "URL", "Description", "Category", "Created")
+        columns = ("Name", "URL", "Description", "Category", "Tags", "Created")
         self.bookmarks_tree = ttk.Treeview(bookmarks_frame, columns=columns, show="headings", height=15)
         
         # Configure columns
         self.bookmarks_tree.heading("Name", text="Name")
-        self.bookmarks_tree.column("Name", width=200)
+        self.bookmarks_tree.column("Name", width=150)
         
         self.bookmarks_tree.heading("URL", text="URL")
-        self.bookmarks_tree.column("URL", width=300)
+        self.bookmarks_tree.column("URL", width=250)
         
         self.bookmarks_tree.heading("Description", text="Description")
-        self.bookmarks_tree.column("Description", width=250)
+        self.bookmarks_tree.column("Description", width=200)
         
         self.bookmarks_tree.heading("Category", text="Category")
         self.bookmarks_tree.column("Category", width=100)
         
+        self.bookmarks_tree.heading("Tags", text="Tags")
+        self.bookmarks_tree.column("Tags", width=120)
+        
         self.bookmarks_tree.heading("Created", text="Created")
-        self.bookmarks_tree.column("Created", width=120)
+        self.bookmarks_tree.column("Created", width=100)
         
         # Scrollbars
         v_scrollbar = ttk.Scrollbar(bookmarks_frame, orient=tk.VERTICAL, command=self.bookmarks_tree.yview)
@@ -5603,6 +6290,20 @@ class ProjectBookmarksTab:
         
         # Bind double-click to open bookmark
         self.bookmarks_tree.bind("<Double-1>", lambda e: self.open_bookmark())
+        
+        # Quick Access Panel
+        self.quick_access_expanded = False
+        quick_access_frame = ttk.LabelFrame(main_frame, text="Quick Access (Click to Expand)", padding=5)
+        quick_access_frame.pack(fill=tk.X, pady=(10, 0))
+        quick_access_frame.bind("<Button-1>", self.toggle_quick_access)
+        
+        self.quick_access_content = ttk.Frame(quick_access_frame)
+        # Don't pack initially - will be packed when expanded
+        
+        # Quick access buttons will be added here when expanded
+        self.quick_access_buttons_frame = ttk.Frame(self.quick_access_content)
+        self.quick_access_label = ttk.Label(self.quick_access_content, text="No frequently used bookmarks yet.\nAdd bookmarks and use them to populate this panel.")
+        self.quick_access_label.pack(pady=20)
     
     def refresh_data(self):
         """Refresh project list"""
@@ -5631,7 +6332,7 @@ class ProjectBookmarksTab:
         project_notification_system.notify_project_changed(selection)
     
     def refresh_bookmarks(self):
-        """Refresh the bookmarks list"""
+        """Refresh the bookmarks list with search and filter applied"""
         if not self.current_project_id or not self.bookmarks_tree:
             return
         
@@ -5639,19 +6340,68 @@ class ProjectBookmarksTab:
         for item in self.bookmarks_tree.get_children():
             self.bookmarks_tree.delete(item)
         
-        # Get bookmarks
-        bookmarks = get_project_bookmarks(self.current_project_id)
+        # Get all bookmarks
+        all_bookmarks = get_project_bookmarks(self.current_project_id)
         
-        # Group by category
-        categories = {}
-        for bookmark in bookmarks:
+        # Apply search filter
+        search_term = self.search_var.get().strip().lower()
+        if search_term:
+            all_bookmarks = [
+                b for b in all_bookmarks 
+                if search_term in b['name'].lower() or 
+                   search_term in (b['url'] or '').lower() or 
+                   search_term in (b['description'] or '').lower() or
+                   search_term in (b['tags'] or '').lower()
+            ]
+        
+        # Apply category filter
+        category_filter = self.category_filter_var.get()
+        if category_filter != "All":
+            all_bookmarks = [b for b in all_bookmarks if b['category'] == category_filter]
+        
+        # Apply tags filter
+        tags_filter = self.tags_filter_var.get()
+        if tags_filter != "All":
+            all_bookmarks = [
+                b for b in all_bookmarks 
+                if b['tags'] and tags_filter in b['tags']
+            ]
+        
+        # Apply sorting
+        sort_by = self.sort_var.get()
+        if sort_by == "Name":
+            all_bookmarks.sort(key=lambda x: x['name'].lower())
+        elif sort_by == "Category":
+            all_bookmarks.sort(key=lambda x: (x['category'] or '', x['name'].lower()))
+        elif sort_by == "Created":
+            all_bookmarks.sort(key=lambda x: x['created_at'] or '', reverse=True)
+        elif sort_by == "URL":
+            all_bookmarks.sort(key=lambda x: x['url'].lower())
+        
+        # Update category filter dropdown with available categories
+        categories = list(set(b['category'] for b in all_bookmarks if b['category']))
+        categories.sort()
+        self.category_filter_combo['values'] = ["All"] + categories
+        
+        # Update tags filter dropdown with available tags
+        all_tags = []
+        for b in all_bookmarks:
+            if b['tags']:
+                all_tags.extend([tag.strip() for tag in b['tags'].split(',') if tag.strip()])
+        unique_tags = list(set(all_tags))
+        unique_tags.sort()
+        self.tags_filter_combo['values'] = ["All"] + unique_tags
+        
+        # Group by category and display
+        categories_dict = {}
+        for bookmark in all_bookmarks:
             category = bookmark['category'] or 'Uncategorized'
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(bookmark)
+            if category not in categories_dict:
+                categories_dict[category] = []
+            categories_dict[category].append(bookmark)
         
         # Add to treeview
-        for category, category_bookmarks in categories.items():
+        for category, category_bookmarks in categories_dict.items():
             # Add category as parent
             category_item = self.bookmarks_tree.insert("", tk.END, text=category, values=("", "", "", category, ""))
             
@@ -5673,10 +6423,15 @@ class ProjectBookmarksTab:
                         bookmark['url'],
                         bookmark['description'] or '',
                         bookmark['category'],
+                        bookmark['tags'] or '',
                         created_at_str
-                    ),
-                    tags=(str(bookmark['id']),)
+                ),
+                tags=(str(bookmark['id']),)
                 )
+        
+        # Refresh quick access panel if expanded
+        if self.quick_access_expanded:
+            self.refresh_quick_access()
     
     def add_bookmark(self):
         """Add a new bookmark"""
@@ -5710,20 +6465,26 @@ class ProjectBookmarksTab:
         if categories:
             category_combo['values'] = categories
         
-        ttk.Label(dialog, text="Description:").grid(row=3, column=0, sticky="nw", padx=10, pady=5)
+        ttk.Label(dialog, text="Tags:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        tags_entry = ttk.Entry(dialog, width=50)
+        tags_entry.grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+        tags_entry.insert(0, "BIM, Documentation")  # Default suggestion
+        
+        ttk.Label(dialog, text="Description:").grid(row=4, column=0, sticky="nw", padx=10, pady=5)
         desc_text = tk.Text(dialog, height=5, width=40)
-        desc_text.grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+        desc_text.grid(row=4, column=1, padx=10, pady=5, sticky="ew")
         
         dialog.columnconfigure(1, weight=1)
         
         # Buttons
         button_frame = ttk.Frame(dialog)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=10)
         
         def save_bookmark():
             name = name_entry.get().strip()
             url = url_entry.get().strip()
             category = category_var.get().strip() or "General"
+            tags = tags_entry.get().strip()
             description = desc_text.get(1.0, tk.END).strip()
             
             if not name or not url:
@@ -5733,7 +6494,7 @@ class ProjectBookmarksTab:
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
             
-            success = add_bookmark(self.current_project_id, name, url, description, category)
+            success = add_bookmark(self.current_project_id, name, url, description, category, tags)
             if success:
                 messagebox.showinfo("Success", "Bookmark added successfully.")
                 dialog.destroy()
@@ -5788,21 +6549,27 @@ class ProjectBookmarksTab:
         if categories:
             category_combo['values'] = categories
         
-        ttk.Label(dialog, text="Description:").grid(row=3, column=0, sticky="nw", padx=10, pady=5)
+        ttk.Label(dialog, text="Tags:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        tags_entry = ttk.Entry(dialog, width=50)
+        tags_entry.insert(0, values[4])  # Tags are in index 4 now
+        tags_entry.grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+        
+        ttk.Label(dialog, text="Description:").grid(row=4, column=0, sticky="nw", padx=10, pady=5)
         desc_text = tk.Text(dialog, height=5, width=40)
         desc_text.insert(1.0, values[2])
-        desc_text.grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+        desc_text.grid(row=4, column=1, padx=10, pady=5, sticky="ew")
         
         dialog.columnconfigure(1, weight=1)
         
         # Buttons
         button_frame = ttk.Frame(dialog)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=10)
         
         def update_bookmark_data():
             name = name_entry.get().strip()
             url = url_entry.get().strip()
             category = category_var.get().strip() or "General"
+            tags = tags_entry.get().strip()
             description = desc_text.get(1.0, tk.END).strip()
             
             if not name or not url:
@@ -5812,7 +6579,7 @@ class ProjectBookmarksTab:
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
             
-            success = update_bookmark(bookmark_id, name=name, url=url, description=description, category=category)
+            success = update_bookmark(bookmark_id, name=name, url=url, description=description, category=category, tags=tags)
             if success:
                 messagebox.showinfo("Success", "Bookmark updated successfully.")
                 dialog.destroy()
@@ -5850,6 +6617,647 @@ class ProjectBookmarksTab:
         else:
             messagebox.showerror("Error", "Failed to delete bookmark.")
     
+    def on_search_change(self, event=None):
+        """Handle search input changes"""
+        self.refresh_bookmarks()
+    
+    def on_filter_change(self, event=None):
+        """Handle filter changes"""
+        self.refresh_bookmarks()
+    
+    def clear_filters(self):
+        """Clear all search and filter criteria"""
+        self.search_var.set("")
+        self.category_filter_var.set("All")
+        self.tags_filter_var.set("All")
+        self.sort_var.set("Name")
+        self.refresh_bookmarks()
+    
+    def duplicate_bookmark(self):
+        """Duplicate selected bookmark"""
+        selection = self.bookmarks_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a bookmark to duplicate.")
+            return
+        
+        item = selection[0]
+        tags = self.bookmarks_tree.item(item, 'tags')
+        if not tags:
+            messagebox.showwarning("Invalid Selection", "Please select a bookmark (not a category).")
+            return
+        
+        bookmark_id = int(tags[0])
+        values = self.bookmarks_tree.item(item, 'values')
+        
+        # Create duplicate with "Copy" suffix
+        new_name = f"{values[0]} (Copy)"
+        
+        success = add_bookmark(
+            self.current_project_id, 
+            new_name, 
+            values[1],  # URL
+            values[2],  # Description
+            values[3],  # Category
+            values[4]   # Tags
+        )
+        
+        if success:
+            messagebox.showinfo("Success", "Bookmark duplicated successfully.")
+            self.refresh_bookmarks()
+        else:
+            messagebox.showerror("Error", "Failed to duplicate bookmark.")
+    
+    def import_bookmarks(self):
+        """Import bookmarks from CSV file"""
+        if not self.current_project_id:
+            messagebox.showwarning("No Project", "Please select a project first.")
+            return
+        
+        # Ask for file location
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            title="Import Bookmarks"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            import csv
+            imported_count = 0
+            errors = []
+            
+            with open(file_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                
+                for row_num, row in enumerate(reader, start=2):  # Start at 2 since row 1 is header
+                    try:
+                        name = row.get('name', '').strip()
+                        url = row.get('url', '').strip()
+                        description = row.get('description', '').strip()
+                        category = row.get('category', 'General').strip()
+                        tags = row.get('tags', '').strip()
+                        
+                        if not name or not url:
+                            errors.append(f"Row {row_num}: Missing name or URL")
+                            continue
+                        
+                        if not url.startswith(('http://', 'https://')):
+                            url = 'https://' + url
+                        
+                        success = add_bookmark(
+                            self.current_project_id,
+                            name,
+                            url,
+                            description,
+                            category,
+                            tags
+                        )
+                        
+                        if success:
+                            imported_count += 1
+                        else:
+                            errors.append(f"Row {row_num}: Failed to save bookmark '{name}'")
+                            
+                    except Exception as e:
+                        errors.append(f"Row {row_num}: {str(e)}")
+            
+            # Show results
+            if imported_count > 0:
+                self.refresh_bookmarks()
+                
+            message = f"Import completed: {imported_count} bookmarks imported successfully."
+            if errors:
+                message += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors[:5])  # Show first 5 errors
+                if len(errors) > 5:
+                    message += f"\n... and {len(errors) - 5} more errors"
+            
+            if errors:
+                # Show in a scrollable text dialog for errors
+                error_dialog = tk.Toplevel(self.frame)
+                error_dialog.title("Import Results")
+                error_dialog.geometry("500x400")
+                error_dialog.transient(self.frame)
+                
+                text_widget = tk.Text(error_dialog, wrap=tk.WORD, padx=10, pady=10)
+                text_widget.insert(tk.END, message)
+                text_widget.config(state=tk.DISABLED)
+                
+                scrollbar = ttk.Scrollbar(error_dialog, command=text_widget.yview)
+                text_widget.configure(yscrollcommand=scrollbar.set)
+                
+                text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+                
+                ttk.Button(error_dialog, text="Close", command=error_dialog.destroy).pack(pady=10)
+            else:
+                messagebox.showinfo("Import Successful", message)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import bookmarks: {e}")
+    
+    def export_bookmarks(self):
+        """Export bookmarks to CSV file"""
+        if not self.current_project_id:
+            messagebox.showwarning("No Project", "Please select a project first.")
+            return
+        
+        # Get all bookmarks (unfiltered)
+        all_bookmarks = get_project_bookmarks(self.current_project_id)
+        
+        if not all_bookmarks:
+            messagebox.showinfo("No Bookmarks", "No bookmarks to export.")
+            return
+        
+        # Ask for file location
+        from tkinter import filedialog
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            title="Export Bookmarks"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            import csv
+            with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = ['name', 'url', 'description', 'category', 'created_at']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                
+                writer.writeheader()
+                for bookmark in all_bookmarks:
+                    writer.writerow({
+                        'name': bookmark['name'],
+                        'url': bookmark['url'],
+                        'description': bookmark['description'] or '',
+                        'category': bookmark['category'] or '',
+                        'created_at': bookmark['created_at']
+                    })
+            
+            messagebox.showinfo("Success", f"Exported {len(all_bookmarks)} bookmarks to {file_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export bookmarks: {e}")
+    
+    def check_links(self):
+        """Check the health of bookmark URLs"""
+        if not self.current_project_id:
+            messagebox.showwarning("No Project", "Please select a project first.")
+            return
+        
+        # Get all bookmarks
+        bookmarks = get_project_bookmarks(self.current_project_id)
+        if not bookmarks:
+            messagebox.showinfo("No Bookmarks", "No bookmarks to check.")
+            return
+        
+        # Create progress dialog
+        progress_dialog = tk.Toplevel(self.frame)
+        progress_dialog.title("Checking Links")
+        progress_dialog.geometry("400x150")
+        progress_dialog.transient(self.frame)
+        progress_dialog.grab_set()
+        
+        ttk.Label(progress_dialog, text="Checking bookmark URLs...").pack(pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_dialog, variable=progress_var, maximum=len(bookmarks))
+        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+        
+        status_label = ttk.Label(progress_dialog, text="Starting...")
+        status_label.pack(pady=5)
+        
+        results = []
+        
+        def check_url(url, name):
+            """Check if URL is accessible"""
+            try:
+                import urllib.request
+                import urllib.error
+                import socket
+                
+                # Set timeout
+                socket.setdefaulttimeout(10)
+                
+                # Try to open URL
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                response = urllib.request.urlopen(req)
+                return "OK", response.getcode()
+                
+            except urllib.error.HTTPError as e:
+                return "ERROR", e.code
+            except urllib.error.URLError as e:
+                return "ERROR", str(e.reason)
+            except Exception as e:
+                return "ERROR", str(e)
+        
+        def run_checks():
+            """Run link checks in background"""
+            for i, bookmark in enumerate(bookmarks):
+                status_label.config(text=f"Checking: {bookmark['name'][:30]}...")
+                progress_var.set(i + 1)
+                progress_dialog.update()
+                
+                status, detail = check_url(bookmark['url'], bookmark['name'])
+                results.append({
+                    'bookmark': bookmark,
+                    'status': status,
+                    'detail': detail
+                })
+            
+            # Close progress dialog
+            progress_dialog.destroy()
+            
+            # Show results
+            self.show_link_check_results(results)
+        
+        # Run checks in separate thread
+        import threading
+        check_thread = threading.Thread(target=run_checks)
+        check_thread.daemon = True
+        check_thread.start()
+    
+    def show_link_check_results(self, results):
+        """Show the results of link checking"""
+        # Create results dialog
+        results_dialog = tk.Toplevel(self.frame)
+        results_dialog.title("Link Check Results")
+        results_dialog.geometry("700x500")
+        results_dialog.transient(self.frame)
+        
+        # Summary
+        ok_count = sum(1 for r in results if r['status'] == 'OK')
+        error_count = len(results) - ok_count
+        
+        summary_frame = ttk.Frame(results_dialog)
+        summary_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(summary_frame, text=f"Total: {len(results)}", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=10)
+        ttk.Label(summary_frame, text=f"OK: {ok_count}", foreground="green").pack(side=tk.LEFT, padx=10)
+        ttk.Label(summary_frame, text=f"Errors: {error_count}", foreground="red").pack(side=tk.LEFT, padx=10)
+        
+        # Results treeview
+        columns = ("Name", "URL", "Status", "Details")
+        results_tree = ttk.Treeview(results_dialog, columns=columns, show="headings", height=15)
+        
+        results_tree.heading("Name", text="Bookmark Name")
+        results_tree.column("Name", width=150)
+        
+        results_tree.heading("URL", text="URL")
+        results_tree.column("URL", width=200)
+        
+        results_tree.heading("Status", text="Status")
+        results_tree.column("Status", width=80)
+        
+        results_tree.heading("Details", text="Details")
+        results_tree.column("Details", width=150)
+        
+        # Add results
+        for result in results:
+            results_tree.insert("", tk.END, values=(
+                result['bookmark']['name'],
+                result['bookmark']['url'],
+                result['status'],
+                str(result['detail'])
+            ), tags=(result['status'],))
+        
+        # Color rows based on status
+        results_tree.tag_configure("OK", foreground="green")
+        results_tree.tag_configure("ERROR", foreground="red")
+        
+        # Scrollbars
+        v_scrollbar = ttk.Scrollbar(results_dialog, orient=tk.VERTICAL, command=results_tree.yview)
+        h_scrollbar = ttk.Scrollbar(results_dialog, orient=tk.HORIZONTAL, command=results_tree.xview)
+        results_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        results_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Buttons
+        button_frame = ttk.Frame(results_dialog)
+        button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        ttk.Button(button_frame, text="Close", command=results_dialog.destroy).pack(side=tk.RIGHT, padx=5)
+    
+    def view_notes(self):
+        """View and edit notes for selected bookmark"""
+        selection = self.bookmarks_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a bookmark to view notes.")
+            return
+        
+        item = selection[0]
+        tags = self.bookmarks_tree.item(item, 'tags')
+        if not tags:
+            messagebox.showwarning("Invalid Selection", "Please select a bookmark (not a category).")
+            return
+        
+        bookmark_id = int(tags[0])
+        values = self.bookmarks_tree.item(item, 'values')
+        
+        # Get full bookmark data including notes
+        bookmarks = get_project_bookmarks(self.current_project_id)
+        bookmark = next((b for b in bookmarks if b['id'] == bookmark_id), None)
+        
+        if not bookmark:
+            messagebox.showerror("Error", "Bookmark not found.")
+            return
+        
+        # Create notes dialog
+        dialog = tk.Toplevel(self.frame)
+        dialog.title(f"Notes: {bookmark['name']}")
+        dialog.geometry("500x400")
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Notes text area
+        ttk.Label(dialog, text="Notes:").pack(anchor="w", padx=10, pady=(10, 5))
+        
+        notes_frame = ttk.Frame(dialog)
+        notes_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        
+        notes_text = tk.Text(notes_frame, wrap=tk.WORD, height=15)
+        notes_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(notes_frame, command=notes_text.yview)
+        notes_text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Insert existing notes
+        if bookmark['notes']:
+            notes_text.insert(1.0, bookmark['notes'])
+        
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        def save_notes():
+            new_notes = notes_text.get(1.0, tk.END).strip()
+            success = update_bookmark(bookmark_id, notes=new_notes)
+            if success:
+                messagebox.showinfo("Success", "Notes saved successfully.")
+                dialog.destroy()
+                self.refresh_bookmarks()
+            else:
+                messagebox.showerror("Error", "Failed to save notes.")
+        
+        ttk.Button(button_frame, text="Save", command=save_notes).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+    
+    def toggle_quick_access(self, event=None):
+        """Toggle the quick access panel"""
+        if self.quick_access_expanded:
+            # Collapse
+            self.quick_access_content.pack_forget()
+            self.quick_access_expanded = False
+            # Find the label frame and update text
+            for child in self.frame.winfo_children():
+                if isinstance(child, ttk.LabelFrame) and "Quick Access" in str(child.cget("text")):
+                    child.config(text="Quick Access (Click to Expand)")
+                    break
+        else:
+            # Expand
+            self.quick_access_content.pack(fill=tk.X, pady=5)
+            self.quick_access_expanded = True
+            # Find the label frame and update text
+            for child in self.frame.winfo_children():
+                if isinstance(child, ttk.LabelFrame) and "Quick Access" in str(child.cget("text")):
+                    child.config(text="Quick Access (Click to Collapse)")
+                    break
+            # Refresh quick access content
+            self.refresh_quick_access()
+    
+    def refresh_quick_access(self):
+        """Refresh the quick access panel with recent bookmarks"""
+        if not self.quick_access_expanded:
+            return
+        
+        # Clear existing buttons
+        for widget in self.quick_access_buttons_frame.winfo_children():
+            widget.destroy()
+        
+        # Get recent bookmarks (last 10 by creation date)
+        bookmarks = get_project_bookmarks(self.current_project_id)
+        if not bookmarks:
+            self.quick_access_label.pack(pady=20)
+            return
+        
+        # Sort by creation date (most recent first) and take top 10
+        recent_bookmarks = sorted(
+            bookmarks, 
+            key=lambda x: x['created_at'] or '', 
+            reverse=True
+        )[:10]
+        
+        if not recent_bookmarks:
+            self.quick_access_label.pack(pady=20)
+            return
+        
+        # Hide the "no bookmarks" label
+        self.quick_access_label.pack_forget()
+        
+        # Pack the buttons frame
+        self.quick_access_buttons_frame.pack(fill=tk.X, pady=5)
+        
+        # Create buttons for recent bookmarks
+        for bookmark in recent_bookmarks:
+            btn = ttk.Button(
+                self.quick_access_buttons_frame,
+                text=bookmark['name'][:20] + ("..." if len(bookmark['name']) > 20 else ""),
+                command=lambda b=bookmark: self.open_bookmark_by_id(b['id'])
+            )
+            btn.pack(side=tk.LEFT, padx=2, pady=2)
+            # Add tooltip
+            CreateToolTip(btn, f"{bookmark['name']}\n{bookmark['url']}\nCategory: {bookmark['category'] or 'None'}")
+    
+    def open_bookmark_by_id(self, bookmark_id):
+        """Open a bookmark by its ID"""
+        # Get bookmark details
+        bookmarks = get_project_bookmarks(self.current_project_id)
+        bookmark = next((b for b in bookmarks if b['id'] == bookmark_id), None)
+        
+        if bookmark:
+            try:
+                webbrowser.open(bookmark['url'])
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to open URL: {e}")
+    
+    def show_templates(self):
+        """Show bookmark templates dialog"""
+        if not self.current_project_id:
+            messagebox.showwarning("No Project", "Please select a project first.")
+            return
+        
+        # Create templates dialog
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Bookmark Templates")
+        dialog.geometry("600x500")
+        dialog.transient(self.frame)
+        dialog.grab_set()
+        
+        # Templates data
+        templates = [
+            {
+                "name": "Autodesk Construction Cloud",
+                "url": "https://acc.autodesk.com",
+                "category": "BIM Tools",
+                "tags": "Autodesk, ACC, Construction Cloud, BIM",
+                "description": "Autodesk Construction Cloud - Project management and BIM collaboration platform"
+            },
+            {
+                "name": "Revit Health Check",
+                "url": "https://healthcheck.autodesk.com",
+                "category": "BIM Tools",
+                "tags": "Autodesk, Revit, Health Check, BIM",
+                "description": "Autodesk Revit Health Check - Analyze model performance and issues"
+            },
+            {
+                "name": "BIM 360 Docs",
+                "url": "https://docs.b360.autodesk.com",
+                "category": "Document Management",
+                "tags": "Autodesk, BIM 360, Documents, Collaboration",
+                "description": "BIM 360 Docs - Document management and collaboration platform"
+            },
+            {
+                "name": "Navisworks",
+                "url": "https://www.autodesk.com/products/navisworks/overview",
+                "category": "BIM Tools",
+                "tags": "Autodesk, Navisworks, Coordination, BIM",
+                "description": "Autodesk Navisworks - Project review and coordination software"
+            },
+            {
+                "name": "IFC Model Viewer",
+                "url": "https://ifcjs.github.io/web-ifc-viewer/example/index",
+                "category": "BIM Tools",
+                "tags": "IFC, Viewer, Open Source, BIM",
+                "description": "Web IFC Viewer - Open source IFC model viewer"
+            },
+            {
+                "name": "Construction Specifications Institute",
+                "url": "https://www.csiresources.org",
+                "category": "Standards",
+                "tags": "CSI, Specifications, Standards, Construction",
+                "description": "CSI - Construction Specifications Institute resources"
+            },
+            {
+                "name": "Building Information Modeling Forum",
+                "url": "https://www.bimforum.org",
+                "category": "Industry",
+                "tags": "BIM, Forum, Industry, Standards",
+                "description": "BIMForum - Building Information Modeling industry organization"
+            },
+            {
+                "name": "ISO 19650 Standards",
+                "url": "https://www.iso.org/standard/68078.html",
+                "category": "Standards",
+                "tags": "ISO, 19650, BIM, Standards",
+                "description": "ISO 19650 - Information management using building information modelling"
+            }
+        ]
+        
+        # Create treeview for templates
+        columns = ("Name", "Category", "Tags")
+        template_tree = ttk.Treeview(dialog, columns=columns, show="headings", height=12)
+        
+        template_tree.heading("Name", text="Template Name")
+        template_tree.column("Name", width=200)
+        
+        template_tree.heading("Category", text="Category")
+        template_tree.column("Category", width=120)
+        
+        template_tree.heading("Tags", text="Tags")
+        template_tree.column("Tags", width=150)
+        
+        # Add templates to treeview
+        for template in templates:
+            template_tree.insert("", tk.END, values=(
+                template["name"],
+                template["category"],
+                template["tags"]
+            ), tags=(str(templates.index(template)),))
+        
+        template_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        def add_selected_template():
+            selection = template_tree.selection()
+            if not selection:
+                messagebox.showwarning("No Selection", "Please select a template to add.")
+                return
+            
+            item = selection[0]
+            item_tags = template_tree.item(item, 'tags')
+            if not item_tags:
+                return
+            
+            template_index = int(item_tags[0])
+            template = templates[template_index]
+            
+            success = add_bookmark(
+                self.current_project_id,
+                template["name"],
+                template["url"],
+                template["description"],
+                template["category"],
+                template["tags"]
+            )
+            
+            if success:
+                messagebox.showinfo("Success", f"Template '{template['name']}' added successfully.")
+                dialog.destroy()
+                self.refresh_bookmarks()
+            else:
+                messagebox.showerror("Error", "Failed to add template bookmark.")
+        
+        def preview_template():
+            selection = template_tree.selection()
+            if not selection:
+                messagebox.showwarning("No Selection", "Please select a template to preview.")
+                return
+            
+            item = selection[0]
+            item_tags = template_tree.item(item, 'tags')
+            if not item_tags:
+                return
+            
+            template_index = int(item_tags[0])
+            template = templates[template_index]
+            
+            # Show preview dialog
+            preview_dialog = tk.Toplevel(dialog)
+            preview_dialog.title(f"Preview: {template['name']}")
+            preview_dialog.geometry("500x300")
+            preview_dialog.transient(dialog)
+            
+            ttk.Label(preview_dialog, text="Name:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky="w", padx=10, pady=5)
+            ttk.Label(preview_dialog, text=template["name"]).grid(row=0, column=1, sticky="w", padx=10, pady=5)
+            
+            ttk.Label(preview_dialog, text="URL:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky="w", padx=10, pady=5)
+            ttk.Label(preview_dialog, text=template["url"]).grid(row=1, column=1, sticky="w", padx=10, pady=5)
+            
+            ttk.Label(preview_dialog, text="Category:", font=("Arial", 10, "bold")).grid(row=2, column=0, sticky="w", padx=10, pady=5)
+            ttk.Label(preview_dialog, text=template["category"]).grid(row=2, column=1, sticky="w", padx=10, pady=5)
+            
+            ttk.Label(preview_dialog, text="Tags:", font=("Arial", 10, "bold")).grid(row=3, column=0, sticky="w", padx=10, pady=5)
+            ttk.Label(preview_dialog, text=template["tags"]).grid(row=3, column=1, sticky="w", padx=10, pady=5)
+            
+            ttk.Label(preview_dialog, text="Description:", font=("Arial", 10, "bold")).grid(row=4, column=0, sticky="nw", padx=10, pady=5)
+            desc_label = ttk.Label(preview_dialog, text=template["description"], wraplength=300)
+            desc_label.grid(row=4, column=1, sticky="w", padx=10, pady=5)
+            
+            ttk.Button(preview_dialog, text="Close", command=preview_dialog.destroy).grid(row=5, column=0, columnspan=2, pady=10)
+        
+        ttk.Button(button_frame, text="Preview", command=preview_template).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Add Template", command=add_selected_template).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+    
     def open_bookmark(self):
         """Open selected bookmark in browser"""
         selection = self.bookmarks_tree.selection()
@@ -5876,6 +7284,413 @@ class ProjectBookmarksTab:
         if self.project_var.get() != new_project:
             self.project_var.set(new_project)
             self.on_project_selected()
+    
+    def on_project_list_changed(self):
+        """Handle notification that the project list has changed"""
+        self.refresh_data()
+
+
+class IssueManagementTab:
+    """Issue Management Interface - ACC Folders and Revizto Data"""
+    
+    def __init__(self, parent_notebook):
+        self.frame = ttk.Frame(parent_notebook)
+        parent_notebook.add(self.frame, text="?? Issue Management")
+        
+        # Initialize variables that will be used across sub-tabs
+        self.current_project_id = None
+        
+        self.setup_ui()
+        self.refresh_data()
+        
+        # Register for project change notifications
+        project_notification_system.register_observer(self)
+    
+    def setup_ui(self):
+        """Set up the issue management interface with sub-tabs"""
+        # Create main notebook for sub-tabs
+        self.sub_notebook = ttk.Notebook(self.frame)
+        self.sub_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Tab 1: ACC Folder Management
+        self.setup_acc_folder_tab()
+        
+        # Tab 2: Revizto Data Management
+        self.setup_revizto_tab()
+    
+    def setup_revizto_tab(self):
+        """Setup the Revizto Data Management sub-tab"""
+        revizto_frame = ttk.Frame(self.sub_notebook)
+        self.sub_notebook.add(revizto_frame, text="?? Revizto Data")
+        
+        # Extraction Control Frame
+        control_frame = ttk.LabelFrame(revizto_frame, text="?? Extraction Control", padding=10)
+        control_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Extraction buttons
+        ttk.Button(control_frame, text="Start Revizto Extract", 
+                  command=self.open_revizto_exporter).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Refresh History", 
+                  command=self.refresh_revizto_history).pack(side=tk.LEFT, padx=5)
+        
+        # Last run info
+        self.last_run_var = tk.StringVar(value="No extraction runs found")
+        ttk.Label(control_frame, textvariable=self.last_run_var, 
+                 font=("Arial", 10)).pack(side=tk.RIGHT, padx=20)
+        
+        # Extraction History Frame
+        history_frame = ttk.LabelFrame(revizto_frame, text="?? Extraction History", padding=10)
+        history_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # History treeview
+        history_columns = ("Run ID", "Start Time", "End Time", "Status", "Projects", "Issues", "Licenses", "Duration")
+        self.revizto_history_tree = ttk.Treeview(history_frame, columns=history_columns, show="headings", height=8)
+        
+        for col in history_columns:
+            self.revizto_history_tree.heading(col, text=col)
+            if col in ["Run ID", "Projects", "Issues", "Licenses"]:
+                width = 80
+            elif col == "Status":
+                width = 100
+            elif col == "Duration":
+                width = 120
+            else:
+                width = 150
+            self.revizto_history_tree.column(col, width=width, anchor="w")
+        
+        # Scrollbars
+        history_v_scroll = ttk.Scrollbar(history_frame, orient=tk.VERTICAL, command=self.revizto_history_tree.yview)
+        history_h_scroll = ttk.Scrollbar(history_frame, orient=tk.HORIZONTAL, command=self.revizto_history_tree.xview)
+        self.revizto_history_tree.configure(yscrollcommand=history_v_scroll.set, xscrollcommand=history_h_scroll.set)
+        
+        self.revizto_history_tree.grid(row=0, column=0, sticky="nsew")
+        history_v_scroll.grid(row=0, column=1, sticky="ns")
+        history_h_scroll.grid(row=1, column=0, sticky="ew")
+        
+        history_frame.grid_rowconfigure(0, weight=1)
+        history_frame.grid_columnconfigure(0, weight=1)
+        
+        # Project Changes Frame
+        changes_frame = ttk.LabelFrame(revizto_frame, text="?? Recent Project Changes", padding=10)
+        changes_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Changes treeview
+        changes_columns = ("Project UUID", "Title", "Updated", "Owner", "Status")
+        self.revizto_changes_tree = ttk.Treeview(changes_frame, columns=changes_columns, show="headings", height=6)
+        
+        for col in changes_columns:
+            self.revizto_changes_tree.heading(col, text=col)
+            if col == "Project UUID":
+                width = 200
+            elif col == "Updated":
+                width = 150
+            elif col == "Status":
+                width = 100
+            else:
+                width = 120
+            self.revizto_changes_tree.column(col, width=width, anchor="w")
+        
+        self.revizto_changes_tree.pack(fill=tk.BOTH, expand=True)
+    
+    def safe_format_datetime(self, dt_value):
+        """Safely format datetime value that might be string or datetime object"""
+        if not dt_value:
+            return 'N/A'
+        if isinstance(dt_value, str):
+            try:
+                # Try to parse string as datetime
+                dt_obj = datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except (ValueError, AttributeError):
+                return str(dt_value)
+        elif hasattr(dt_value, 'strftime'):
+            return dt_value.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            return str(dt_value)
+    
+    def open_revizto_exporter(self):
+        """Open Revizto data exporter and track the extraction run"""
+        try:
+            exe_path = os.path.abspath("tools/ReviztoDataExporter.exe")
+            if os.path.exists(exe_path):
+                # Start recording the extraction run
+                export_folder = os.path.join(os.path.dirname(exe_path), "Exports")
+                run_id = start_revizto_extraction_run(
+                    export_folder=export_folder,
+                    notes="Started via BIM Project Management UI"
+                )
+
+                if run_id:
+                    logger.info(f"Started Revizto extraction run {run_id}")
+                    messagebox.showinfo("Revizto Extract", f"Started extraction run #{run_id}. Check the extraction history tab to monitor progress.")
+                else:
+                    logger.warning("Failed to record extraction run start")
+
+                # Launch the exporter
+                import subprocess
+                subprocess.Popen([exe_path])
+
+                # Note: In a future enhancement, we could monitor the export folder
+                # for new files to automatically detect completion and update the run record
+
+            else:
+                messagebox.showerror("Error", f"Revizto Exporter not found at: {exe_path}")
+        except Exception as e:
+            logger.error(f"Error opening Revizto exporter: {e}")
+            messagebox.showerror("Error", f"Error opening Revizto exporter: {e}")
+    
+    def refresh_revizto_history(self):
+        """Refresh the Revizto extraction history"""
+        try:
+            # Clear existing data
+            for item in self.revizto_history_tree.get_children():
+                self.revizto_history_tree.delete(item)
+            
+            # Get extraction runs
+            runs = get_revizto_extraction_runs()
+            
+            for run in runs:
+                start_time = self.safe_format_datetime(run['start_time'])
+                end_time = self.safe_format_datetime(run['end_time']) if run['end_time'] else 'Running'
+                
+                # Calculate duration
+                if run['end_time'] and run['start_time']:
+                    try:
+                        # Convert to datetime objects if they are strings
+                        start_dt = run['start_time'] if isinstance(run['start_time'], datetime) else datetime.fromisoformat(str(run['start_time']).replace('Z', '+00:00'))
+                        end_dt = run['end_time'] if isinstance(run['end_time'], datetime) else datetime.fromisoformat(str(run['end_time']).replace('Z', '+00:00'))
+                        duration = str(end_dt - start_dt).split('.')[0]  # Remove microseconds
+                    except (ValueError, TypeError):
+                        duration = 'N/A'
+                else:
+                    duration = 'N/A'
+                
+                self.revizto_history_tree.insert("", tk.END, values=(
+                    run['run_id'],
+                    start_time,
+                    end_time,
+                    run['status'],
+                    run['projects_extracted'],
+                    run['issues_extracted'],
+                    run['licenses_extracted'],
+                    duration
+                ))
+            
+            # Update last run info
+            last_run = get_last_revizto_extraction_run()
+            if last_run:
+                last_run_time = last_run['end_time'] or last_run['start_time']
+                self.last_run_var.set(f"Last run: {self.safe_format_datetime(last_run_time)} ({last_run['status']})")
+            else:
+                self.last_run_var.set("No extraction runs found")
+            
+            # Load project changes
+            self.refresh_revizto_changes()
+            
+        except Exception as e:
+            logger.error(f"Error refreshing Revizto history: {e}")
+            messagebox.showerror("Error", f"Failed to refresh extraction history: {e}")
+    
+    def refresh_revizto_changes(self):
+        """Refresh the recent project changes"""
+        try:
+            # Clear existing data
+            for item in self.revizto_changes_tree.get_children():
+                self.revizto_changes_tree.delete(item)
+            
+            # Get projects changed since last run
+            from database import get_revizto_projects_since_last_run
+            changed_projects = get_revizto_projects_since_last_run()
+            
+            for project in changed_projects:
+                status = "Archived" if project['archived'] else ("Frozen" if project['frozen'] else "Active")
+                updated_time = self.safe_format_datetime(project['updated'])
+                
+                self.revizto_changes_tree.insert("", tk.END, values=(
+                    project['project_uuid'],
+                    project['title'],
+                    updated_time,
+                    project['owner_email'],
+                    status
+                ))
+            
+        except Exception as e:
+            logger.error(f"Error refreshing Revizto changes: {e}")
+    
+    def setup_acc_folder_tab(self):
+        """Setup the ACC folder management sub-tab"""
+        acc_frame = ttk.Frame(self.sub_notebook)
+        self.sub_notebook.add(acc_frame, text="?? ACC Folders")
+        
+        # === Project Selection ===
+        project_frame = ttk.LabelFrame(acc_frame, text="Project Selection", padding=10)
+        project_frame.pack(fill="x", padx=10, pady=5)
+        
+        projects = format_id_name_list(get_projects())
+        ttk.Label(project_frame, text="Select Project:").grid(row=0, column=0, sticky="w", padx=5)
+        self.project_var = tk.StringVar()
+        self.project_combo = ttk.Combobox(project_frame, textvariable=self.project_var, values=projects, width=50)
+        self.project_combo.grid(row=0, column=1, padx=5, sticky="ew")
+        self.project_combo.bind("<<ComboboxSelected>>", self.on_project_selected_local)
+        
+        project_frame.columnconfigure(1, weight=1)
+        
+        # === ACC Data Export Path ===
+        export_frame = ttk.LabelFrame(acc_frame, text="ACC Data Export Configuration", padding=10)
+        export_frame.pack(fill="x", padx=10, pady=5)
+        
+        ttk.Label(export_frame, text="ACC Data Export Folder:").grid(row=0, column=0, sticky="w", padx=5)
+        self.export_path_entry = ttk.Entry(export_frame, width=60)
+        self.export_path_entry.grid(row=0, column=1, padx=5, sticky="ew")
+        
+        def browse_export_folder():
+            path = filedialog.askdirectory(title="Select ACC Data Export Folder")
+            if path:
+                self.export_path_entry.delete(0, tk.END)
+                self.export_path_entry.insert(0, path)
+        
+        def save_export_path():
+            if " - " not in self.project_combo.get():
+                messagebox.showerror("Error", "Select a project first")
+                return
+            pid = self.project_combo.get().split(" - ")[0]
+            path = self.export_path_entry.get().strip()
+            if not path or not os.path.isdir(path):
+                messagebox.showerror("Error", "Select a valid folder")
+                return
+            save_acc_folder_path(pid, path)
+            messagebox.showinfo("Success", "ACC data export path saved")
+        
+        ttk.Button(export_frame, text="Browse", command=browse_export_folder).grid(row=0, column=2, padx=5)
+        ttk.Button(export_frame, text="Save Path", command=save_export_path).grid(row=0, column=3, padx=5)
+        
+        export_frame.columnconfigure(1, weight=1)
+        
+        # === ACC CSV Import Section ===
+        import_frame = ttk.LabelFrame(acc_frame, text="ACC Issues ZIP Import", padding=10)
+        import_frame.pack(fill="x", padx=10, pady=5)
+        
+        ttk.Label(import_frame, text="ACC Issues ZIP File:").grid(row=0, column=0, sticky="w", padx=5)
+        self.import_path_entry = ttk.Entry(import_frame, width=60)
+        self.import_path_entry.grid(row=0, column=1, padx=5, sticky="ew")
+        
+        def browse_import_file():
+            path = filedialog.askopenfilename(
+                title="Select ACC Issues ZIP File",
+                filetypes=[("ZIP files", "*.zip"), ("All files", "*.*")]
+            )
+            if path:
+                self.import_path_entry.delete(0, tk.END)
+                self.import_path_entry.insert(0, path)
+        
+        def run_import():
+            zip_path = self.import_path_entry.get().strip()
+            if not zip_path or not os.path.isfile(zip_path):
+                messagebox.showerror("Error", "Select a valid ZIP file")
+                return
+            
+            try:
+                # Run the ACC import
+                run_acc_import(zip_path)
+                messagebox.showinfo("Success", "ACC import completed successfully")
+                # Refresh any dependent data if needed
+            except Exception as e:
+                messagebox.showerror("Error", f"Import failed: {e}")
+        
+        ttk.Button(import_frame, text="Browse", command=browse_import_file).grid(row=0, column=2, padx=5)
+        ttk.Button(import_frame, text="Import ACC Issues", command=run_import).grid(row=0, column=3, padx=5)
+        
+        import_frame.columnconfigure(1, weight=1)
+        
+        # === ACC Import Logs ===
+        logs_frame = ttk.LabelFrame(acc_frame, text="ACC Import Logs", padding=10)
+        logs_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Logs treeview
+        logs_columns = ("Log ID", "Project", "Folder", "Import Date", "Status", "Summary")
+        self.logs_tree = ttk.Treeview(logs_frame, columns=logs_columns, show="headings", height=8)
+        
+        for col in logs_columns:
+            self.logs_tree.heading(col, text=col)
+            width = 100 if col in ["Log ID", "Status"] else 120 if col == "Import Date" else 150
+            self.logs_tree.column(col, width=width, anchor="w")
+        
+        logs_scroll = ttk.Scrollbar(logs_frame, orient=tk.VERTICAL, command=self.logs_tree.yview)
+        self.logs_tree.configure(yscrollcommand=logs_scroll.set)
+        
+        self.logs_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        logs_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Refresh logs button
+        ttk.Button(logs_frame, text="Refresh Logs", command=self.refresh_acc_logs).pack(pady=5)
+    
+    def on_project_selected_local(self, event=None):
+        """Handle project selection for ACC folder management"""
+        try:
+            selected = self.project_var.get()
+            if not selected or " - " not in selected:
+                return
+            
+            self.current_project_id = int(selected.split(" - ")[0])
+            
+            # Load ACC folder path for this project
+            acc_path = get_acc_folder_path(self.current_project_id)
+            if acc_path:
+                self.export_path_entry.delete(0, tk.END)
+                self.export_path_entry.insert(0, acc_path)
+            else:
+                self.export_path_entry.delete(0, tk.END)
+            
+            # Refresh logs for this project
+            self.refresh_acc_logs()
+            
+        except Exception as e:
+            logger.error(f"Error selecting project: {e}")
+    
+    def refresh_acc_logs(self):
+        """Refresh ACC import logs"""
+        try:
+            # Clear existing logs
+            for item in self.logs_tree.get_children():
+                self.logs_tree.delete(item)
+            
+            # Get logs for current project if selected
+            logs = []
+            if self.current_project_id:
+                logs = get_acc_import_logs(self.current_project_id)
+            
+            for log in logs:
+                self.logs_tree.insert("", tk.END, values=(
+                    log.get('log_id', ''),
+                    log.get('project_id', ''),
+                    log.get('folder_name', ''),
+                    log.get('import_date', ''),
+                    log.get('status', ''),
+                    log.get('summary', '')
+                ))
+            
+        except Exception as e:
+            logger.error(f"Error refreshing ACC logs: {e}")
+    
+    def refresh_data(self):
+        """Refresh all data in the issue management tab"""
+        try:
+            # Refresh project list
+            projects = format_id_name_list(get_projects())
+            if hasattr(self, 'project_combo'):
+                self.project_combo['values'] = projects
+            
+            # Refresh Revizto data
+            self.refresh_revizto_history()
+            
+        except Exception as e:
+            logger.error(f"Error refreshing issue management data: {e}")
+    
+    def on_project_changed(self, new_project):
+        """Handle project change notification from other tabs"""
+        if hasattr(self, 'project_var') and self.project_var.get() != new_project:
+            self.project_var.set(new_project)
+            self.on_project_selected_local()
     
     def on_project_list_changed(self):
         """Handle notification that the project list has changed"""
