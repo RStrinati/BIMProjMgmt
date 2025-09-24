@@ -5,10 +5,15 @@ This script tests the comprehensive alias management functionality
 including CRUD operations, validation, discovery, and import/export.
 """
 
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from services.project_alias_service import ProjectAliasManager
 import tempfile
 import csv
-import os
 
 def test_alias_management():
     """Test the complete alias management system"""

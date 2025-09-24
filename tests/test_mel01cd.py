@@ -1,3 +1,15 @@
+#!/usr/bin/env python3
+"""
+Enhanced test script for MEL01CD project issue debugging
+Focused on understanding the alias mapping and issues data
+"""
+
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import get_project_combined_issues_overview, get_project_issues_by_status
 
 # Test with the matching project MEL01CD (ID 13)

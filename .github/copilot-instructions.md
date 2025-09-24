@@ -50,6 +50,23 @@ cursor.execute(f"SELECT {S.Projects.ID}, {S.Projects.NAME} FROM {S.Projects.TABL
 
 ## Project-Specific Conventions
 
+### File Organization Rules
+- **Tests**: All test files MUST be placed in the `tests/` directory
+- **Tools**: All analysis, debugging, and utility scripts MUST be placed in the `tools/` directory  
+- **Services**: Business logic services MUST be placed in the `services/` directory
+- **UI Components**: Individual UI components MUST be placed in the `ui/` directory
+- **Handlers**: Data import/export handlers MUST be placed in the `handlers/` directory
+- **Constants**: Schema and configuration constants MUST be placed in the `constants/` directory
+- **Import Paths**: Files in subdirectories MUST use proper parent directory imports:
+  ```python
+  # For files in tests/, tools/, services/, etc.
+  import sys
+  import os
+  sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  ```
+
+**CRITICAL**: A clean and organised file system is imperative to this tool. Never place test files, analysis scripts, or utilities in the root directory.
+
 ### Schema Constants Pattern
 - **Always** import from `constants/schema.py` for table/column references
 - **Never** use string literals for database identifiers

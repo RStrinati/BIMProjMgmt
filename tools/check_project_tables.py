@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+"""
+Script to analyze project tables structure and data
+"""
+
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import connect_to_db
 import pyodbc
 

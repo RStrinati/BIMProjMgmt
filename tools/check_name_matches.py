@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+"""
+Script to check name matches between projects and issues
+"""
+
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import connect_to_db, get_projects
 
 conn = connect_to_db()

@@ -5,7 +5,9 @@ Test script for the new combined issues overview functionality
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import get_project_combined_issues_overview, get_project_issues_by_status, get_projects
 
