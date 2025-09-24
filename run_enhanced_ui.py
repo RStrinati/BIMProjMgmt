@@ -27,6 +27,7 @@ def main():
             ProjectBookmarksTab,
             IssueManagementTab,
         )
+        from ui.project_alias_tab import ProjectAliasManagementTab
 
         # Create main window
         root = tk.Tk()
@@ -58,6 +59,9 @@ def main():
 
         logger.info("Creating Project Bookmarks tab...")
         ProjectBookmarksTab(notebook)
+
+        logger.info("Creating Project Alias Management tab...")
+        ProjectAliasManagementTab(notebook)
 
         logger.info("UI initialized successfully! Starting main loop...")
         root.mainloop()

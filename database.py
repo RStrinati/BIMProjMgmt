@@ -2563,3 +2563,177 @@ def get_revizto_projects():
         return []
     finally:
         conn.close()
+
+
+def get_project_combined_issues_overview(project_id):
+    """Get combined ACC and Revizto issues overview for a specific project."""
+    conn = connect_to_db()
+    if conn is None:
+        return {'summary': {}, 'recent_issues': []}
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get project name and all its aliases
+        cursor.execute(f"""
+            SELECT {S.Projects.NAME} FROM {S.Projects.TABLE} WHERE {S.Projects.ID} = ?
+        """, (project_id,))
+        project_row = cursor.fetchone()
+        if not project_row:
+            return {'summary': {'total_issues': 0}, 'recent_issues': []}
+        
+        project_name = project_row[0]
+        
+        # Get all aliases for this project (including the main project name)
+        cursor.execute("""
+            SELECT alias_name FROM project_aliases WHERE pm_project_id = ?
+        """, (project_id,))
+        aliases = [row[0] for row in cursor.fetchall()]
+        
+        # Include the main project name as well
+        all_project_names = [project_name] + aliases
+        
+        # Create placeholders for the IN clause
+        placeholders = ','.join(['?' for _ in all_project_names])
+        
+        # Get issue summary statistics using all possible project names
+        cursor.execute(f"""
+            SELECT 
+                source,
+                status,
+                COUNT(*) as count
+            FROM vw_ProjectManagement_AllIssues
+            WHERE project_name IN ({placeholders})
+            GROUP BY source, status
+        """, all_project_names)
+        
+        stats = cursor.fetchall()
+        
+        # Build summary statistics
+        summary = {
+            'total_issues': 0,
+            'acc_issues': {'total': 0, 'open': 0, 'closed': 0},
+            'revizto_issues': {'total': 0, 'open': 0, 'closed': 0},
+            'overall': {'open': 0, 'closed': 0}
+        }
+        
+        for source, status, count in stats:
+            summary['total_issues'] += count
+            if source == 'ACC':
+                summary['acc_issues']['total'] += count
+                summary['acc_issues'][status] = count
+            elif source == 'Revizto':
+                summary['revizto_issues']['total'] += count
+                summary['revizto_issues'][status] = count
+            
+            summary['overall'][status] = summary['overall'].get(status, 0) + count
+        
+        # Get recent issues (last 10) - use all project names
+        cursor.execute(f"""
+            SELECT TOP 10
+                source,
+                issue_id,
+                title,
+                status,
+                created_at,
+                assignee,
+                priority
+            FROM vw_ProjectManagement_AllIssues
+            WHERE project_name IN ({placeholders})
+            ORDER BY created_at DESC
+        """, all_project_names)
+        
+        recent_issues = []
+        for row in cursor.fetchall():
+            recent_issues.append({
+                'source': row[0],
+                'issue_id': row[1],
+                'title': row[2],
+                'status': row[3],
+                'created_at': row[4],
+                'assignee': row[5],
+                'priority': row[6]
+            })
+        
+        return {
+            'summary': summary,
+            'recent_issues': recent_issues
+        }
+        
+    except Exception as e:
+        print(f"❌ Error fetching project issues overview: {e}")
+        return {'summary': {}, 'recent_issues': []}
+    finally:
+        conn.close()
+
+
+def get_project_issues_by_status(project_id, status='open'):
+    """Get all issues for a project filtered by status."""
+    conn = connect_to_db()
+    if conn is None:
+        return []
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get project name and all its aliases
+        cursor.execute(f"""
+            SELECT {S.Projects.NAME} FROM {S.Projects.TABLE} WHERE {S.Projects.ID} = ?
+        """, (project_id,))
+        project_row = cursor.fetchone()
+        if not project_row:
+            return []
+        
+        project_name = project_row[0]
+        
+        # Get all aliases for this project
+        cursor.execute("""
+            SELECT alias_name FROM project_aliases WHERE pm_project_id = ?
+        """, (project_id,))
+        aliases = [row[0] for row in cursor.fetchall()]
+        
+        # Include the main project name as well
+        all_project_names = [project_name] + aliases
+        
+        # Create placeholders for the IN clause
+        placeholders = ','.join(['?' for _ in all_project_names])
+        
+        cursor.execute(f"""
+            SELECT 
+                source,
+                issue_id,
+                title,
+                status,
+                created_at,
+                closed_at,
+                assignee,
+                author,
+                priority,
+                web_link
+            FROM vw_ProjectManagement_AllIssues
+            WHERE project_name IN ({placeholders}) AND status = ?
+            ORDER BY created_at DESC
+        """, all_project_names + [status])
+        
+        issues = []
+        for row in cursor.fetchall():
+            issues.append({
+                'source': row[0],
+                'issue_id': row[1],
+                'title': row[2],
+                'status': row[3],
+                'created_at': row[4],
+                'closed_at': row[5],
+                'assignee': row[6],
+                'author': row[7],
+                'priority': row[8],
+                'web_link': row[9]
+            })
+        
+        return issues
+        
+    except Exception as e:
+        print(f"❌ Error fetching project issues by status: {e}")
+        return []
+    finally:
+        conn.close()

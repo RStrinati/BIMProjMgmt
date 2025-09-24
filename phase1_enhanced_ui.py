@@ -17,7 +17,8 @@ from database import (
     update_bookmark, delete_bookmark, get_contractual_links,
     update_project_folders, insert_files_into_tblACCDocs,
     start_revizto_extraction_run, complete_revizto_extraction_run,
-    get_revizto_extraction_runs, get_last_revizto_extraction_run
+    get_revizto_extraction_runs, get_last_revizto_extraction_run,
+    get_project_combined_issues_overview, get_project_issues_by_status
 )
 from review_management_service import ReviewManagementService
 from handlers.acc_handler import run_acc_import
@@ -529,6 +530,80 @@ class ProjectSetupTab:
             self.status_labels[field] = ttk.Label(row_frame, text="Not Configured", foreground="gray", wraplength=300)
             self.status_labels[field].pack(side="left", padx=(5, 0))
 
+        # ===== PROJECT ISSUES OVERVIEW SECTION =====
+        issues_frame = ttk.LabelFrame(main_frame, text="Project Issues Overview", padding=15)
+        issues_frame.pack(fill="x", pady=(0, 15))
+
+        # Issues summary section
+        summary_frame = ttk.Frame(issues_frame)
+        summary_frame.pack(fill="x", pady=(0, 10))
+
+        # Left side - Issue statistics
+        stats_frame = ttk.Frame(summary_frame)
+        stats_frame.pack(side="left", fill="both", expand=True)
+
+        self.issues_stats_labels = {}
+        
+        # Total issues display
+        total_frame = ttk.Frame(stats_frame)
+        total_frame.pack(fill="x", pady=2)
+        ttk.Label(total_frame, text="Total Issues:", font=("Arial", 10, "bold"), width=15).pack(side="left")
+        self.issues_stats_labels["total"] = ttk.Label(total_frame, text="0", foreground="blue", font=("Arial", 10, "bold"))
+        self.issues_stats_labels["total"].pack(side="left", padx=(5, 0))
+
+        # ACC Issues
+        acc_frame = ttk.Frame(stats_frame)
+        acc_frame.pack(fill="x", pady=2)
+        ttk.Label(acc_frame, text="ACC Issues:", width=15).pack(side="left")
+        self.issues_stats_labels["acc_total"] = ttk.Label(acc_frame, text="0", foreground="gray")
+        self.issues_stats_labels["acc_total"].pack(side="left", padx=(5, 0))
+        ttk.Label(acc_frame, text="(Open:").pack(side="left", padx=(5, 0))
+        self.issues_stats_labels["acc_open"] = ttk.Label(acc_frame, text="0", foreground="red")
+        self.issues_stats_labels["acc_open"].pack(side="left")
+        ttk.Label(acc_frame, text="Closed:").pack(side="left", padx=(5, 0))
+        self.issues_stats_labels["acc_closed"] = ttk.Label(acc_frame, text="0", foreground="green")
+        self.issues_stats_labels["acc_closed"].pack(side="left")
+        ttk.Label(acc_frame, text=")").pack(side="left")
+
+        # Revizto Issues
+        revizto_frame = ttk.Frame(stats_frame)
+        revizto_frame.pack(fill="x", pady=2)
+        ttk.Label(revizto_frame, text="Revizto Issues:", width=15).pack(side="left")
+        self.issues_stats_labels["revizto_total"] = ttk.Label(revizto_frame, text="0", foreground="gray")
+        self.issues_stats_labels["revizto_total"].pack(side="left", padx=(5, 0))
+        ttk.Label(revizto_frame, text="(Open:").pack(side="left", padx=(5, 0))
+        self.issues_stats_labels["revizto_open"] = ttk.Label(revizto_frame, text="0", foreground="red")
+        self.issues_stats_labels["revizto_open"].pack(side="left")
+        ttk.Label(revizto_frame, text="Closed:").pack(side="left", padx=(5, 0))
+        self.issues_stats_labels["revizto_closed"] = ttk.Label(revizto_frame, text="0", foreground="green")
+        self.issues_stats_labels["revizto_closed"].pack(side="left")
+        ttk.Label(revizto_frame, text=")").pack(side="left")
+
+        # Right side - Recent Issues
+        recent_frame = ttk.Frame(summary_frame)
+        recent_frame.pack(side="right", fill="both", expand=True)
+
+        ttk.Label(recent_frame, text="Recent Issues:", font=("Arial", 10, "bold")).pack(anchor="w")
+        
+        # Recent issues listbox with scrollbar
+        recent_container = ttk.Frame(recent_frame)
+        recent_container.pack(fill="both", expand=True, pady=(5, 0))
+        
+        self.recent_issues_listbox = tk.Listbox(recent_container, height=6, font=("Arial", 9))
+        recent_scrollbar = ttk.Scrollbar(recent_container, orient="vertical", command=self.recent_issues_listbox.yview)
+        self.recent_issues_listbox.configure(yscrollcommand=recent_scrollbar.set)
+        
+        self.recent_issues_listbox.pack(side="left", fill="both", expand=True)
+        recent_scrollbar.pack(side="right", fill="y")
+
+        # Issues action buttons
+        issues_actions_frame = ttk.Frame(issues_frame)
+        issues_actions_frame.pack(fill="x", pady=(10, 0))
+        
+        ttk.Button(issues_actions_frame, text="View All Open Issues", command=self.view_open_issues).pack(side="left", padx=(0, 5))
+        ttk.Button(issues_actions_frame, text="View All Closed Issues", command=self.view_closed_issues).pack(side="left", padx=5)
+        ttk.Button(issues_actions_frame, text="Refresh Issues", command=self.refresh_issues_overview).pack(side="left", padx=5)
+
         # ===== MIDDLE SECTION: PROJECT ACTIONS =====
         actions_frame = ttk.LabelFrame(main_frame, text="Project Actions", padding=15)
         actions_frame.pack(fill="x", pady=(0, 15))
@@ -590,6 +665,9 @@ class ProjectSetupTab:
             
             # Update project details
             self.update_project_details(project_id)
+            
+            # Update issues overview
+            self.update_issues_overview(project_id)
             
             # Notify other tabs about project change
             project_notification_system.notify_project_changed(project_selection)
@@ -1228,6 +1306,169 @@ class ProjectSetupTab:
             messagebox.showwarning("Warning", "Please select a project first")
             return
         messagebox.showinfo("Info", "Archive Project functionality will be implemented in future version")
+
+    def update_issues_overview(self, project_id):
+        """Update the issues overview section with current project data"""
+        try:
+            # Get combined issues overview for the project
+            issues_data = get_project_combined_issues_overview(project_id)
+            
+            if not issues_data or 'summary' not in issues_data:
+                # Clear display if no data
+                self.clear_issues_display()
+                return
+            
+            summary = issues_data['summary']
+            recent_issues = issues_data['recent_issues']
+            
+            # Update statistics labels
+            self.issues_stats_labels["total"].config(text=str(summary.get('total_issues', 0)))
+            
+            # ACC Issues
+            acc_stats = summary.get('acc_issues', {})
+            self.issues_stats_labels["acc_total"].config(text=str(acc_stats.get('total', 0)))
+            self.issues_stats_labels["acc_open"].config(text=str(acc_stats.get('open', 0)))
+            self.issues_stats_labels["acc_closed"].config(text=str(acc_stats.get('closed', 0)))
+            
+            # Revizto Issues
+            revizto_stats = summary.get('revizto_issues', {})
+            self.issues_stats_labels["revizto_total"].config(text=str(revizto_stats.get('total', 0)))
+            self.issues_stats_labels["revizto_open"].config(text=str(revizto_stats.get('open', 0)))
+            self.issues_stats_labels["revizto_closed"].config(text=str(revizto_stats.get('closed', 0)))
+            
+            # Update recent issues list
+            self.recent_issues_listbox.delete(0, tk.END)
+            for issue in recent_issues[:10]:  # Show only top 10
+                # Format the issue for display
+                created_date = issue['created_at'].strftime('%m/%d') if issue['created_at'] else 'N/A'
+                status_indicator = '🔴' if issue['status'] == 'open' else '🟢'
+                source_indicator = '[ACC]' if issue['source'] == 'ACC' else '[REV]'
+                
+                # Truncate title if too long
+                title = issue['title']
+                if len(title) > 50:
+                    title = title[:47] + '...'
+                
+                display_text = f"{status_indicator} {source_indicator} {created_date} - {title}"
+                self.recent_issues_listbox.insert(tk.END, display_text)
+            
+            if not recent_issues:
+                self.recent_issues_listbox.insert(tk.END, "No recent issues found")
+                
+        except Exception as e:
+            print(f"Error updating issues overview: {e}")
+            self.clear_issues_display()
+    
+    def clear_issues_display(self):
+        """Clear the issues overview display"""
+        try:
+            # Clear all statistics
+            for label in self.issues_stats_labels.values():
+                label.config(text="0")
+            
+            # Clear recent issues
+            self.recent_issues_listbox.delete(0, tk.END)
+            self.recent_issues_listbox.insert(tk.END, "No project selected")
+        except Exception as e:
+            print(f"Error clearing issues display: {e}")
+    
+    def refresh_issues_overview(self):
+        """Refresh the issues overview for the current project"""
+        project_selection = self.project_var.get()
+        if project_selection and ' - ' in project_selection:
+            project_id = project_selection.split(' - ')[0].strip()
+            self.update_issues_overview(project_id)
+        else:
+            messagebox.showwarning("Warning", "Please select a project first")
+    
+    def view_open_issues(self):
+        """Open a window showing all open issues for the current project"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        
+        project_id = project_selection.split(' - ')[0].strip()
+        self._show_issues_window(project_id, 'open', 'Open Issues')
+    
+    def view_closed_issues(self):
+        """Open a window showing all closed issues for the current project"""
+        project_selection = self.project_var.get()
+        if not project_selection or ' - ' not in project_selection:
+            messagebox.showwarning("Warning", "Please select a project first")
+            return
+        
+        project_id = project_selection.split(' - ')[0].strip()
+        self._show_issues_window(project_id, 'closed', 'Closed Issues')
+    
+    def _show_issues_window(self, project_id, status, window_title):
+        """Show a detailed window with issues filtered by status"""
+        try:
+            issues = get_project_issues_by_status(project_id, status)
+            
+            # Create the window
+            issues_window = tk.Toplevel(self.frame)
+            issues_window.title(f"{window_title} - Project {project_id}")
+            issues_window.geometry("1000x600")
+            issues_window.transient(self.frame)
+            
+            # Create treeview for issues
+            frame = ttk.Frame(issues_window)
+            frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            columns = ("Source", "Issue ID", "Title", "Status", "Created", "Assignee", "Author")
+            tree = ttk.Treeview(frame, columns=columns, show="headings", height=20)
+            
+            # Configure column headings and widths
+            tree.heading("Source", text="Source")
+            tree.heading("Issue ID", text="Issue ID")
+            tree.heading("Title", text="Title")
+            tree.heading("Status", text="Status")
+            tree.heading("Created", text="Created")
+            tree.heading("Assignee", text="Assignee")
+            tree.heading("Author", text="Author")
+            
+            tree.column("Source", width=80)
+            tree.column("Issue ID", width=80)
+            tree.column("Title", width=350)
+            tree.column("Status", width=80)
+            tree.column("Created", width=120)
+            tree.column("Assignee", width=150)
+            tree.column("Author", width=100)
+            
+            # Add scrollbar
+            scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=scrollbar.set)
+            
+            # Pack tree and scrollbar
+            tree.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            
+            # Populate with issues data
+            for issue in issues:
+                created_date = issue['created_at'].strftime('%Y-%m-%d %H:%M') if issue['created_at'] else 'N/A'
+                tree.insert("", tk.END, values=(
+                    issue['source'],
+                    str(issue['issue_id']),
+                    issue['title'],
+                    issue['status'],
+                    created_date,
+                    issue['assignee'] or 'Unassigned',
+                    issue['author'] or 'N/A'
+                ))
+            
+            if not issues:
+                tree.insert("", tk.END, values=(
+                    "", "", f"No {status} issues found", "", "", "", ""
+                ))
+            
+            # Add summary label
+            summary_label = ttk.Label(frame, text=f"Total {status} issues: {len(issues)}")
+            summary_label.pack(pady=(10, 0))
+            
+        except Exception as e:
+            print(f"Error showing issues window: {e}")
+            messagebox.showerror("Error", f"Failed to load {status} issues: {str(e)}")
 
 class EnhancedTaskManagementTab:
     """Enhanced task management interface with dependencies and progress tracking"""
