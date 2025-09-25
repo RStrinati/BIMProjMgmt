@@ -279,6 +279,35 @@ class ProjectAliasManager:
     
     # ==================== Validation & Monitoring ====================
     
+    def validate_aliases_basic(self) -> Dict:
+        """Basic alias validation without expensive queries"""
+        conn = self._get_connection()
+        if not conn:
+            return {}
+        
+        try:
+            cursor = conn.cursor()
+            
+            validation_results = {
+                'orphaned_aliases': [],
+                'unused_projects': [],
+                'total_aliases': 0,
+                'total_projects_with_aliases': 0
+            }
+            
+            # Get summary stats only (fast queries)
+            cursor.execute("SELECT COUNT(*) FROM project_aliases")
+            validation_results['total_aliases'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(DISTINCT pm_project_id) FROM project_aliases")
+            validation_results['total_projects_with_aliases'] = cursor.fetchone()[0]
+            
+            return validation_results
+            
+        except Exception as e:
+            print(f"❌ Error validating aliases (basic): {e}")
+            return {}
+    
     def validate_aliases(self) -> Dict:
         """Validate all aliases and detect issues"""
         conn = self._get_connection()

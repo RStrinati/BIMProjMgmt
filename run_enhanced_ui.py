@@ -62,6 +62,7 @@ def main():
 
         logger.info("Creating Project Alias Management tab...")
         ProjectAliasManagementTab(notebook)
+        logger.info("Project Alias Management tab created successfully!")
 
         logger.info("UI initialized successfully! Starting main loop...")
         root.mainloop()

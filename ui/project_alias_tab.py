@@ -22,9 +22,11 @@ class ProjectAliasManagementTab:
         
         self.alias_manager = ProjectAliasManager()
         self.current_aliases = []
+        self.data_loaded = False
         
         self.setup_ui()
-        self.load_data()
+        # Defer data loading to avoid blocking UI startup
+        self.frame.after(100, self.load_data_deferred)
     
     def setup_ui(self):
         """Setup the user interface"""
@@ -160,24 +162,64 @@ class ProjectAliasManagementTab:
         # Bind double-click to create mapping
         self.unmapped_tree.bind('<Double-1>', lambda e: self.create_mapping_from_unmapped())
     
+    def load_data_deferred(self):
+        """Load data after UI is ready"""
+        if self.data_loaded:
+            return
+            
+        try:
+            # Show loading message
+            self.update_statistics_text("Loading alias data...")
+            self.frame.update_idletasks()
+            
+            # Load data in stages with UI updates
+            self.load_data()
+            self.data_loaded = True
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading alias data: {str(e)}")
+            self.update_statistics_text("Error loading data")
+    
     def load_data(self):
         """Load all alias data"""
+        if not hasattr(self, 'stats_text'):
+            return  # UI not ready yet
+            
         try:
-            # Load aliases
+            # Load aliases first (usually quick)
+            self.update_statistics_text("Loading aliases...")
+            self.frame.update_idletasks()
+            
             self.current_aliases = self.alias_manager.get_all_aliases()
             self.refresh_alias_tree()
             
-            # Load usage statistics
+            # Load usage statistics (can be slow)
+            self.update_statistics_text("Loading usage statistics...")
+            self.frame.update_idletasks()
+            
             self.refresh_usage_stats()
             
-            # Load unmapped projects
+            # Load unmapped projects (potentially slow)
+            self.update_statistics_text("Discovering unmapped projects...")
+            self.frame.update_idletasks()
+            
             self.refresh_unmapped_projects()
             
             # Update summary statistics
             self.update_statistics()
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error loading alias data: {str(e)}")
+            error_msg = f"Error loading alias data: {str(e)}"
+            print(f"❌ {error_msg}")
+            self.update_statistics_text(error_msg)
+    
+    def update_statistics_text(self, message):
+        """Helper to update the statistics text safely"""
+        if hasattr(self, 'stats_text'):
+            self.stats_text.config(state=tk.NORMAL)
+            self.stats_text.delete(1.0, tk.END)
+            self.stats_text.insert(tk.END, message)
+            self.stats_text.config(state=tk.DISABLED)
     
     def refresh_data(self):
         """Refresh all data"""
@@ -227,6 +269,9 @@ class ProjectAliasManagementTab:
         try:
             unmapped = self.alias_manager.discover_unmapped_projects()
             
+            # Update cached count for statistics
+            self._unmapped_count = len(unmapped)
+            
             # Clear existing items
             for item in self.unmapped_tree.get_children():
                 self.unmapped_tree.delete(item)
@@ -242,9 +287,14 @@ class ProjectAliasManagementTab:
                     project['sources'],
                     suggested_text
                 ))
+            
+            # Update statistics with the new count
+            self.update_statistics()
                 
         except Exception as e:
-            messagebox.showerror("Error", f"Error loading unmapped projects: {str(e)}")
+            print(f"❌ Error loading unmapped projects: {str(e)}")
+            self._unmapped_count = 0
+            self.update_statistics_text("Error loading unmapped projects")
     
     def update_statistics(self):
         """Update summary statistics"""
@@ -252,23 +302,30 @@ class ProjectAliasManagementTab:
             total_aliases = len(self.current_aliases)
             unique_projects = len(set(alias['pm_project_id'] for alias in self.current_aliases))
             
-            # Get validation results
-            validation = self.alias_manager.validate_aliases()
-            orphaned = len(validation.get('orphaned_aliases', []))
-            unused_projects = len(validation.get('unused_projects', []))
+            # Get basic validation stats (avoid expensive operations during startup)
+            try:
+                validation = self.alias_manager.validate_aliases_basic() if hasattr(self.alias_manager, 'validate_aliases_basic') else {}
+                orphaned = len(validation.get('orphaned_aliases', []))
+                unused_projects = len(validation.get('unused_projects', []))
+            except:
+                orphaned = 0
+                unused_projects = 0
             
-            # Get unmapped count
-            unmapped = len(self.alias_manager.discover_unmapped_projects())
+            # Use cached unmapped count if available, otherwise show "Loading..."
+            unmapped_text = "Loading..." if not hasattr(self, '_unmapped_count') else str(self._unmapped_count)
             
-            stats_text = f"Total Aliases: {total_aliases} | Projects with Aliases: {unique_projects} | Orphaned: {orphaned} | Unused Projects: {unused_projects} | Unmapped: {unmapped}"
+            stats_text = f"Total Aliases: {total_aliases} | Projects with Aliases: {unique_projects} | Orphaned: {orphaned} | Unused Projects: {unused_projects} | Unmapped: {unmapped_text}"
             
-            self.stats_text.config(state=tk.NORMAL)
-            self.stats_text.delete(1.0, tk.END)
-            self.stats_text.insert(1.0, stats_text)
-            self.stats_text.config(state=tk.DISABLED)
+            self.update_statistics_text(stats_text)
             
         except Exception as e:
             print(f"Error updating statistics: {e}")
+            self.update_statistics_text("Error loading statistics")
+    
+    def update_statistics_with_unmapped_count(self, count):
+        """Update statistics with actual unmapped count"""
+        self._unmapped_count = count
+        self.update_statistics()
     
     def show_add_alias_dialog(self):
         """Show dialog to add a new alias"""
