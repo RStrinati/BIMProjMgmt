@@ -60,114 +60,17 @@
     {
       "name": "AWS – MEL081 STOCKMAN (Day 1)",
       "sector": "Data Centre",
-      "notes": "Amazon Web Services data center - MEL081 STOCKMAN Day 1 operations template",
+      "notes": "AWS Data Centre template for construction phase reviews",
       "items": [
         {
-          "phase": "Stage 1 – Strategic Business Case",
-          "service_code": "INIT",
-          "service_name": "BIM Strategy & Setup",
-          "unit_type": "lump_sum",
-          "default_units": 1,
-          "lump_sum_fee": 12000,
-          "bill_rule": "on_setup",
-          "notes": "Initial BIM strategy, standards, and platform setup"
-        },
-        {
-          "phase": "Stage 5 – Design Development",
-          "service_code": "PROD",
-          "service_name": "Design Audit & Lead BIM Information Manager",
-          "unit_type": "review",
-          "default_units": 6,
-          "unit_rate": 4500,
-          "bill_rule": "per_unit_complete",
-          "notes": "Lead BIM Information Manager services"
-        },
-        {
-          "phase": "Stage 6 – Construction Documentation",
-          "service_code": "PROD",
-          "service_name": "Construction Documentation Reviews",
-          "unit_type": "review",
-          "default_units": 8,
-          "unit_rate": 5000,
-          "bill_rule": "per_unit_complete",
-          "notes": "Detailed design coordination reviews"
-        },
-        {
-          "phase": "Stage 8 – Construction",
-          "service_code": "PROD",
-          "service_name": "Construction Phase Reviews",
-          "unit_type": "review",
-          "default_units": 26,
-          "unit_rate": 4500,
-          "bill_rule": "per_unit_complete",
-          "notes": "Weekly construction coordination reviews"
-        },
-        {
-          "phase": "Stage 9 – Commissioning & Handover",
+          "phase": "Stage 7 - Construction",
           "service_code": "AUDIT",
-          "service_name": "Model Quality Assurance",
+          "service_name": "Milestone Audit Report",
           "unit_type": "audit",
-          "default_units": 2,
-          "unit_rate": 6000,
-          "bill_rule": "per_unit_complete",
-          "notes": "Final model validation and QA audits"
-        }
-      ]
-    },
-    {
-      "name": "NEXTDC S5 – Spatial & Technical Design",
-      "sector": "Data Centre",
-      "notes": "NEXTDC data center facility template - Spatial & Technical Design focus",
-      "items": [
-        {
-          "phase": "Phase 1 – Planning",
-          "service_code": "INIT",
-          "service_name": "BIM Implementation & Training",
-          "unit_type": "lump_sum",
           "default_units": 1,
-          "lump_sum_fee": 18000,
-          "bill_rule": "on_setup",
-          "notes": "Comprehensive BIM setup and team training"
-        },
-        {
-          "phase": "Phase 2 – Design Development",
-          "service_code": "PROD",
-          "service_name": "MEP Coordination Reviews",
-          "unit_type": "review",
-          "default_units": 10,
-          "unit_rate": 6000,
-          "bill_rule": "per_unit_complete",
-          "notes": "Focus on critical MEP systems coordination"
-        },
-        {
-          "phase": "Phase 3 – Construction Documentation",
-          "service_code": "PROD",
-          "service_name": "Technical Documentation Reviews",
-          "unit_type": "review",
-          "default_units": 6,
-          "unit_rate": 7000,
-          "bill_rule": "per_unit_complete",
-          "notes": "Detailed technical documentation reviews"
-        },
-        {
-          "phase": "Phase 4 – Construction",
-          "service_code": "PROD",
-          "service_name": "Weekly Coordination Reviews",
-          "unit_type": "review",
-          "default_units": 32,
-          "unit_rate": 5500,
-          "bill_rule": "per_unit_complete",
-          "notes": "Intensive construction phase coordination"
-        },
-        {
-          "phase": "Phase 5 – Commissioning",
-          "service_code": "HANDOVER",
-          "service_name": "As-Built Validation",
-          "unit_type": "audit",
-          "default_units": 4,
           "unit_rate": 5000,
-          "bill_rule": "per_unit_complete",
-          "notes": "As-built model validation against construction"
+          "bill_rule": "on_completion",
+          "notes": "Construction milestone audit report"
         }
       ]
     }

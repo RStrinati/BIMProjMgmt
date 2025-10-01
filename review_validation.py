@@ -25,7 +25,7 @@ class ReviewValidationService:
     def __init__(self):
         # Define validation rules
         self.template_rules = {
-            'name': {'required': True, 'max_length': 200, 'pattern': r'^[a-zA-Z0-9\s\-\(\)\.\–]+$'},
+            'name': {'required': True, 'max_length': 200, 'pattern': r'^[a-zA-Z0-9\s\-\(\)\.\–\&]+$'},  # Added & and – characters
             'sector': {'required': True, 'max_length': 100, 'allowed_values': ['Education', 'Data Centre', 'Healthcare', 'Commercial', 'Residential', 'Infrastructure', 'Other']},
             'items': {'required': True, 'min_items': 1}
         }
@@ -74,10 +74,22 @@ class ReviewValidationService:
         return errors
 
     def validate_template_item(self, item: Dict) -> List[ValidationError]:
-        """Validate a single template item"""
+        """Validate a single template item (using template schema)"""
         errors = []
 
-        for field, rules in self.service_rules.items():
+        # Template-specific validation rules (different from service rules)
+        template_item_rules = {
+            'service_code': {'required': True, 'max_length': 20, 'pattern': r'^[A-Z0-9_]+$'},
+            'service_name': {'required': True, 'max_length': 200},
+            'phase': {'required': True, 'max_length': 200},
+            'unit_type': {'required': True, 'allowed_values': ['lump_sum', 'review', 'audit', 'hourly']},
+            'default_units': {'required': True, 'min_value': 0, 'max_value': 1000},  # Template uses default_units, not unit_qty
+            'unit_rate': {'min_value': 0, 'max_value': 100000},
+            'lump_sum_fee': {'min_value': 0, 'max_value': 10000000},
+            'bill_rule': {'required': True, 'allowed_values': ['on_setup', 'per_unit_complete', 'on_completion', 'monthly', 'quarterly', 'on_report_issue']},
+        }
+
+        for field, rules in template_item_rules.items():
             try:
                 self._validate_field(field, item.get(field), rules)
             except ValidationError as e:

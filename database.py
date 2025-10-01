@@ -371,14 +371,32 @@ def get_acc_import_logs(project_id):
         cursor = conn.cursor()
         cursor.execute(
             f"""
-            SELECT TOP 5 {S.ACCImportLogs.FOLDER_NAME}, {S.ACCImportLogs.IMPORT_DATE}, {S.ACCImportLogs.SUMMARY}
+            SELECT TOP 50 
+                {S.ACCImportLogs.LOG_ID}, 
+                {S.ACCImportLogs.PROJECT_ID}, 
+                {S.ACCImportLogs.FOLDER_NAME}, 
+                {S.ACCImportLogs.IMPORT_DATE}, 
+                COALESCE({S.ACCImportLogs.STATUS}, 'Unknown') as status,
+                COALESCE({S.ACCImportLogs.SUMMARY}, '') as summary
             FROM {S.ACCImportLogs.TABLE}
             WHERE {S.ACCImportLogs.PROJECT_ID} = ?
             ORDER BY {S.ACCImportLogs.IMPORT_DATE} DESC
             """,
             (project_id,),
         )
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        # Convert pyodbc.Row objects to dictionaries
+        result = []
+        for row in rows:
+            result.append({
+                'log_id': row[0] if row[0] is not None else '',
+                'project_id': row[1] if row[1] is not None else '',
+                'folder_name': row[2] if row[2] is not None else '',
+                'import_date': row[3] if row[3] is not None else '',
+                'status': row[4] if row[4] is not None else 'Unknown',
+                'summary': row[5] if row[5] is not None else ''
+            })
+        return result
     except Exception as e:
         print(f"❌ Error retrieving import logs: {e}")
         return []
@@ -1141,7 +1159,8 @@ def get_review_cycles(project_id):
         cursor.execute(
             """
             SELECT sr.review_id, ps.service_name, sr.cycle_no, sr.planned_date, 
-                   sr.due_date, sr.status, sr.disciplines
+                   sr.due_date, sr.status, sr.disciplines,
+                   ISNULL(sr.status_override, 0) as status_override
             FROM ServiceReviews sr
             LEFT JOIN ProjectServices ps ON sr.service_id = ps.service_id
             WHERE ps.project_id = ?

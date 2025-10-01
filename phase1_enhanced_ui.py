@@ -8,6 +8,37 @@ from datetime import datetime, timedelta
 import logging
 import webbrowser
 import threading
+
+class TabOperationManager:
+    """Manages concurrent operations across the Review Management tab"""
+    
+    def __init__(self):
+        self._operations = {}
+    
+    def start_operation(self, operation_name: str) -> bool:
+        """Start an operation if not already running"""
+        if operation_name in self._operations:
+            print(f"⚠️  Operation '{operation_name}' already in progress")
+            return False
+        
+        self._operations[operation_name] = True
+        print(f"🔄 Starting operation: {operation_name}")
+        return True
+    
+    def end_operation(self, operation_name: str):
+        """Mark operation as complete"""
+        if operation_name in self._operations:
+            del self._operations[operation_name]
+            print(f"✅ Completed operation: {operation_name}")
+    
+    def is_operation_running(self, operation_name: str) -> bool:
+        """Check if operation is currently running"""
+        return operation_name in self._operations
+    
+    def get_active_operations(self) -> list:
+        """Get list of currently active operations"""
+        return list(self._operations.keys())
+
 from database import (
     get_projects, save_acc_folder_path, get_acc_folder_path,
     connect_to_db, get_acc_import_logs, get_project_details,
@@ -530,6 +561,57 @@ class ProjectSetupTab:
             self.status_labels[field] = ttk.Label(row_frame, text="Not Configured", foreground="gray", wraplength=300)
             self.status_labels[field].pack(side="left", padx=(5, 0))
 
+        # ===== REVIEW STATUS KPI DASHBOARD =====
+        kpi_frame = ttk.LabelFrame(main_frame, text="📊 Review Status Dashboard", padding=15)
+        kpi_frame.pack(fill="x", pady=(0, 15))
+
+        # KPI metrics in a grid layout
+        kpi_grid = ttk.Frame(kpi_frame)
+        kpi_grid.pack(fill="x")
+
+        # Initialize KPI labels
+        self.kpi_labels = {}
+        
+        # Top row - main metrics
+        top_row = ttk.Frame(kpi_grid)
+        top_row.pack(fill="x", pady=(0, 10))
+        
+        kpi_metrics = [
+            ("Total Services", "0", "blue"),
+            ("Total Reviews", "0", "black"),
+            ("Completed", "0", "green"),
+            ("In Progress", "0", "orange"),
+            ("Overdue", "0", "red")
+        ]
+        
+        for i, (label, value, color) in enumerate(kpi_metrics):
+            metric_frame = ttk.Frame(top_row)
+            metric_frame.pack(side="left", padx=(0, 20))
+            
+            ttk.Label(metric_frame, text=label + ":", font=("Arial", 9)).pack()
+            self.kpi_labels[label] = ttk.Label(metric_frame, text=value, font=("Arial", 12, "bold"), foreground=color)
+            self.kpi_labels[label].pack()
+        
+        # Progress bar section
+        progress_frame = ttk.Frame(kpi_frame)
+        progress_frame.pack(fill="x", pady=(5, 0))
+        
+        ttk.Label(progress_frame, text="Overall Progress:", font=("Arial", 10)).pack(side="left")
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var, length=200, mode='determinate')
+        self.progress_bar.pack(side="left", padx=(10, 10))
+        
+        self.kpi_labels["Progress"] = ttk.Label(progress_frame, text="0.0%", font=("Arial", 10, "bold"))
+        self.kpi_labels["Progress"].pack(side="left")
+        
+        # Upcoming reviews section
+        upcoming_frame = ttk.Frame(kpi_frame)
+        upcoming_frame.pack(fill="x", pady=(10, 0))
+        
+        ttk.Label(upcoming_frame, text="Upcoming Reviews (Next 7 Days):", font=("Arial", 9, "bold")).pack(anchor="w")
+        self.upcoming_text = tk.Text(upcoming_frame, height=3, wrap="word", state="disabled", font=("Arial", 8))
+        self.upcoming_text.pack(fill="x", pady=(5, 0))
+
         # ===== PROJECT ISSUES OVERVIEW SECTION =====
         issues_frame = ttk.LabelFrame(main_frame, text="Project Issues Overview", padding=15)
         issues_frame.pack(fill="x", pady=(0, 15))
@@ -691,6 +773,9 @@ class ProjectSetupTab:
                         self.status_labels["Start Date"].config(text=str(project_details.get('start_date', 'Not set')), foreground="black")
                         self.status_labels["End Date"].config(text=str(project_details.get('end_date', 'Not set')), foreground="black")
                         
+                        # Update KPI dashboard
+                        self.update_kpi_dashboard(project_id)
+                        
                         # Try to get project folders
                         try:
                             folders = get_project_folders(project_id)
@@ -737,6 +822,69 @@ class ProjectSetupTab:
             for label in self.status_labels.values():
                 label.config(text="Error", foreground="red")
 
+    def update_kpi_dashboard(self, project_id):
+        """Update the KPI dashboard with review statistics"""
+        try:
+            # Initialize review management service if not available
+            if not hasattr(self, 'review_service') or not self.review_service:
+                from review_management_service import ReviewManagementService
+                from database import connect_to_db
+                conn = connect_to_db()
+                if conn:
+                    self.review_service = ReviewManagementService(conn)
+                else:
+                    print("Could not connect to database for KPI dashboard")
+                    return
+            
+            # Get project review KPIs
+            kpis = self.review_service.get_project_review_kpis(project_id)
+            
+            # Update KPI labels
+            self.kpi_labels["Total Services"].config(text=str(kpis['total_services']))
+            self.kpi_labels["Total Reviews"].config(text=str(kpis['total_reviews']))
+            self.kpi_labels["Completed"].config(text=str(kpis['completed_reviews']))
+            self.kpi_labels["In Progress"].config(text=str(kpis['in_progress_reviews']))
+            self.kpi_labels["Overdue"].config(text=str(kpis['overdue_reviews']))
+            
+            # Update progress bar and percentage
+            progress_pct = kpis['overall_completion_percentage']
+            self.progress_var.set(progress_pct)
+            self.kpi_labels["Progress"].config(text=f"{progress_pct:.1f}%")
+            
+            # Update upcoming reviews text
+            self.upcoming_text.config(state="normal")
+            self.upcoming_text.delete(1.0, tk.END)
+            
+            if kpis['upcoming_reviews']:
+                upcoming_text = ""
+                for review in kpis['upcoming_reviews'][:5]:  # Show max 5 upcoming reviews
+                    upcoming_text += f"• {review['service_name']} - {review['planned_date']} ({review['status']})\n"
+                self.upcoming_text.insert(tk.END, upcoming_text.strip())
+            else:
+                self.upcoming_text.insert(tk.END, "No upcoming reviews in the next 7 days")
+            
+            self.upcoming_text.config(state="disabled")
+            
+            # Update colors based on status
+            if kpis['overdue_reviews'] > 0:
+                self.kpi_labels["Overdue"].config(foreground="red")
+            else:
+                self.kpi_labels["Overdue"].config(foreground="green")
+                
+            if progress_pct >= 90:
+                self.kpi_labels["Progress"].config(foreground="green")
+            elif progress_pct >= 70:
+                self.kpi_labels["Progress"].config(foreground="orange")
+            else:
+                self.kpi_labels["Progress"].config(foreground="black")
+                
+        except Exception as e:
+            print(f"Error updating KPI dashboard: {e}")
+            # Show error state
+            for label_name in ["Total Services", "Total Reviews", "Completed", "In Progress", "Overdue"]:
+                if label_name in self.kpi_labels:
+                    self.kpi_labels[label_name].config(text="Error", foreground="red")
+
     def create_project_details_display(self, parent_frame):
         """Create the project details display with current activities, billing, scope, and completion"""
         # Create scrollable frame for project details
@@ -767,13 +915,36 @@ class ProjectSetupTab:
                                                    font=("Arial", 10), justify="left")
         self.detail_labels['activities'].pack(anchor="w")
 
-        # Billing section
-        billing_frame = ttk.LabelFrame(scrollable_frame, text="Billing", padding=10)
+        # Billing section - Enhanced with KPIs
+        billing_frame = ttk.LabelFrame(scrollable_frame, text="Billing & Progress KPIs", padding=10)
         billing_frame.pack(fill="x", pady=(0, 10))
 
+        # Overall billing summary
+        self.detail_labels['billing_summary'] = ttk.Label(billing_frame, text="No project selected",
+                                                font=("Arial", 10, "bold"), justify="left")
+        self.detail_labels['billing_summary'].pack(anchor="w", pady=(0, 5))
+        
+        # Current month billing
         self.detail_labels['billing'] = ttk.Label(billing_frame, text="No project selected",
                                                 font=("Arial", 10), justify="left")
-        self.detail_labels['billing'].pack(anchor="w")
+        self.detail_labels['billing'].pack(anchor="w", pady=(0, 5))
+
+        # Billable by Stage table
+        stage_billing_subframe = ttk.Frame(billing_frame)
+        stage_billing_subframe.pack(fill="x", pady=(5, 0))
+        
+        ttk.Label(stage_billing_subframe, text="Billable by Stage:", 
+                  font=("Arial", 9, "bold")).pack(anchor="w")
+        
+        # Create treeview for stage billing
+        stage_columns = ("Stage", "Billed Amount")
+        self.stage_billing_tree = ttk.Treeview(stage_billing_subframe, columns=stage_columns, 
+                                               show="headings", height=4)
+        self.stage_billing_tree.heading("Stage", text="Stage/Phase")
+        self.stage_billing_tree.heading("Billed Amount", text="Billed Amount")
+        self.stage_billing_tree.column("Stage", width=200, anchor="w")
+        self.stage_billing_tree.column("Billed Amount", width=150, anchor="e")
+        self.stage_billing_tree.pack(fill="x", pady=(2, 0))
 
         # Scope remaining section
         scope_frame = ttk.LabelFrame(scrollable_frame, text="Scope Remaining", padding=10)
@@ -797,7 +968,9 @@ class ProjectSetupTab:
     def update_project_details(self, project_id):
         """Update the project details display with current data"""
         try:
-            from database import get_project_details_summary
+            from database import get_project_details_summary, connect_to_db
+            from review_management_service import ReviewManagementService
+            
             details = get_project_details_summary(project_id)
 
             # Update current activities
@@ -807,13 +980,64 @@ class ProjectSetupTab:
                 activities_text = "No activities scheduled for this month"
             self.detail_labels['activities'].config(text=activities_text)
 
-            # Update billing
-            current_month = datetime.now().strftime('%B')
-            if details['billing_amount'] > 0:
-                billing_text = f"${details['billing_amount']:,.0f} to bill for {current_month} ({len(details['current_activities'])}x reviews in {current_month})"
+            # Get comprehensive billing KPIs
+            conn = connect_to_db()
+            if conn:
+                try:
+                    review_service = ReviewManagementService(conn)
+                    
+                    # Get service progress summary for overall KPIs
+                    progress_summary = review_service.get_service_progress_summary(int(project_id))
+                    
+                    # Calculate totals
+                    total_value = sum(s.get('agreed_fee', 0) for s in progress_summary)
+                    total_billed = sum(s.get('billed_amount', 0) for s in progress_summary)
+                    total_remaining = total_value - total_billed
+                    
+                    # Overall progress percentage
+                    if total_value > 0:
+                        overall_progress = (total_billed / total_value) * 100
+                    else:
+                        overall_progress = 0
+                    
+                    # Update billing summary
+                    billing_summary = (f"Total Project Value: ${total_value:,.0f} | "
+                                     f"Billed to Date: ${total_billed:,.0f} ({overall_progress:.1f}%) | "
+                                     f"Remaining: ${total_remaining:,.0f}")
+                    self.detail_labels['billing_summary'].config(text=billing_summary, foreground="darkblue")
+                    
+                    # Update current month billing
+                    current_month = datetime.now().strftime('%B')
+                    if details['billing_amount'] > 0:
+                        billing_text = f"This Month ({current_month}): ${details['billing_amount']:,.0f} ({len(details['current_activities'])} reviews)"
+                    else:
+                        billing_text = f"This Month ({current_month}): No billing due"
+                    self.detail_labels['billing'].config(text=billing_text, foreground="black")
+                    
+                    # Update billable by stage table
+                    for item in self.stage_billing_tree.get_children():
+                        self.stage_billing_tree.delete(item)
+                    
+                    stage_billing = review_service.get_billable_by_stage(int(project_id))
+                    for stage_data in stage_billing:
+                        phase = stage_data.get('phase', 'Unknown')
+                        billed = stage_data.get('billed_amount', 0)
+                        self.stage_billing_tree.insert('', 'end', values=(phase, f"${billed:,.0f}"))
+                    
+                except Exception as e:
+                    print(f"Error getting billing KPIs: {e}")
+                    self.detail_labels['billing_summary'].config(text="Error loading billing data", foreground="red")
+                finally:
+                    conn.close()
             else:
-                billing_text = f"No billing due for {current_month}"
-            self.detail_labels['billing'].config(text=billing_text)
+                # Fallback to basic billing if no connection
+                current_month = datetime.now().strftime('%B')
+                if details['billing_amount'] > 0:
+                    billing_text = f"${details['billing_amount']:,.0f} to bill for {current_month} ({len(details['current_activities'])}x reviews in {current_month})"
+                else:
+                    billing_text = f"No billing due for {current_month}"
+                self.detail_labels['billing'].config(text=billing_text)
+                self.detail_labels['billing_summary'].config(text="Billing KPIs unavailable", foreground="orange")
 
             # Update scope remaining
             if details['scope_remaining']:
@@ -2257,6 +2481,7 @@ class ReviewManagementTab:
         self.current_cycle_id = None
         self.review_service = None
         self.auto_complete_candidates = []
+        self.operation_manager = TabOperationManager()
         
         # Initialize missing UI components to prevent attribute errors
         self.summary_vars = {
@@ -2288,6 +2513,15 @@ class ReviewManagementTab:
         # Register for project change notifications
         project_notification_system.register_observer(self)
     
+    def clear_stages(self):
+        """Clear all stages from the stages tree"""
+        try:
+            for item in self.stages_tree.get_children():
+                self.stages_tree.delete(item)
+            messagebox.showinfo("Success", "Stages cleared successfully")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error clearing stages: {e}")
+    
     def setup_ui(self):
         """Set up the comprehensive review management interface"""
         # Create main notebook for sub-tabs
@@ -2309,10 +2543,10 @@ class ReviewManagementTab:
     def setup_service_template_tab(self):
         """Setup the Service Templates and Project Services tab"""
         service_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(service_frame, text="??? Service Setup")
+        self.sub_notebook.add(service_frame, text="Service Setup")
         
         # Project Selection Frame
-        project_frame = ttk.LabelFrame(service_frame, text="?? Project Selection", padding=10)
+        project_frame = ttk.LabelFrame(service_frame, text="Project Selection", padding=10)
         project_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(project_frame, text="Project:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
@@ -2322,7 +2556,7 @@ class ReviewManagementTab:
         self.project_combo.bind('<<ComboboxSelected>>', self.on_project_selected)
         
         # Service Template Frame
-        template_frame = ttk.LabelFrame(service_frame, text="?? Service Templates", padding=10)
+        template_frame = ttk.LabelFrame(service_frame, text="Service Templates", padding=10)
         template_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Template selection
@@ -2334,10 +2568,11 @@ class ReviewManagementTab:
         # Template action buttons
         ttk.Button(template_frame, text="Load Template", command=self.load_template).grid(row=0, column=2, padx=5)
         ttk.Button(template_frame, text="Apply to Project", command=self.apply_template).grid(row=0, column=3, padx=5)
-        ttk.Button(template_frame, text="Clear All Services", command=self.clear_services).grid(row=0, column=4, padx=5)
+        ttk.Button(template_frame, text="Save as Template", command=self.save_as_template).grid(row=0, column=4, padx=5)
+        ttk.Button(template_frame, text="Clear All Services", command=self.clear_services).grid(row=0, column=5, padx=5)
         
         # Current Project Services Frame
-        services_frame = ttk.LabelFrame(service_frame, text="?? Current Project Services", padding=10)
+        services_frame = ttk.LabelFrame(service_frame, text="Current Project Services", padding=10)
         services_frame.pack(fill=tk.BOTH, expand=True)
         
         # Services treeview
@@ -2376,13 +2611,15 @@ class ReviewManagementTab:
         ttk.Button(service_buttons_frame, text="Add Service", command=self.add_service).pack(side=tk.LEFT, padx=5)
         ttk.Button(service_buttons_frame, text="Edit Service", command=self.edit_service).pack(side=tk.LEFT, padx=5)
         ttk.Button(service_buttons_frame, text="Delete Service", command=self.delete_service).pack(side=tk.LEFT, padx=5)
+        ttk.Button(service_buttons_frame, text="Update Status", command=self.update_service_status).pack(side=tk.LEFT, padx=5)
         ttk.Button(service_buttons_frame, text="Generate Reviews", command=self.generate_reviews_from_services).pack(side=tk.LEFT, padx=5)
+        ttk.Button(service_buttons_frame, text="Refresh Status", command=self.manual_refresh_statuses).pack(side=tk.LEFT, padx=5)
     
 
     def setup_review_planning_tab(self):
         """Setup the Review Planning & Scheduling tab with column layout."""
         planning_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(planning_frame, text="?? Review Planning")
+        self.sub_notebook.add(planning_frame, text="Review Planning")
 
         layout = ttk.Panedwindow(planning_frame, orient=tk.HORIZONTAL)
         layout.pack(fill=tk.BOTH, expand=True)
@@ -2434,7 +2671,9 @@ class ReviewManagementTab:
         ttk.Button(refresh_btn_frame, text="Refresh Service Planning", 
                   command=self.load_services_for_review_planning).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(refresh_btn_frame, text="Generate Reviews", 
-                  command=self.generate_reviews_from_services_planning).pack(side=tk.LEFT)
+                  command=self.generate_reviews_from_services_planning).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(refresh_btn_frame, text="📅 Update by Dates", 
+                  command=self.refresh_cycles_by_meeting_dates).pack(side=tk.LEFT)
 
         cycles_frame = ttk.LabelFrame(workbench_column, text="?? Review Cycles", padding=10)
         cycles_frame.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
@@ -2472,7 +2711,7 @@ class ReviewManagementTab:
         tree_frame = ttk.Frame(cycles_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        cycle_columns = ("Review ID", "Cycle", "Meeting Date", "Due Date", "Actual Start", "Actual End", "Status", "Stage", "Reviewer", "Notes")
+        cycle_columns = ("Review ID", "Cycle", "Meeting Date", "Status", "Stage", "Reviewer", "Notes")
         self.cycles_tree = ttk.Treeview(tree_frame, columns=cycle_columns, show="headings", height=8)
         for col in cycle_columns:
             self.cycles_tree.heading(col, text=col)
@@ -2633,10 +2872,18 @@ class ReviewManagementTab:
     def setup_billing_tab(self):
         """Setup the Billing & Progress tab"""
         billing_frame = ttk.Frame(self.sub_notebook)
-        self.sub_notebook.add(billing_frame, text="?? Billing")
+        self.sub_notebook.add(billing_frame, text="Billing")
+        
+        # Create main container with left and right panels
+        main_container = ttk.PanedWindow(billing_frame, orient=tk.HORIZONTAL)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left panel - Claims and Service Progress
+        left_panel = ttk.Frame(main_container)
+        main_container.add(left_panel, weight=2)
         
         # Billing Claims Frame
-        claims_frame = ttk.LabelFrame(billing_frame, text="?? Billing Claims", padding=10)
+        claims_frame = ttk.LabelFrame(left_panel, text="Billing Claims", padding=10)
         claims_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
         # Claims treeview
@@ -2650,7 +2897,7 @@ class ReviewManagementTab:
         self.claims_tree.pack(fill=tk.BOTH, expand=True)
         
         # Service Progress Frame
-        progress_frame = ttk.LabelFrame(billing_frame, text="?? Service Progress & Billing", padding=10)
+        progress_frame = ttk.LabelFrame(left_panel, text="Service Progress & Billing", padding=10)
         progress_frame.pack(fill=tk.BOTH, expand=True)
         
         # Progress treeview
@@ -2660,6 +2907,38 @@ class ReviewManagementTab:
         for col in progress_columns:
             self.progress_tree.heading(col, text=col)
             self.progress_tree.column(col, width=120, anchor="w")
+        
+        self.progress_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Right panel - Billing Summaries
+        right_panel = ttk.Frame(main_container)
+        main_container.add(right_panel, weight=1)
+        
+        # Total Billable by Stage Frame
+        stage_summary_frame = ttk.LabelFrame(right_panel, text="Total Billable by Stage", padding=10)
+        stage_summary_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        stage_columns = ("Stage/Phase", "Billed Amount")
+        self.stage_summary_tree = ttk.Treeview(stage_summary_frame, columns=stage_columns, 
+                                               show="headings", height=6)
+        self.stage_summary_tree.heading("Stage/Phase", text="Stage/Phase")
+        self.stage_summary_tree.heading("Billed Amount", text="Billed Amount")
+        self.stage_summary_tree.column("Stage/Phase", width=180, anchor="w")
+        self.stage_summary_tree.column("Billed Amount", width=120, anchor="e")
+        self.stage_summary_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Total Billable by Month Frame
+        month_summary_frame = ttk.LabelFrame(right_panel, text="Total Billable by Month", padding=10)
+        month_summary_frame.pack(fill=tk.BOTH, expand=True)
+        
+        month_columns = ("Month", "Total Billed")
+        self.month_summary_tree = ttk.Treeview(month_summary_frame, columns=month_columns, 
+                                               show="headings", height=6)
+        self.month_summary_tree.heading("Month", text="Month")
+        self.month_summary_tree.heading("Total Billed", text="Total Billed")
+        self.month_summary_tree.column("Month", width=180, anchor="w")
+        self.month_summary_tree.column("Total Billed", width=120, anchor="e")
+        self.month_summary_tree.pack(fill=tk.BOTH, expand=True)
         
         self.progress_tree.pack(fill=tk.BOTH, expand=True)
     
@@ -2834,6 +3113,9 @@ class ReviewManagementTab:
             # Check if we should auto-populate stages from services
             self.check_auto_populate_stages()
             
+            # Auto-refresh project statuses based on current date
+            self.refresh_project_statuses()
+            
             # NOTE: Removed automatic sync of stages and cycles on project change
             # Users can manually trigger this via "Load Stages from Services" button
             # self.auto_update_stages_and_cycles()
@@ -2843,6 +3125,43 @@ class ReviewManagementTab:
             
         except Exception as e:
             print(f"Error loading project data: {e}")
+    
+    def auto_update_stages_and_cycles(self, force_update=False):
+        """Automatically update stages and cycles based on current services"""
+        try:
+            if not self.review_service or not self.current_project_id:
+                print("⚠️ Cannot auto-update: No review service or project selected")
+                return
+            
+            # Get current services for the project
+            services = self.get_project_services()
+            if not services:
+                print("📊 No services found - skipping auto-update")
+                return
+            
+            print(f"🔄 Auto-updating stages and cycles from {len(services)} services...")
+            
+            # Update review cycles from services
+            self.auto_sync_review_cycles_from_services(services)
+            print("✅ Review cycles updated from services")
+            
+            # Refresh the UI
+            if hasattr(self, 'refresh_cycles'):
+                self.refresh_cycles()
+                
+        except Exception as e:
+            print(f"❌ Error auto-updating stages and cycles: {e}")
+            # Don't show error dialog as this is an automatic operation
+    
+    def get_project_services(self):
+        """Get services for the current project"""
+        try:
+            if not self.current_project_id or not self.review_service:
+                return []
+            return self.review_service.get_project_services(self.current_project_id)
+        except Exception as e:
+            print(f"❌ Error getting project services: {e}")
+            return []
     
     def check_auto_populate_stages(self):
         """Check if stages should be auto-populated from services"""
@@ -3015,9 +3334,9 @@ class ReviewManagementTab:
                 else:
                     frequency = "weekly"
                     if "initiation" in phase.lower() or "setup" in phase.lower():
-                        frequency = "as-required"
+                        frequency = "one-off"
                     elif "handover" in phase.lower() or "completion" in phase.lower():
-                        frequency = "as-required"
+                        frequency = "one-off"
                     elif "construction" in phase.lower():
                         frequency = "weekly"
                     elif "design" in phase.lower() or "documentation" in phase.lower():
@@ -3073,8 +3392,8 @@ class ReviewManagementTab:
                 print("📊 No review services found - no review cycles to generate")
                 return
 
-            print(f"🔄 Generating review cycles from {len(review_services)} review services...")
-            reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
+            print(f"🔄 Smart sync: checking review cycles from {len(review_services)} review services...")
+            reviews_created = self.review_service.generate_service_reviews(self.current_project_id, force_regenerate=False)
 
             if reviews_created:
                 print(f"✅ Generated {len(reviews_created)} review cycles")
@@ -3240,9 +3559,9 @@ class ReviewManagementTab:
                 # Suggest frequency based on phase characteristics
                 frequency = "weekly"
                 if "initiation" in phase.lower() or "setup" in phase.lower():
-                    frequency = "as-required"
+                    frequency = "one-off"
                 elif "handover" in phase.lower() or "completion" in phase.lower():
-                    frequency = "as-required"
+                    frequency = "one-off"
                 elif "construction" in phase.lower():
                     frequency = "weekly"
                 elif "design" in phase.lower() or "documentation" in phase.lower():
@@ -3312,24 +3631,288 @@ class ReviewManagementTab:
         except Exception as e:
             messagebox.showerror("Error", f"Error applying template: {e}")
     
-    def load_project_services(self):
-        """Load project services into the services tree"""
+    def save_as_template(self):
+        """Save current project services as a new template"""
         try:
-            # Prevent concurrent refreshes
-            if hasattr(self, '_refreshing_services') and self._refreshing_services:
+            if not self.current_project_id:
+                messagebox.showwarning("Warning", "Please select a project first")
                 return
-            self._refreshing_services = True
             
+            if not self.review_service:
+                messagebox.showerror("Error", "Review service not initialized")
+                return
+            
+            # Get current project services
+            services = self.review_service.get_project_services(self.current_project_id)
+            if not services:
+                messagebox.showwarning("Warning", "No services found in current project")
+                return
+            
+            # Show save template dialog
+            self.show_save_template_dialog(services)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error saving template: {e}")
+    
+    def show_save_template_dialog(self, services):
+        """Show dialog to save services as template"""
+        try:
+            dialog = tk.Toplevel(self.frame)
+            dialog.title("Save as Template")
+            dialog.geometry("500x400")
+            dialog.transient(self.frame)
+            dialog.grab_set()
+            
+            form_frame = ttk.LabelFrame(dialog, text="Template Details", padding=10)
+            form_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # Template name
+            ttk.Label(form_frame, text="Template Name:").grid(row=0, column=0, sticky=tk.W, pady=5)
+            name_var = tk.StringVar()
+            name_entry = ttk.Entry(form_frame, textvariable=name_var, width=40)
+            name_entry.grid(row=0, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
+            
+            # Sector
+            ttk.Label(form_frame, text="Sector:").grid(row=1, column=0, sticky=tk.W, pady=5)
+            sector_var = tk.StringVar()
+            sector_combo = ttk.Combobox(form_frame, textvariable=sector_var, width=20, state="normal")
+            sector_combo['values'] = ["Education", "Data Centre", "Commercial", "Residential", "Infrastructure", "Healthcare", "Other"]
+            sector_combo.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+            
+            # Notes
+            ttk.Label(form_frame, text="Notes:").grid(row=2, column=0, sticky=tk.NW, pady=5)
+            notes_text = tk.Text(form_frame, width=40, height=4)
+            notes_text.grid(row=2, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
+            
+            # Existing templates option
+            ttk.Label(form_frame, text="Save Options:").grid(row=3, column=0, sticky=tk.W, pady=10)
+            save_option_var = tk.StringVar(value="new")
+            ttk.Radiobutton(form_frame, text="Create New Template", variable=save_option_var, value="new").grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=2)
+            ttk.Radiobutton(form_frame, text="Overwrite Existing Template", variable=save_option_var, value="overwrite").grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=2)
+            
+            # Existing template selector (initially hidden)
+            existing_frame = ttk.Frame(form_frame)
+            existing_frame.grid(row=6, column=0, columnspan=2, sticky=tk.W+tk.E, pady=5)
+            ttk.Label(existing_frame, text="Existing Template:").pack(side=tk.LEFT)
+            existing_var = tk.StringVar()
+            existing_combo = ttk.Combobox(existing_frame, textvariable=existing_var, width=30, state="readonly")
+            existing_combo.pack(side=tk.LEFT, padx=(10, 0))
+            existing_frame.grid_remove()  # Hide initially
+            
+            def on_save_option_change():
+                if save_option_var.get() == "overwrite":
+                    existing_combo['values'] = [t['name'] for t in self.review_service.get_available_templates()]
+                    existing_frame.grid()
+                else:
+                    existing_frame.grid_remove()
+            
+            save_option_var.trace("w", lambda *args: on_save_option_change())
+            
+            form_frame.columnconfigure(1, weight=1)
+            
+            button_frame = ttk.Frame(dialog)
+            button_frame.pack(fill=tk.X, padx=10, pady=10)
+            
+            def save_template():
+                try:
+                    template_name = name_var.get().strip()
+                    if not template_name:
+                        messagebox.showerror("Error", "Template name is required")
+                        return
+                    
+                    sector = sector_var.get().strip()
+                    notes = notes_text.get("1.0", tk.END).strip()
+                    
+                    if save_option_var.get() == "overwrite":
+                        existing_name = existing_var.get()
+                        if not existing_name:
+                            messagebox.showerror("Error", "Please select an existing template to overwrite")
+                            return
+                        template_name = existing_name
+                    
+                    # Convert services to template format
+                    template_items = []
+                    for service in services:
+                        item = {
+                            "phase": service.get('phase', ''),
+                            "service_code": service.get('service_code', ''),
+                            "service_name": service.get('service_name', ''),
+                            "unit_type": service.get('unit_type', 'lump_sum'),
+                            "default_units": service.get('unit_qty', 1),
+                            "unit_rate": service.get('unit_rate', 0),
+                            "lump_sum_fee": service.get('lump_sum_fee', 0),
+                            "bill_rule": service.get('bill_rule', 'on_completion'),
+                            "notes": service.get('notes', '')
+                        }
+                        template_items.append(item)
+                    
+                    # Save template
+                    success = self.review_service.save_template(template_name, sector, notes, template_items, save_option_var.get() == "overwrite")
+                    
+                    if success:
+                        messagebox.showinfo("Success", f"Template '{template_name}' saved successfully")
+                        dialog.destroy()
+                        # Refresh template list
+                        self.refresh_template_list()
+                    else:
+                        messagebox.showerror("Error", "Failed to save template")
+                        
+                except Exception as e:
+                    messagebox.showerror("Error", f"Error saving template: {e}")
+            
+            def cancel_save():
+                dialog.destroy()
+            
+            ttk.Button(button_frame, text="Save Template", command=save_template).pack(side=tk.LEFT, padx=10)
+            ttk.Button(button_frame, text="Cancel", command=cancel_save).pack(side=tk.LEFT)
+            
+        except Exception as e:
+            self.show_user_friendly_error("Template Save Dialog Error", e, "Failed to show template save dialog")
+    
+    def show_user_friendly_error(self, title: str, error: Exception, context: str = ""):
+        """Show detailed but user-friendly error dialogs"""
+        import traceback
+        
+        # Simple message for users
+        user_message = f"{context}\n\nError: {str(error)}"
+        
+        # Detailed message for developers/logs
+        detailed_message = f"""
+Context: {context}
+Error Type: {type(error).__name__}
+Error Message: {str(error)}
+Traceback:
+{traceback.format_exc()}
+"""
+        
+        print(f"❌ ERROR: {detailed_message}")
+        
+        # Show simple message to user with option for details
+        result = messagebox.askyesno(title, 
+                                    f"{user_message}\n\nWould you like to see technical details?")
+        
+        if result:
+            # Show detailed error in separate dialog
+            detail_window = tk.Toplevel(self.frame)
+            detail_window.title(f"{title} - Details")
+            detail_window.geometry("600x400")
+            detail_window.transient(self.frame)
+            detail_window.grab_set()
+            
+            text_widget = tk.Text(detail_window, wrap=tk.WORD)
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            text_widget.insert(tk.END, detailed_message)
+            text_widget.config(state=tk.DISABLED)
+            
+            ttk.Button(detail_window, text="Close", 
+                      command=detail_window.destroy).pack(pady=10)
+    
+    def show_user_friendly_error(self, title: str, error: Exception, context: str = ""):
+        """Show detailed but user-friendly error dialogs"""
+        import traceback
+        
+        # Simple message for users
+        user_message = f"{context}\n\nError: {str(error)}"
+        
+        # Detailed message for developers/logs
+        detailed_message = f"""
+Context: {context}
+Error Type: {type(error).__name__}
+Error Message: {str(error)}
+Traceback:
+{traceback.format_exc()}
+"""
+        
+        print(f"❌ ERROR: {detailed_message}")
+        
+        # Show simple message to user with option for details
+        result = messagebox.askyesno(title, 
+                                    f"{user_message}\n\nWould you like to see technical details?")
+        
+        if result:
+            # Show detailed error in separate dialog
+            detail_window = tk.Toplevel(self.frame)
+            detail_window.title(f"{title} - Details")
+            detail_window.geometry("600x400")
+            detail_window.transient(self.frame)
+            detail_window.grab_set()
+            
+            text_widget = tk.Text(detail_window, wrap=tk.WORD)
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            text_widget.insert(tk.END, detailed_message)
+            text_widget.config(state=tk.DISABLED)
+            
+            ttk.Button(detail_window, text="Close", 
+                      command=detail_window.destroy).pack(pady=10)
+    
+    def refresh_template_list(self):
+        """Enhanced template refresh with user feedback"""
+        try:
+            if not self.review_service:
+                print("⚠️  Review service not initialized")
+                return False
+                
+            if not hasattr(self, 'template_combo'):
+                print("⚠️  Template combo box not found")
+                return False
+            
+            # Show loading indicator
+            original_state = self.template_combo['state']
+            self.template_combo['state'] = 'disabled'
+            self.template_combo.set("Loading templates...")
+            
+            # Update GUI
+            self.template_combo.update_idletasks()
+            
+            # Load templates
+            templates = self.review_service.get_available_templates()
+            template_list = [f"{t['name']} ({t['sector']})" for t in templates]
+            
+            # Update combo box
+            self.template_combo['values'] = template_list
+            self.template_combo['state'] = original_state
+            
+            if not templates:
+                self.template_combo.set("No templates available")
+            else:
+                self.template_combo.set("Select template...")
+                
+            print(f"✅ Loaded {len(templates)} templates successfully")
+            return True
+            
+        except Exception as e:
+            # Restore combo box state
+            if hasattr(self, 'template_combo'):
+                self.template_combo['state'] = 'readonly'
+                self.template_combo.set("Error loading templates")
+            
+            error_msg = f"Failed to load templates: {str(e)}"
+            print(f"❌ {error_msg}")
+            
+            # Show user-friendly error
+            messagebox.showerror("Template Loading Error", 
+                               f"Could not load service templates.\n\n{error_msg}")
+            return False
+    
+    def load_project_services(self):
+        """Load project services into the services tree with enhanced protection"""
+        operation_name = "load_project_services"
+        
+        if not self.operation_manager.start_operation(operation_name):
+            return
+        
+        try:
             # Clear existing services
             for item in self.services_tree.get_children():
                 self.services_tree.delete(item)
 
             if not self.current_project_id or not self.review_service:
-                self._refreshing_services = False
+                print("⚠️  Missing project ID or review service")
                 return
 
             # Get project services
             services = self.review_service.get_project_services(self.current_project_id)
+            print(f"📋 Loading {len(services)} project services")
 
             for service in services:
                 start_date = service.get('schedule_start')
@@ -3366,11 +3949,12 @@ class ReviewManagementTab:
                 )
                 self.services_tree.insert("", tk.END, values=values)
             
-            self._refreshing_services = False
+            print(f"✅ Loaded {len(services)} services successfully")
 
         except Exception as e:
-            print(f"Error loading project services: {e}")
-            self._refreshing_services = False
+            self.show_user_friendly_error("Service Loading Error", e, "Failed to load project services")
+        finally:
+            self.operation_manager.end_operation(operation_name)
     
     def generate_reviews_from_services(self):
         """Generate review cycles from current project services"""
@@ -3398,8 +3982,8 @@ class ReviewManagementTab:
                 if not result:
                     return
             
-            # Generate reviews
-            reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
+            # Generate reviews - force regeneration since user explicitly requested it
+            reviews_created = self.review_service.generate_service_reviews(self.current_project_id, force_regenerate=True)
             
             if reviews_created:
                 messagebox.showinfo("Success", f"Generated {len(reviews_created)} review cycles from services")
@@ -3499,9 +4083,17 @@ class ReviewManagementTab:
                     # For other unit types, calculate based on duration and frequency
                     review_count = self._calculate_review_count(start_date, end_date, frequency)
 
-                # Calculate completion percentage (placeholder - would need actual progress data)
-                # For now, show 0% or get from service status
-                status_percent = "0%"  # TODO: Calculate actual completion percentage
+                # Calculate actual completion percentage based on review status
+                service_id = service.get('service_id')
+                if service_id and self.review_service:
+                    try:
+                        status_summary = self.review_service.get_service_review_status_summary(service_id)
+                        status_percent = status_summary['status_display']
+                    except Exception as e:
+                        print(f"Error getting status for service {service_id}: {e}")
+                        status_percent = "0.0%"
+                else:
+                    status_percent = "0.0%"
 
                 values = (stage, start_display, end_display, review_count, frequency, status_percent)
                 self.services_review_tree.insert("", tk.END, values=values)
@@ -3543,8 +4135,8 @@ class ReviewManagementTab:
                 if not result:
                     return
             
-            # Generate reviews
-            reviews_created = self.review_service.generate_service_reviews(self.current_project_id)
+            # Generate reviews - force regeneration since user explicitly requested it
+            reviews_created = self.review_service.generate_service_reviews(self.current_project_id, force_regenerate=True)
             
             if reviews_created:
                 messagebox.showinfo("Success", 
@@ -3590,7 +4182,9 @@ class ReviewManagementTab:
             duration_days = (end - start).days
 
             # Calculate review count based on frequency
-            if frequency == 'weekly':
+            if frequency == 'one-off':
+                return "1"  # One-off reviews always have exactly one review
+            elif frequency == 'weekly':
                 weeks = duration_days / 7
                 return str(max(1, int(weeks)))
             elif frequency == 'bi-weekly':
@@ -3600,7 +4194,7 @@ class ReviewManagementTab:
                 months = duration_days / 30
                 return str(max(1, int(months)))
             else:
-                return "1"  # Default for as-required or unknown
+                return "1"  # Default for unknown frequency
 
         except Exception as e:
             print(f"Error calculating review count: {e}")
@@ -3742,67 +4336,22 @@ class ReviewManagementTab:
                 if selected_cycle and cycle_no != selected_cycle:
                     continue
 
-                due_display = cycle[4] or ""
-                due_flag = False
-                if due_display:
-                    try:
-                        # Handle both string and date object types
-                        if isinstance(due_display, str):
-                            due_date = datetime.strptime(due_display, '%Y-%m-%d').date()
-                        elif isinstance(due_display, datetime):
-                            due_date = due_display.date()
-                        else:
-                            due_date = due_display  # Assume it's already a date object
-                        
-                        if due_date <= today and cycle_status not in completed_states:
-                            due_flag = True
-                            
-                            # Automatically update status based on due date
-                            current_status = cycle[5] or ""
-                            if current_status in ['planned', 'in_progress']:
-                                # Update to completed if past due
-                                success = self.review_service.update_review_status_to(cycle[0], 'completed')
-                                if success:
-                                    cycle_status = 'completed'
-                                    # Update the cycle tuple for display
-                                    cycle = list(cycle)
-                                    cycle[5] = 'completed'
-                                    cycle = tuple(cycle)
-                        elif due_date <= today + timedelta(days=7) and (cycle[5] or "") == 'planned':
-                            # Update to in_progress if due within 7 days
-                            success = self.review_service.update_review_status_to(cycle[0], 'in_progress')
-                            if success:
-                                cycle_status = 'in_progress'
-                                # Update the cycle tuple for display
-                                cycle = list(cycle)
-                                cycle[5] = 'in_progress'
-                                cycle = tuple(cycle)
-                    except (ValueError, AttributeError):
-                        pass
-
-                notes = "Due for confirmation" if due_flag else ""
+                notes = ""
+                
+                # Check if manual override is set (index 7 is status_override from query)
+                has_override = len(cycle) > 7 and cycle[7] == 1
+                override_icon = "🔒 " if has_override else ""
 
                 formatted_cycle = (
                     str(cycle[0]),
                     f"{cycle[1]} - Cycle {cycle_no}",
                     cycle[3] or "",
-                    due_display,
-                    "",
-                    "",
-                    cycle[5] or "",
+                    f"{override_icon}{cycle[5] or ''}",  # Add lock icon to status if override
                     cycle[6] if len(cycle) > 6 and cycle[6] else "All",
                     "",
                     notes
                 )
                 self.cycles_tree.insert("", tk.END, values=formatted_cycle)
-
-                if due_flag:
-                    self.auto_complete_candidates.append({
-                        'review_id': cycle[0],
-                        'label': formatted_cycle[1],
-                        'due_date': due_display,
-                        'status': cycle[5] or ''
-                    })
 
             if hasattr(self, 'cycle_filter_combo'):
                 if available_cycles:
@@ -3864,15 +4413,26 @@ class ReviewManagementTab:
             if not hasattr(self, 'claims_tree') or not hasattr(self, 'progress_tree'):
                 return
 
+            # Clear existing data
             for item in self.claims_tree.get_children():
                 self.claims_tree.delete(item)
 
             for item in self.progress_tree.get_children():
                 self.progress_tree.delete(item)
+                
+            # Clear summary tables if they exist
+            if hasattr(self, 'stage_summary_tree'):
+                for item in self.stage_summary_tree.get_children():
+                    self.stage_summary_tree.delete(item)
+                    
+            if hasattr(self, 'month_summary_tree'):
+                for item in self.month_summary_tree.get_children():
+                    self.month_summary_tree.delete(item)
 
             if not self.current_project_id or not self.review_service:
                 return
 
+            # Load billing claims
             claims = self.review_service.get_billing_claims(self.current_project_id)
             for claim in claims:
                 values = (
@@ -3886,6 +4446,7 @@ class ReviewManagementTab:
                 )
                 self.claims_tree.insert('', tk.END, values=values)
 
+            # Load service progress
             services = self.review_service.get_service_progress_summary(self.current_project_id)
             for service in services:
                 values = (
@@ -3898,8 +4459,43 @@ class ReviewManagementTab:
                     service.get('next_milestone', '')
                 )
                 self.progress_tree.insert('', tk.END, values=values)
+            
+            # Load billable by stage summary
+            if hasattr(self, 'stage_summary_tree'):
+                stage_billing = self.review_service.get_billable_by_stage(self.current_project_id)
+                stage_total = 0
+                for stage_data in stage_billing:
+                    phase = stage_data.get('phase', 'Unknown')
+                    billed = float(stage_data.get('billed_amount', 0))
+                    stage_total += billed
+                    self.stage_summary_tree.insert('', tk.END, values=(phase, f"${billed:,.0f}"))
+                
+                # Add total row
+                if stage_total > 0:
+                    self.stage_summary_tree.insert('', tk.END, values=("═══ TOTAL ═══", f"${stage_total:,.0f}"), 
+                                                   tags=('total',))
+                    self.stage_summary_tree.tag_configure('total', font=('Arial', 9, 'bold'))
+            
+            # Load billable by month summary
+            if hasattr(self, 'month_summary_tree'):
+                month_billing = self.review_service.get_billable_by_month(self.current_project_id)
+                month_total = 0
+                for month_data in month_billing:
+                    month_label = month_data.get('month', 'Unknown')
+                    billed = float(month_data.get('total_billed', 0))
+                    month_total += billed
+                    self.month_summary_tree.insert('', tk.END, values=(month_label, f"${billed:,.0f}"))
+                
+                # Add total row
+                if month_total > 0:
+                    self.month_summary_tree.insert('', tk.END, values=("═══ TOTAL ═══", f"${month_total:,.0f}"),
+                                                   tags=('total',))
+                    self.month_summary_tree.tag_configure('total', font=('Arial', 9, 'bold'))
+                    
         except Exception as e:
             print(f"Error loading billing data: {e}")
+            import traceback
+            traceback.print_exc()
 
     def add_service(self):
         """Add a new service to the project"""
@@ -3957,12 +4553,17 @@ class ReviewManagementTab:
 
             row = 0
             ttk.Label(form_frame, text="Phase:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
-            phase_entry = ttk.Entry(form_frame, textvariable=phase_var, width=40)
-            phase_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 10), pady=2)
+            phase_combo = ttk.Combobox(form_frame, textvariable=phase_var, width=40, state="normal")
+            if self.review_service:
+                phase_combo['values'] = self.review_service.get_available_phases()
+            phase_combo.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 10), pady=2)
             row += 1
 
             ttk.Label(form_frame, text="Service Code:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
-            ttk.Entry(form_frame, textvariable=service_code_var, width=20).grid(row=row, column=1, sticky=tk.W, pady=2)
+            service_code_combo = ttk.Combobox(form_frame, textvariable=service_code_var, width=20, state="normal")
+            if self.review_service:
+                service_code_combo['values'] = self.review_service.get_available_service_codes()
+            service_code_combo.grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
 
             ttk.Label(form_frame, text="Service Name:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
@@ -4008,7 +4609,7 @@ class ReviewManagementTab:
 
             ttk.Label(form_frame, text="Review Frequency:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=2)
             frequency_combo = ttk.Combobox(form_frame, textvariable=frequency_var, width=15, state="readonly")
-            frequency_combo['values'] = ['weekly', 'bi-weekly', 'monthly']
+            frequency_combo['values'] = ['one-off', 'weekly', 'bi-weekly', 'monthly']
             frequency_combo.grid(row=row, column=1, sticky=tk.W, pady=2)
             row += 1
 
@@ -4117,7 +4718,7 @@ class ReviewManagementTab:
             ttk.Button(button_frame, text="Save", command=save_service).pack(side=tk.RIGHT, padx=5)
             ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
 
-            phase_entry.focus()
+            phase_combo.focus()
         except Exception as e:
             messagebox.showerror("Error", f"Error showing service dialog: {e}")
     
@@ -4229,6 +4830,87 @@ class ReviewManagementTab:
                     
         except Exception as e:
             messagebox.showerror("Error", f"Error clearing services: {e}")
+    
+    def update_service_status(self):
+        """Update status for non-review services (lump_sum, audit, etc.)"""
+        try:
+            selection = self.services_tree.selection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a service first")
+                return
+            
+            item = self.services_tree.item(selection[0])
+            service_data = item['values'] if 'values' in item else None
+            if not service_data or not self.review_service:
+                messagebox.showerror("Error", "Invalid service selected")
+                return
+            
+            # Extract service details
+            service_id = service_data[0] if len(service_data) > 0 else None
+            service_name = service_data[3] if len(service_data) > 3 else ""
+            unit_type = service_data[4] if len(service_data) > 4 else ""
+            current_status = service_data[8] if len(service_data) > 8 else "not_started"
+            
+            # Check if this is a review-type service
+            if unit_type.lower() == 'review':
+                messagebox.showinfo("Info", 
+                    "Review-type services are managed through review cycles.\n"
+                    "Use the Review Planning tab to manage review statuses.")
+                return
+            
+            # Create status update dialog
+            dialog = tk.Toplevel(self.frame)
+            dialog.title(f"Update Status: {service_name}")
+            dialog.geometry("400x200")
+            dialog.transient(self.frame)
+            dialog.grab_set()
+            
+            # Status selection
+            ttk.Label(dialog, text=f"Service: {service_name}", 
+                     font=("Arial", 10, "bold")).pack(pady=10)
+            ttk.Label(dialog, text=f"Type: {unit_type}", 
+                     font=("Arial", 9)).pack(pady=5)
+            ttk.Label(dialog, text=f"Current Status: {current_status}", 
+                     font=("Arial", 9)).pack(pady=5)
+            
+            ttk.Label(dialog, text="Select New Status:", 
+                     font=("Arial", 10)).pack(pady=10)
+            
+            status_var = tk.StringVar(value=current_status)
+            status_frame = ttk.Frame(dialog)
+            status_frame.pack(pady=10)
+            
+            ttk.Radiobutton(status_frame, text="[ ] Planned (0%)", 
+                           variable=status_var, value="planned").pack(anchor=tk.W, pady=2)
+            ttk.Radiobutton(status_frame, text="[~] In Progress (50%)", 
+                           variable=status_var, value="in_progress").pack(anchor=tk.W, pady=2)
+            ttk.Radiobutton(status_frame, text="[X] Completed (100%)", 
+                           variable=status_var, value="completed").pack(anchor=tk.W, pady=2)
+            
+            # Buttons
+            button_frame = ttk.Frame(dialog)
+            button_frame.pack(pady=15)
+            
+            def save_status():
+                new_status = status_var.get()
+                if self.review_service.set_non_review_service_status(service_id, new_status):
+                    progress_map = {'planned': 0, 'in_progress': 50, 'completed': 100}
+                    messagebox.showinfo("Success", 
+                        f"Status updated to '{new_status}'\n"
+                        f"Progress set to: {progress_map[new_status]}%")
+                    self.load_project_services()  # Refresh display
+                    self.load_billing_data()  # Refresh billing since progress changed
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", "Failed to update status")
+            
+            ttk.Button(button_frame, text="Save", command=save_status).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error updating service status: {e}")
+            import traceback
+            traceback.print_exc()
     
     def on_cycle_filter_changed(self, event=None):
         """Handle cycle filter change"""
@@ -4480,12 +5162,11 @@ class ReviewManagementTab:
             review_id = values[0]
             cycle_name = values[1]
             planned_start = values[2]
-            planned_end = values[3]
-            status = values[6]
-            stage = values[7]
+            status = values[3]
+            stage = values[4]
             
             # Create edit dialog
-            self.show_edit_review_dialog(review_id, cycle_name, planned_start, planned_end, status, stage)
+            self.show_edit_review_dialog(review_id, cycle_name, planned_start, status, stage)
             
         except Exception as e:
             messagebox.showerror("Error", f"Error editing review cycle: {e}")
@@ -4544,27 +5225,30 @@ class ReviewManagementTab:
             )
             
             if result:
+                print(f"🗑️ User confirmed deletion for project {self.current_project_id}")
+                
                 if self.review_service:
                     # Use the service method for better consistency
                     delete_result = self.review_service.delete_all_project_reviews(self.current_project_id)
-                    if delete_result['reviews_deleted'] > 0 or delete_result['services_deleted'] > 0:
+                    
+                    if delete_result.get('success'):
                         messagebox.showinfo(
                             "Success", 
                             f"Successfully deleted:\n"
                             f"• {delete_result['reviews_deleted']} review cycles\n"
                             f"• {delete_result['services_deleted']} auto-generated services"
                         )
+                        # Simple refresh - just the cycles tree
                         self.refresh_cycles()
-                        self.load_project_services()  # Refresh services list too
                     else:
-                        messagebox.showinfo("Info", "No reviews or services were found to delete")
+                        error_msg = delete_result.get('error', 'Unknown error occurred')
+                        messagebox.showerror("Error", f"Failed to delete reviews: {error_msg}")
                 else:
                     # Fallback to direct database method
                     success = self.delete_all_reviews_from_database()
                     if success:
                         messagebox.showinfo("Success", f"All {review_count} review cycles deleted successfully")
                         self.refresh_cycles()
-                        self.load_project_services()  # Refresh services list too
                     else:
                         messagebox.showerror("Error", "Failed to delete all review cycles")
                     
@@ -4654,7 +5338,7 @@ class ReviewManagementTab:
         except Exception as e:
             messagebox.showerror("Error", f"Error marking review as completed: {e}")
     
-    def show_edit_review_dialog(self, review_id, cycle_name, planned_start, planned_end, status, stage):
+    def show_edit_review_dialog(self, review_id, cycle_name, planned_start, status, stage):
         """Show dialog to edit review cycle details"""
         try:
             # Create edit window
@@ -4684,35 +5368,27 @@ class ReviewManagementTab:
                                        borderwidth=2, date_pattern='yyyy-mm-dd')
             start_date_entry.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
             
-            # Planned end date
-            ttk.Label(main_frame, text="Due Date:").grid(row=3, column=0, sticky=tk.W, pady=5)
-            end_date_var = tk.StringVar(value=planned_end)
-            end_date_entry = DateEntry(main_frame, textvariable=end_date_var, width=12,
-                                     background='darkblue', foreground='white',
-                                     borderwidth=2, date_pattern='yyyy-mm-dd')
-            end_date_entry.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
-            
             # Status
-            ttk.Label(main_frame, text="Status:").grid(row=4, column=0, sticky=tk.W, pady=5)
+            ttk.Label(main_frame, text="Status:").grid(row=3, column=0, sticky=tk.W, pady=5)
             status_var = tk.StringVar(value=status)
             status_combo = ttk.Combobox(main_frame, textvariable=status_var, width=15, state="readonly")
             status_combo['values'] = ["planned", "in_progress", "report_issued", "completed", "on_hold", "cancelled"]
-            status_combo.grid(row=4, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+            status_combo.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
             
             # Stage/Disciplines
-            ttk.Label(main_frame, text="Stage/Disciplines:").grid(row=5, column=0, sticky=tk.W, pady=5)
+            ttk.Label(main_frame, text="Stage/Disciplines:").grid(row=4, column=0, sticky=tk.W, pady=5)
             stage_var = tk.StringVar(value=stage)
             stage_entry = ttk.Entry(main_frame, textvariable=stage_var, width=30)
-            stage_entry.grid(row=5, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
+            stage_entry.grid(row=4, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
             
             # Notes
-            ttk.Label(main_frame, text="Notes:").grid(row=6, column=0, sticky=tk.NW, pady=5)
+            ttk.Label(main_frame, text="Notes:").grid(row=5, column=0, sticky=tk.NW, pady=5)
             notes_text = tk.Text(main_frame, width=40, height=4)
-            notes_text.grid(row=6, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
+            notes_text.grid(row=5, column=1, sticky=tk.W+tk.E, padx=(10, 0), pady=5)
             
             # Button frame
             button_frame = ttk.Frame(main_frame)
-            button_frame.grid(row=7, column=0, columnspan=2, pady=20)
+            button_frame.grid(row=6, column=0, columnspan=2, pady=20)
             
             def save_changes():
                 try:
@@ -4720,7 +5396,6 @@ class ReviewManagementTab:
                     success = self.update_review_in_database(
                         review_id,
                         start_date_var.get(),
-                        end_date_var.get(),
                         status_var.get(),
                         stage_var.get(),
                         notes_text.get("1.0", tk.END).strip()
@@ -4748,7 +5423,7 @@ class ReviewManagementTab:
         except Exception as e:
             messagebox.showerror("Error", f"Error showing edit dialog: {e}")
     
-    def update_review_in_database(self, review_id, planned_start, planned_end, status, stage, notes):
+    def update_review_in_database(self, review_id, planned_start, status, stage, notes):
         """Update review cycle in database"""
         try:
             conn = connect_to_db()
@@ -4757,20 +5432,51 @@ class ReviewManagementTab:
             
             cursor = conn.cursor()
             
-            # Update ServiceReviews table
+            # FIX 1: Update BOTH planned_date AND due_date (due_date is used by refresh logic)
+            # FIX 2: Add status_override flag to mark as manual override
+            # FIX 3: Store notes in evidence_links with timestamp
+            from datetime import datetime
+            
+            # Format notes with timestamp if provided
+            note_entry = ""
+            if notes:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+                note_entry = f"[{timestamp}] {notes}"
+            
             update_sql = """
             UPDATE ServiceReviews 
-            SET planned_date = ?, due_date = ?, status = ?, disciplines = ?
+            SET planned_date = ?, 
+                due_date = ?,  -- CRITICAL FIX: Also update due_date (used by refresh logic)
+                status = ?, 
+                disciplines = ?,
+                evidence_links = CASE 
+                    WHEN evidence_links IS NULL OR evidence_links = '' THEN ?
+                    ELSE evidence_links + CHAR(10) + ?
+                END,
+                status_override = 1,  -- CRITICAL FIX: Mark as manual override
+                status_override_by = SYSTEM_USER,
+                status_override_at = SYSDATETIME()
             WHERE review_id = ?
             """
             
-            cursor.execute(update_sql, (planned_start, planned_end, status, stage, review_id))
+            cursor.execute(update_sql, (
+                planned_start, 
+                planned_start,  # Use same date for due_date
+                status, 
+                stage,
+                note_entry,
+                note_entry,
+                review_id
+            ))
             conn.commit()
             
+            print(f"✅ Review {review_id} updated with manual override flag")
             return cursor.rowcount > 0
             
         except Exception as e:
             print(f"Error updating review in database: {e}")
+            if conn:
+                conn.rollback()
             return False
         finally:
             if conn:
@@ -4919,6 +5625,225 @@ class ReviewManagementTab:
 
         except Exception as e:
             messagebox.showerror("Error", f"Error confirming reviews: {e}")
+    
+    def refresh_project_statuses(self):
+        """Refresh all project statuses based on current date"""
+        try:
+            if not self.current_project_id or not self.review_service:
+                return
+                
+            print(f"🔄 Refreshing statuses for project {self.current_project_id}...")
+            
+            # Call the comprehensive status refresh
+            results = self.review_service.refresh_all_project_statuses(self.current_project_id)
+            
+            if results['reviews_updated'] > 0 or results['services_updated'] > 0:
+                # Refresh UI components if changes were made
+                self.load_project_services()
+                self.load_billing_data()
+                self.refresh_cycles()
+                
+                # Show notification if significant updates occurred
+                if results['reviews_updated'] > 0:
+                    print(f"✅ Auto-updated {results['reviews_updated']} review statuses")
+                if results['services_updated'] > 0:
+                    print(f"✅ Auto-updated {results['services_updated']} service progress percentages")
+                    
+        except Exception as e:
+            print(f"❌ Error refreshing project statuses: {e}")
+
+    def refresh_cycles_by_meeting_dates(self):
+        """Refresh review cycles based on meeting dates with automatic status progression"""
+        try:
+            if not self.current_project_id:
+                messagebox.showwarning("Warning", "Please select a project first")
+                return
+                
+            if not self.review_service:
+                messagebox.showerror("Error", "Review service not initialized")
+                return
+            
+            # Show confirmation dialog
+            result = messagebox.askyesno(
+                "Refresh Review Cycles by Dates", 
+                "This will update review statuses based on meeting dates:\n\n"
+                "• Past meetings → Completed\n"
+                "• Next upcoming meeting → In Progress\n"
+                "• Future meetings → Planned\n\n"
+                "Status percentages will be updated in Project Setup and Service Review Planning.\n\n"
+                "Continue?",
+                icon="question"
+            )
+            
+            if not result:
+                return
+            
+            print(f"🔄 Refreshing review cycles by meeting dates for project {self.current_project_id}")
+            
+            # Call the new comprehensive refresh method
+            results = self.review_service.refresh_review_cycles_by_date(self.current_project_id)
+            
+            print(f"🔍 UI received results: {results}")
+            
+            if results.get('success', False):
+                # Update UI components with new data
+                self.load_services_for_review_planning()  # Refresh service percentages
+                self.update_kpi_dashboard()  # Refresh Project Setup KPIs
+                self.refresh_cycles()  # Refresh review cycles display
+                # Update UI components with new data
+                self.load_services_for_review_planning()  # Refresh service percentages
+                self.update_kpi_dashboard()  # Refresh Project Setup KPIs
+                self.refresh_cycles()  # Refresh review cycles display
+                
+                # Show success message with details
+                message = f"""Review Cycles Updated Successfully!
+
+📋 Reviews Updated: {results['reviews_updated']}
+📊 Status percentages refreshed
+🎯 Project KPIs updated
+
+The system has automatically updated review statuses based on meeting dates:
+• Past meetings are marked as completed
+• The next upcoming meeting is set to in progress  
+• Future meetings remain planned
+
+All status percentages in Project Setup and Service Review Planning have been updated."""
+                
+                messagebox.showinfo("Success", message)
+                
+                # Log the update for debugging
+                print(f"✅ Date-based refresh completed: {results['reviews_updated']} reviews updated")
+                
+            else:
+                error_msg = results.get('error', 'Unknown error occurred')
+                messagebox.showerror("Error", f"Failed to refresh review cycles:\n\n{error_msg}")
+                print(f"❌ Date-based refresh failed: {error_msg}")
+                
+        except Exception as e:
+            error_msg = f"Error refreshing cycles by dates: {str(e)}"
+            messagebox.showerror("Error", error_msg)
+            print(f"❌ {error_msg}")
+
+    def manual_refresh_statuses(self):
+        """Manual refresh button handler for status updates with override protection"""
+        try:
+            if not self.current_project_id:
+                messagebox.showwarning("Warning", "Please select a project first")
+                return
+                
+            if not self.review_service:
+                messagebox.showerror("Error", "Review service not initialized")
+                return
+            
+            # NEW: Check for manual overrides and show confirmation
+            conn = connect_to_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM ServiceReviews sr
+                    INNER JOIN ProjectServices ps ON sr.service_id = ps.service_id
+                    WHERE ps.project_id = ? AND ISNULL(sr.status_override, 0) = 1
+                """, (self.current_project_id,))
+                override_count = cursor.fetchone()[0]
+                conn.close()
+                
+                if override_count > 0:
+                    result = messagebox.askyesno(
+                        "Refresh Status", 
+                        f"This will auto-update review statuses based on meeting dates.\n\n"
+                        f"⚠️  {override_count} review(s) have manual status overrides.\n"
+                        f"These will NOT be changed.\n\n"
+                        f"Continue with refresh?"
+                    )
+                    if not result:
+                        return
+                
+            results = self.review_service.refresh_all_project_statuses(self.current_project_id)
+            
+            # Enhanced results dialog with override information
+            skipped = results.get('skipped_count', 0)
+            summary = f"""Status Refresh Results:
+
+📋 Reviews Auto-Updated: {results['reviews_updated']}
+🔒 Manual Overrides Preserved: {skipped}
+🔧 Services Updated: {results['services_updated']}
+📊 Overall Status: {results['overall_status'].get('status_summary', 'Unknown')}
+📈 Progress: {results['overall_status'].get('progress_percentage', 0):.1f}%
+
+Completed: {results['overall_status'].get('completed_reviews', 0)}
+In Progress: {results['overall_status'].get('in_progress_reviews', 0)}
+Planned: {results['overall_status'].get('planned_reviews', 0)}"""
+
+            if results['errors']:
+                summary += f"\n\n❌ Errors:\n" + "\n".join(results['errors'])
+                
+            messagebox.showinfo("Status Refresh Complete", summary)
+            
+            # Refresh UI
+            self.load_project_services()
+            self.load_billing_data()
+            self.refresh_cycles()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error refreshing statuses: {e}")
+    
+    def reset_review_to_auto(self):
+        """Reset selected review to automatic status management"""
+        try:
+            selection = self.cycles_tree.selection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a review to reset")
+                return
+            
+            item = self.cycles_tree.item(selection[0])
+            review_data = item['values']
+            review_id = review_data[0]
+            current_status = review_data[3]  # Status with possible lock icon
+            
+            # Check if it has override
+            if not str(current_status).startswith("🔒"):
+                messagebox.showinfo("Info", "This review is already using automatic status management")
+                return
+            
+            # Confirm action
+            result = messagebox.askyesno(
+                "Reset to Auto", 
+                "This will reset the review to automatic status management.\\n"
+                "The status will be recalculated based on the meeting date.\\n\\n"
+                "Continue?"
+            )
+            
+            if not result:
+                return
+            
+            # Clear override flag
+            conn = connect_to_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE ServiceReviews 
+                    SET status_override = 0,
+                        status_override_by = NULL,
+                        status_override_at = NULL
+                    WHERE review_id = ?
+                """, (review_id,))
+                conn.commit()
+                conn.close()
+                
+                # Trigger refresh to recalculate status
+                if self.review_service:
+                    # Force recalculation for this review
+                    self.review_service.update_service_statuses_by_date(
+                        self.current_project_id, 
+                        respect_overrides=False  # Force recalculation
+                    )
+                
+                messagebox.showinfo("Success", "Review reset to automatic status management")
+                self.refresh_cycles()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error resetting to auto: {e}")
 
 
 class DuplicateProjectSetupTab:
@@ -7760,6 +8685,9 @@ class IssueManagementTab:
     
     def setup_acc_folder_tab(self):
         """Setup the ACC folder management sub-tab"""
+        # Initialize current project ID
+        self.current_project_id = None
+        
         acc_frame = ttk.Frame(self.sub_notebook)
         self.sub_notebook.add(acc_frame, text="?? ACC Folders")
         
@@ -7830,11 +8758,24 @@ class IssueManagementTab:
                 messagebox.showerror("Error", "Select a valid ZIP file")
                 return
             
+            # Check if project is selected
+            if " - " not in self.project_combo.get():
+                messagebox.showerror("Error", "Please select a project first")
+                return
+            
             try:
-                # Run the ACC import
-                run_acc_import(zip_path)
-                messagebox.showinfo("Success", "ACC import completed successfully")
-                # Refresh any dependent data if needed
+                # Run the ACC import with proper parameters
+                # Since we don't have a dedicated listbox here, we'll create a temporary one for logging
+                temp_log_listbox = tk.Listbox(acc_frame, height=1)  # Temporary listbox for compatibility
+                success, msg = run_acc_import(self.project_combo, self.import_path_entry, temp_log_listbox)
+                temp_log_listbox.destroy()  # Clean up temporary widget
+                
+                if success:
+                    messagebox.showinfo("Success", "ACC import completed successfully")
+                    # Refresh the logs tree view
+                    self.refresh_acc_logs()
+                else:
+                    messagebox.showerror("Error", msg)
             except Exception as e:
                 messagebox.showerror("Error", f"Import failed: {e}")
         
@@ -7897,21 +8838,40 @@ class IssueManagementTab:
             
             # Get logs for current project if selected
             logs = []
-            if self.current_project_id:
+            if hasattr(self, 'current_project_id') and self.current_project_id:
                 logs = get_acc_import_logs(self.current_project_id)
             
-            for log in logs:
-                self.logs_tree.insert("", tk.END, values=(
-                    log.get('log_id', ''),
-                    log.get('project_id', ''),
-                    log.get('folder_name', ''),
-                    log.get('import_date', ''),
-                    log.get('status', ''),
-                    log.get('summary', '')
-                ))
+            # Insert logs into tree view
+            if logs:
+                for log in logs:
+                    # Handle both dictionary and tuple formats for backward compatibility
+                    if isinstance(log, dict):
+                        values = (
+                            log.get('log_id', ''),
+                            log.get('project_id', ''),
+                            log.get('folder_name', ''),
+                            log.get('import_date', ''),
+                            log.get('status', ''),
+                            log.get('summary', '')
+                        )
+                    else:
+                        # Handle tuple format (legacy support)
+                        values = tuple(log) + ('',) * (6 - len(log))  # Pad to 6 columns
+                    
+                    self.logs_tree.insert("", tk.END, values=values)
+            else:
+                # Show "No logs found" message
+                self.logs_tree.insert("", tk.END, values=('', '', 'No ACC import logs found', '', '', ''))
             
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
             logger.error(f"Error refreshing ACC logs: {e}")
+            # Show error in the tree view
+            try:
+                self.logs_tree.insert("", tk.END, values=('', '', f'Error loading logs: {str(e)}', '', '', ''))
+            except:
+                pass
     
     def refresh_data(self):
         """Refresh all data in the issue management tab"""

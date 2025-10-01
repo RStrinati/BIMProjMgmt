@@ -1,0 +1,48 @@
+2025-10-01 09:50:44.940 +10:00 [INF] Starting Revizto Export Application...
+2025-10-01 09:50:45.058 +10:00 [INF] No tokens found in configuration
+2025-10-01 09:50:45.060 +10:00 [INF] Authentication required
+2025-10-01 09:51:34.859 +10:00 [INF] Starting authentication with API key...
+2025-10-01 09:51:34.867 +10:00 [INF] Trying grant type: api_key with parameter: api_key
+2025-10-01 09:51:36.510 +10:00 [WRN] Grant type api_key failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:51:36.521 +10:00 [INF] Trying grant type: client_credentials with parameter: client_secret
+2025-10-01 09:51:36.551 +10:00 [WRN] Grant type client_credentials failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:51:36.556 +10:00 [INF] Trying grant type: password with parameter: api_key
+2025-10-01 09:51:36.587 +10:00 [WRN] Grant type password failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:51:36.593 +10:00 [ERR] All authentication methods failed. Last exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:51:36.597 +10:00 [ERR] Authentication failed
+System.Exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+   at ReviztoDataExporter.ReviztoAuthService.ExchangeApiKeyForTokens(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 260
+   at ReviztoDataExporter.ReviztoAuthService.AuthenticateWithApiKey(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 37
+2025-10-01 09:51:40.530 +10:00 [ERR] Authentication failed or cancelled
+2025-10-01 09:51:50.712 +10:00 [INF] Starting Revizto Export Application...
+2025-10-01 09:51:50.812 +10:00 [INF] No tokens found in configuration
+2025-10-01 09:51:50.815 +10:00 [INF] Authentication required
+2025-10-01 09:52:44.799 +10:00 [INF] Starting authentication with API key...
+2025-10-01 09:52:44.807 +10:00 [INF] Trying grant type: api_key with parameter: api_key
+2025-10-01 09:52:44.983 +10:00 [WRN] Grant type api_key failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:44.991 +10:00 [INF] Trying grant type: client_credentials with parameter: client_secret
+2025-10-01 09:52:45.016 +10:00 [WRN] Grant type client_credentials failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:45.019 +10:00 [INF] Trying grant type: password with parameter: api_key
+2025-10-01 09:52:45.044 +10:00 [WRN] Grant type password failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:45.049 +10:00 [ERR] All authentication methods failed. Last exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:45.052 +10:00 [ERR] Authentication failed
+System.Exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+   at ReviztoDataExporter.ReviztoAuthService.ExchangeApiKeyForTokens(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 260
+   at ReviztoDataExporter.ReviztoAuthService.AuthenticateWithApiKey(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 37
+2025-10-01 09:52:45.966 +10:00 [ERR] Authentication failed or cancelled
+2025-10-01 09:52:53.223 +10:00 [INF] Starting Revizto Export Application...
+2025-10-01 09:52:53.324 +10:00 [INF] No tokens found in configuration
+2025-10-01 09:52:53.327 +10:00 [INF] Authentication required
+2025-10-01 09:52:54.819 +10:00 [INF] Starting authentication with API key...
+2025-10-01 09:52:54.831 +10:00 [INF] Trying grant type: api_key with parameter: api_key
+2025-10-01 09:52:55.021 +10:00 [WRN] Grant type api_key failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:55.028 +10:00 [INF] Trying grant type: client_credentials with parameter: client_secret
+2025-10-01 09:52:55.059 +10:00 [WRN] Grant type client_credentials failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:55.063 +10:00 [INF] Trying grant type: password with parameter: api_key
+2025-10-01 09:52:55.089 +10:00 [WRN] Grant type password failed. Status: "Forbidden", Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:55.092 +10:00 [ERR] All authentication methods failed. Last exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+2025-10-01 09:52:55.094 +10:00 [ERR] Authentication failed
+System.Exception: Grant type password failed: Forbidden - {"result":-20,"data":null,"message":"Access denied"}
+   at ReviztoDataExporter.ReviztoAuthService.ExchangeApiKeyForTokens(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 260
+   at ReviztoDataExporter.ReviztoAuthService.AuthenticateWithApiKey(String apiKey) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoAuthService.cs:line 37
+2025-10-01 09:52:55.970 +10:00 [ERR] Authentication failed or cancelled
