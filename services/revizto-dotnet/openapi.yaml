@@ -1,0 +1,11 @@
+openapi: 3.0.0
+info:
+  title: Revizto .NET API
+  version: 1.0.0
+paths:
+  /issues:
+    get:
+      summary: Get Revizto issues
+      responses:
+        '200':
+          description: Success

@@ -1,0 +1,183 @@
+2025-09-29 10:27:07.622 +10:00 [INF] Starting Revizto Export Application...
+2025-09-29 10:27:07.800 +10:00 [INF] Database initialized.
+2025-09-29 10:27:07.802 +10:00 [INF] Starting GUI mode...
+2025-09-29 10:27:28.338 +10:00 [INF] Exporting issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5"
+2025-09-29 10:27:28.347 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Attempt 1/3)
+2025-09-29 10:27:30.298 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:30.302 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:30.375 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:30.380 +10:00 [WRN] Error during Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:31.421 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Attempt 2/3)
+2025-09-29 10:27:31.445 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:31.447 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:31.525 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:31.526 +10:00 [WRN] Error during Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:32.542 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Attempt 3/3)
+2025-09-29 10:27:32.563 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:32.565 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:32.645 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:32.647 +10:00 [WRN] Error during Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:33.653 +10:00 [ERR] Operation failed after 3 attempts: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0
+2025-09-29 10:27:33.655 +10:00 [WRN] No issues found for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5"
+2025-09-29 10:27:33.657 +10:00 [INF] Exporting issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a"
+2025-09-29 10:27:33.658 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 1/3)
+2025-09-29 10:27:33.683 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:33.685 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:33.745 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:33.748 +10:00 [WRN] Error during Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:34.756 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 2/3)
+2025-09-29 10:27:34.790 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:34.793 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:34.872 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:34.880 +10:00 [WRN] Error during Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:35.901 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 3/3)
+2025-09-29 10:27:35.928 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:35.930 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:35.998 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:36.001 +10:00 [WRN] Error during Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:37.016 +10:00 [ERR] Operation failed after 3 attempts: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0
+2025-09-29 10:27:37.018 +10:00 [WRN] No issues found for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a"
+2025-09-29 10:27:37.019 +10:00 [INF] Exporting issues for project "2a529e1e-3068-4e3d-9d2b-e76df0383d60"
+2025-09-29 10:27:37.021 +10:00 [INF] Starting operation: Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0 (Attempt 1/3)
+2025-09-29 10:27:37.043 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:37.043 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:37.114 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:37.116 +10:00 [WRN] Error during Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:38.134 +10:00 [INF] Starting operation: Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0 (Attempt 2/3)
+2025-09-29 10:27:38.156 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:38.158 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:38.226 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:38.229 +10:00 [WRN] Error during Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:39.238 +10:00 [INF] Starting operation: Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0 (Attempt 3/3)
+2025-09-29 10:27:39.263 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:39.266 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:39.337 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:39.339 +10:00 [WRN] Error during Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:40.341 +10:00 [ERR] Operation failed after 3 attempts: Fetching issues for project 2a529e1e-3068-4e3d-9d2b-e76df0383d60, page 0
+2025-09-29 10:27:40.343 +10:00 [WRN] No issues found for project "2a529e1e-3068-4e3d-9d2b-e76df0383d60"
+2025-09-29 10:27:40.346 +10:00 [INF] Exporting issues for project "e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0"
+2025-09-29 10:27:40.346 +10:00 [INF] Starting operation: Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0 (Attempt 1/3)
+2025-09-29 10:27:40.372 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:40.373 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:40.462 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:40.467 +10:00 [WRN] Error during Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:41.483 +10:00 [INF] Starting operation: Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0 (Attempt 2/3)
+2025-09-29 10:27:41.509 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:41.510 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:41.586 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:41.591 +10:00 [WRN] Error during Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:42.596 +10:00 [INF] Starting operation: Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0 (Attempt 3/3)
+2025-09-29 10:27:42.620 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:42.622 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:42.689 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:42.692 +10:00 [WRN] Error during Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:43.701 +10:00 [ERR] Operation failed after 3 attempts: Fetching issues for project e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0, page 0
+2025-09-29 10:27:43.703 +10:00 [WRN] No issues found for project "e4a8ae56-0988-4d3a-8a53-0d6c2026bcc0"
+2025-09-29 10:27:43.705 +10:00 [INF] Exporting issues for project "2124a8fd-1c4d-4580-8ae2-1d53713c2793"
+2025-09-29 10:27:43.706 +10:00 [INF] Starting operation: Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0 (Attempt 1/3)
+2025-09-29 10:27:43.729 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:43.730 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:43.789 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:43.791 +10:00 [WRN] Error during Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:44.799 +10:00 [INF] Starting operation: Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0 (Attempt 2/3)
+2025-09-29 10:27:44.820 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:44.820 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:44.885 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:44.887 +10:00 [WRN] Error during Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:45.895 +10:00 [INF] Starting operation: Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0 (Attempt 3/3)
+2025-09-29 10:27:45.917 +10:00 [WRN] Access token expired. Refreshing...
+2025-09-29 10:27:45.919 +10:00 [INF] Attempting to refresh access token...
+2025-09-29 10:27:46.003 +10:00 [ERR] Token refresh failed. Status Code: Forbidden, Reason: Forbidden, Response: {"result":-20,"data":null,"message":"Access denied"}
+2025-09-29 10:27:46.006 +10:00 [WRN] Error during Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0. Retrying in 1000 ms...
+System.Exception: Failed to refresh access token. Status code: Forbidden
+   at ReviztoTokenRefresher.RefreshAccessToken() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoTokenManager.cs:line 70
+   at ReviztoDataExporter.ReviztoApiClient.ExecuteRequest(RestRequest request) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 143
+   at ReviztoDataExporter.ReviztoApiClient.<>c__DisplayClass6_0.<<GetProjectIssues>b__0>d.MoveNext() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ReviztoApiClient.cs:line 59
+--- End of stack trace from previous location ---
+   at ApiCallHelper.SafeApiCall(Func`1 apiCall, String operationName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\ApiCallHelper.cs:line 26
+2025-09-29 10:27:47.010 +10:00 [ERR] Operation failed after 3 attempts: Fetching issues for project 2124a8fd-1c4d-4580-8ae2-1d53713c2793, page 0
+2025-09-29 10:27:47.011 +10:00 [WRN] No issues found for project "2124a8fd-1c4d-4580-8ae2-1d53713c2793"

@@ -1,0 +1,1517 @@
+2025-05-16 12:53:24.649 +10:00 [INF] Starting application...
+2025-05-16 12:53:24.797 +10:00 [INF] Database initialized.
+2025-05-16 12:53:24.804 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 12:53:24.808 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 12:53:25.072 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 262 ms)
+2025-05-16 12:53:25.077 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 12:53:25.173 +10:00 [INF] Operation successful: Fetching current user info (Duration: 95 ms)
+2025-05-16 12:53:25.183 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:53:25.187 +10:00 [INF] User has 4 licenses.
+2025-05-16 12:53:25.188 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:53:25.199 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:53:25.202 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:53:25.206 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:53:25.210 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 12:53:25.212 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:53:25.334 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 12:53:25.370 +10:00 [INF] Inserted 2 license records.
+2025-05-16 12:53:25.372 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 12:53:25.383 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_125325.txt
+2025-05-16 12:53:25.387 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:53:25.390 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 12:53:26.385 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 995 ms)
+2025-05-16 12:53:26.418 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:53:26.925 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:53:26.927 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:53:26.929 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 12:53:26.931 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 12:53:26.992 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 61 ms)
+2025-05-16 12:53:27.004 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:53:27.005 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:53:27.006 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 12:53:27.161 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 154 ms)
+2025-05-16 12:53:27.167 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:53:27.207 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:53:27.208 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:53:27.208 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 12:53:27.210 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 12:53:27.272 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 62 ms)
+2025-05-16 12:53:27.273 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:53:27.275 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 12:53:27.328 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 53 ms)
+2025-05-16 12:53:27.329 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 12:53:27.331 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 12:53:27.333 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_125327.txt
+2025-05-16 12:53:27.335 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 12:53:27.336 +10:00 [INF] User license retrieval process completed.
+2025-05-16 12:53:27.337 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 12:54:07.353 +10:00 [INF] Starting application...
+2025-05-16 12:54:07.458 +10:00 [INF] Database initialized.
+2025-05-16 12:54:07.462 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 12:54:07.464 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 12:54:07.850 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 385 ms)
+2025-05-16 12:54:07.853 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 12:54:07.935 +10:00 [INF] Operation successful: Fetching current user info (Duration: 82 ms)
+2025-05-16 12:54:07.941 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:54:07.942 +10:00 [INF] User has 4 licenses.
+2025-05-16 12:54:07.944 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:54:07.951 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:54:07.953 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:54:07.956 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:54:07.958 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 12:54:07.959 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:54:08.059 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 12:54:08.085 +10:00 [INF] Inserted 2 license records.
+2025-05-16 12:54:08.086 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 12:54:08.092 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_125408.txt
+2025-05-16 12:54:08.094 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:54:08.095 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 12:54:08.898 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 803 ms)
+2025-05-16 12:54:08.929 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:54:09.349 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:54:09.351 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:54:09.352 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 12:54:09.353 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 12:54:09.403 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 50 ms)
+2025-05-16 12:54:09.413 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:54:09.415 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:54:09.417 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 12:54:09.574 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 157 ms)
+2025-05-16 12:54:09.579 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:54:09.617 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:54:09.618 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:54:09.619 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 12:54:09.620 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 12:54:09.681 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 61 ms)
+2025-05-16 12:54:09.682 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:54:09.684 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 12:54:09.764 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 79 ms)
+2025-05-16 12:54:09.765 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 12:54:09.767 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 12:54:09.769 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_125409.txt
+2025-05-16 12:54:09.771 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 12:54:09.772 +10:00 [INF] User license retrieval process completed.
+2025-05-16 12:54:09.773 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 12:56:26.210 +10:00 [INF] Starting application...
+2025-05-16 12:56:26.312 +10:00 [INF] Database initialized.
+2025-05-16 12:56:26.316 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 12:56:26.318 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 12:56:26.582 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 263 ms)
+2025-05-16 12:56:26.584 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 12:56:26.689 +10:00 [INF] Operation successful: Fetching current user info (Duration: 104 ms)
+2025-05-16 12:56:26.695 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:56:26.696 +10:00 [INF] User has 4 licenses.
+2025-05-16 12:56:26.698 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:56:26.706 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:56:26.708 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:56:26.709 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:56:26.712 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 12:56:26.713 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:56:26.807 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 12:56:26.836 +10:00 [INF] Inserted 2 license records.
+2025-05-16 12:56:26.837 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 12:56:26.843 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_125626.txt
+2025-05-16 12:56:26.846 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:56:26.847 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 12:56:27.825 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 977 ms)
+2025-05-16 12:56:27.856 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:56:28.301 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:56:28.303 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:56:28.304 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 12:56:28.306 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 12:56:28.365 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 59 ms)
+2025-05-16 12:56:28.375 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:56:28.377 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:56:28.380 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 12:56:28.589 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 209 ms)
+2025-05-16 12:56:28.595 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:56:28.630 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:56:28.631 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:56:28.632 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 12:56:28.633 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 12:56:28.680 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 46 ms)
+2025-05-16 12:56:28.680 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:56:28.682 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 12:56:28.758 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 75 ms)
+2025-05-16 12:56:28.759 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 12:56:28.762 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 12:56:28.763 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_125628.txt
+2025-05-16 12:56:28.766 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 12:56:28.767 +10:00 [INF] User license retrieval process completed.
+2025-05-16 12:56:28.768 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 12:57:35.363 +10:00 [INF] Starting application...
+2025-05-16 12:57:35.477 +10:00 [INF] Database initialized.
+2025-05-16 12:57:35.480 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 12:57:35.482 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 12:57:35.752 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 269 ms)
+2025-05-16 12:57:35.754 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 12:57:35.874 +10:00 [INF] Operation successful: Fetching current user info (Duration: 119 ms)
+2025-05-16 12:57:35.880 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:57:35.882 +10:00 [INF] User has 4 licenses.
+2025-05-16 12:57:35.883 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:57:35.891 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:57:35.892 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 12:57:35.894 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 12:57:35.896 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 12:57:35.897 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 12:57:35.995 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 12:57:36.022 +10:00 [INF] Inserted 2 license records.
+2025-05-16 12:57:36.023 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 12:57:36.029 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_125736.txt
+2025-05-16 12:57:36.032 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:57:36.035 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 12:57:36.731 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 696 ms)
+2025-05-16 12:57:36.762 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:57:37.242 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 12:57:37.244 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:57:37.245 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 12:57:37.246 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 12:57:37.338 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 91 ms)
+2025-05-16 12:57:37.347 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 12:57:37.349 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:57:37.349 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 12:57:37.504 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 154 ms)
+2025-05-16 12:57:37.510 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:57:37.547 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 12:57:37.548 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:57:37.549 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 12:57:37.550 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 12:57:37.620 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 69 ms)
+2025-05-16 12:57:37.621 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 12:57:37.624 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 12:57:37.685 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 61 ms)
+2025-05-16 12:57:37.687 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 12:57:37.688 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 12:57:37.690 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_125737.txt
+2025-05-16 12:57:37.693 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 12:57:37.695 +10:00 [INF] User license retrieval process completed.
+2025-05-16 12:57:37.696 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:01:15.020 +10:00 [INF] Starting application...
+2025-05-16 13:01:15.111 +10:00 [INF] Database initialized.
+2025-05-16 13:01:15.114 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:01:15.116 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:01:15.312 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 196 ms)
+2025-05-16 13:01:15.314 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 13:01:15.411 +10:00 [INF] Operation successful: Fetching current user info (Duration: 96 ms)
+2025-05-16 13:01:15.417 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:01:15.417 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:01:15.419 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:01:15.429 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:01:15.431 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:01:15.434 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:01:15.436 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 13:01:15.438 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:01:15.531 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:01:15.557 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:01:15.559 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 13:01:15.565 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_130115.txt
+2025-05-16 13:01:15.568 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:01:15.569 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 13:01:16.264 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 694 ms)
+2025-05-16 13:01:16.297 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:01:16.774 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:01:16.775 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:01:16.777 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 13:01:16.779 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 13:01:16.849 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 70 ms)
+2025-05-16 13:01:16.859 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:01:16.861 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:01:16.863 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 13:01:17.014 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 150 ms)
+2025-05-16 13:01:17.020 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:01:17.059 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:01:17.060 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:01:17.061 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 13:01:17.062 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 13:01:17.125 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 63 ms)
+2025-05-16 13:01:17.127 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:01:17.129 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 13:01:17.210 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 81 ms)
+2025-05-16 13:01:17.212 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 13:01:17.213 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 13:01:17.214 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_130117.txt
+2025-05-16 13:01:17.215 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 13:01:17.216 +10:00 [INF] User license retrieval process completed.
+2025-05-16 13:01:17.217 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:04:33.444 +10:00 [INF] Starting application...
+2025-05-16 13:04:33.555 +10:00 [INF] Database initialized.
+2025-05-16 13:04:33.560 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:04:33.563 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:04:33.826 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 263 ms)
+2025-05-16 13:04:33.828 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 13:04:33.924 +10:00 [INF] Operation successful: Fetching current user info (Duration: 95 ms)
+2025-05-16 13:04:33.929 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:04:33.930 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:04:33.932 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:04:33.939 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:04:33.941 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:04:33.942 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:04:33.944 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 13:04:33.945 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:04:34.036 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:04:34.059 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:04:34.059 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 13:04:34.067 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_130434.txt
+2025-05-16 13:04:34.069 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:04:34.070 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 13:04:35.074 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 1003 ms)
+2025-05-16 13:04:35.107 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:04:35.505 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:04:35.507 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:04:35.508 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 13:04:35.509 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 13:04:35.565 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 56 ms)
+2025-05-16 13:04:35.573 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:04:35.574 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:04:35.575 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 13:04:35.781 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 206 ms)
+2025-05-16 13:04:35.785 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:04:35.820 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:04:35.821 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:04:35.823 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 13:04:35.824 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 13:04:35.886 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 61 ms)
+2025-05-16 13:04:35.887 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:04:35.888 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 13:04:35.954 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 66 ms)
+2025-05-16 13:04:35.956 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 13:04:35.957 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 13:04:35.958 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_130435.txt
+2025-05-16 13:04:35.960 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 13:04:35.962 +10:00 [INF] User license retrieval process completed.
+2025-05-16 13:04:35.963 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:07:13.551 +10:00 [INF] Starting application...
+2025-05-16 13:07:13.660 +10:00 [INF] Database initialized.
+2025-05-16 13:07:13.664 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:07:13.666 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:07:13.935 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 267 ms)
+2025-05-16 13:07:13.937 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 13:07:14.050 +10:00 [INF] Operation successful: Fetching current user info (Duration: 113 ms)
+2025-05-16 13:07:14.056 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:07:14.057 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:07:14.058 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:07:14.067 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:07:14.069 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:07:14.070 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:07:14.072 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 13:07:14.073 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:07:14.175 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:07:14.211 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:07:14.212 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 13:07:14.218 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_130714.txt
+2025-05-16 13:07:14.221 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:07:14.223 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 13:07:15.217 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 994 ms)
+2025-05-16 13:07:15.250 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:07:16.321 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:07:16.323 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:07:16.324 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 13:07:16.325 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 13:07:16.388 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 62 ms)
+2025-05-16 13:07:16.397 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:07:16.399 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:07:16.400 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 13:07:16.613 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 213 ms)
+2025-05-16 13:07:16.627 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:07:16.784 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:07:16.786 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:07:16.787 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 13:07:16.788 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 13:07:16.853 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 64 ms)
+2025-05-16 13:07:16.854 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:07:16.855 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 13:07:16.940 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 85 ms)
+2025-05-16 13:07:16.942 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 13:07:16.944 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 13:07:16.945 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_130716.txt
+2025-05-16 13:07:16.947 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 13:07:16.949 +10:00 [INF] User license retrieval process completed.
+2025-05-16 13:07:16.950 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:08:14.247 +10:00 [INF] Starting application...
+2025-05-16 13:08:14.343 +10:00 [INF] Database initialized.
+2025-05-16 13:08:14.348 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:08:14.350 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:08:14.592 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 241 ms)
+2025-05-16 13:08:14.593 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 13:08:14.683 +10:00 [INF] Operation successful: Fetching current user info (Duration: 89 ms)
+2025-05-16 13:08:14.688 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:08:14.689 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:08:14.691 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:08:14.698 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:08:14.700 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:08:14.701 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:08:14.703 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 13:08:14.704 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:08:14.793 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:08:14.817 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:08:14.818 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 13:08:14.824 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_130814.txt
+2025-05-16 13:08:14.826 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:08:14.827 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 13:08:15.486 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 658 ms)
+2025-05-16 13:08:15.514 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:08:15.986 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:08:15.988 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:08:15.989 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 13:08:15.990 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 13:08:16.041 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 50 ms)
+2025-05-16 13:08:16.051 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:08:16.053 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:08:16.054 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 13:08:16.261 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 206 ms)
+2025-05-16 13:08:16.267 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:08:16.304 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:08:16.306 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:08:16.307 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 13:08:16.308 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 13:08:16.353 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 44 ms)
+2025-05-16 13:08:16.354 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:08:16.356 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 13:08:16.440 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 84 ms)
+2025-05-16 13:08:16.441 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 13:08:16.443 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 13:08:16.444 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_130816.txt
+2025-05-16 13:08:16.446 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 13:08:16.447 +10:00 [INF] User license retrieval process completed.
+2025-05-16 13:08:16.448 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:09:52.544 +10:00 [INF] Starting application...
+2025-05-16 13:09:52.635 +10:00 [INF] Database initialized.
+2025-05-16 13:09:52.639 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:09:52.640 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:09:52.882 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 241 ms)
+2025-05-16 13:09:52.884 +10:00 [INF] Starting operation: Fetching current user info (Attempt 1/3)
+2025-05-16 13:09:52.982 +10:00 [INF] Operation successful: Fetching current user info (Duration: 98 ms)
+2025-05-16 13:09:52.988 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:09:52.988 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:09:52.989 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 2, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:09:52.993 +10:00 [INF] [DIAG] License UUID: [], Frozen: true, Role: 3, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:09:52.994 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: david.foley@iimbe.io, OwnerId: 1434074
+2025-05-16 13:09:52.995 +10:00 [INF] [DIAG] License UUID: [], Frozen: false, Role: 4, OwnerEmail: michel.elsharoony@hindmarsh.com.au, OwnerId: 4289619
+2025-05-16 13:09:52.997 +10:00 [INF] Filtering to 2 active and owned licenses.
+2025-05-16 13:09:52.997 +10:00 [INF] Authenticated as rico.strinati@iimbe.io (ID: 5211974)
+2025-05-16 13:09:53.177 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:09:53.207 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:09:53.209 +10:00 [INF] User licenses successfully inserted into the database.
+2025-05-16 13:09:53.217 +10:00 [INF] User licenses saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_130953.txt
+2025-05-16 13:09:53.219 +10:00 [INF] Fetching team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:09:53.221 +10:00 [INF] Starting operation: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Attempt 1/3)
+2025-05-16 13:09:54.161 +10:00 [INF] Operation successful: Fetching team members for license 3575016fd4924d9ab14c6650a3d5719f (Duration: 939 ms)
+2025-05-16 13:09:54.210 +10:00 [INF] Deleted 676 existing members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:09:54.631 +10:00 [INF] Inserted 676 members for license 3575016fd4924d9ab14c6650a3d5719f.
+2025-05-16 13:09:54.633 +10:00 [INF] Inserted 676 team members for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:09:54.634 +10:00 [INF] Fetching paged projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f (ID: 5933)
+2025-05-16 13:09:54.635 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Attempt 1/3)
+2025-05-16 13:09:54.699 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 1 (Duration: 63 ms)
+2025-05-16 13:09:54.708 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2025-05-16 13:09:54.711 +10:00 [INF] Fetching team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:09:54.712 +10:00 [INF] Starting operation: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Attempt 1/3)
+2025-05-16 13:09:54.854 +10:00 [INF] Operation successful: Fetching team members for license ad5f9970-76fd-4ace-8471-90b52ee2121f (Duration: 141 ms)
+2025-05-16 13:09:54.859 +10:00 [INF] Deleted 58 existing members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:09:54.897 +10:00 [INF] Inserted 58 members for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:09:54.899 +10:00 [INF] Inserted 58 team members for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:09:54.900 +10:00 [INF] Fetching paged projects for license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f (ID: 20647)
+2025-05-16 13:09:54.901 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Attempt 1/3)
+2025-05-16 13:09:54.962 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 1 (Duration: 60 ms)
+2025-05-16 13:09:54.964 +10:00 [WRN] [Empty] No projects array found or it's empty for page 1 of license UUID: ad5f9970-76fd-4ace-8471-90b52ee2121f
+2025-05-16 13:09:54.965 +10:00 [INF] Starting operation: Fetching all user projects - page 1 (Attempt 1/3)
+2025-05-16 13:09:55.030 +10:00 [INF] Operation successful: Fetching all user projects - page 1 (Duration: 65 ms)
+2025-05-16 13:09:55.032 +10:00 [INF] Total projects collected before filtering: 0
+2025-05-16 13:09:55.033 +10:00 [INF] Valid projects prepared for DB insertion: 0
+2025-05-16 13:09:55.034 +10:00 [INF] Project list saved to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_130955.txt
+2025-05-16 13:09:55.037 +10:00 [INF] Inserted 0 valid projects into the database.
+2025-05-16 13:09:55.038 +10:00 [INF] User license retrieval process completed.
+2025-05-16 13:09:55.038 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:20:23.593 +10:00 [INF] Starting application...
+2025-05-16 13:20:23.688 +10:00 [INF] Database initialized.
+2025-05-16 13:20:23.691 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:20:23.693 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:20:23.863 +10:00 [WRN] Access token expired. Refreshing...
+2025-05-16 13:20:23.865 +10:00 [INF] Attempting to refresh access token...
+2025-05-16 13:20:24.038 +10:00 [INF] Tokens updated successfully in configuration.
+2025-05-16 13:20:24.042 +10:00 [INF] Access token successfully refreshed.
+2025-05-16 13:20:24.147 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 454 ms)
+2025-05-16 13:20:24.151 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:20:24.156 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 13:20:24.335 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:20:24.373 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:20:24.374 +10:00 [INF] User licenses inserted into database.
+2025-05-16 13:20:24.424 +10:00 [INF] Wrote license metadata to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_132024.json
+2025-05-16 13:20:24.426 +10:00 [INF] Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f...
+2025-05-16 13:20:24.427 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 13:20:24.914 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 487 ms)
+2025-05-16 13:20:24.917 +10:00 [INF] Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f...
+2025-05-16 13:20:24.918 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 13:20:25.011 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 93 ms)
+2025-05-16 13:20:25.028 +10:00 [INF] Wrote project list to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_132025.json
+2025-05-16 13:20:25.041 +10:00 [ERR] Error inserting Revizto projects into database.
+System.Collections.Generic.KeyNotFoundException: The given key 'region' was not present in the dictionary.
+   at System.Collections.Generic.Dictionary`2.get_Item(TKey key)
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjects(List`1 projects) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 194
+2025-05-16 13:20:25.069 +10:00 [ERR] Error during FetchAndSaveUserLicensesAsync
+System.Collections.Generic.KeyNotFoundException: The given key 'region' was not present in the dictionary.
+   at System.Collections.Generic.Dictionary`2.get_Item(TKey key)
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjects(List`1 projects) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 194
+   at ReviztoDataExporter.UserLicenceService.FetchAndSaveUserLicensesAsync() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\UserLicenceService.cs:line 113
+2025-05-16 13:20:25.073 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 13:20:25.074 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 13:23:40.175 +10:00 [INF] Starting application...
+2025-05-16 13:23:40.274 +10:00 [INF] Database initialized.
+2025-05-16 13:23:40.277 +10:00 [INF] Starting user license retrieval process...
+2025-05-16 13:23:40.278 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 13:23:40.534 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 256 ms)
+2025-05-16 13:23:40.543 +10:00 [INF] User has 4 licenses.
+2025-05-16 13:23:40.547 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 13:23:40.654 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 13:23:40.682 +10:00 [INF] Inserted 2 license records.
+2025-05-16 13:23:40.684 +10:00 [INF] User licenses inserted into database.
+2025-05-16 13:23:40.733 +10:00 [INF] Wrote license metadata to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_132340.json
+2025-05-16 13:23:40.735 +10:00 [INF] Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f...
+2025-05-16 13:23:40.737 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 13:23:40.936 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 198 ms)
+2025-05-16 13:23:40.938 +10:00 [INF] Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f...
+2025-05-16 13:23:40.939 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 13:23:41.034 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 95 ms)
+2025-05-16 13:23:41.050 +10:00 [INF] Wrote project list to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_132341.json
+2025-05-16 13:23:41.063 +10:00 [INF] Deleted 0 existing projects for license 3575016f-d492-4d9a-b14c-6650a3d5719f.
+2025-05-16 13:23:41.064 +10:00 [INF] Deleted 1 existing projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 13:23:41.082 +10:00 [INF] Inserted 8 Revizto project records into the database.
+2025-05-16 13:23:41.085 +10:00 [INF] Inserted 8 projects into database.
+2025-05-16 13:23:41.087 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 13:23:41.089 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 15:36:42.654 +10:00 [INF] Starting application...
+2025-05-16 15:36:42.759 +10:00 [INF] Database initialized.
+2025-05-16 15:36:42.762 +10:00 [INF] Starting user license and project retrieval...
+2025-05-16 15:36:42.764 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 15:36:43.071 +10:00 [WRN] Access token expired. Refreshing...
+2025-05-16 15:36:43.074 +10:00 [INF] Attempting to refresh access token...
+2025-05-16 15:36:43.243 +10:00 [INF] Tokens updated successfully in configuration.
+2025-05-16 15:36:43.245 +10:00 [INF] Access token successfully refreshed.
+2025-05-16 15:36:43.348 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 583 ms)
+2025-05-16 15:36:43.352 +10:00 [INF] User has 4 licenses.
+2025-05-16 15:36:43.357 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 15:36:43.530 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 15:36:43.570 +10:00 [INF] Inserted 2 license records.
+2025-05-16 15:36:43.572 +10:00 [INF] User licenses inserted into database.
+2025-05-16 15:36:43.620 +10:00 [INF] Wrote licenses to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_153643.json
+2025-05-16 15:36:43.622 +10:00 [INF] Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f...
+2025-05-16 15:36:43.627 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 15:36:43.892 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 264 ms)
+2025-05-16 15:36:43.895 +10:00 [INF] Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f...
+2025-05-16 15:36:43.898 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 15:36:43.984 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 85 ms)
+2025-05-16 15:36:44.005 +10:00 [INF] Wrote 8 projects to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_153643.json
+2025-05-16 15:36:44.025 +10:00 [INF] Deleted 7 existing projects for license 3575016f-d492-4d9a-b14c-6650a3d5719f.
+2025-05-16 15:36:44.026 +10:00 [INF] Deleted 1 existing projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 15:36:44.048 +10:00 [INF] Inserted 8 Revizto project records into database.
+2025-05-16 15:36:44.051 +10:00 [INF] Inserted 8 projects into database.
+2025-05-16 15:36:44.055 +10:00 [INF] tblReviztoProjectIssues truncated.
+2025-05-16 15:36:44.058 +10:00 [INF] Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a...
+2025-05-16 15:36:44.059 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 1/3)
+2025-05-16 15:36:44.451 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Duration: 391 ms)
+2025-05-16 15:36:46.762 +10:00 [INF] Wrote 100 issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_554a3521-c2b4-4a21-ad6e-e7dc1c44db2a_20250516_153644.json
+2025-05-16 15:36:46.766 +10:00 [INF] Deleted 0 existing issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a.
+2025-05-16 15:36:46.839 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:36:46.840 +10:00 [INF] Inserted 100 issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a.
+2025-05-16 15:36:46.841 +10:00 [INF] Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684...
+2025-05-16 15:36:46.842 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Attempt 1/3)
+2025-05-16 15:36:47.068 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Duration: 226 ms)
+2025-05-16 15:36:49.931 +10:00 [INF] Wrote 100 issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_023e8305-922b-4cd2-8938-d8ee7f74b684_20250516_153647.json
+2025-05-16 15:36:49.934 +10:00 [INF] Deleted 0 existing issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684.
+2025-05-16 15:36:49.941 +10:00 [ERR] Error inserting Revizto project issues.
+System.Data.SqlClient.SqlException (0x80131904): Violation of PRIMARY KEY constraint 'PK_tblReviztoProjectIssues'. Cannot insert duplicate key in object 'dbo.tblReviztoProjectIssues'. The duplicate key value is (5).
+The statement has been terminated.
+   at System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at System.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReaderTds(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, Boolean async, Int32 timeout, Task& task, Boolean asyncWrite, SqlDataReader ds)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReader(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, TaskCompletionSource`1 completion, Int32 timeout, Task& task, Boolean asyncWrite, String method)
+   at System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, Boolean sendToPipe, Int32 timeout, Boolean asyncWrite, String methodName)
+   at System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjectIssues(List`1 issues) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 266
+ClientConnectionId:6933d8b4-b29a-4ade-b24d-a2f29bf2c8fe
+Error Number:2627,State:1,Class:14
+2025-05-16 15:36:49.961 +10:00 [ERR] Error during FetchAndSaveUserLicensesAsync
+System.Data.SqlClient.SqlException (0x80131904): Violation of PRIMARY KEY constraint 'PK_tblReviztoProjectIssues'. Cannot insert duplicate key in object 'dbo.tblReviztoProjectIssues'. The duplicate key value is (5).
+The statement has been terminated.
+   at System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at System.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReaderTds(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, Boolean async, Int32 timeout, Task& task, Boolean asyncWrite, SqlDataReader ds)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReader(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, TaskCompletionSource`1 completion, Int32 timeout, Task& task, Boolean asyncWrite, String method)
+   at System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, Boolean sendToPipe, Int32 timeout, Boolean asyncWrite, String methodName)
+   at System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjectIssues(List`1 issues) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 266
+   at ReviztoDataExporter.UserLicenceService.FetchAndSaveUserLicensesAsync() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\UserLicenceService.cs:line 115
+ClientConnectionId:6933d8b4-b29a-4ade-b24d-a2f29bf2c8fe
+Error Number:2627,State:1,Class:14
+2025-05-16 15:36:49.966 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 15:36:49.966 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 15:39:48.548 +10:00 [INF] Starting application...
+2025-05-16 15:39:48.642 +10:00 [INF] Database initialized.
+2025-05-16 15:39:48.644 +10:00 [INF] Starting user license and project retrieval...
+2025-05-16 15:39:48.646 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 15:39:49.428 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 781 ms)
+2025-05-16 15:39:49.434 +10:00 [INF] User has 4 licenses.
+2025-05-16 15:39:49.438 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 15:39:49.528 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 15:39:49.553 +10:00 [INF] Inserted 2 license records.
+2025-05-16 15:39:49.554 +10:00 [INF] User licenses inserted into database.
+2025-05-16 15:39:49.598 +10:00 [INF] Wrote licenses to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_153949.json
+2025-05-16 15:39:49.600 +10:00 [INF] Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f...
+2025-05-16 15:39:49.603 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 15:39:49.775 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 172 ms)
+2025-05-16 15:39:49.777 +10:00 [INF] Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f...
+2025-05-16 15:39:49.779 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 15:39:49.865 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 86 ms)
+2025-05-16 15:39:49.887 +10:00 [INF] Wrote 8 projects to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_153949.json
+2025-05-16 15:39:49.912 +10:00 [ERR] Error inserting Revizto projects.
+System.Data.SqlClient.SqlException (0x80131904): The DELETE statement conflicted with the REFERENCE constraint "FK_Issues_Projects". The conflict occurred in database "ReviztoData", table "dbo.tblReviztoProjectIssues", column 'projectUuid'.
+The statement has been terminated.
+   at System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at System.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReaderTds(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, Boolean async, Int32 timeout, Task& task, Boolean asyncWrite, SqlDataReader ds)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReader(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, TaskCompletionSource`1 completion, Int32 timeout, Task& task, Boolean asyncWrite, String method)
+   at System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, Boolean sendToPipe, Int32 timeout, Boolean asyncWrite, String methodName)
+   at System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjects(List`1 projects) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 174
+ClientConnectionId:acd217f8-2705-4e82-a24a-1df9ee93da1c
+Error Number:547,State:0,Class:16
+2025-05-16 15:39:49.934 +10:00 [ERR] Error during FetchAndSaveUserLicensesAsync
+System.Data.SqlClient.SqlException (0x80131904): The DELETE statement conflicted with the REFERENCE constraint "FK_Issues_Projects". The conflict occurred in database "ReviztoData", table "dbo.tblReviztoProjectIssues", column 'projectUuid'.
+The statement has been terminated.
+   at System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at System.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReaderTds(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, Boolean async, Int32 timeout, Task& task, Boolean asyncWrite, SqlDataReader ds)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReader(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, TaskCompletionSource`1 completion, Int32 timeout, Task& task, Boolean asyncWrite, String method)
+   at System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, Boolean sendToPipe, Int32 timeout, Boolean asyncWrite, String methodName)
+   at System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjects(List`1 projects) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 174
+   at ReviztoDataExporter.UserLicenceService.FetchAndSaveUserLicensesAsync() in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\UserLicenceService.cs:line 89
+ClientConnectionId:acd217f8-2705-4e82-a24a-1df9ee93da1c
+Error Number:547,State:0,Class:16
+2025-05-16 15:39:49.942 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 15:39:49.943 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 15:41:01.959 +10:00 [INF] Starting application...
+2025-05-16 15:41:02.070 +10:00 [INF] Database initialized.
+2025-05-16 15:41:02.074 +10:00 [INF] Starting user license and project retrieval...
+2025-05-16 15:41:02.081 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 15:41:02.333 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 251 ms)
+2025-05-16 15:41:02.339 +10:00 [INF] User has 4 licenses.
+2025-05-16 15:41:02.344 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 15:41:02.441 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 15:41:02.467 +10:00 [INF] Inserted 2 license records.
+2025-05-16 15:41:02.468 +10:00 [INF] User licenses inserted into database.
+2025-05-16 15:41:02.520 +10:00 [INF] Wrote licenses to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Licenses_20250516_154102.json
+2025-05-16 15:41:02.521 +10:00 [INF] Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f...
+2025-05-16 15:41:02.523 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 15:41:02.765 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 241 ms)
+2025-05-16 15:41:02.767 +10:00 [INF] Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f...
+2025-05-16 15:41:02.768 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 15:41:02.848 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 79 ms)
+2025-05-16 15:41:02.869 +10:00 [INF] Wrote 8 projects to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Projects_20250516_154102.json
+2025-05-16 15:41:02.877 +10:00 [INF] tblReviztoProjectIssues truncated.
+2025-05-16 15:41:02.892 +10:00 [INF] Deleted 7 existing projects for license 3575016f-d492-4d9a-b14c-6650a3d5719f.
+2025-05-16 15:41:02.894 +10:00 [INF] Deleted 1 existing projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 15:41:02.913 +10:00 [INF] Inserted 8 Revizto project records into database.
+2025-05-16 15:41:02.915 +10:00 [INF] Inserted 8 projects into database.
+2025-05-16 15:41:02.917 +10:00 [INF] Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a...
+2025-05-16 15:41:02.920 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 1/3)
+2025-05-16 15:41:03.190 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Duration: 270 ms)
+2025-05-16 15:41:05.637 +10:00 [INF] Wrote 100 issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_554a3521-c2b4-4a21-ad6e-e7dc1c44db2a_20250516_154103.json
+2025-05-16 15:41:05.644 +10:00 [INF] Deleted 0 existing issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a.
+2025-05-16 15:41:05.704 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:05.705 +10:00 [INF] Inserted 100 issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a.
+2025-05-16 15:41:05.706 +10:00 [INF] Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684...
+2025-05-16 15:41:05.707 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Attempt 1/3)
+2025-05-16 15:41:06.030 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Duration: 323 ms)
+2025-05-16 15:41:08.877 +10:00 [INF] Wrote 100 issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_023e8305-922b-4cd2-8938-d8ee7f74b684_20250516_154106.json
+2025-05-16 15:41:08.881 +10:00 [INF] Deleted 0 existing issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684.
+2025-05-16 15:41:08.920 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:08.921 +10:00 [INF] Inserted 100 issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684.
+2025-05-16 15:41:08.921 +10:00 [INF] Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9...
+2025-05-16 15:41:08.922 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-16 15:41:09.203 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 281 ms)
+2025-05-16 15:41:12.295 +10:00 [INF] Wrote 100 issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_429b27f4-4359-40d6-a526-c2ac8374a3c9_20250516_154109.json
+2025-05-16 15:41:12.298 +10:00 [INF] Deleted 0 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-16 15:41:12.332 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:12.333 +10:00 [INF] Inserted 100 issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-16 15:41:12.334 +10:00 [INF] Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6...
+2025-05-16 15:41:12.336 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 0 (Attempt 1/3)
+2025-05-16 15:41:12.592 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 0 (Duration: 255 ms)
+2025-05-16 15:41:15.884 +10:00 [INF] Wrote 100 issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6_20250516_154112.json
+2025-05-16 15:41:15.887 +10:00 [INF] Deleted 0 existing issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6.
+2025-05-16 15:41:15.924 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:15.925 +10:00 [INF] Inserted 100 issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6.
+2025-05-16 15:41:15.926 +10:00 [INF] Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5...
+2025-05-16 15:41:15.927 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Attempt 1/3)
+2025-05-16 15:41:16.272 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Duration: 344 ms)
+2025-05-16 15:41:19.338 +10:00 [INF] Wrote 100 issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_eadbc964-2829-49e0-a4ca-3b61dfc67aa5_20250516_154116.json
+2025-05-16 15:41:19.354 +10:00 [INF] Deleted 0 existing issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5.
+2025-05-16 15:41:19.512 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:19.514 +10:00 [INF] Inserted 100 issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5.
+2025-05-16 15:41:19.515 +10:00 [INF] Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5...
+2025-05-16 15:41:19.515 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 0 (Attempt 1/3)
+2025-05-16 15:41:19.827 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 0 (Duration: 311 ms)
+2025-05-16 15:41:22.120 +10:00 [INF] Wrote 100 issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_0908f4ea-24f0-4841-b20c-7b93690dbdc5_20250516_154119.json
+2025-05-16 15:41:22.130 +10:00 [INF] Deleted 0 existing issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5.
+2025-05-16 15:41:22.189 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:22.190 +10:00 [INF] Inserted 100 issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5.
+2025-05-16 15:41:22.192 +10:00 [INF] Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d...
+2025-05-16 15:41:22.193 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 0 (Attempt 1/3)
+2025-05-16 15:41:22.503 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 0 (Duration: 309 ms)
+2025-05-16 15:41:26.002 +10:00 [INF] Wrote 100 issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_f046baa4-29a2-4a48-b5ef-74dd8ef6636d_20250516_154122.json
+2025-05-16 15:41:26.006 +10:00 [INF] Deleted 0 existing issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d.
+2025-05-16 15:41:26.047 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:26.048 +10:00 [INF] Inserted 100 issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d.
+2025-05-16 15:41:26.049 +10:00 [INF] Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8...
+2025-05-16 15:41:26.050 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 0 (Attempt 1/3)
+2025-05-16 15:41:26.348 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 0 (Duration: 297 ms)
+2025-05-16 15:41:29.224 +10:00 [INF] Wrote 100 issues for project 7407639c-b37d-4511-811b-863b08ad58d8 to C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Exports\Issues_7407639c-b37d-4511-811b-863b08ad58d8_20250516_154126.json
+2025-05-16 15:41:29.226 +10:00 [INF] Deleted 0 existing issues for project 7407639c-b37d-4511-811b-863b08ad58d8.
+2025-05-16 15:41:29.274 +10:00 [INF] Inserted 100 issues into tblReviztoProjectIssues.
+2025-05-16 15:41:29.275 +10:00 [INF] Inserted 100 issues for project 7407639c-b37d-4511-811b-863b08ad58d8.
+2025-05-16 15:41:29.276 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 15:41:29.276 +10:00 [INF] Data retrieval and export completed successfully.
+2025-05-16 15:49:17.412 +10:00 [INF] Starting application...
+2025-05-16 15:49:17.562 +10:00 [INF] Database initialized.
+2025-05-16 15:49:17.567 +10:00 [INF] Starting user license, project, and issue retrieval...
+2025-05-16 15:49:17.572 +10:00 [INF] Starting operation: Fetching user licenses (Attempt 1/3)
+2025-05-16 15:49:17.902 +10:00 [INF] Operation successful: Fetching user licenses (Duration: 329 ms)
+2025-05-16 15:49:17.907 +10:00 [INF] Fetched licenses in 336ms
+2025-05-16 15:49:17.919 +10:00 [INF] User has 4 licenses.
+2025-05-16 15:49:17.924 +10:00 [INF] Found 2 admin-access licenses.
+2025-05-16 15:49:18.047 +10:00 [INF] tblUserLicenses truncated.
+2025-05-16 15:49:18.082 +10:00 [INF] Inserted 2 license records.
+2025-05-16 15:49:18.144 +10:00 [INF] Processed and saved license metadata in 217ms
+2025-05-16 15:49:18.146 +10:00 [INF] Starting operation: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Attempt 1/3)
+2025-05-16 15:49:18.386 +10:00 [INF] Operation successful: Fetching projects for license 3575016fd4924d9ab14c6650a3d5719f, page 0 (Duration: 239 ms)
+2025-05-16 15:49:18.388 +10:00 [INF] Fetched license 3575016fd4924d9ab14c6650a3d5719f projects page 0 in 242ms
+2025-05-16 15:49:18.391 +10:00 [INF] Starting operation: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Attempt 1/3)
+2025-05-16 15:49:18.473 +10:00 [INF] Operation successful: Fetching projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f, page 0 (Duration: 81 ms)
+2025-05-16 15:49:18.476 +10:00 [INF] Fetched license ad5f9970-76fd-4ace-8471-90b52ee2121f projects page 0 in 85ms
+2025-05-16 15:49:18.502 +10:00 [INF] tblReviztoProjectIssues truncated.
+2025-05-16 15:49:18.518 +10:00 [INF] Deleted 7 existing projects for license 3575016f-d492-4d9a-b14c-6650a3d5719f.
+2025-05-16 15:49:18.521 +10:00 [INF] Deleted 1 existing projects for license ad5f9970-76fd-4ace-8471-90b52ee2121f.
+2025-05-16 15:49:18.541 +10:00 [INF] Inserted 8 Revizto project records into database.
+2025-05-16 15:49:18.544 +10:00 [INF] Inserted 8 projects in 39ms
+2025-05-16 15:49:18.547 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 0...
+2025-05-16 15:49:18.554 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Attempt 1/3)
+2025-05-16 15:49:18.925 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 0 (Duration: 371 ms)
+2025-05-16 15:49:18.929 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 382ms
+2025-05-16 15:49:18.966 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 1...
+2025-05-16 15:49:18.969 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 1 (Attempt 1/3)
+2025-05-16 15:49:19.344 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 1 (Duration: 374 ms)
+2025-05-16 15:49:19.345 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 378ms
+2025-05-16 15:49:19.363 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 2...
+2025-05-16 15:49:19.368 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 2 (Attempt 1/3)
+2025-05-16 15:49:19.714 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 2 (Duration: 346 ms)
+2025-05-16 15:49:19.716 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 353ms
+2025-05-16 15:49:19.731 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 3...
+2025-05-16 15:49:19.733 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 3 (Attempt 1/3)
+2025-05-16 15:49:20.070 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 3 (Duration: 337 ms)
+2025-05-16 15:49:20.074 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 342ms
+2025-05-16 15:49:20.089 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 4...
+2025-05-16 15:49:20.091 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 4 (Attempt 1/3)
+2025-05-16 15:49:20.333 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 4 (Duration: 241 ms)
+2025-05-16 15:49:20.334 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 245ms
+2025-05-16 15:49:20.353 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 5...
+2025-05-16 15:49:20.357 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 5 (Attempt 1/3)
+2025-05-16 15:49:20.666 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 5 (Duration: 308 ms)
+2025-05-16 15:49:20.669 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 315ms
+2025-05-16 15:49:20.694 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 6...
+2025-05-16 15:49:20.696 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 6 (Attempt 1/3)
+2025-05-16 15:49:21.000 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 6 (Duration: 303 ms)
+2025-05-16 15:49:21.001 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 307ms
+2025-05-16 15:49:21.021 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 7...
+2025-05-16 15:49:21.023 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 7 (Attempt 1/3)
+2025-05-16 15:49:21.313 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 7 (Duration: 289 ms)
+2025-05-16 15:49:21.315 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 293ms
+2025-05-16 15:49:21.339 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 8...
+2025-05-16 15:49:21.343 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 8 (Attempt 1/3)
+2025-05-16 15:49:21.574 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 8 (Duration: 230 ms)
+2025-05-16 15:49:21.576 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 236ms
+2025-05-16 15:49:21.600 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 9...
+2025-05-16 15:49:21.604 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 9 (Attempt 1/3)
+2025-05-16 15:49:21.933 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 9 (Duration: 328 ms)
+2025-05-16 15:49:21.935 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 335ms
+2025-05-16 15:49:21.960 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 10...
+2025-05-16 15:49:21.964 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 10 (Attempt 1/3)
+2025-05-16 15:49:22.285 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 10 (Duration: 321 ms)
+2025-05-16 15:49:22.288 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 328ms
+2025-05-16 15:49:22.293 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 11...
+2025-05-16 15:49:22.296 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 11 (Attempt 1/3)
+2025-05-16 15:49:22.645 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 11 (Duration: 348 ms)
+2025-05-16 15:49:22.648 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 354ms
+2025-05-16 15:49:22.653 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 12...
+2025-05-16 15:49:22.657 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 12 (Attempt 1/3)
+2025-05-16 15:49:22.989 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 12 (Duration: 331 ms)
+2025-05-16 15:49:22.992 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 338ms
+2025-05-16 15:49:23.000 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 13...
+2025-05-16 15:49:23.002 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 13 (Attempt 1/3)
+2025-05-16 15:49:23.295 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 13 (Duration: 292 ms)
+2025-05-16 15:49:23.297 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 296ms
+2025-05-16 15:49:23.301 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 14...
+2025-05-16 15:49:23.303 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 14 (Attempt 1/3)
+2025-05-16 15:49:23.524 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 14 (Duration: 221 ms)
+2025-05-16 15:49:23.526 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 224ms
+2025-05-16 15:49:23.530 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 15...
+2025-05-16 15:49:23.531 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 15 (Attempt 1/3)
+2025-05-16 15:49:23.894 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 15 (Duration: 362 ms)
+2025-05-16 15:49:23.896 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 365ms
+2025-05-16 15:49:23.901 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 16...
+2025-05-16 15:49:23.902 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 16 (Attempt 1/3)
+2025-05-16 15:49:24.277 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 16 (Duration: 375 ms)
+2025-05-16 15:49:24.278 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 377ms
+2025-05-16 15:49:24.290 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 17...
+2025-05-16 15:49:24.291 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 17 (Attempt 1/3)
+2025-05-16 15:49:24.604 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 17 (Duration: 312 ms)
+2025-05-16 15:49:24.606 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 316ms
+2025-05-16 15:49:24.622 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 18...
+2025-05-16 15:49:24.623 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 18 (Attempt 1/3)
+2025-05-16 15:49:24.887 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 18 (Duration: 264 ms)
+2025-05-16 15:49:24.890 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 267ms
+2025-05-16 15:49:24.894 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 19...
+2025-05-16 15:49:24.897 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 19 (Attempt 1/3)
+2025-05-16 15:49:25.275 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 19 (Duration: 377 ms)
+2025-05-16 15:49:25.276 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 381ms
+2025-05-16 15:49:25.281 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 20...
+2025-05-16 15:49:25.281 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 20 (Attempt 1/3)
+2025-05-16 15:49:25.611 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 20 (Duration: 329 ms)
+2025-05-16 15:49:25.613 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 332ms
+2025-05-16 15:49:25.618 +10:00 [INF] Fetching issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" page 21...
+2025-05-16 15:49:25.619 +10:00 [INF] Starting operation: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 21 (Attempt 1/3)
+2025-05-16 15:49:25.836 +10:00 [INF] Operation successful: Fetching issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a, page 21 (Duration: 217 ms)
+2025-05-16 15:49:25.837 +10:00 [INF] Fetched issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a" in 219ms
+2025-05-16 15:49:51.479 +10:00 [INF] Deleted 0 existing issues for project 554a3521-c2b4-4a21-ad6e-e7dc1c44db2a.
+2025-05-16 15:49:52.575 +10:00 [INF] Inserted 2156 issues into tblReviztoProjectIssues.
+2025-05-16 15:49:52.577 +10:00 [INF] Inserted 2156 issues for project "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a"
+2025-05-16 15:49:52.578 +10:00 [INF] Fetching issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" page 0...
+2025-05-16 15:49:52.580 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Attempt 1/3)
+2025-05-16 15:49:52.912 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 0 (Duration: 331 ms)
+2025-05-16 15:49:52.915 +10:00 [INF] Fetched issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" in 336ms
+2025-05-16 15:49:52.923 +10:00 [INF] Fetching issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" page 1...
+2025-05-16 15:49:52.927 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 1 (Attempt 1/3)
+2025-05-16 15:49:53.239 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 1 (Duration: 311 ms)
+2025-05-16 15:49:53.241 +10:00 [INF] Fetched issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" in 317ms
+2025-05-16 15:49:53.248 +10:00 [INF] Fetching issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" page 2...
+2025-05-16 15:49:53.250 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 2 (Attempt 1/3)
+2025-05-16 15:49:53.474 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 2 (Duration: 224 ms)
+2025-05-16 15:49:53.476 +10:00 [INF] Fetched issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" in 227ms
+2025-05-16 15:49:53.483 +10:00 [INF] Fetching issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" page 3...
+2025-05-16 15:49:53.485 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 3 (Attempt 1/3)
+2025-05-16 15:49:53.810 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 3 (Duration: 325 ms)
+2025-05-16 15:49:53.814 +10:00 [INF] Fetched issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" in 331ms
+2025-05-16 15:49:53.825 +10:00 [INF] Fetching issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" page 4...
+2025-05-16 15:49:53.829 +10:00 [INF] Starting operation: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 4 (Attempt 1/3)
+2025-05-16 15:49:53.977 +10:00 [INF] Operation successful: Fetching issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684, page 4 (Duration: 147 ms)
+2025-05-16 15:49:53.980 +10:00 [INF] Fetched issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684" in 154ms
+2025-05-16 15:50:03.871 +10:00 [INF] Deleted 0 existing issues for project 023e8305-922b-4cd2-8938-d8ee7f74b684.
+2025-05-16 15:50:04.123 +10:00 [INF] Inserted 420 issues into tblReviztoProjectIssues.
+2025-05-16 15:50:04.125 +10:00 [INF] Inserted 420 issues for project "023e8305-922b-4cd2-8938-d8ee7f74b684"
+2025-05-16 15:50:04.127 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 0...
+2025-05-16 15:50:04.130 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-16 15:50:04.442 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 312 ms)
+2025-05-16 15:50:04.447 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 319ms
+2025-05-16 15:50:04.460 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 1...
+2025-05-16 15:50:04.463 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-16 15:50:04.697 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 233 ms)
+2025-05-16 15:50:04.700 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 240ms
+2025-05-16 15:50:04.711 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 2...
+2025-05-16 15:50:04.715 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-16 15:50:05.046 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 330 ms)
+2025-05-16 15:50:05.050 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 339ms
+2025-05-16 15:50:05.058 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 3...
+2025-05-16 15:50:05.060 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-16 15:50:05.369 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 309 ms)
+2025-05-16 15:50:05.371 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 313ms
+2025-05-16 15:50:05.406 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 4...
+2025-05-16 15:50:05.409 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-16 15:50:05.711 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 302 ms)
+2025-05-16 15:50:05.713 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 307ms
+2025-05-16 15:50:05.752 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 5...
+2025-05-16 15:50:05.756 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-16 15:50:06.052 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 295 ms)
+2025-05-16 15:50:06.056 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 303ms
+2025-05-16 15:50:06.066 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 6...
+2025-05-16 15:50:06.070 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-16 15:50:06.413 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 342 ms)
+2025-05-16 15:50:06.415 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 348ms
+2025-05-16 15:50:06.427 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 7...
+2025-05-16 15:50:06.430 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-16 15:50:06.764 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 333 ms)
+2025-05-16 15:50:06.766 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 339ms
+2025-05-16 15:50:06.777 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 8...
+2025-05-16 15:50:06.782 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-16 15:50:07.106 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 323 ms)
+2025-05-16 15:50:07.110 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 332ms
+2025-05-16 15:50:07.124 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 9...
+2025-05-16 15:50:07.128 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-16 15:50:07.447 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 319 ms)
+2025-05-16 15:50:07.449 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 324ms
+2025-05-16 15:50:07.455 +10:00 [INF] Fetching issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" page 10...
+2025-05-16 15:50:07.457 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-16 15:50:07.574 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 117 ms)
+2025-05-16 15:50:07.578 +10:00 [INF] Fetched issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9" in 122ms
+2025-05-16 15:50:32.375 +10:00 [INF] Deleted 0 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-16 15:50:32.768 +10:00 [INF] Inserted 1002 issues into tblReviztoProjectIssues.
+2025-05-16 15:50:32.770 +10:00 [INF] Inserted 1002 issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-16 15:50:32.770 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 0...
+2025-05-16 15:50:32.772 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 0 (Attempt 1/3)
+2025-05-16 15:50:33.095 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 0 (Duration: 323 ms)
+2025-05-16 15:50:33.098 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 327ms
+2025-05-16 15:50:33.111 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 1...
+2025-05-16 15:50:33.113 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 1 (Attempt 1/3)
+2025-05-16 15:50:33.428 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 1 (Duration: 314 ms)
+2025-05-16 15:50:33.431 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 319ms
+2025-05-16 15:50:33.435 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 2...
+2025-05-16 15:50:33.437 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 2 (Attempt 1/3)
+2025-05-16 15:50:33.699 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 2 (Duration: 262 ms)
+2025-05-16 15:50:33.700 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 265ms
+2025-05-16 15:50:33.704 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 3...
+2025-05-16 15:50:33.708 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 3 (Attempt 1/3)
+2025-05-16 15:50:34.048 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 3 (Duration: 339 ms)
+2025-05-16 15:50:34.050 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 345ms
+2025-05-16 15:50:34.054 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 4...
+2025-05-16 15:50:34.056 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 4 (Attempt 1/3)
+2025-05-16 15:50:34.276 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 4 (Duration: 219 ms)
+2025-05-16 15:50:34.279 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 224ms
+2025-05-16 15:50:34.284 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 5...
+2025-05-16 15:50:34.285 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 5 (Attempt 1/3)
+2025-05-16 15:50:34.613 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 5 (Duration: 327 ms)
+2025-05-16 15:50:34.615 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 330ms
+2025-05-16 15:50:34.629 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 6...
+2025-05-16 15:50:34.630 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 6 (Attempt 1/3)
+2025-05-16 15:50:34.975 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 6 (Duration: 345 ms)
+2025-05-16 15:50:34.977 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 348ms
+2025-05-16 15:50:35.001 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 7...
+2025-05-16 15:50:35.004 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 7 (Attempt 1/3)
+2025-05-16 15:50:35.318 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 7 (Duration: 314 ms)
+2025-05-16 15:50:35.320 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 318ms
+2025-05-16 15:50:35.343 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 8...
+2025-05-16 15:50:35.346 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 8 (Attempt 1/3)
+2025-05-16 15:50:35.709 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 8 (Duration: 363 ms)
+2025-05-16 15:50:35.713 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 369ms
+2025-05-16 15:50:35.723 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 9...
+2025-05-16 15:50:35.726 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 9 (Attempt 1/3)
+2025-05-16 15:50:36.024 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 9 (Duration: 298 ms)
+2025-05-16 15:50:36.026 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 302ms
+2025-05-16 15:50:36.030 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 10...
+2025-05-16 15:50:36.031 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 10 (Attempt 1/3)
+2025-05-16 15:50:36.403 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 10 (Duration: 372 ms)
+2025-05-16 15:50:36.406 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 375ms
+2025-05-16 15:50:36.410 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 11...
+2025-05-16 15:50:36.410 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 11 (Attempt 1/3)
+2025-05-16 15:50:36.728 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 11 (Duration: 317 ms)
+2025-05-16 15:50:36.730 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 320ms
+2025-05-16 15:50:36.740 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 12...
+2025-05-16 15:50:36.742 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 12 (Attempt 1/3)
+2025-05-16 15:50:37.060 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 12 (Duration: 317 ms)
+2025-05-16 15:50:37.062 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 322ms
+2025-05-16 15:50:37.066 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 13...
+2025-05-16 15:50:37.067 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 13 (Attempt 1/3)
+2025-05-16 15:50:37.298 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 13 (Duration: 231 ms)
+2025-05-16 15:50:37.301 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 235ms
+2025-05-16 15:50:37.305 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 14...
+2025-05-16 15:50:37.307 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 14 (Attempt 1/3)
+2025-05-16 15:50:37.704 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 14 (Duration: 397 ms)
+2025-05-16 15:50:37.706 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 400ms
+2025-05-16 15:50:37.710 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 15...
+2025-05-16 15:50:37.711 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 15 (Attempt 1/3)
+2025-05-16 15:50:38.001 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 15 (Duration: 289 ms)
+2025-05-16 15:50:38.003 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 292ms
+2025-05-16 15:50:38.007 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 16...
+2025-05-16 15:50:38.008 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 16 (Attempt 1/3)
+2025-05-16 15:50:38.324 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 16 (Duration: 316 ms)
+2025-05-16 15:50:38.326 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 319ms
+2025-05-16 15:50:38.349 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 17...
+2025-05-16 15:50:38.351 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 17 (Attempt 1/3)
+2025-05-16 15:50:38.579 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 17 (Duration: 228 ms)
+2025-05-16 15:50:38.582 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 232ms
+2025-05-16 15:50:38.585 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 18...
+2025-05-16 15:50:38.587 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 18 (Attempt 1/3)
+2025-05-16 15:50:38.911 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 18 (Duration: 324 ms)
+2025-05-16 15:50:38.913 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 327ms
+2025-05-16 15:50:38.916 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 19...
+2025-05-16 15:50:38.917 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 19 (Attempt 1/3)
+2025-05-16 15:50:39.260 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 19 (Duration: 342 ms)
+2025-05-16 15:50:39.262 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 345ms
+2025-05-16 15:50:39.265 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 20...
+2025-05-16 15:50:39.266 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 20 (Attempt 1/3)
+2025-05-16 15:50:39.559 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 20 (Duration: 293 ms)
+2025-05-16 15:50:39.562 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 296ms
+2025-05-16 15:50:39.583 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 21...
+2025-05-16 15:50:39.585 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 21 (Attempt 1/3)
+2025-05-16 15:50:39.794 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 21 (Duration: 209 ms)
+2025-05-16 15:50:39.797 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 214ms
+2025-05-16 15:50:39.814 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 22...
+2025-05-16 15:50:39.817 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 22 (Attempt 1/3)
+2025-05-16 15:50:40.186 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 22 (Duration: 369 ms)
+2025-05-16 15:50:40.189 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 374ms
+2025-05-16 15:50:40.192 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 23...
+2025-05-16 15:50:40.193 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 23 (Attempt 1/3)
+2025-05-16 15:50:40.519 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 23 (Duration: 326 ms)
+2025-05-16 15:50:40.522 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 330ms
+2025-05-16 15:50:40.526 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 24...
+2025-05-16 15:50:40.528 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 24 (Attempt 1/3)
+2025-05-16 15:50:40.828 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 24 (Duration: 299 ms)
+2025-05-16 15:50:40.830 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 303ms
+2025-05-16 15:50:40.839 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 25...
+2025-05-16 15:50:40.841 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 25 (Attempt 1/3)
+2025-05-16 15:50:41.088 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 25 (Duration: 246 ms)
+2025-05-16 15:50:41.091 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 252ms
+2025-05-16 15:50:41.095 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 26...
+2025-05-16 15:50:41.095 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 26 (Attempt 1/3)
+2025-05-16 15:50:41.449 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 26 (Duration: 354 ms)
+2025-05-16 15:50:41.451 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 356ms
+2025-05-16 15:50:41.454 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 27...
+2025-05-16 15:50:41.455 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 27 (Attempt 1/3)
+2025-05-16 15:50:41.776 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 27 (Duration: 320 ms)
+2025-05-16 15:50:41.777 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 322ms
+2025-05-16 15:50:41.782 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 28...
+2025-05-16 15:50:41.783 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 28 (Attempt 1/3)
+2025-05-16 15:50:42.090 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 28 (Duration: 306 ms)
+2025-05-16 15:50:42.092 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 310ms
+2025-05-16 15:50:42.101 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 29...
+2025-05-16 15:50:42.102 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 29 (Attempt 1/3)
+2025-05-16 15:50:42.395 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 29 (Duration: 293 ms)
+2025-05-16 15:50:42.398 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 296ms
+2025-05-16 15:50:42.402 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 30...
+2025-05-16 15:50:42.403 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 30 (Attempt 1/3)
+2025-05-16 15:50:42.869 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 30 (Duration: 465 ms)
+2025-05-16 15:50:42.871 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 469ms
+2025-05-16 15:50:42.875 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 31...
+2025-05-16 15:50:42.875 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 31 (Attempt 1/3)
+2025-05-16 15:50:43.732 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 31 (Duration: 856 ms)
+2025-05-16 15:50:43.734 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 859ms
+2025-05-16 15:50:43.739 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 32...
+2025-05-16 15:50:43.740 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 32 (Attempt 1/3)
+2025-05-16 15:50:44.093 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 32 (Duration: 352 ms)
+2025-05-16 15:50:44.098 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 358ms
+2025-05-16 15:50:44.110 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 33...
+2025-05-16 15:50:44.115 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 33 (Attempt 1/3)
+2025-05-16 15:50:44.463 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 33 (Duration: 347 ms)
+2025-05-16 15:50:44.464 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 354ms
+2025-05-16 15:50:44.493 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 34...
+2025-05-16 15:50:44.496 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 34 (Attempt 1/3)
+2025-05-16 15:50:44.738 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 34 (Duration: 242 ms)
+2025-05-16 15:50:44.739 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 245ms
+2025-05-16 15:50:44.747 +10:00 [INF] Fetching issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" page 35...
+2025-05-16 15:50:44.751 +10:00 [INF] Starting operation: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 35 (Attempt 1/3)
+2025-05-16 15:50:44.906 +10:00 [INF] Operation successful: Fetching issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6, page 35 (Duration: 154 ms)
+2025-05-16 15:50:44.907 +10:00 [INF] Fetched issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6" in 160ms
+2025-05-16 15:51:11.016 +10:00 [INF] Deleted 0 existing issues for project 6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6.
+2025-05-16 15:51:14.044 +10:00 [INF] Inserted 3510 issues into tblReviztoProjectIssues.
+2025-05-16 15:51:14.045 +10:00 [INF] Inserted 3510 issues for project "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6"
+2025-05-16 15:51:14.046 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 0...
+2025-05-16 15:51:14.046 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Attempt 1/3)
+2025-05-16 15:51:14.365 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 0 (Duration: 318 ms)
+2025-05-16 15:51:14.366 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 319ms
+2025-05-16 15:51:14.369 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 1...
+2025-05-16 15:51:14.370 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 1 (Attempt 1/3)
+2025-05-16 15:51:14.599 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 1 (Duration: 229 ms)
+2025-05-16 15:51:14.603 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 234ms
+2025-05-16 15:51:14.609 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 2...
+2025-05-16 15:51:14.613 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 2 (Attempt 1/3)
+2025-05-16 15:51:14.960 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 2 (Duration: 347 ms)
+2025-05-16 15:51:14.961 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 351ms
+2025-05-16 15:51:14.964 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 3...
+2025-05-16 15:51:14.965 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 3 (Attempt 1/3)
+2025-05-16 15:51:15.284 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 3 (Duration: 318 ms)
+2025-05-16 15:51:15.285 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 320ms
+2025-05-16 15:51:15.288 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 4...
+2025-05-16 15:51:15.288 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 4 (Attempt 1/3)
+2025-05-16 15:51:15.523 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 4 (Duration: 234 ms)
+2025-05-16 15:51:15.524 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 236ms
+2025-05-16 15:51:15.527 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 5...
+2025-05-16 15:51:15.528 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 5 (Attempt 1/3)
+2025-05-16 15:51:15.865 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 5 (Duration: 337 ms)
+2025-05-16 15:51:15.866 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 339ms
+2025-05-16 15:51:15.870 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 6...
+2025-05-16 15:51:15.871 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 6 (Attempt 1/3)
+2025-05-16 15:51:16.158 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 6 (Duration: 287 ms)
+2025-05-16 15:51:16.159 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 289ms
+2025-05-16 15:51:16.163 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 7...
+2025-05-16 15:51:16.164 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 7 (Attempt 1/3)
+2025-05-16 15:51:16.435 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 7 (Duration: 271 ms)
+2025-05-16 15:51:16.439 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 275ms
+2025-05-16 15:51:16.445 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 8...
+2025-05-16 15:51:16.449 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 8 (Attempt 1/3)
+2025-05-16 15:51:16.806 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 8 (Duration: 356 ms)
+2025-05-16 15:51:16.807 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 362ms
+2025-05-16 15:51:16.811 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 9...
+2025-05-16 15:51:16.812 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 9 (Attempt 1/3)
+2025-05-16 15:51:17.400 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 9 (Duration: 588 ms)
+2025-05-16 15:51:17.401 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 590ms
+2025-05-16 15:51:17.409 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 10...
+2025-05-16 15:51:17.411 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 10 (Attempt 1/3)
+2025-05-16 15:51:17.716 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 10 (Duration: 305 ms)
+2025-05-16 15:51:17.720 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 310ms
+2025-05-16 15:51:17.723 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 11...
+2025-05-16 15:51:17.724 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 11 (Attempt 1/3)
+2025-05-16 15:51:17.979 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 11 (Duration: 255 ms)
+2025-05-16 15:51:17.983 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 259ms
+2025-05-16 15:51:17.988 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 12...
+2025-05-16 15:51:17.993 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 12 (Attempt 1/3)
+2025-05-16 15:51:18.361 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 12 (Duration: 368 ms)
+2025-05-16 15:51:18.363 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 375ms
+2025-05-16 15:51:18.372 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 13...
+2025-05-16 15:51:18.376 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 13 (Attempt 1/3)
+2025-05-16 15:51:18.708 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 13 (Duration: 332 ms)
+2025-05-16 15:51:18.713 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 341ms
+2025-05-16 15:51:18.720 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 14...
+2025-05-16 15:51:18.721 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 14 (Attempt 1/3)
+2025-05-16 15:51:19.024 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 14 (Duration: 302 ms)
+2025-05-16 15:51:19.026 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 305ms
+2025-05-16 15:51:19.031 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 15...
+2025-05-16 15:51:19.032 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 15 (Attempt 1/3)
+2025-05-16 15:51:19.275 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 15 (Duration: 242 ms)
+2025-05-16 15:51:19.276 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 245ms
+2025-05-16 15:51:19.287 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 16...
+2025-05-16 15:51:19.289 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 16 (Attempt 1/3)
+2025-05-16 15:51:19.643 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 16 (Duration: 354 ms)
+2025-05-16 15:51:19.647 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 359ms
+2025-05-16 15:51:19.651 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 17...
+2025-05-16 15:51:19.652 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 17 (Attempt 1/3)
+2025-05-16 15:51:19.969 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 17 (Duration: 317 ms)
+2025-05-16 15:51:19.973 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 322ms
+2025-05-16 15:51:19.979 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 18...
+2025-05-16 15:51:19.981 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 18 (Attempt 1/3)
+2025-05-16 15:51:20.306 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 18 (Duration: 324 ms)
+2025-05-16 15:51:20.307 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 327ms
+2025-05-16 15:51:20.310 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 19...
+2025-05-16 15:51:20.311 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 19 (Attempt 1/3)
+2025-05-16 15:51:20.594 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 19 (Duration: 282 ms)
+2025-05-16 15:51:20.596 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 286ms
+2025-05-16 15:51:20.604 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 20...
+2025-05-16 15:51:20.608 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 20 (Attempt 1/3)
+2025-05-16 15:51:20.943 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 20 (Duration: 334 ms)
+2025-05-16 15:51:20.944 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 339ms
+2025-05-16 15:51:20.948 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 21...
+2025-05-16 15:51:20.949 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 21 (Attempt 1/3)
+2025-05-16 15:51:21.269 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 21 (Duration: 320 ms)
+2025-05-16 15:51:21.271 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 322ms
+2025-05-16 15:51:21.283 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 22...
+2025-05-16 15:51:21.285 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 22 (Attempt 1/3)
+2025-05-16 15:51:21.613 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 22 (Duration: 328 ms)
+2025-05-16 15:51:21.616 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 332ms
+2025-05-16 15:51:21.647 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 23...
+2025-05-16 15:51:21.650 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 23 (Attempt 1/3)
+2025-05-16 15:51:21.994 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 23 (Duration: 344 ms)
+2025-05-16 15:51:21.996 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 348ms
+2025-05-16 15:51:21.999 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 24...
+2025-05-16 15:51:22.001 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 24 (Attempt 1/3)
+2025-05-16 15:51:22.324 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 24 (Duration: 322 ms)
+2025-05-16 15:51:22.325 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 325ms
+2025-05-16 15:51:22.328 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 25...
+2025-05-16 15:51:22.329 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 25 (Attempt 1/3)
+2025-05-16 15:51:22.684 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 25 (Duration: 354 ms)
+2025-05-16 15:51:22.685 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 356ms
+2025-05-16 15:51:22.689 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 26...
+2025-05-16 15:51:22.690 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 26 (Attempt 1/3)
+2025-05-16 15:51:23.030 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 26 (Duration: 339 ms)
+2025-05-16 15:51:23.032 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 343ms
+2025-05-16 15:51:23.038 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 27...
+2025-05-16 15:51:23.039 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 27 (Attempt 1/3)
+2025-05-16 15:51:23.340 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 27 (Duration: 301 ms)
+2025-05-16 15:51:23.342 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 303ms
+2025-05-16 15:51:23.346 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 28...
+2025-05-16 15:51:23.348 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 28 (Attempt 1/3)
+2025-05-16 15:51:23.673 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 28 (Duration: 325 ms)
+2025-05-16 15:51:23.674 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 327ms
+2025-05-16 15:51:23.678 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 29...
+2025-05-16 15:51:23.679 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 29 (Attempt 1/3)
+2025-05-16 15:51:24.039 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 29 (Duration: 360 ms)
+2025-05-16 15:51:24.042 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 363ms
+2025-05-16 15:51:24.049 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 30...
+2025-05-16 15:51:24.050 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 30 (Attempt 1/3)
+2025-05-16 15:51:24.385 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 30 (Duration: 335 ms)
+2025-05-16 15:51:24.386 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 337ms
+2025-05-16 15:51:24.391 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 31...
+2025-05-16 15:51:24.392 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 31 (Attempt 1/3)
+2025-05-16 15:51:24.635 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 31 (Duration: 243 ms)
+2025-05-16 15:51:24.636 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 245ms
+2025-05-16 15:51:24.641 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 32...
+2025-05-16 15:51:24.643 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 32 (Attempt 1/3)
+2025-05-16 15:51:24.996 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 32 (Duration: 353 ms)
+2025-05-16 15:51:24.998 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 357ms
+2025-05-16 15:51:25.024 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 33...
+2025-05-16 15:51:25.025 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 33 (Attempt 1/3)
+2025-05-16 15:51:25.345 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 33 (Duration: 320 ms)
+2025-05-16 15:51:25.348 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 324ms
+2025-05-16 15:51:25.367 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 34...
+2025-05-16 15:51:25.369 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 34 (Attempt 1/3)
+2025-05-16 15:51:25.591 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 34 (Duration: 222 ms)
+2025-05-16 15:51:25.591 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 224ms
+2025-05-16 15:51:25.615 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 35...
+2025-05-16 15:51:25.617 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 35 (Attempt 1/3)
+2025-05-16 15:51:25.922 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 35 (Duration: 304 ms)
+2025-05-16 15:51:25.922 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 307ms
+2025-05-16 15:51:25.939 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 36...
+2025-05-16 15:51:25.940 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 36 (Attempt 1/3)
+2025-05-16 15:51:26.297 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 36 (Duration: 356 ms)
+2025-05-16 15:51:26.300 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 361ms
+2025-05-16 15:51:26.321 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 37...
+2025-05-16 15:51:26.323 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 37 (Attempt 1/3)
+2025-05-16 15:51:26.626 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 37 (Duration: 303 ms)
+2025-05-16 15:51:26.627 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 305ms
+2025-05-16 15:51:26.647 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 38...
+2025-05-16 15:51:26.649 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 38 (Attempt 1/3)
+2025-05-16 15:51:26.885 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 38 (Duration: 235 ms)
+2025-05-16 15:51:26.887 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 239ms
+2025-05-16 15:51:26.891 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 39...
+2025-05-16 15:51:26.893 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 39 (Attempt 1/3)
+2025-05-16 15:51:27.232 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 39 (Duration: 339 ms)
+2025-05-16 15:51:27.233 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 341ms
+2025-05-16 15:51:27.238 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 40...
+2025-05-16 15:51:27.239 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 40 (Attempt 1/3)
+2025-05-16 15:51:27.584 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 40 (Duration: 345 ms)
+2025-05-16 15:51:27.586 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 347ms
+2025-05-16 15:51:27.589 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 41...
+2025-05-16 15:51:27.590 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 41 (Attempt 1/3)
+2025-05-16 15:51:27.828 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 41 (Duration: 238 ms)
+2025-05-16 15:51:27.829 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 239ms
+2025-05-16 15:51:27.833 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 42...
+2025-05-16 15:51:27.834 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 42 (Attempt 1/3)
+2025-05-16 15:51:28.150 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 42 (Duration: 315 ms)
+2025-05-16 15:51:28.151 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 318ms
+2025-05-16 15:51:28.155 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 43...
+2025-05-16 15:51:28.156 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 43 (Attempt 1/3)
+2025-05-16 15:51:28.483 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 43 (Duration: 326 ms)
+2025-05-16 15:51:28.484 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 329ms
+2025-05-16 15:51:28.487 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 44...
+2025-05-16 15:51:28.488 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 44 (Attempt 1/3)
+2025-05-16 15:51:28.826 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 44 (Duration: 337 ms)
+2025-05-16 15:51:28.827 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 339ms
+2025-05-16 15:51:28.830 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 45...
+2025-05-16 15:51:28.831 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 45 (Attempt 1/3)
+2025-05-16 15:51:29.156 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 45 (Duration: 324 ms)
+2025-05-16 15:51:29.157 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 326ms
+2025-05-16 15:51:29.160 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 46...
+2025-05-16 15:51:29.161 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 46 (Attempt 1/3)
+2025-05-16 15:51:29.508 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 46 (Duration: 346 ms)
+2025-05-16 15:51:29.510 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 349ms
+2025-05-16 15:51:29.514 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 47...
+2025-05-16 15:51:29.515 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 47 (Attempt 1/3)
+2025-05-16 15:51:29.849 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 47 (Duration: 334 ms)
+2025-05-16 15:51:29.851 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 337ms
+2025-05-16 15:51:29.870 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 48...
+2025-05-16 15:51:29.873 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 48 (Attempt 1/3)
+2025-05-16 15:51:30.215 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 48 (Duration: 341 ms)
+2025-05-16 15:51:30.218 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 348ms
+2025-05-16 15:51:30.223 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 49...
+2025-05-16 15:51:30.225 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 49 (Attempt 1/3)
+2025-05-16 15:51:30.672 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 49 (Duration: 447 ms)
+2025-05-16 15:51:30.676 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 452ms
+2025-05-16 15:51:30.681 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 50...
+2025-05-16 15:51:30.682 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 50 (Attempt 1/3)
+2025-05-16 15:51:31.103 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 50 (Duration: 421 ms)
+2025-05-16 15:51:31.105 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 423ms
+2025-05-16 15:51:31.108 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 51...
+2025-05-16 15:51:31.110 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 51 (Attempt 1/3)
+2025-05-16 15:51:31.440 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 51 (Duration: 330 ms)
+2025-05-16 15:51:31.445 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 336ms
+2025-05-16 15:51:31.450 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 52...
+2025-05-16 15:51:31.452 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 52 (Attempt 1/3)
+2025-05-16 15:51:31.707 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 52 (Duration: 255 ms)
+2025-05-16 15:51:31.710 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 259ms
+2025-05-16 15:51:31.746 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 53...
+2025-05-16 15:51:31.748 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 53 (Attempt 1/3)
+2025-05-16 15:51:32.093 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 53 (Duration: 345 ms)
+2025-05-16 15:51:32.095 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 349ms
+2025-05-16 15:51:32.117 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 54...
+2025-05-16 15:51:32.118 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 54 (Attempt 1/3)
+2025-05-16 15:51:32.384 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 54 (Duration: 266 ms)
+2025-05-16 15:51:32.386 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 269ms
+2025-05-16 15:51:32.390 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 55...
+2025-05-16 15:51:32.392 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 55 (Attempt 1/3)
+2025-05-16 15:51:32.735 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 55 (Duration: 343 ms)
+2025-05-16 15:51:32.738 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 347ms
+2025-05-16 15:51:32.741 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 56...
+2025-05-16 15:51:32.743 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 56 (Attempt 1/3)
+2025-05-16 15:51:33.054 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 56 (Duration: 311 ms)
+2025-05-16 15:51:33.056 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 314ms
+2025-05-16 15:51:33.059 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 57...
+2025-05-16 15:51:33.060 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 57 (Attempt 1/3)
+2025-05-16 15:51:33.291 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 57 (Duration: 230 ms)
+2025-05-16 15:51:33.292 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 232ms
+2025-05-16 15:51:33.296 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 58...
+2025-05-16 15:51:33.297 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 58 (Attempt 1/3)
+2025-05-16 15:51:33.628 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 58 (Duration: 331 ms)
+2025-05-16 15:51:33.630 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 334ms
+2025-05-16 15:51:33.643 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 59...
+2025-05-16 15:51:33.644 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 59 (Attempt 1/3)
+2025-05-16 15:51:33.964 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 59 (Duration: 319 ms)
+2025-05-16 15:51:33.965 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 322ms
+2025-05-16 15:51:33.995 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 60...
+2025-05-16 15:51:33.997 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 60 (Attempt 1/3)
+2025-05-16 15:51:34.261 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 60 (Duration: 263 ms)
+2025-05-16 15:51:34.262 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 267ms
+2025-05-16 15:51:34.266 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 61...
+2025-05-16 15:51:34.267 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 61 (Attempt 1/3)
+2025-05-16 15:51:34.644 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 61 (Duration: 376 ms)
+2025-05-16 15:51:34.648 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 382ms
+2025-05-16 15:51:34.662 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 62...
+2025-05-16 15:51:34.666 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 62 (Attempt 1/3)
+2025-05-16 15:51:35.004 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 62 (Duration: 338 ms)
+2025-05-16 15:51:35.006 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 344ms
+2025-05-16 15:51:35.010 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 63...
+2025-05-16 15:51:35.011 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 63 (Attempt 1/3)
+2025-05-16 15:51:35.342 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 63 (Duration: 331 ms)
+2025-05-16 15:51:35.345 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 335ms
+2025-05-16 15:51:35.353 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 64...
+2025-05-16 15:51:35.356 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 64 (Attempt 1/3)
+2025-05-16 15:51:35.599 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 64 (Duration: 242 ms)
+2025-05-16 15:51:35.600 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 247ms
+2025-05-16 15:51:35.612 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 65...
+2025-05-16 15:51:35.614 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 65 (Attempt 1/3)
+2025-05-16 15:51:35.994 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 65 (Duration: 380 ms)
+2025-05-16 15:51:35.995 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 383ms
+2025-05-16 15:51:36.048 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 66...
+2025-05-16 15:51:36.051 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 66 (Attempt 1/3)
+2025-05-16 15:51:36.455 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 66 (Duration: 403 ms)
+2025-05-16 15:51:36.456 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 408ms
+2025-05-16 15:51:36.464 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 67...
+2025-05-16 15:51:36.474 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 67 (Attempt 1/3)
+2025-05-16 15:51:36.749 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 67 (Duration: 275 ms)
+2025-05-16 15:51:36.751 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 286ms
+2025-05-16 15:51:36.775 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 68...
+2025-05-16 15:51:36.784 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 68 (Attempt 1/3)
+2025-05-16 15:51:37.146 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 68 (Duration: 361 ms)
+2025-05-16 15:51:37.148 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 373ms
+2025-05-16 15:51:37.157 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 69...
+2025-05-16 15:51:37.159 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 69 (Attempt 1/3)
+2025-05-16 15:51:37.502 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 69 (Duration: 342 ms)
+2025-05-16 15:51:37.505 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 348ms
+2025-05-16 15:51:37.521 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 70...
+2025-05-16 15:51:37.527 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 70 (Attempt 1/3)
+2025-05-16 15:51:37.810 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 70 (Duration: 283 ms)
+2025-05-16 15:51:37.813 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 292ms
+2025-05-16 15:51:37.838 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 71...
+2025-05-16 15:51:37.839 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 71 (Attempt 1/3)
+2025-05-16 15:51:38.156 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 71 (Duration: 316 ms)
+2025-05-16 15:51:38.160 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 322ms
+2025-05-16 15:51:38.225 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 72...
+2025-05-16 15:51:38.234 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 72 (Attempt 1/3)
+2025-05-16 15:51:38.551 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 72 (Duration: 317 ms)
+2025-05-16 15:51:38.556 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 330ms
+2025-05-16 15:51:38.567 +10:00 [INF] Fetching issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" page 73...
+2025-05-16 15:51:38.570 +10:00 [INF] Starting operation: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 73 (Attempt 1/3)
+2025-05-16 15:51:38.817 +10:00 [INF] Operation successful: Fetching issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5, page 73 (Duration: 247 ms)
+2025-05-16 15:51:38.818 +10:00 [INF] Fetched issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5" in 250ms
+2025-05-16 15:52:08.446 +10:00 [INF] Deleted 0 existing issues for project eadbc964-2829-49e0-a4ca-3b61dfc67aa5.
+2025-05-16 15:52:11.364 +10:00 [INF] Inserted 7399 issues into tblReviztoProjectIssues.
+2025-05-16 15:52:11.366 +10:00 [INF] Inserted 7399 issues for project "eadbc964-2829-49e0-a4ca-3b61dfc67aa5"
+2025-05-16 15:52:11.367 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 0...
+2025-05-16 15:52:11.367 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 0 (Attempt 1/3)
+2025-05-16 15:52:11.594 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 0 (Duration: 226 ms)
+2025-05-16 15:52:11.595 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 228ms
+2025-05-16 15:52:11.598 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 1...
+2025-05-16 15:52:11.599 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 1 (Attempt 1/3)
+2025-05-16 15:52:11.903 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 1 (Duration: 303 ms)
+2025-05-16 15:52:11.904 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 305ms
+2025-05-16 15:52:11.923 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 2...
+2025-05-16 15:52:11.924 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 2 (Attempt 1/3)
+2025-05-16 15:52:12.140 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 2 (Duration: 216 ms)
+2025-05-16 15:52:12.142 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 218ms
+2025-05-16 15:52:12.145 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 3...
+2025-05-16 15:52:12.146 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 3 (Attempt 1/3)
+2025-05-16 15:52:12.461 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 3 (Duration: 314 ms)
+2025-05-16 15:52:12.464 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 318ms
+2025-05-16 15:52:12.468 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 4...
+2025-05-16 15:52:12.469 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 4 (Attempt 1/3)
+2025-05-16 15:52:12.713 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 4 (Duration: 243 ms)
+2025-05-16 15:52:12.715 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 247ms
+2025-05-16 15:52:12.721 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 5...
+2025-05-16 15:52:12.726 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 5 (Attempt 1/3)
+2025-05-16 15:52:13.016 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 5 (Duration: 290 ms)
+2025-05-16 15:52:13.018 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 296ms
+2025-05-16 15:52:13.023 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 6...
+2025-05-16 15:52:13.025 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 6 (Attempt 1/3)
+2025-05-16 15:52:13.236 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 6 (Duration: 210 ms)
+2025-05-16 15:52:13.237 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 213ms
+2025-05-16 15:52:13.240 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 7...
+2025-05-16 15:52:13.241 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 7 (Attempt 1/3)
+2025-05-16 15:52:13.566 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 7 (Duration: 324 ms)
+2025-05-16 15:52:13.567 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 326ms
+2025-05-16 15:52:13.571 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 8...
+2025-05-16 15:52:13.572 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 8 (Attempt 1/3)
+2025-05-16 15:52:13.877 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 8 (Duration: 305 ms)
+2025-05-16 15:52:13.880 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 309ms
+2025-05-16 15:52:13.885 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 9...
+2025-05-16 15:52:13.888 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 9 (Attempt 1/3)
+2025-05-16 15:52:14.170 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 9 (Duration: 282 ms)
+2025-05-16 15:52:14.173 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 287ms
+2025-05-16 15:52:14.195 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 10...
+2025-05-16 15:52:14.196 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 10 (Attempt 1/3)
+2025-05-16 15:52:14.495 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 10 (Duration: 298 ms)
+2025-05-16 15:52:14.497 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 301ms
+2025-05-16 15:52:14.501 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 11...
+2025-05-16 15:52:14.503 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 11 (Attempt 1/3)
+2025-05-16 15:52:14.848 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 11 (Duration: 344 ms)
+2025-05-16 15:52:14.850 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 348ms
+2025-05-16 15:52:14.854 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 12...
+2025-05-16 15:52:14.854 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 12 (Attempt 1/3)
+2025-05-16 15:52:15.136 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 12 (Duration: 281 ms)
+2025-05-16 15:52:15.137 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 283ms
+2025-05-16 15:52:15.155 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 13...
+2025-05-16 15:52:15.156 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 13 (Attempt 1/3)
+2025-05-16 15:52:15.459 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 13 (Duration: 303 ms)
+2025-05-16 15:52:15.460 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 305ms
+2025-05-16 15:52:15.475 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 14...
+2025-05-16 15:52:15.476 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 14 (Attempt 1/3)
+2025-05-16 15:52:15.837 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 14 (Duration: 360 ms)
+2025-05-16 15:52:15.838 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 363ms
+2025-05-16 15:52:15.857 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 15...
+2025-05-16 15:52:15.860 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 15 (Attempt 1/3)
+2025-05-16 15:52:16.129 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 15 (Duration: 269 ms)
+2025-05-16 15:52:16.133 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 276ms
+2025-05-16 15:52:16.161 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 16...
+2025-05-16 15:52:16.163 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 16 (Attempt 1/3)
+2025-05-16 15:52:16.480 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 16 (Duration: 316 ms)
+2025-05-16 15:52:16.481 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 319ms
+2025-05-16 15:52:16.497 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 17...
+2025-05-16 15:52:16.498 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 17 (Attempt 1/3)
+2025-05-16 15:52:16.796 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 17 (Duration: 298 ms)
+2025-05-16 15:52:16.798 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 300ms
+2025-05-16 15:52:16.817 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 18...
+2025-05-16 15:52:16.818 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 18 (Attempt 1/3)
+2025-05-16 15:52:17.106 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 18 (Duration: 287 ms)
+2025-05-16 15:52:17.108 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 290ms
+2025-05-16 15:52:17.126 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 19...
+2025-05-16 15:52:17.126 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 19 (Attempt 1/3)
+2025-05-16 15:52:17.424 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 19 (Duration: 297 ms)
+2025-05-16 15:52:17.425 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 298ms
+2025-05-16 15:52:17.443 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 20...
+2025-05-16 15:52:17.446 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 20 (Attempt 1/3)
+2025-05-16 15:52:17.645 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 20 (Duration: 199 ms)
+2025-05-16 15:52:17.646 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 202ms
+2025-05-16 15:52:17.664 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 21...
+2025-05-16 15:52:17.667 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 21 (Attempt 1/3)
+2025-05-16 15:52:18.012 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 21 (Duration: 345 ms)
+2025-05-16 15:52:18.014 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 350ms
+2025-05-16 15:52:18.017 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 22...
+2025-05-16 15:52:18.020 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 22 (Attempt 1/3)
+2025-05-16 15:52:18.311 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 22 (Duration: 291 ms)
+2025-05-16 15:52:18.313 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 295ms
+2025-05-16 15:52:18.318 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 23...
+2025-05-16 15:52:18.320 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 23 (Attempt 1/3)
+2025-05-16 15:52:18.547 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 23 (Duration: 227 ms)
+2025-05-16 15:52:18.549 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 231ms
+2025-05-16 15:52:18.553 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 24...
+2025-05-16 15:52:18.554 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 24 (Attempt 1/3)
+2025-05-16 15:52:18.865 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 24 (Duration: 310 ms)
+2025-05-16 15:52:18.866 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 312ms
+2025-05-16 15:52:18.876 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 25...
+2025-05-16 15:52:18.878 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 25 (Attempt 1/3)
+2025-05-16 15:52:19.164 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 25 (Duration: 286 ms)
+2025-05-16 15:52:19.165 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 288ms
+2025-05-16 15:52:19.184 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 26...
+2025-05-16 15:52:19.186 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 26 (Attempt 1/3)
+2025-05-16 15:52:19.460 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 26 (Duration: 274 ms)
+2025-05-16 15:52:19.462 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 278ms
+2025-05-16 15:52:19.488 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 27...
+2025-05-16 15:52:19.489 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 27 (Attempt 1/3)
+2025-05-16 15:52:19.690 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 27 (Duration: 201 ms)
+2025-05-16 15:52:19.693 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 204ms
+2025-05-16 15:52:19.709 +10:00 [INF] Fetching issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" page 28...
+2025-05-16 15:52:19.709 +10:00 [INF] Starting operation: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 28 (Attempt 1/3)
+2025-05-16 15:52:19.859 +10:00 [INF] Operation successful: Fetching issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5, page 28 (Duration: 149 ms)
+2025-05-16 15:52:19.861 +10:00 [INF] Fetched issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5" in 151ms
+2025-05-16 15:52:49.469 +10:00 [INF] Deleted 0 existing issues for project 0908f4ea-24f0-4841-b20c-7b93690dbdc5.
+2025-05-16 15:52:50.603 +10:00 [INF] Inserted 2821 issues into tblReviztoProjectIssues.
+2025-05-16 15:52:50.605 +10:00 [INF] Inserted 2821 issues for project "0908f4ea-24f0-4841-b20c-7b93690dbdc5"
+2025-05-16 15:52:50.605 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 0...
+2025-05-16 15:52:50.607 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 0 (Attempt 1/3)
+2025-05-16 15:52:50.917 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 0 (Duration: 310 ms)
+2025-05-16 15:52:50.919 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 313ms
+2025-05-16 15:52:50.937 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 1...
+2025-05-16 15:52:50.938 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 1 (Attempt 1/3)
+2025-05-16 15:52:51.264 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 1 (Duration: 326 ms)
+2025-05-16 15:52:51.266 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 329ms
+2025-05-16 15:52:51.296 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 2...
+2025-05-16 15:52:51.301 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 2 (Attempt 1/3)
+2025-05-16 15:52:51.585 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 2 (Duration: 284 ms)
+2025-05-16 15:52:51.588 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 291ms
+2025-05-16 15:52:51.606 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 3...
+2025-05-16 15:52:51.607 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 3 (Attempt 1/3)
+2025-05-16 15:52:51.817 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 3 (Duration: 210 ms)
+2025-05-16 15:52:51.819 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 212ms
+2025-05-16 15:52:51.841 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 4...
+2025-05-16 15:52:51.844 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 4 (Attempt 1/3)
+2025-05-16 15:52:52.161 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 4 (Duration: 317 ms)
+2025-05-16 15:52:52.165 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 324ms
+2025-05-16 15:52:52.191 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 5...
+2025-05-16 15:52:52.195 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 5 (Attempt 1/3)
+2025-05-16 15:52:52.411 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 5 (Duration: 216 ms)
+2025-05-16 15:52:52.412 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 221ms
+2025-05-16 15:52:52.431 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 6...
+2025-05-16 15:52:52.432 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 6 (Attempt 1/3)
+2025-05-16 15:52:52.737 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 6 (Duration: 304 ms)
+2025-05-16 15:52:52.738 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 307ms
+2025-05-16 15:52:52.758 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 7...
+2025-05-16 15:52:52.761 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 7 (Attempt 1/3)
+2025-05-16 15:52:53.135 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 7 (Duration: 373 ms)
+2025-05-16 15:52:53.137 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 379ms
+2025-05-16 15:52:53.141 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 8...
+2025-05-16 15:52:53.142 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 8 (Attempt 1/3)
+2025-05-16 15:52:53.383 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 8 (Duration: 240 ms)
+2025-05-16 15:52:53.385 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 244ms
+2025-05-16 15:52:53.389 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 9...
+2025-05-16 15:52:53.389 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 9 (Attempt 1/3)
+2025-05-16 15:52:53.721 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 9 (Duration: 331 ms)
+2025-05-16 15:52:53.721 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 332ms
+2025-05-16 15:52:53.727 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 10...
+2025-05-16 15:52:53.728 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 10 (Attempt 1/3)
+2025-05-16 15:52:54.038 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 10 (Duration: 310 ms)
+2025-05-16 15:52:54.041 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 313ms
+2025-05-16 15:52:54.044 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 11...
+2025-05-16 15:52:54.045 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 11 (Attempt 1/3)
+2025-05-16 15:52:54.266 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 11 (Duration: 221 ms)
+2025-05-16 15:52:54.270 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 225ms
+2025-05-16 15:52:54.273 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 12...
+2025-05-16 15:52:54.274 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 12 (Attempt 1/3)
+2025-05-16 15:52:54.569 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 12 (Duration: 294 ms)
+2025-05-16 15:52:54.571 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 297ms
+2025-05-16 15:52:54.575 +10:00 [INF] Fetching issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" page 13...
+2025-05-16 15:52:54.576 +10:00 [INF] Starting operation: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 13 (Attempt 1/3)
+2025-05-16 15:52:54.762 +10:00 [INF] Operation successful: Fetching issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d, page 13 (Duration: 186 ms)
+2025-05-16 15:52:54.763 +10:00 [INF] Fetched issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d" in 188ms
+2025-05-16 15:53:22.592 +10:00 [INF] Deleted 0 existing issues for project f046baa4-29a2-4a48-b5ef-74dd8ef6636d.
+2025-05-16 15:53:23.313 +10:00 [INF] Inserted 1332 issues into tblReviztoProjectIssues.
+2025-05-16 15:53:23.315 +10:00 [INF] Inserted 1332 issues for project "f046baa4-29a2-4a48-b5ef-74dd8ef6636d"
+2025-05-16 15:53:23.316 +10:00 [INF] Fetching issues for project "7407639c-b37d-4511-811b-863b08ad58d8" page 0...
+2025-05-16 15:53:23.317 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 0 (Attempt 1/3)
+2025-05-16 15:53:23.604 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 0 (Duration: 286 ms)
+2025-05-16 15:53:23.605 +10:00 [INF] Fetched issues for project "7407639c-b37d-4511-811b-863b08ad58d8" in 289ms
+2025-05-16 15:53:23.618 +10:00 [INF] Fetching issues for project "7407639c-b37d-4511-811b-863b08ad58d8" page 1...
+2025-05-16 15:53:23.619 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 1 (Attempt 1/3)
+2025-05-16 15:53:23.957 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 1 (Duration: 337 ms)
+2025-05-16 15:53:23.960 +10:00 [INF] Fetched issues for project "7407639c-b37d-4511-811b-863b08ad58d8" in 341ms
+2025-05-16 15:53:23.965 +10:00 [INF] Fetching issues for project "7407639c-b37d-4511-811b-863b08ad58d8" page 2...
+2025-05-16 15:53:23.966 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 2 (Attempt 1/3)
+2025-05-16 15:53:24.291 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 2 (Duration: 325 ms)
+2025-05-16 15:53:24.293 +10:00 [INF] Fetched issues for project "7407639c-b37d-4511-811b-863b08ad58d8" in 328ms
+2025-05-16 15:53:24.297 +10:00 [INF] Fetching issues for project "7407639c-b37d-4511-811b-863b08ad58d8" page 3...
+2025-05-16 15:53:24.298 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 3 (Attempt 1/3)
+2025-05-16 15:53:24.645 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 3 (Duration: 347 ms)
+2025-05-16 15:53:24.649 +10:00 [INF] Fetched issues for project "7407639c-b37d-4511-811b-863b08ad58d8" in 351ms
+2025-05-16 15:53:24.666 +10:00 [INF] Fetching issues for project "7407639c-b37d-4511-811b-863b08ad58d8" page 4...
+2025-05-16 15:53:24.668 +10:00 [INF] Starting operation: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 4 (Attempt 1/3)
+2025-05-16 15:53:24.888 +10:00 [INF] Operation successful: Fetching issues for project 7407639c-b37d-4511-811b-863b08ad58d8, page 4 (Duration: 220 ms)
+2025-05-16 15:53:24.892 +10:00 [INF] Fetched issues for project "7407639c-b37d-4511-811b-863b08ad58d8" in 225ms
+2025-05-16 15:53:42.027 +10:00 [INF] Deleted 0 existing issues for project 7407639c-b37d-4511-811b-863b08ad58d8.
+2025-05-16 15:53:42.204 +10:00 [INF] Inserted 448 issues into tblReviztoProjectIssues.
+2025-05-16 15:53:42.205 +10:00 [INF] Inserted 448 issues for project "7407639c-b37d-4511-811b-863b08ad58d8"
+2025-05-16 15:53:42.205 +10:00 [INF] All operations complete in 264635ms
+2025-05-16 15:53:42.206 +10:00 [INF] FetchAndSaveUserLicensesAsync complete.
+2025-05-16 15:53:42.207 +10:00 [INF] Data retrieval and export completed successfully.

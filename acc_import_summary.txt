@@ -1,88 +1,53 @@
-[2025-06-05 10:06:58] [SKIP] activities_admin_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_assets_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_bridge_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_cost_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_cost_changes: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_custom_attribute_constraints: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_custom_attributes: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_naming_standards: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_permissions: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_docs_standard_attributes: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_issues_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_issues_changes: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_rfis_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_rfis_changes: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_sheets_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_activities: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_object_ball_in_court_companies: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_object_ball_in_court_roles: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_object_ball_in_court_users: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_ball_in_court_companies: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_ball_in_court_roles: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_ball_in_court_users: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_steps: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_tasks: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_transition_attachments: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] activities_submittals_target_watchers: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] admin_account_services: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] admin_accounts: missing CSV or merge SQL
-[2025-06-05 10:06:58] [SKIP] admin_business_units: missing CSV or merge SQL
-[2025-06-05 10:06:58] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_companies.csv → staging.admin_companies ...
-[2025-06-05 10:06:58] [DEBUG] First insert into staging.admin_companies: ('82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'School Infrastructure NSW', 'Owner', 'owner', 'Level 8 West', '8 Central Ave', 'Eveleigh', 'NSW', 2015, 'AU', '+61 (13) 0048 2651', 'https://www.schoolinfrastructure.nsw.gov.au/', None, None, None, None, '2022-01-18 17:05:55.815', 122, 71, None)
-[2025-06-05 10:06:58] [DONE] Processed admin_companies in 0.23s
-[2025-06-05 10:06:58] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_companies.csv → staging.admin_project_companies ...
-[2025-06-05 10:06:58] [DEBUG] First insert into staging.admin_project_companies: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '82c43acb-6369-4c53-8132-57d5e7f04b98', '7a870e2e-a4c3-4733-988b-7d7680564de6', 252229688)
-[2025-06-05 10:06:59] [DONE] Processed admin_project_companies in 0.18s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_products.csv → staging.admin_project_products ...
-[2025-06-05 10:06:59] [DEBUG] First insert into staging.admin_project_products: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'docs', 'active', '2023-03-06 21:30:10.935')
-[2025-06-05 10:06:59] [DONE] Processed admin_project_products in 0.18s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_roles.csv → staging.admin_project_roles ...
-[2025-06-05 10:06:59] [DEBUG] First insert into staging.admin_project_roles: ('7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 252229695, 'BIM Manager', 'inactive')
-[2025-06-05 10:06:59] [DONE] Processed admin_project_roles in 0.19s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_services.csv → staging.admin_project_services ...
-[2025-06-05 10:06:59] [DONE] Processed admin_project_services in 0.02s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_user_companies.csv → staging.admin_project_user_companies ...
-[2025-06-05 10:06:59] [DEBUG] First insert into staging.admin_project_user_companies: ('7a870e2e-a4c3-4733-988b-7d7680564de6', '82c43acb-6369-4c53-8132-57d5e7f04b98', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '11ec3d54-bcd8-46bc-86fc-f440b61f201f')
-[2025-06-05 10:06:59] [DONE] Processed admin_project_user_companies in 0.2s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_user_products.csv → staging.admin_project_user_products ...
-[2025-06-05 10:06:59] [DEBUG] First insert into staging.admin_project_user_products: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '7a870e2e-a4c3-4733-988b-7d7680564de6', '01d2be7e-bc1b-41a8-81be-0c5ae7f4a6f6', 'docs', 'project_user', '2025-03-12 23:13:10.702')
-[2025-06-05 10:06:59] [DONE] Processed admin_project_user_products in 0.25s
-[2025-06-05 10:06:59] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_user_roles.csv → staging.admin_project_user_roles ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.admin_project_user_roles: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '7a870e2e-a4c3-4733-988b-7d7680564de6', '11ec3d54-bcd8-46bc-86fc-f440b61f201f', '294ad8d9-4cd9-401c-b3eb-b4f5caea97d8', '2023-03-06 21:30:15.443')
-[2025-06-05 10:07:00] [DONE] Processed admin_project_user_roles in 0.19s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_user_services.csv → staging.admin_project_user_services ...
-[2025-06-05 10:07:00] [DONE] Processed admin_project_user_services in 0.03s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_users.csv → staging.admin_project_users ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.admin_project_users: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '7a870e2e-a4c3-4733-988b-7d7680564de6', '11ec3d54-bcd8-46bc-86fc-f440b61f201f', 'active', '82c43acb-6369-4c53-8132-57d5e7f04b98', 'project_admin', '2023-03-06 21:30:15.443', '2023-03-06 21:32:15.334')
-[2025-06-05 10:07:00] [FAIL] C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_project_users.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-06-05 10:07:00] [DONE] Processed admin_project_users in 0.06s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_projects.csv → staging.admin_projects ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.admin_projects: ('e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'Schofields PS [P220702]', None, None, 'Education Facility', 0, 'AUD', 'active', 'P220702', '60 St Albans Rd', None, 'Schofields', 'NSW', 2762, 'AU', 'Australia/Sydney', None, None, None, None, '2023-03-06 21:30:10.914', 1, -33.692506, 150.874863, '2023-04-04 01:27:38.683', None, 88, 18, 'production')
-[2025-06-05 10:07:00] [DONE] Processed admin_projects in 0.2s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_roles.csv → staging.admin_roles ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.admin_roles: ('00e23b17-921e-45b0-8c93-0a43a2dcabb2', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'Manufacturing for Schools Partner', 'active')
-[2025-06-05 10:07:00] [DONE] Processed admin_roles in 0.19s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_users.csv → staging.admin_users ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.admin_users: ('11ec3d54-bcd8-46bc-86fc-f440b61f201f', 'ZUNJU76VMXUAJLQP', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'craig.walker34@det.nsw.edu.au', 'Craig Walker', 'Craig', 'Walker', None, None, None, None, None, 'US', datetime.datetime(2023, 6, 9, 3, 6, 41), '61499893641', None, 1, 1, 1, 1, '4ed9cf1b-4e36-40cf-8971-c4bc10164c7c', '82c43acb-6369-4c53-8132-57d5e7f04b98', 'active', None, '2022-08-17 01:16:59.991', '2024-02-16 03:09:08.907')
-[2025-06-05 10:07:00] [FAIL] C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\admin_users.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-06-05 10:07:00] [DONE] Processed admin_users in 0.09s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_assigned_clash_group.csv → staging.clashes_assigned_clash_group ...
-[2025-06-05 10:07:00] [DEBUG] First insert into staging.clashes_assigned_clash_group: ('7924d700-04f9-11ef-8e21-0b4b01ef9c4a', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 'e5d0a89d-5711-4730-824f-f46e5439e296', 'STRU (gr flr slab & steel framing) vs Combined Services (duct & pipes)', '56 total clashes:\n\n19 clashes between Floor [1444973] in SPS-STN-BQ-ZZ-M3-S-0001.rvt - 3D View - Coord - Structural and SPS-BSE-BQ-ZZ-M3-N-0001.rvt - 3D - BIM 360 Glue\n\n1 clash between Foundation - Strc - Pad - 0200 [1498965] in SPS-STN-BQ-ZZ-M3-S-0001.rvt - 3D View - Coord - Structural and SPS-BSE-BQ-ZZ-M3-N-0001.rvt - 3D - BIM 360 Glue\n\n2 clashes between Framing - Strc - Steel - EA - 0200 [1610535] in SPS-STN-BQ-ZZ-M3-S-0001.rvt - 3D View - Coord - Structural and SPS-BSE-BQ-ZZ-M3-N-0001.rvt - 3D - BIM 360 Glue\n\n2 clashes between Framing - Strc - Steel - UB - 0200 [1450100] in SPS-STN-BQ-ZZ-M3-S-0001.rvt - 3D View - Coord - Structural and SPS-BSE-BQ-ZZ-M3-N-0001.rvt - 3D - BIM 360 Glue', 'open', 'f73efcee-fed8-4fd0-9713-b5f2a39c40ca', '3d1a718c-50c2-49cc-920c-93631c06e49a', 8, '2024-04-28 00:51:43.826328', 'A7T2C667MYFWBP7D')
-[2025-06-05 10:07:00] [FAIL] C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_assigned_clash_group.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-06-05 10:07:00] [DONE] Processed clashes_assigned_clash_group in 0.07s
-[2025-06-05 10:07:00] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_clash_group_to_clash_id.csv → staging.clashes_clash_group_to_clash_id ...
-[2025-06-05 10:07:01] [DEBUG] First insert into staging.clashes_clash_group_to_clash_id: ('a3fd1d70-cfa2-11ee-aa84-83b624d86dcd', 3552038056458387, '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7')
-[2025-06-05 10:07:01] [DONE] Processed clashes_clash_group_to_clash_id in 0.41s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_clash_test.csv → staging.clashes_clash_test ...
-[2025-06-05 10:07:01] [DEBUG] First insert into staging.clashes_clash_test: ('3d58b620-f71f-48c7-8044-3ff4725e1f6b', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '51815074-4a51-4a50-8989-37a88be7e271', 3, 'urn:adsk.wipprod:fs.folder:co.jElLS6KoTW6UiodMxHiiOQ', '2023-08-21 05:12:14.121937', '2023-08-21 05:12:25.038899', 'Successful', 1)
-[2025-06-05 10:07:01] [DONE] Processed clashes_clash_test in 0.18s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_closed_clash_group.csv → staging.clashes_closed_clash_group ...
-[2025-06-05 10:07:01] [DEBUG] First insert into staging.clashes_closed_clash_group: ('a3fd1d70-cfa2-11ee-aa84-83b624d86dcd', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 'VALID_INTERFACE', '2 clashes across 2 Clash Groups', None, 'eee5af12-7225-4117-a197-0b4364b329d4', '51815074-4a51-4a50-8989-37a88be7e271', 9, '2024-02-20 03:46:40.671845', 'U466RCJNQ2CZ')
-[2025-06-05 10:07:01] [FAIL] C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\clashes_closed_clash_group.csv import failed: ('String data, right truncation: length 52 buffer 46', 'HY000')
-[2025-06-05 10:07:01] [DONE] Processed clashes_closed_clash_group in 0.18s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_attachments.csv → staging.issues_attachments ...
-[2025-06-05 10:07:01] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
+[2025-09-29 10:57:06] [SKIP] activities_admin_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_assets_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_bridge_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_cost_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_cost_changes: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_custom_attribute_constraints: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_custom_attributes: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_naming_standards: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_permissions: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_docs_standard_attributes: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_issues_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_issues_changes: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_rfis_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_rfis_changes: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_sheets_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_activities: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_object_ball_in_court_companies: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_object_ball_in_court_roles: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_object_ball_in_court_users: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_ball_in_court_companies: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_ball_in_court_roles: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_ball_in_court_users: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_steps: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_tasks: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_transition_attachments: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] activities_submittals_target_watchers: missing merge SQL
+[2025-09-29 10:57:06] [SKIP] admin_companies: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_companies: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_products: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_roles: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_services: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_user_companies: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_user_products: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_user_roles: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_user_services: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_project_users: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_projects: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_roles: missing CSV
+[2025-09-29 10:57:06] [SKIP] admin_users: missing CSV
+[2025-09-29 10:57:06] [SKIP] clashes_assigned_clash_group: missing CSV
+[2025-09-29 10:57:06] [SKIP] clashes_clash_group_to_clash_id: missing CSV
+[2025-09-29 10:57:06] [SKIP] clashes_clash_test: missing CSV
+[2025-09-29 10:57:06] [SKIP] clashes_closed_clash_group: missing CSV
+[2025-09-29 10:57:06] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_attachments.csv → staging.issues_attachments ...
+[2025-09-29 10:57:06] [ERROR] Column mismatch in staging.issues_attachments
+[2025-09-29 10:57:06] Missing in CSV: {'attachment_name', 'attachment_type'}
+[2025-09-29 10:57:06] Extra in CSV: {'bubble_urn', 'storage_urn', 'deleted_by', 'file_size', 'lineage_urn', 'updated_by', 'version', 'version_urn', 'file_type', 'display_name', 'tip_version_urn', 'deleted_at', 'file_name'}
+[2025-09-29 10:57:06] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_attachments.csv import failed: Column mismatch in staging.issues_attachments
+[2025-09-29 10:57:06] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
 -- MERGE for issues_attachments
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -107,104 +72,122 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (attachment_id, issue_id, attachment_name, attachment_type, created_by, created_at, updated_by, updated_at)
     VALUES (src.attachment_id, src.issue_id, src.attachment_name, src.attachment_type, src.created_by, src.created_at, src.updated_by, src.updated_at);
-[2025-06-05 10:07:01] [DONE] Processed issues_attachments in 0.03s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
-[2025-06-05 10:07:01] [DONE] Processed issues_checklist_mappings in 0.17s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_comments.csv → staging.issues_comments ...
-[2025-06-05 10:07:01] [DEBUG] First insert into staging.issues_comments: ('34cb7e3d-0ecf-48d0-9958-36700c6dde3b', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 'ce08364b-b42e-4238-8e8d-0f657023ee5f', 'Levels have been updated.', '5HUWMSVRRG3X', '2025-03-12 23:10:35.22')
-[2025-06-05 10:07:01] [DONE] Processed issues_comments in 0.07s
-[2025-06-05 10:07:01] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
-[2025-06-05 10:07:01] [SQL ERROR] in merge_issues_custom_attribute_list_values.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
--- MERGE for issues_custom_attribute_list_values
-WITH src_deduped AS (
-    SELECT *, ROW_NUMBER() OVER (
-        PARTITION BY attribute_mappings_id
-        ORDER BY created_at DESC
-    ) AS rn
-    FROM staging.issues_custom_attribute_list_values
-    WHERE attribute_mappings_id IS NOT NULL
+[2025-09-29 10:57:06] [DONE] Processed issues_attachments in 0.08s
+[2025-09-29 10:57:06] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
+[2025-09-29 10:57:07] [DONE] Processed issues_checklist_mappings in 0.23s
+[2025-09-29 10:57:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_comments.csv → staging.issues_comments ...
+[2025-09-29 10:57:07] [DEBUG] First insert into staging.issues_comments: ('18cb4acb-6b2c-4527-b857-5315eef00eb5', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', '8739e13c-c03a-4027-bc61-f17e7ef45e4e', 'incorrectly copied across from inital audit', 'D2B2TAMXJ96R4SZ3', datetime.datetime(2025, 7, 2, 9, 31, 38, 545000))
+[2025-09-29 10:57:07] [DONE] Processed issues_comments in 0.24s
+[2025-09-29 10:57:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
+[2025-09-29 10:57:07] [DEBUG] First insert into staging.issues_custom_attribute_list_values: ('9ef9d592-e5f2-4e1a-a356-d82253049d0f', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', '369eac6d-ee0e-4858-b3b4-cc24034a512f', 'Admin')
+[2025-09-29 10:57:07] [DONE] Processed issues_custom_attribute_list_values in 0.23s
+[2025-09-29 10:57:07] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_custom_attributes.csv → staging.issues_custom_attributes ...
+[2025-09-29 10:57:08] [DEBUG] First insert into staging.issues_custom_attributes: ('52fdd749-12cd-4b85-bfa9-40cf92f68f58', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 'issueSubtype', '9ef9d592-e5f2-4e1a-a356-d82253049d0f', 'Location', 'Locations', 'list', 0, None)
+[2025-09-29 10:57:08] [SQL ERROR] in merge_issues_custom_attributes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_custom_attributes'. Cannot insert duplicate key in object 'dbo.issues_custom_attributes'. The duplicate key value is (983a2dce-e8bd-4329-946b-007b96c40f08). (2627) (SQLExecDirectW)")
+WITH src_raw AS (
+    SELECT 
+        TRY_CONVERT(uniqueidentifier, NULLIF(LTRIM(RTRIM(s.issue_id)), ''))            AS issue_id_guid,
+        TRY_CONVERT(uniqueidentifier, NULLIF(LTRIM(RTRIM(s.bim360_account_id)), ''))   AS bim360_account_id_guid,
+        TRY_CONVERT(uniqueidentifier, NULLIF(LTRIM(RTRIM(s.bim360_project_id)), ''))   AS bim360_project_id_guid,
+        s.mapped_item_type,
+        TRY_CONVERT(uniqueidentifier, NULLIF(LTRIM(RTRIM(s.attribute_mapping_id)), '')) AS attribute_mapping_id_guid,
+        s.attribute_title,
+        s.attribute_description,
+        s.attribute_data_type,
+        CASE 
+            WHEN TRY_CONVERT(bit, s.is_required) IS NOT NULL THEN TRY_CONVERT(bit, s.is_required)
+            WHEN s.is_required IN ('true','TRUE','yes','YES','1','t','T') THEN 1
+            WHEN s.is_required IN ('false','FALSE','no','NO','0','f','F') THEN 0
+            ELSE NULL
+        END                                                                             AS is_required_bit,
+        s.attribute_value
+    FROM acc_data_schema.staging.issues_custom_attributes s
+),
+src_valid AS (
+    -- keep only rows with valid GUIDs for the key columns
+    SELECT *
+    FROM src_raw
+    WHERE issue_id_guid IS NOT NULL
+      AND attribute_mapping_id_guid IS NOT NULL
+),
+src_deduped AS (
+    -- one row per (issue, attribute, type); no created_at available in staging
+    SELECT *
+    FROM (
+        SELECT r.*,
+               ROW_NUMBER() OVER (
+                   PARTITION BY r.issue_id_guid, r.attribute_mapping_id_guid, r.mapped_item_type
+                   ORDER BY COALESCE(r.attribute_value,'') DESC,
+                            COALESCE(r.attribute_title,'') DESC
+               ) AS rn
+        FROM src_valid r
+    ) x
+    WHERE rn = 1
 )
-MERGE INTO dbo.issues_custom_attribute_list_values AS tgt
-USING (SELECT * FROM src_deduped WHERE rn = 1) AS src
-ON tgt.attribute_mappings_id = src.attribute_mappings_id
+
+MERGE acc_data_schema.dbo.issues_custom_attributes AS tgt
+USING src_deduped AS src
+   ON  tgt.issue_id            = src.issue_id_guid
+   AND tgt.attribute_mapping_id = src.attribute_mapping_id_guid
+   AND ISNULL(tgt.mapped_item_type,'') = ISNULL(src.mapped_item_type,'')
 WHEN MATCHED THEN
-    UPDATE SET
-        list_id = src.list_id,
-        list_value = src.list_value,
-        created_at = src.created_at
-WHEN NOT MATCHED THEN
-    INSERT (attribute_mappings_id, list_id, list_value, created_at)
-    VALUES (src.attribute_mappings_id, src.list_id, src.list_value, src.created_at);
-[2025-06-05 10:07:02] [DONE] Processed issues_custom_attribute_list_values in 0.17s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_custom_attributes.csv → staging.issues_custom_attributes ...
-[2025-06-05 10:07:02] [SQL ERROR] in merge_issues_custom_attributes.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
--- MERGE for issues_custom_attributes
-WITH src_deduped AS (
-    SELECT *, ROW_NUMBER() OVER (
-        PARTITION BY issue_id
-        ORDER BY created_at DESC
-    ) AS rn
-    FROM staging.issues_custom_attributes
-    WHERE issue_id IS NOT NULL
-)
-MERGE INTO dbo.issues_custom_attributes AS tgt
-USING (SELECT * FROM src_deduped WHERE rn = 1) AS src
-ON tgt.issue_id = src.issue_id
-WHEN MATCHED THEN
-    UPDATE SET
-        mapped_item_type = src.mapped_item_type,
-        attribute_mapping_id = src.attribute_mapping_id,
-        attribute_title = src.attribute_title,
-        attribute_description = src.attribute_description,
-        attribute_data_type = src.attribute_data_type,
-        is_required = src.is_required,
-        attribute_value = src.attribute_value
-WHEN NOT MATCHED THEN
-    INSERT (issue_id, mapped_item_type, attribute_mapping_id, attribute_title, attribute_description, attribute_data_type, is_required, attribute_value)
-    VALUES (src.issue_id, src.mapped_item_type, src.attribute_mapping_id, src.attribute_title, src.attribute_description, src.attribute_data_type, src.is_required, src.attribute_value);
-[2025-06-05 10:07:02] [DONE] Processed issues_custom_attributes in 0.03s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
-[2025-06-05 10:07:02] [SQL ERROR] in merge_issues_custom_attributes_mappings.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'created_at'. (207) (SQLExecDirectW)")
--- MERGE for issues_custom_attributes
-WITH src_deduped AS (
-    SELECT *, ROW_NUMBER() OVER (
-        PARTITION BY issue_id
-        ORDER BY created_at DESC
-    ) AS rn
-    FROM staging.issues_custom_attributes
-    WHERE issue_id IS NOT NULL
-)
-MERGE INTO dbo.issues_custom_attributes AS tgt
-USING (SELECT * FROM src_deduped WHERE rn = 1) AS src
-ON tgt.issue_id = src.issue_id
-WHEN MATCHED THEN
-    UPDATE SET
-        mapped_item_type = src.mapped_item_type,
-        attribute_mapping_id = src.attribute_mapping_id,
-        attribute_title = src.attribute_title,
-        attribute_description = src.attribute_description,
-        attribute_data_type = src.attribute_data_type,
-        is_required = src.is_required,
-        attribute_value = src.attribute_value
-WHEN NOT MATCHED THEN
-    INSERT (issue_id, mapped_item_type, attribute_mapping_id, attribute_title, attribute_description, attribute_data_type, is_required, attribute_value)
-    VALUES (src.issue_id, src.mapped_item_type, src.attribute_mapping_id, src.attribute_title, src.attribute_description, src.attribute_data_type, src.is_required, src.attribute_value);
-[2025-06-05 10:07:02] [DONE] Processed issues_custom_attributes_mappings in 0.17s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
-[2025-06-05 10:07:02] [DEBUG] First insert into staging.issues_issue_subtypes: ('f43a1aeb-228d-4243-a643-95992e11f52d', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', '6b2ea181-83eb-4b7c-9b73-609cb0dd3169', 'Quality', 1, 'System', '2023-03-06 21:30:28.304', 'System', '2023-03-06 21:30:28.304', None, None)
-[2025-06-05 10:07:02] [DONE] Processed issues_issue_subtypes in 0.19s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_issue_types.csv → staging.issues_issue_types ...
-[2025-06-05 10:07:02] [DEBUG] First insert into staging.issues_issue_types: ('6b2ea181-83eb-4b7c-9b73-609cb0dd3169', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 'Quality', 1, 'System', '2023-03-06 21:30:28.301', 'System', '2023-03-06 21:30:28.301', None, None)
-[2025-06-05 10:07:02] [DONE] Processed issues_issue_types in 0.04s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_issues.csv → staging.issues_issues ...
-[2025-06-05 10:07:02] [DEBUG] First insert into staging.issues_issues: ('9a61718a-cffd-434f-8108-00b54238b822', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'e8c6b4fd-6e47-4d9c-815f-f871c5b30da7', 33, 'HYDR (pipes under gr) vs FIRE (pipes under gr)', '11 total clashes:\n\n3 clashes between Pipe Types [8751089] in SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Hydraulic and SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Fire\n\n1 clash between Pipe Types [8764935] in SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Hydraulic and SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Fire\n\n2 clashes between Pipe Types [8765682] in SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Hydraulic and SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Fire\n\n2 clashes between Pipe Types [8765731] in SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Hydraulic and SPS-BSE-PRM-ZZ-M3-N-0001.rvt - #3D - Workset - Fire', '74edde3c-aced-4f9b-bfc6-d5019bcf7b65', 'd875dcfe-f36e-4fe9-89e2-3785a8ed373c', 'closed', 'U466RCJNQ2CZ', 'user', datetime.datetime(2024, 4, 15, 0, 0), None, None, 'urn:adsk.wipprod:dm.lineage:ZzWmrPZDQIy_gA1Q98VwLw', 'A7T2C667MYFWBP7D', '80a060d3-4647-4352-bd1d-ca93ff4985bc', '369f1b01-8c1a-445f-a5f3-85b1adbb9a14', None, None, None, 'A7T2C667MYFWBP7D', '2024-03-12 04:33:31.88', 'A7T2C667MYFWBP7D', '2024-04-24 03:35:39.934', 'A7T2C667MYFWBP7D', '2024-03-12 04:33:31.887', 'A7T2C667MYFWBP7D', '2024-04-26 05:37:51.794', datetime.datetime(2024, 3, 15, 0, 0), None, 'urn:adsk.objects:os.object:wip.dm.prod/fd1c174a-8b80-44ee-8d9c-d243f9e0e603.jpg', 1, None, None)
-[2025-06-05 10:07:02] [DONE] Processed issues_issues in 0.29s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
-[2025-06-05 10:07:02] [DEBUG] First insert into staging.issues_root_cause_categories: ('78284b01-4b2a-42aa-a7b7-32100c3a1136', None, None, 'Commissioning', 1, 'System', '2018-12-06 08:25:17.653', 'System', '2018-12-09 09:43:32.047', 'System', '2018-12-09 09:43:32.051', 1)
-[2025-06-05 10:07:02] [DONE] Processed issues_root_cause_categories in 0.05s
-[2025-06-05 10:07:02] Importing C:/Users/RicoStrinati/iimbe/D2_252323_Nirimba_Fields_&_Schofields_PS - Documents/Delivery/03_Dashboard/06_ACCData/NFPS/autodesk_data_extract_250605\issues_root_causes.csv → staging.issues_root_causes ...
-[2025-06-05 10:07:02] [DEBUG] First insert into staging.issues_root_causes: ('08afdebc-35fb-4cf4-9c3e-521906250108', None, None, '93d1b9cb-deb0-4166-9a48-5f0227feaacb', 'Human - Human error', 1, 'System', '2018-12-06 08:25:18.028', '8P9VK3RMFR2M', '2021-03-29 15:28:56.049', None, None, 1)
-[2025-06-05 10:07:02] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (e6bbede9-c08d-44d7-8f3b-0610c18932a3). (2627) (SQLExecDirectW); [23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The statement has been terminated. (3621)")
+  UPDATE SET
+      tgt.bim360_account_id     = src.bim360_account_id_guid,
+      tgt.bim360_project_id     = src.bim360_project_id_guid,
+      tgt.mapped_item_type      = src.mapped_item_type,
+      tgt.attribute_title       = src.attribute_title,
+      tgt.attribute_description = src.attribute_description,
+      tgt.attribute_data_type   = src.attribute_data_type,
+      tgt.is_required           = src.is_required_bit,
+      tgt.attribute_value       = src.attribute_value,
+      -- staging has no created_at; preserve existing or stamp if null
+      tgt.created_at            = ISNULL(tgt.created_at, SYSUTCDATETIME())
+WHEN NOT MATCHED BY TARGET THEN
+  INSERT (
+      issue_id,
+      bim360_account_id,
+      bim360_project_id,
+      mapped_item_type,
+      attribute_mapping_id,
+      attribute_title,
+      attribute_description,
+      attribute_data_type,
+      is_required,
+      attribute_value,
+      created_at
+  )
+  VALUES (
+      src.issue_id_guid,
+      src.bim360_account_id_guid,
+      src.bim360_project_id_guid,
+      src.mapped_item_type,
+      src.attribute_mapping_id_guid,
+      src.attribute_title,
+      src.attribute_description,
+      src.attribute_data_type,
+      src.is_required_bit,
+      src.attribute_value,
+      SYSUTCDATETIME()
+  );
+[2025-09-29 10:57:08] [DONE] Processed issues_custom_attributes in 0.65s
+[2025-09-29 10:57:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
+[2025-09-29 10:57:08] [DEBUG] First insert into staging.issues_custom_attributes_mappings: ('9ef9d592-e5f2-4e1a-a356-d82253049d0f', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 'issueSubtype', '7b363082-cb62-559a-ba7e-635ce9d79fca', 'Location', 'Locations', 'list', 2, 0, datetime.datetime(2025, 6, 26, 3, 23, 43, 987000), '98E3KB6B3THN', datetime.datetime(2025, 6, 27, 5, 19, 49, 917000), '98E3KB6B3THN')
+[2025-09-29 10:57:08] [DONE] Processed issues_custom_attributes_mappings in 0.24s
+[2025-09-29 10:57:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
+[2025-09-29 10:57:08] [DEBUG] First insert into staging.issues_issue_subtypes: ('e318cf84-d80a-56fc-b900-c19d33e46a46', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', '1773a5e8-0890-51a9-a8fb-43764138c03a', 'Punch List', 0, 'System', datetime.datetime(2025, 6, 25, 8, 30, 1, 542000), '98E3KB6B3THN', datetime.datetime(2025, 6, 27, 5, 6, 50, 948000), None, None)
+[2025-09-29 10:57:08] [DONE] Processed issues_issue_subtypes in 0.21s
+[2025-09-29 10:57:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_issue_types.csv → staging.issues_issue_types ...
+[2025-09-29 10:57:08] [DEBUG] First insert into staging.issues_issue_types: ('1773a5e8-0890-51a9-a8fb-43764138c03a', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 'Punch List', 0, 'System', datetime.datetime(2025, 6, 25, 8, 30, 1, 357000), '98E3KB6B3THN', datetime.datetime(2025, 6, 27, 5, 6, 50, 965000), None, None)
+[2025-09-29 10:57:08] [DONE] Processed issues_issue_types in 0.17s
+[2025-09-29 10:57:08] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_issues.csv → staging.issues_issues ...
+[2025-09-29 10:57:09] [DEBUG] First insert into staging.issues_issues: ('0e36d25e-f9c5-4967-99d6-d0b145e38640', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 416, 'Security Issue - security devices to reviewed against tate framing', 'review needed throughout', '3f78faf2-9988-58e5-9bf8-df1a40fa6156', '7734f47c-9c16-54ab-8354-589f1ee7fef7', 'open', 550960462, 'company', None, '4a9bf23a-2505-48e5-bd61-2ec3c93edc94', None, 'urn:adsk.wipprodanz:dm.lineage:ukXrVUlRQ4KJqLy62NgZ3g', 'D2B2TAMXJ96R4SZ3', None, None, None, None, None, 'D2B2TAMXJ96R4SZ3', '2025-09-23 20:59:52.866', None, None, 'D2B2TAMXJ96R4SZ3', datetime.datetime(2025, 9, 23, 20, 59, 52, 879000), 'D2B2TAMXJ96R4SZ3', datetime.datetime(2025, 9, 23, 21, 0, 1, 553000), None, None, 'urn:adsk.objects:os.object:wip.dm.pt8ix/651ae484-c1aa-4347-a959-9ff94c446f0c.jpg', 1, None, None)
+[2025-09-29 10:57:09] [DONE] Processed issues_issues in 0.44s
+[2025-09-29 10:57:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
+[2025-09-29 10:57:09] [DEBUG] First insert into staging.issues_root_cause_categories: ('74bb6959-3af8-415d-9c74-eab998e20c45', None, None, 'Safety', 1, 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), None, None, 1)
+[2025-09-29 10:57:09] [DONE] Processed issues_root_cause_categories in 0.2s
+[2025-09-29 10:57:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\issues_root_causes.csv → staging.issues_root_causes ...
+[2025-09-29 10:57:09] [DEBUG] First insert into staging.issues_root_causes: ('003d38e3-ec84-4e84-95e7-a88b1dae3fcc', None, None, 'beb06eb0-6238-4482-b113-11be24f233ac', 'Coordination', 1, 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), None, None, 1)
+[2025-09-29 10:57:09] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (c4b1d29c-6ce8-46ab-9899-11f544077316). (2627) (SQLExecDirectW)")
 -- MERGE for issues_root_causes
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -243,23 +226,59 @@ WHEN NOT MATCHED BY TARGET THEN
         src.created_by, src.created_at, src.updated_by, src.updated_at,
         src.deleted_by, src.deleted_at
     );
-[2025-06-05 10:07:02] [DONE] Processed issues_root_causes in 0.06s
-[2025-06-05 10:07:02] [SKIP] issuesbim360_attachments: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_checklist_mappings: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_comments: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_custom_attribute_list_values: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_custom_attributes: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_custom_attributes_mappings: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_issue_subtypes: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_issue_types: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_issues: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_root_cause_categories: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] issuesbim360_root_causes: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] locations_nodes: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] locations_trees: missing CSV or merge SQL
-[2025-06-05 10:07:02] [SKIP] markups_layer: missing CSV or merge SQL
-[2025-06-05 10:07:03] [SKIP] markups_link: missing CSV or merge SQL
-[2025-06-05 10:07:03] [SKIP] markups_markup: missing CSV or merge SQL
-[2025-06-05 10:07:03] [SKIP] markups_placement: missing CSV or merge SQL
-[2025-06-05 10:07:03] [SKIP] metadata: missing CSV or merge SQL
-[2025-06-05 10:07:03] [SKIP] relationships_entity_relationship: missing CSV or merge SQL
+[2025-09-29 10:57:09] [DONE] Processed issues_root_causes in 0.04s
+[2025-09-29 10:57:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\locations_nodes.csv → staging.locations_nodes ...
+[2025-09-29 10:57:09] [DEBUG] First insert into staging.locations_nodes: ('6901f376-cb41-4410-bdfd-4f9114c44785', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 'ca27515f-fce7-438d-a471-26cf96a57604', '51a92a19-519d-4c4b-8a8e-348d0c082906', 'Zone 5-Ground', 1, datetime.datetime(2025, 7, 28, 0, 38, 23, 727000), datetime.datetime(2025, 8, 14, 0, 37, 4, 541000))
+[2025-09-29 10:57:09] [DONE] Processed locations_nodes in 0.05s
+[2025-09-29 10:57:09] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpmrk84ptc\locations_trees.csv → staging.locations_trees ...
+[2025-09-29 10:57:09] [DEBUG] First insert into staging.locations_trees: ('6901f376-cb41-4410-bdfd-4f9114c44785', 'cdf81203-db08-480c-ab50-9ad6b1de7cc6', '057c6bb8-cf6e-449c-8a07-33c1af69cdff', 'Default', datetime.datetime(2025, 6, 25, 8, 29, 56, 436000), datetime.datetime(2025, 6, 25, 8, 29, 56, 436000))
+[2025-09-29 10:57:09] [DONE] Processed locations_trees in 0.03s
+[2025-09-29 10:57:09] [SKIP] metadata: missing merge SQL
+[2025-09-29 10:57:09] [SKIP] relationships_entity_relationship: missing merge SQL
+[2025-09-29 10:57:09] Skipped table summary:
+[2025-09-29 10:57:09]  - activities_admin_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_assets_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_bridge_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_cost_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_cost_changes: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_custom_attribute_constraints: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_custom_attributes: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_naming_standards: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_permissions: missing merge SQL
+[2025-09-29 10:57:09]  - activities_docs_standard_attributes: missing merge SQL
+[2025-09-29 10:57:09]  - activities_issues_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_issues_changes: missing merge SQL
+[2025-09-29 10:57:09]  - activities_rfis_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_rfis_changes: missing merge SQL
+[2025-09-29 10:57:09]  - activities_sheets_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_activities: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_object_ball_in_court_companies: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_object_ball_in_court_roles: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_object_ball_in_court_users: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_ball_in_court_companies: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_ball_in_court_roles: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_ball_in_court_users: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_steps: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_tasks: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_transition_attachments: missing merge SQL
+[2025-09-29 10:57:09]  - activities_submittals_target_watchers: missing merge SQL
+[2025-09-29 10:57:09]  - admin_companies: missing CSV
+[2025-09-29 10:57:09]  - admin_project_companies: missing CSV
+[2025-09-29 10:57:09]  - admin_project_products: missing CSV
+[2025-09-29 10:57:09]  - admin_project_roles: missing CSV
+[2025-09-29 10:57:09]  - admin_project_services: missing CSV
+[2025-09-29 10:57:09]  - admin_project_user_companies: missing CSV
+[2025-09-29 10:57:09]  - admin_project_user_products: missing CSV
+[2025-09-29 10:57:09]  - admin_project_user_roles: missing CSV
+[2025-09-29 10:57:09]  - admin_project_user_services: missing CSV
+[2025-09-29 10:57:09]  - admin_project_users: missing CSV
+[2025-09-29 10:57:09]  - admin_projects: missing CSV
+[2025-09-29 10:57:09]  - admin_roles: missing CSV
+[2025-09-29 10:57:09]  - admin_users: missing CSV
+[2025-09-29 10:57:09]  - clashes_assigned_clash_group: missing CSV
+[2025-09-29 10:57:09]  - clashes_clash_group_to_clash_id: missing CSV
+[2025-09-29 10:57:09]  - clashes_clash_test: missing CSV
+[2025-09-29 10:57:09]  - clashes_closed_clash_group: missing CSV
+[2025-09-29 10:57:09]  - metadata: missing merge SQL
+[2025-09-29 10:57:09]  - relationships_entity_relationship: missing merge SQL

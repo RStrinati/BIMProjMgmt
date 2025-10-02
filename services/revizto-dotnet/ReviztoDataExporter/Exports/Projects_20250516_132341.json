@@ -1,0 +1,98 @@
+[
+  {
+    "projectId": 324483,
+    "projectUuid": "554a3521-c2b4-4a21-ad6e-e7dc1c44db2a",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "DCI-AKL02",
+    "created": "2022-07-20T07:46:14",
+    "updated": "2025-01-21T04:40:26",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "ben.shoebridge@iimbe.io"
+  },
+  {
+    "projectId": 433407,
+    "projectUuid": "023e8305-922b-4cd2-8938-d8ee7f74b684",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "NEXTDC S5",
+    "created": "2024-05-09T04:30:09",
+    "updated": "2025-01-05T23:12:48",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "patrick.fingleton@iimbe.io"
+  },
+  {
+    "projectId": 433061,
+    "projectUuid": "429b27f4-4359-40d6-a526-c2ac8374a3c9",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "NEXTDC S4",
+    "created": "2024-04-03T06:48:58",
+    "updated": "2025-01-05T23:12:16",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "patrick.fingleton@iimbe.io"
+  },
+  {
+    "projectId": 432861,
+    "projectUuid": "6a0efdc0-ee3d-4d8b-9a91-891928d8dfc6",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "NEXTDC | S3 | SP14 / SP17 / SP18",
+    "created": "2024-03-07T22:27:15",
+    "updated": "2025-01-05T22:40:18",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "mitchell.mccloskey@iimbe.io"
+  },
+  {
+    "projectId": 237819,
+    "projectUuid": "eadbc964-2829-49e0-a4ca-3b61dfc67aa5",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "55 Pitt Street",
+    "created": "2021-09-01T05:06:25",
+    "updated": "2025-01-05T22:39:04",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "mitchell.mccloskey@iimbe.io"
+  },
+  {
+    "projectId": 431707,
+    "projectUuid": "0908f4ea-24f0-4841-b20c-7b93690dbdc5",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "MEL01A",
+    "created": "2023-11-08T22:56:03",
+    "updated": "2024-12-11T03:37:03",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "mitchell.mccloskey@iimbe.io"
+  },
+  {
+    "projectId": 370635,
+    "projectUuid": "f046baa4-29a2-4a48-b5ef-74dd8ef6636d",
+    "licenseUuid": "3575016f-d492-4d9a-b14c-6650a3d5719f",
+    "title": "SYD054",
+    "created": "2023-02-07T03:57:37",
+    "updated": "2023-02-07T05:41:16",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "puspa.hort@iimbe.io"
+  },
+  {
+    "projectId": 435466,
+    "projectUuid": "7407639c-b37d-4511-811b-863b08ad58d8",
+    "licenseUuid": "ad5f9970-76fd-4ace-8471-90b52ee2121f",
+    "title": "Hindmarsh EC6 Project",
+    "created": "2025-02-18T00:59:27",
+    "updated": "2025-02-18T00:59:27",
+    "region": "ap-southeast-2",
+    "archived": false,
+    "frozen": false,
+    "ownerEmail": "rico.strinati@iimbe.io"
+  }
+]

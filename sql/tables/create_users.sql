@@ -1,0 +1,8 @@
+CREATE TABLE users (
+    user_id INT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(510) NOT NULL,
+    role NVARCHAR(100) NULL,
+    email NVARCHAR(510) NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT GETDATE()
+);
+GO

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: bim_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_SERVER=${DB_SERVER}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DRIVER=${DB_DRIVER}
+      - PROJECT_MGMT_DB=${PROJECT_MGMT_DB}
+      - ACC_DB=${ACC_DB}
+      - REVIT_HEALTH_DB=${REVIT_HEALTH_DB}
+      - REVIZTO_DB=${REVIZTO_DB}
+      - ACC_SERVICE_URL=http://acc-node:4000/api/v1
+      - REVIZTO_SERVICE_URL=http://revizto-dotnet:5000/api/v1
+      - ACC_SERVICE_TOKEN=${ACC_SERVICE_TOKEN}
+      - REVIZTO_SERVICE_TOKEN=${REVIZTO_SERVICE_TOKEN}
+    depends_on:
+      acc-node:
+        condition: service_healthy
+      revizto-dotnet:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/projects"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  acc-node:
+    build:
+      context: ../services/acc-node
+      dockerfile: Dockerfile
+    container_name: acc_node
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  revizto-dotnet:
+    build:
+      context: ../services/revizto-dotnet
+      dockerfile: Dockerfile
+    container_name: revizto_dotnet
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  default:
+    name: bim_network

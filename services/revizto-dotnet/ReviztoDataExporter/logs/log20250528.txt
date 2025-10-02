@@ -1,0 +1,164 @@
+2025-05-28 15:47:14.533 +10:00 [INF] Starting Revizto Export UI...
+2025-05-28 15:47:59.907 +10:00 [INF] Exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 15:47:59.914 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-28 15:48:00.466 +10:00 [WRN] Access token expired. Refreshing...
+2025-05-28 15:48:00.468 +10:00 [INF] Attempting to refresh access token...
+2025-05-28 15:48:00.612 +10:00 [INF] Tokens updated successfully in configuration.
+2025-05-28 15:48:00.614 +10:00 [INF] Access token successfully refreshed.
+2025-05-28 15:48:00.852 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 937 ms)
+2025-05-28 15:48:00.875 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-28 15:48:01.160 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 284 ms)
+2025-05-28 15:48:01.177 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-28 15:48:01.467 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 289 ms)
+2025-05-28 15:48:01.494 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-28 15:48:01.684 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 190 ms)
+2025-05-28 15:48:01.712 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-28 15:48:02.017 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 304 ms)
+2025-05-28 15:48:02.021 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-28 15:48:02.296 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 274 ms)
+2025-05-28 15:48:02.301 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-28 15:48:02.508 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 206 ms)
+2025-05-28 15:48:02.512 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-28 15:48:02.769 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 257 ms)
+2025-05-28 15:48:02.773 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-28 15:48:03.062 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 289 ms)
+2025-05-28 15:48:03.068 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-28 15:48:03.346 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 278 ms)
+2025-05-28 15:48:03.350 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-28 15:48:03.616 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 265 ms)
+2025-05-28 15:48:03.619 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Attempt 1/3)
+2025-05-28 15:48:03.868 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Duration: 249 ms)
+2025-05-28 15:48:33.081 +10:00 [ERR] Error exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+System.InvalidOperationException: The ConnectionString property has not been initialized.
+   at System.Data.SqlClient.SqlConnection.PermissionDemand()
+   at System.Data.SqlClient.SqlConnectionFactory.PermissionDemand(DbConnection outerConnection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at ReviztoDataExporter.SQLServerHelper.InsertReviztoProjectIssues(List`1 issues) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 278
+   at ReviztoDataExporter.UserLicenceService.ExportIssuesForProject(Guid projectUuid) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\UserLicenceService.cs:line 57
+2025-05-28 15:52:54.370 +10:00 [INF] Starting Revizto Export UI...
+2025-05-28 15:52:54.481 +10:00 [INF] Database initialized.
+2025-05-28 15:53:00.298 +10:00 [INF] Exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 15:53:00.305 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-28 15:53:00.772 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 467 ms)
+2025-05-28 15:53:00.808 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-28 15:53:01.018 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 209 ms)
+2025-05-28 15:53:01.036 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-28 15:53:01.350 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 313 ms)
+2025-05-28 15:53:01.380 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-28 15:53:01.664 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 284 ms)
+2025-05-28 15:53:01.698 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-28 15:53:01.999 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 300 ms)
+2025-05-28 15:53:02.003 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-28 15:53:02.204 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 201 ms)
+2025-05-28 15:53:02.209 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-28 15:53:02.493 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 284 ms)
+2025-05-28 15:53:02.497 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-28 15:53:02.755 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 258 ms)
+2025-05-28 15:53:02.759 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-28 15:53:03.083 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 323 ms)
+2025-05-28 15:53:03.087 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-28 15:53:03.368 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 280 ms)
+2025-05-28 15:53:03.373 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-28 15:53:03.640 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 267 ms)
+2025-05-28 15:53:03.645 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Attempt 1/3)
+2025-05-28 15:53:03.888 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Duration: 243 ms)
+2025-05-28 15:53:33.627 +10:00 [INF] Deleted 1064 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-28 15:53:34.148 +10:00 [INF] Inserted 1168 issues into tblReviztoProjectIssues.
+2025-05-28 15:53:34.149 +10:00 [INF] Exported 1168 issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 16:02:24.200 +10:00 [INF] Starting Revizto Export UI...
+2025-05-28 16:02:24.578 +10:00 [INF] Database initialized.
+2025-05-28 16:02:28.662 +10:00 [INF] Exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 16:02:28.671 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-28 16:02:29.150 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 479 ms)
+2025-05-28 16:02:29.182 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-28 16:02:29.385 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 202 ms)
+2025-05-28 16:02:29.403 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-28 16:02:29.724 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 320 ms)
+2025-05-28 16:02:29.751 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-28 16:02:30.022 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 271 ms)
+2025-05-28 16:02:30.051 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-28 16:02:30.281 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 229 ms)
+2025-05-28 16:02:30.294 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-28 16:02:30.591 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 297 ms)
+2025-05-28 16:02:30.594 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-28 16:02:30.868 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 273 ms)
+2025-05-28 16:02:30.872 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-28 16:02:31.161 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 289 ms)
+2025-05-28 16:02:31.165 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-28 16:02:31.362 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 196 ms)
+2025-05-28 16:02:31.367 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-28 16:02:31.673 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 306 ms)
+2025-05-28 16:02:31.677 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-28 16:02:31.979 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 302 ms)
+2025-05-28 16:02:31.983 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Attempt 1/3)
+2025-05-28 16:02:32.211 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Duration: 228 ms)
+2025-05-28 16:03:02.004 +10:00 [INF] Deleted 1168 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-28 16:03:02.524 +10:00 [INF] Inserted 1169 issues into tblReviztoProjectIssues.
+2025-05-28 16:03:02.525 +10:00 [INF] Exported 1169 issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 16:14:43.856 +10:00 [INF] Starting Revizto Export UI...
+2025-05-28 16:14:43.951 +10:00 [INF] Database initialized.
+2025-05-28 16:14:50.076 +10:00 [INF] Exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 16:14:50.081 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-28 16:14:50.549 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 467 ms)
+2025-05-28 16:14:50.580 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-28 16:14:50.780 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 200 ms)
+2025-05-28 16:14:50.799 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-28 16:14:51.099 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 299 ms)
+2025-05-28 16:14:51.123 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-28 16:14:51.414 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 290 ms)
+2025-05-28 16:14:51.442 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-28 16:14:51.721 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 279 ms)
+2025-05-28 16:14:51.726 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-28 16:14:52.010 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 284 ms)
+2025-05-28 16:14:52.013 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-28 16:14:52.211 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 197 ms)
+2025-05-28 16:14:52.215 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-28 16:14:52.517 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 302 ms)
+2025-05-28 16:14:52.521 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-28 16:14:52.779 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 257 ms)
+2025-05-28 16:14:52.785 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-28 16:14:53.078 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 293 ms)
+2025-05-28 16:14:53.082 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-28 16:14:53.270 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 188 ms)
+2025-05-28 16:14:53.274 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Attempt 1/3)
+2025-05-28 16:14:53.514 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Duration: 240 ms)
+2025-05-28 16:15:20.788 +10:00 [INF] Deleted 1169 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-28 16:15:21.438 +10:00 [INF] Inserted 1169 issues into tblReviztoProjectIssues.
+2025-05-28 16:15:21.440 +10:00 [INF] Exported 1169 issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 17:05:19.079 +10:00 [INF] Starting Revizto Export UI...
+2025-05-28 17:05:19.176 +10:00 [INF] Database initialized.
+2025-05-28 17:05:23.780 +10:00 [INF] Exporting issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"
+2025-05-28 17:05:23.786 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Attempt 1/3)
+2025-05-28 17:05:24.068 +10:00 [WRN] Access token expired. Refreshing...
+2025-05-28 17:05:24.070 +10:00 [INF] Attempting to refresh access token...
+2025-05-28 17:05:24.214 +10:00 [INF] Tokens updated successfully in configuration.
+2025-05-28 17:05:24.218 +10:00 [INF] Access token successfully refreshed.
+2025-05-28 17:05:24.527 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 0 (Duration: 741 ms)
+2025-05-28 17:05:24.552 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Attempt 1/3)
+2025-05-28 17:05:24.864 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 1 (Duration: 311 ms)
+2025-05-28 17:05:24.889 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Attempt 1/3)
+2025-05-28 17:05:25.191 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 2 (Duration: 302 ms)
+2025-05-28 17:05:25.211 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Attempt 1/3)
+2025-05-28 17:05:25.496 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 3 (Duration: 285 ms)
+2025-05-28 17:05:25.516 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Attempt 1/3)
+2025-05-28 17:05:25.721 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 4 (Duration: 204 ms)
+2025-05-28 17:05:25.729 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Attempt 1/3)
+2025-05-28 17:05:26.031 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 5 (Duration: 301 ms)
+2025-05-28 17:05:26.034 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Attempt 1/3)
+2025-05-28 17:05:26.227 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 6 (Duration: 192 ms)
+2025-05-28 17:05:26.231 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Attempt 1/3)
+2025-05-28 17:05:26.533 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 7 (Duration: 301 ms)
+2025-05-28 17:05:26.537 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Attempt 1/3)
+2025-05-28 17:05:26.796 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 8 (Duration: 259 ms)
+2025-05-28 17:05:26.800 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Attempt 1/3)
+2025-05-28 17:05:26.997 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 9 (Duration: 197 ms)
+2025-05-28 17:05:27.002 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Attempt 1/3)
+2025-05-28 17:05:27.304 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 10 (Duration: 302 ms)
+2025-05-28 17:05:27.308 +10:00 [INF] Starting operation: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Attempt 1/3)
+2025-05-28 17:05:27.465 +10:00 [INF] Operation successful: Fetching issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9, page 11 (Duration: 157 ms)
+2025-05-28 17:05:56.998 +10:00 [INF] Deleted 1169 existing issues for project 429b27f4-4359-40d6-a526-c2ac8374a3c9.
+2025-05-28 17:05:57.526 +10:00 [INF] Inserted 1169 issues into tblReviztoProjectIssues.
+2025-05-28 17:05:57.527 +10:00 [INF] Exported 1169 issues for project "429b27f4-4359-40d6-a526-c2ac8374a3c9"

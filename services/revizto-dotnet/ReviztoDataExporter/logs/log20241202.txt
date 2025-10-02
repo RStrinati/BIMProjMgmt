@@ -1,0 +1,68 @@
+2024-12-02 12:41:18.668 +11:00 [INF] Starting application
+2024-12-02 12:41:19.137 +11:00 [INF] Current user info retrieved successfully.
+2024-12-02 12:41:19.146 +11:00 [INF] Data successfully exported to CurrentUser.json
+2024-12-02 12:41:19.250 +11:00 [INF] User licenses retrieved successfully. Data saved to UserLicenses.json
+2024-12-02 12:41:19.265 +11:00 [INF] Data successfully exported to UserLicenses.json
+2024-12-02 12:41:19.284 +11:00 [INF] Retrieving projects for license UUID: a9acd965-e694-4f55-9a1c-3923910c3f93
+2024-12-02 12:41:19.431 +11:00 [INF] License projects retrieved successfully. Data saved to LicenseProjects.json
+2024-12-02 12:41:19.441 +11:00 [INF] Data successfully exported to LicenseProjects_a9acd965-e694-4f55-9a1c-3923910c3f93.json
+2024-12-02 12:41:19.443 +11:00 [INF] Retrieving projects for license UUID: 949c5f41-a97b-4530-8fb6-b352e3b49546
+2024-12-02 12:41:19.634 +11:00 [INF] License projects retrieved successfully. Data saved to LicenseProjects.json
+2024-12-02 12:41:19.645 +11:00 [INF] Data successfully exported to LicenseProjects_949c5f41-a97b-4530-8fb6-b352e3b49546.json
+2024-12-02 12:41:19.646 +11:00 [INF] Retrieving projects for license UUID: 3575016fd4924d9ab14c6650a3d5719f
+2024-12-02 12:41:19.750 +11:00 [INF] License projects retrieved successfully. Data saved to LicenseProjects.json
+2024-12-02 12:41:19.757 +11:00 [INF] Data successfully exported to LicenseProjects_3575016fd4924d9ab14c6650a3d5719f.json
+2024-12-02 12:41:19.758 +11:00 [WRN] Unexpected JSON structure in file C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\LicenseProjects_3575016fd4924d9ab14c6650a3d5719f.json: 'data' is missing or not an object.
+2024-12-02 12:41:19.761 +11:00 [INF] Retrieving members for project UUID: 84a5e0c0-df31-43ea-9127-04ad9c2a7349
+2024-12-02 12:41:19.906 +11:00 [INF] Project members for project 84a5e0c0-df31-43ea-9127-04ad9c2a7349 retrieved successfully. Data saved to ProjectMembers_84a5e0c0-df31-43ea-9127-04ad9c2a7349.json
+2024-12-02 12:41:19.916 +11:00 [INF] Data successfully exported to ProjectMembers_84a5e0c0-df31-43ea-9127-04ad9c2a7349.json
+2024-12-02 12:41:19.917 +11:00 [INF] Retrieving members for project UUID: 023e8305-922b-4cd2-8938-d8ee7f74b684
+2024-12-02 12:41:20.083 +11:00 [INF] Project members for project 023e8305-922b-4cd2-8938-d8ee7f74b684 retrieved successfully. Data saved to ProjectMembers_023e8305-922b-4cd2-8938-d8ee7f74b684.json
+2024-12-02 12:41:20.103 +11:00 [INF] Data successfully exported to ProjectMembers_023e8305-922b-4cd2-8938-d8ee7f74b684.json
+2024-12-02 12:41:20.105 +11:00 [INF] Retrieving members for project UUID: 848f2d9b-c762-417a-bf02-fda0a4a6fcdf
+2024-12-02 12:41:20.411 +11:00 [INF] Project members for project 848f2d9b-c762-417a-bf02-fda0a4a6fcdf retrieved successfully. Data saved to ProjectMembers_848f2d9b-c762-417a-bf02-fda0a4a6fcdf.json
+2024-12-02 12:41:20.444 +11:00 [INF] Data successfully exported to ProjectMembers_848f2d9b-c762-417a-bf02-fda0a4a6fcdf.json
+2024-12-02 12:41:30.761 +11:00 [ERR] Error creating table 'ReviztoData'.
+System.Data.SqlClient.SqlException (0x80131904): Cannot open database "ReviztoData" requested by the login. The login failed.
+Login failed for user 'AzureAD\RicoStrinati'.
+   at System.Data.SqlClient.SqlInternalConnectionTds..ctor(DbConnectionPoolIdentity identity, SqlConnectionString connectionOptions, SqlCredential credential, Object providerInfo, String newPassword, SecureString newSecurePassword, Boolean redirectedUserInstance, SqlConnectionString userConnectionOptions, SessionData reconnectSessionData, Boolean applyTransientFaultHandling, String accessToken)
+   at System.Data.SqlClient.SqlConnectionFactory.CreateConnection(DbConnectionOptions options, DbConnectionPoolKey poolKey, Object poolGroupProviderInfo, DbConnectionPool pool, DbConnection owningConnection, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionFactory.CreatePooledConnection(DbConnectionPool pool, DbConnection owningObject, DbConnectionOptions options, DbConnectionPoolKey poolKey, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionPool.CreateObject(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
+   at System.Data.ProviderBase.DbConnectionPool.UserCreateRequest(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, UInt32 waitForMultipleObjectsTimeout, Boolean allowCreate, Boolean onlyOneCheckConnection, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionFactory.TryGetConnection(DbConnection owningConnection, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal oldConnection, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at SQLServerHelper.CreateTable(String tableName, String tableSchema) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 34
+ClientConnectionId:d9e299d0-1e90-48c5-a01a-f6f60f47cb18
+Error Number:4060,State:1,Class:11
+2024-12-02 12:41:30.794 +11:00 [ERR] Error inserting data into table 'ReviztoData'.
+System.Data.SqlClient.SqlException (0x80131904): Cannot open database "ReviztoData" requested by the login. The login failed.
+Login failed for user 'AzureAD\RicoStrinati'.
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, UInt32 waitForMultipleObjectsTimeout, Boolean allowCreate, Boolean onlyOneCheckConnection, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionFactory.TryGetConnection(DbConnection owningConnection, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal oldConnection, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at SQLServerHelper.InsertData(String tableName, List`1 data) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 61
+ClientConnectionId:d9e299d0-1e90-48c5-a01a-f6f60f47cb18
+Error Number:4060,State:1,Class:11
+2024-12-02 12:41:30.800 +11:00 [ERR] Error retrieving data from table 'ReviztoData'.
+System.Data.SqlClient.SqlException (0x80131904): Cannot open database "ReviztoData" requested by the login. The login failed.
+Login failed for user 'AzureAD\RicoStrinati'.
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, UInt32 waitForMultipleObjectsTimeout, Boolean allowCreate, Boolean onlyOneCheckConnection, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionFactory.TryGetConnection(DbConnection owningConnection, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal oldConnection, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at SQLServerHelper.GetData(String tableName) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\SQLServerHelper.cs:line 94
+ClientConnectionId:d9e299d0-1e90-48c5-a01a-f6f60f47cb18
+Error Number:4060,State:1,Class:11

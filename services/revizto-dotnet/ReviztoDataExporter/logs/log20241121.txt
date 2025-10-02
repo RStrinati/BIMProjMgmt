@@ -1,0 +1,320 @@
+2024-11-21 10:11:51.139 +11:00 [INF] Starting application
+2024-11-21 10:11:51.802 +11:00 [INF] Current user info retrieved successfully. Response:
+2024-11-21 10:11:51.803 +11:00 [INF] {"result":-206,"data":null,"message":"The token is invalid or expired."}
+2024-11-21 10:11:51.808 +11:00 [INF] User information successfully exported to CurrentUser.json
+2024-11-21 10:11:51.851 +11:00 [INF] API call successful. Response:
+2024-11-21 10:11:51.853 +11:00 [INF] {"result":-206,"data":null,"message":"The token is invalid or expired."}
+2024-11-21 10:11:51.859 +11:00 [INF] License projects successfully exported to LicenseProjects.json
+2024-11-21 10:14:16.874 +11:00 [INF] Starting application
+2024-11-21 10:14:16.939 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: The input data is not a complete block.
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:06:31.373 +11:00 [INF] Starting application
+2024-11-21 11:06:31.441 +11:00 [ERR] An error occurred during the execution
+System.IO.InvalidDataException: Failed to load configuration from file 'C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\appsettings.json'.
+ ---> System.FormatException: Could not parse the JSON file.
+ ---> System.Text.Json.JsonReaderException: 'U' is an invalid escapable character within a JSON string. The string should be correctly escaped. LineNumber: 9 | BytePositionInLine: 27.
+   at System.Text.Json.ThrowHelper.ThrowJsonReaderException(Utf8JsonReader& json, ExceptionResource resource, Byte nextByte, ReadOnlySpan`1 bytes)
+   at System.Text.Json.Utf8JsonReader.ConsumeStringAndValidate(ReadOnlySpan`1 data, Int32 idx)
+   at System.Text.Json.Utf8JsonReader.ConsumeString()
+   at System.Text.Json.Utf8JsonReader.ConsumeValue(Byte marker)
+   at System.Text.Json.Utf8JsonReader.ReadSingleSegment()
+   at System.Text.Json.Utf8JsonReader.Read()
+   at System.Text.Json.JsonDocument.Parse(ReadOnlySpan`1 utf8JsonSpan, JsonReaderOptions readerOptions, MetadataDb& database, StackRowStack& stack)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 utf8Json, JsonReaderOptions readerOptions, Byte[] extraRentedArrayPoolBytes, PooledByteBufferWriter extraPooledByteBufferWriter)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 json, JsonDocumentOptions options)
+   at System.Text.Json.JsonDocument.Parse(String json, JsonDocumentOptions options)
+   at Microsoft.Extensions.Configuration.Json.JsonConfigurationFileParser.ParseStream(Stream input)
+   at Microsoft.Extensions.Configuration.Json.JsonConfigurationFileParser.Parse(Stream input)
+   at Microsoft.Extensions.Configuration.Json.JsonConfigurationProvider.Load(Stream stream)
+   --- End of inner exception stack trace ---
+   at Microsoft.Extensions.Configuration.Json.JsonConfigurationProvider.Load(Stream stream)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   --- End of inner exception stack trace ---
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.HandleException(ExceptionDispatchInfo info)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load(Boolean reload)
+   at Microsoft.Extensions.Configuration.FileConfigurationProvider.Load()
+   at Microsoft.Extensions.Configuration.ConfigurationRoot..ctor(IList`1 providers)
+   at Microsoft.Extensions.Configuration.ConfigurationBuilder.Build()
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 22
+2024-11-21 11:08:32.561 +11:00 [INF] Starting application
+2024-11-21 11:08:32.632 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: The input data is not a complete block.
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:10:25.415 +11:00 [INF] Starting application
+2024-11-21 11:10:25.484 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:20:28.489 +11:00 [INF] Starting application
+2024-11-21 11:20:28.551 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:21:15.400 +11:00 [INF] Starting application
+2024-11-21 11:21:15.469 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:21:36.032 +11:00 [INF] Starting application
+2024-11-21 11:21:36.096 +11:00 [ERR] An error occurred during the execution
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 35
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 11:22:42.804 +11:00 [INF] Starting application
+2024-11-21 11:22:42.872 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: The input data is not a complete block.
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 13:54:34.619 +11:00 [INF] Starting application
+2024-11-21 13:54:34.692 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 39
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:12:02.100 +11:00 [INF] Starting application
+2024-11-21 14:12:02.167 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 48
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:14:40.838 +11:00 [INF] Starting application
+2024-11-21 14:14:40.909 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 52
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:20:22.455 +11:00 [INF] Starting application
+2024-11-21 14:20:22.520 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 52
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:34:27.207 +11:00 [INF] Starting application
+2024-11-21 14:34:27.272 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 52
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:36:51.917 +11:00 [INF] Starting application
+2024-11-21 14:36:51.982 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 52
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:39:08.236 +11:00 [INF] Starting application
+2024-11-21 14:39:08.302 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 58
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:54:34.691 +11:00 [INF] Starting application
+2024-11-21 14:54:34.760 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 58
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:55:33.708 +11:00 [INF] Starting application
+2024-11-21 14:55:33.777 +11:00 [ERR] An error occurred during the execution
+System.Exception: Ciphertext length must be a multiple of 16 bytes.
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 50
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:56:42.928 +11:00 [INF] Starting application
+2024-11-21 14:56:42.998 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 58
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 14:59:52.450 +11:00 [INF] Starting application
+2024-11-21 14:59:52.520 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 53
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 15:02:25.792 +11:00 [INF] Starting application
+2024-11-21 15:02:25.866 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 53
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 15:21:26.446 +11:00 [INF] Starting application
+2024-11-21 15:21:26.518 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 53
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 15:22:05.030 +11:00 [INF] Starting application
+2024-11-21 15:22:05.107 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 50
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 15:24:34.056 +11:00 [INF] Starting application
+2024-11-21 15:24:34.131 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 67
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 15:26:02.690 +11:00 [INF] Starting application
+2024-11-21 15:26:02.752 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 76
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 16:59:50.484 +11:00 [INF] Starting application
+2024-11-21 16:59:50.545 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 76
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 34
+2024-11-21 17:07:40.403 +11:00 [INF] Starting application
+2024-11-21 17:07:40.446 +11:00 [ERR] An error occurred during the execution
+System.Security.Cryptography.CryptographicException: Padding is invalid and cannot be removed.
+   at System.Security.Cryptography.SymmetricPadding.GetPaddingLength(ReadOnlySpan`1 block, PaddingMode paddingMode, Int32 blockSize)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(ReadOnlySpan`1 inputBuffer, Span`1 outputBuffer)
+   at System.Security.Cryptography.UniversalCryptoDecryptor.UncheckedTransformFinalBlock(Byte[] inputBuffer, Int32 inputOffset, Int32 inputCount)
+   at System.Security.Cryptography.CryptoStream.ReadAsyncCore(Memory`1 buffer, CancellationToken cancellationToken, Boolean useAsync)
+   at System.Security.Cryptography.CryptoStream.Read(Byte[] buffer, Int32 offset, Int32 count)
+   at System.IO.StreamReader.ReadBuffer()
+   at System.IO.StreamReader.ReadToEnd()
+   at EncryptionHelper.Decrypt(String cipherText, String key, String iv) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\EncryptionHelper.cs:line 76
+   at Program.Main(String[] args) in C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\Program.cs:line 32
