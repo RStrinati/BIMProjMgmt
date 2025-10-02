@@ -1,4 +1,5 @@
 from ui.tooltips import CreateToolTip
+from ui.tab_issue_analytics import IssueAnalyticsDashboard
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
@@ -8483,6 +8484,9 @@ class IssueManagementTab:
         
         # Tab 2: Revizto Data Management
         self.setup_revizto_tab()
+        
+        # Tab 3: Analytics Dashboard (NEW)
+        self.setup_analytics_dashboard_tab()
     
     def setup_revizto_tab(self):
         """Setup the Revizto Data Management sub-tab"""
@@ -8682,6 +8686,16 @@ class IssueManagementTab:
             
         except Exception as e:
             logger.error(f"Error refreshing Revizto changes: {e}")
+    
+    def setup_analytics_dashboard_tab(self):
+        """Setup the Issue Analytics Dashboard sub-tab"""
+        try:
+            # Create the dashboard using the dedicated class
+            self.analytics_dashboard = IssueAnalyticsDashboard(self.sub_notebook)
+            logger.info("Issue Analytics Dashboard tab initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing Analytics Dashboard: {e}")
+            messagebox.showerror("Error", f"Failed to initialize Analytics Dashboard:\n{str(e)}")
     
     def setup_acc_folder_tab(self):
         """Setup the ACC folder management sub-tab"""

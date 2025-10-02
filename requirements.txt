@@ -9,3 +9,8 @@ tkcalendar
 Flask
 Flask-Cors
 pytest
+
+# Issue Analytics dependencies
+nltk>=3.8
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
