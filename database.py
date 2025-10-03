@@ -220,8 +220,26 @@ def get_project_details(project_id):
     finally:
         conn.close()
 
-def update_project_details(project_id, start_date, end_date, status, priority):
-    """Update project start date, end date, status, and priority."""
+def update_project_details(project_id, start_date, end_date, status, priority, notify_ui=None):
+    """
+    Update project start date, end date, status, and priority.
+    
+    This function now propagates date changes to related tables to maintain consistency:
+    - ServiceScheduleSettings: Adjusts service-level start/end dates
+    - ServiceReviews: Cancels reviews scheduled beyond new end_date
+    - Tasks: Flags tasks with dates outside project bounds
+    
+    Args:
+        project_id: Project ID to update
+        start_date: New project start date
+        end_date: New project end date
+        status: New project status
+        priority: New project priority
+        notify_ui: Optional UI notification callback (ProjectNotificationSystem instance)
+    
+    Returns:
+        bool: True if update successful, False otherwise
+    """
     conn = connect_to_db("ProjectManagement")
     if conn is None:
         print("❌ Database connection failed.")
@@ -229,6 +247,24 @@ def update_project_details(project_id, start_date, end_date, status, priority):
 
     try:
         cursor = conn.cursor()
+        
+        # Get previous dates to detect changes
+        cursor.execute(
+            f"""
+            SELECT {S.Projects.START_DATE}, {S.Projects.END_DATE}
+            FROM dbo.{S.Projects.TABLE}
+            WHERE {S.Projects.ID} = ?;
+            """,
+            (project_id,)
+        )
+        old_dates = cursor.fetchone()
+        dates_changed = False
+        
+        if old_dates:
+            old_start, old_end = old_dates
+            dates_changed = (old_start != start_date or old_end != end_date)
+        
+        # 1. Update Projects table
         cursor.execute(
             f"""
             UPDATE dbo.{S.Projects.TABLE}
@@ -237,11 +273,92 @@ def update_project_details(project_id, start_date, end_date, status, priority):
             """,
             (start_date, end_date, status, priority, project_id),
         )
+        
+        # 2. If dates changed, propagate to related tables
+        if dates_changed:
+            print(f"📅 Project dates changed - propagating to related tables...")
+            
+            # 2a. Propagate start_date to ServiceScheduleSettings
+            # Adjust service start dates to be within project bounds
+            cursor.execute(
+                f"""
+                UPDATE sss
+                SET sss.{S.ServiceScheduleSettings.START_DATE} = ?
+                FROM {S.ServiceScheduleSettings.TABLE} sss
+                INNER JOIN {S.ProjectServices.TABLE} ps ON sss.{S.ServiceScheduleSettings.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+                    AND sss.{S.ServiceScheduleSettings.START_DATE} < ?;
+                """,
+                (start_date, project_id, start_date)
+            )
+            service_start_updated = cursor.rowcount
+            if service_start_updated > 0:
+                print(f"  ✅ Updated {service_start_updated} service schedule start dates")
+            
+            # 2b. Propagate end_date to ServiceScheduleSettings
+            # Adjust service end dates to be within project bounds
+            cursor.execute(
+                f"""
+                UPDATE sss
+                SET sss.{S.ServiceScheduleSettings.END_DATE} = ?
+                FROM {S.ServiceScheduleSettings.TABLE} sss
+                INNER JOIN {S.ProjectServices.TABLE} ps ON sss.{S.ServiceScheduleSettings.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+                    AND sss.{S.ServiceScheduleSettings.END_DATE} > ?;
+                """,
+                (end_date, project_id, end_date)
+            )
+            service_end_updated = cursor.rowcount
+            if service_end_updated > 0:
+                print(f"  ✅ Updated {service_end_updated} service schedule end dates")
+            
+            # 2c. Cancel ServiceReviews beyond new end_date
+            cursor.execute(
+                f"""
+                UPDATE sr
+                SET sr.{S.ServiceReviews.STATUS} = 'Cancelled'
+                FROM {S.ServiceReviews.TABLE} sr
+                INNER JOIN {S.ProjectServices.TABLE} ps ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+                    AND sr.{S.ServiceReviews.PLANNED_DATE} > ?
+                    AND sr.{S.ServiceReviews.STATUS} != 'Cancelled';
+                """,
+                (project_id, end_date)
+            )
+            reviews_cancelled = cursor.rowcount
+            if reviews_cancelled > 0:
+                print(f"  ⚠️  Cancelled {reviews_cancelled} reviews scheduled beyond new project end date")
+            
+            # 2d. Flag Tasks with dates outside project bounds (optional - just log warning)
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) 
+                FROM {S.Tasks.TABLE}
+                WHERE {S.Tasks.PROJECT_ID} = ?
+                    AND ({S.Tasks.START_DATE} < ? OR {S.Tasks.END_DATE} > ?);
+                """,
+                (project_id, start_date, end_date)
+            )
+            tasks_outside_bounds = cursor.fetchone()[0]
+            if tasks_outside_bounds > 0:
+                print(f"  ⚠️  Warning: {tasks_outside_bounds} tasks have dates outside new project bounds")
+                print(f"     Consider reviewing task schedules in project {project_id}")
+        
         conn.commit()
         print(f"✅ Project {project_id} details updated.")
+        
+        # 3. Notify UI of changes (if callback provided)
+        if notify_ui and dates_changed:
+            try:
+                notify_ui.notify_project_dates_changed(project_id, start_date, end_date)
+            except AttributeError:
+                # Fallback if notify_project_dates_changed not implemented yet
+                notify_ui.notify_project_changed(project_id)
+        
         return True
     except Exception as e:
         print(f"❌ Database Error updating project details: {e}")
+        conn.rollback()
         return False
     finally:
         conn.close()

@@ -1438,7 +1438,21 @@ class ReviewManagementService:
 
                       period_end: datetime, po_ref: str = None) -> Dict:
 
-        """Generate billing claim for period"""
+        """
+        Generate billing claim for period.
+        
+        This function now captures client snapshot data to preserve historical
+        billing information even if the project changes ownership.
+        
+        Args:
+            project_id: Project ID
+            period_start: Claim period start date
+            period_end: Claim period end date
+            po_ref: Optional purchase order reference
+            
+        Returns:
+            Dict with claim_id, total_amount, and claim lines
+        """
 
         try:
 
@@ -1470,13 +1484,79 @@ class ReviewManagementService:
 
             
 
-            # Create claim header
+            # Fetch client snapshot data from current project state
+
+            client_query = """
+
+            SELECT 
+
+                p.project_id,
+
+                c.client_id,
+
+                c.name AS client_name,
+
+                p.contract_number,
+
+                p.contract_value
+
+            FROM Projects p
+
+            INNER JOIN Clients c ON p.client_id = c.client_id
+
+            WHERE p.project_id = ?
+
+            """
+
+            
+
+            self.cursor.execute(client_query, (project_id,))
+
+            client_data = self.cursor.fetchone()
+
+            
+
+            if not client_data:
+
+                error_msg = f"Project {project_id} or client not found"
+
+                print(error_msg)
+
+                raise ValueError(error_msg)
+
+            
+
+            # Unpack client snapshot
+
+            _, client_id_snapshot, client_name_snapshot, contract_number_snapshot, contract_value_snapshot = client_data
+
+            
+
+            # Create claim header WITH client snapshot
 
             query = """
 
-            INSERT INTO BillingClaims (project_id, period_start, period_end, po_ref)
+            INSERT INTO BillingClaims (
 
-            VALUES (?, ?, ?, ?)
+                project_id, 
+
+                period_start, 
+
+                period_end, 
+
+                po_ref,
+
+                client_id_snapshot,
+
+                client_name_snapshot,
+
+                contract_number_snapshot,
+
+                contract_value_snapshot
+
+            )
+
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 
             """
 
@@ -1490,11 +1570,23 @@ class ReviewManagementService:
 
                 period_end.strftime('%Y-%m-%d'),
 
-                po_ref
+                po_ref,
+
+                client_id_snapshot,
+
+                client_name_snapshot,
+
+                contract_number_snapshot,
+
+                contract_value_snapshot
 
             ))
 
             claim_id = self.cursor.lastrowid
+
+            
+
+            print(f"📋 Billing claim created with client snapshot: {client_name_snapshot} (ID: {client_id_snapshot})")
 
             
 

@@ -577,6 +577,11 @@ class BillingClaims:
     INVOICE_REF = "invoice_ref"
     STATUS = "status"
     CREATED_AT = "created_at"
+    # Client snapshot columns (preserve historical client data)
+    CLIENT_ID_SNAPSHOT = "client_id_snapshot"
+    CLIENT_NAME_SNAPSHOT = "client_name_snapshot"
+    CONTRACT_NUMBER_SNAPSHOT = "contract_number_snapshot"
+    CONTRACT_VALUE_SNAPSHOT = "contract_value_snapshot"
 
 class BillingClaimLines:
     TABLE = "BillingClaimLines"

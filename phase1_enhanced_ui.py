@@ -77,19 +77,184 @@ from constants import schema as S
 
 # Simple notification system stub
 class ProjectNotificationSystem:
+    """
+    Enhanced notification system for cross-tab communication.
+    
+    This system uses the observer pattern to notify registered components
+    (tabs, widgets, etc.) of various project-related events. This ensures
+    all UI components stay synchronized with database changes.
+    
+    Event Types:
+    - project_changed: Selected project changed
+    - project_list_changed: Project list modified (add/delete/update)
+    - project_dates_changed: Project start/end dates modified
+    - client_changed: Project client assignment changed
+    - review_status_changed: Review status updated
+    - service_progress_changed: Service progress % updated
+    - task_status_changed: Task status or completion changed
+    - billing_claim_generated: New billing claim created
+    - project_hold_changed: Project hold status changed
+    - acc_data_imported: ACC data import completed
+    """
+    
+    # Event type constants
+    EVENT_TYPES = {
+        'PROJECT_CHANGED': 'project_changed',
+        'PROJECT_LIST_CHANGED': 'project_list_changed',
+        'PROJECT_DATES_CHANGED': 'project_dates_changed',
+        'CLIENT_CHANGED': 'client_changed',
+        'REVIEW_STATUS_CHANGED': 'review_status_changed',
+        'SERVICE_PROGRESS_CHANGED': 'service_progress_changed',
+        'TASK_STATUS_CHANGED': 'task_status_changed',
+        'BILLING_CLAIM_GENERATED': 'billing_claim_generated',
+        'PROJECT_HOLD_CHANGED': 'project_hold_changed',
+        'ACC_DATA_IMPORTED': 'acc_data_imported',
+    }
+    
     def __init__(self):
         self.observers = []
+    
     def register_observer(self, observer):
+        """Register an observer to receive notifications."""
         if observer not in self.observers:
             self.observers.append(observer)
+    
+    def unregister_observer(self, observer):
+        """Unregister an observer."""
+        if observer in self.observers:
+            self.observers.remove(observer)
+    
+    def notify(self, event_type, **kwargs):
+        """
+        Generic notification dispatcher.
+        
+        Args:
+            event_type: Event type from EVENT_TYPES
+            **kwargs: Event-specific data
+        """
+        handler_name = f"on_{event_type}"
+        for observer in self.observers:
+            if hasattr(observer, handler_name):
+                try:
+                    getattr(observer, handler_name)(**kwargs)
+                except Exception as e:
+                    print(f"⚠️  Error notifying {observer.__class__.__name__}.{handler_name}: {e}")
+    
+    # Convenience methods for specific event types
+    
     def notify_project_changed(self, project_selection):
-        for observer in self.observers:
-            if hasattr(observer, 'on_project_changed'):
-                observer.on_project_changed(project_selection)
+        """Notify that the selected project changed."""
+        self.notify(self.EVENT_TYPES['PROJECT_CHANGED'], project_selection=project_selection)
+    
     def notify_project_list_changed(self):
-        for observer in self.observers:
-            if hasattr(observer, 'on_project_list_changed'):
-                observer.on_project_list_changed()
+        """Notify that the project list was modified."""
+        self.notify(self.EVENT_TYPES['PROJECT_LIST_CHANGED'])
+    
+    def notify_project_dates_changed(self, project_id, start_date, end_date):
+        """
+        Notify that project dates changed.
+        
+        This triggers updates to:
+        - ServiceScheduleSettings
+        - ServiceReviews
+        - Tasks
+        - Gantt charts
+        """
+        self.notify(
+            self.EVENT_TYPES['PROJECT_DATES_CHANGED'],
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+    
+    def notify_client_changed(self, project_id, old_client_id, new_client_id, new_client_name):
+        """
+        Notify that project client assignment changed.
+        
+        Note: Existing billing claims preserve old client via snapshot columns.
+        """
+        self.notify(
+            self.EVENT_TYPES['CLIENT_CHANGED'],
+            project_id=project_id,
+            old_client_id=old_client_id,
+            new_client_id=new_client_id,
+            new_client_name=new_client_name
+        )
+    
+    def notify_review_status_changed(self, review_id, service_id, old_status, new_status):
+        """
+        Notify that a review status changed.
+        
+        May trigger:
+        - Task completion
+        - Service progress update
+        - Billing eligibility check
+        """
+        self.notify(
+            self.EVENT_TYPES['REVIEW_STATUS_CHANGED'],
+            review_id=review_id,
+            service_id=service_id,
+            old_status=old_status,
+            new_status=new_status
+        )
+    
+    def notify_service_progress_changed(self, service_id, project_id, old_progress, new_progress):
+        """
+        Notify that service progress % changed.
+        
+        May trigger:
+        - Billing claim generation
+        - Project overall progress update
+        """
+        self.notify(
+            self.EVENT_TYPES['SERVICE_PROGRESS_CHANGED'],
+            service_id=service_id,
+            project_id=project_id,
+            old_progress=old_progress,
+            new_progress=new_progress
+        )
+    
+    def notify_task_status_changed(self, task_id, project_id, old_status, new_status):
+        """Notify that a task status changed."""
+        self.notify(
+            self.EVENT_TYPES['TASK_STATUS_CHANGED'],
+            task_id=task_id,
+            project_id=project_id,
+            old_status=old_status,
+            new_status=new_status
+        )
+    
+    def notify_billing_claim_generated(self, claim_id, project_id, total_amount):
+        """
+        Notify that a billing claim was generated.
+        
+        Includes client snapshot for historical accuracy.
+        """
+        self.notify(
+            self.EVENT_TYPES['BILLING_CLAIM_GENERATED'],
+            claim_id=claim_id,
+            project_id=project_id,
+            total_amount=total_amount
+        )
+    
+    def notify_project_hold_changed(self, project_id, is_on_hold, hold_reason=None):
+        """Notify that project hold status changed."""
+        self.notify(
+            self.EVENT_TYPES['PROJECT_HOLD_CHANGED'],
+            project_id=project_id,
+            is_on_hold=is_on_hold,
+            hold_reason=hold_reason
+        )
+    
+    def notify_acc_data_imported(self, project_id, folder_name, import_id, record_count):
+        """Notify that ACC data import completed."""
+        self.notify(
+            self.EVENT_TYPES['ACC_DATA_IMPORTED'],
+            project_id=project_id,
+            folder_name=folder_name,
+            import_id=import_id,
+            record_count=record_count
+        )
 
 project_notification_system = ProjectNotificationSystem()
 
