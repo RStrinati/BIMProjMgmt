@@ -52,6 +52,8 @@ from database import (
     get_revizto_extraction_runs, get_last_revizto_extraction_run,
     get_project_combined_issues_overview, get_project_issues_by_status
 )
+from shared import project_service
+from shared.project_service import ProjectServiceError, ProjectValidationError
 from review_management_service import ReviewManagementService
 from handlers.acc_handler import run_acc_import
 from handlers.review_handler import submit_review_schedule
@@ -629,45 +631,19 @@ class ProjectSetupTab:
         dialog.after(100, lambda: dialog.focus_set())
 
     def create_project_in_db(self, project_data):
-        """Create a new project in the database with all collected fields"""
+        """Create a new project using the shared service layer."""
         try:
-            from database import insert_project_full
-
-            # Prepare complete project data for insert_project_full
-            db_data = {
-                S.Projects.NAME: project_data['name'],
-                S.Projects.FOLDER_PATH: project_data.get('folder_path', ''),
-                S.Projects.IFC_FOLDER_PATH: project_data.get('ifc_folder_path', ''),
-                S.Projects.START_DATE: project_data.get('start_date', datetime.now().strftime('%Y-%m-%d')),
-                S.Projects.END_DATE: project_data.get('end_date', (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
-            }
-
-            # Add optional fields if provided
-            if project_data.get('client_id'):
-                db_data[S.Projects.CLIENT_ID] = project_data['client_id']
-            if project_data.get('status'):
-                db_data[S.Projects.STATUS] = project_data['status']
-            if project_data.get('priority'):
-                # Map priority strings to numeric values
-                priority_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
-                db_data[S.Projects.PRIORITY] = priority_map.get(project_data['priority'], 2)  # Default to Medium
-            
-            # Insert the project
-            project_id = insert_project_full(db_data)
-            
-            if project_id:
-                messagebox.showinfo("Success", f"Project created successfully! (ID: {project_id})")
-                # Refresh the project list
-                self.load_projects()
-                return project_id
-            else:
-                messagebox.showerror("Error", "Failed to create project")
-                return None
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to create project: {str(e)}")
-            print(f"Project creation error: {e}")
-            return None
+            project_service.create_project(project_data)
+            return True
+        except ProjectValidationError as exc:
+            messagebox.showerror("Validation Error", str(exc))
+        except ProjectServiceError as exc:
+            messagebox.showerror("Error", f"Failed to create project: {exc}")
+            logger.exception("Project creation error via service layer")
+        except Exception as exc:  # Fallback to catch unexpected issues
+            messagebox.showerror("Error", f"Failed to create project: {exc}")
+            logger.exception("Unexpected project creation error")
+        return False
         self.frame = ttk.Frame(parent_notebook)
         parent_notebook.add(self.frame, text="Project Setup")
         self.setup_ui()
@@ -6348,19 +6324,15 @@ class NestedProjectSetupTab:
     def load_projects(self):
         """Load available projects into the dropdown"""
         try:
-            from database import get_projects
-            projects = get_projects()
-            project_options = [f"{p[0]} - {p[1]}" for p in projects] if projects else []  # Use "ID - Name" format like other tabs
+            projects = project_service.list_projects_basic()
+            project_options = [f"{p['project_id']} - {p['name']}" for p in projects]
             self.project_combo['values'] = project_options
-            print(f"Loaded {len(project_options)} projects: {project_options[:3]}...")  # Show first 3
-            # Also show in a message box for debugging
+            print(f"Loaded {len(project_options)} projects: {project_options[:3]}...")
             if not project_options:
                 messagebox.showwarning("No Projects", "No projects found in database")
-            else:
-                messagebox.showinfo("Projects Loaded", f"Loaded {len(project_options)} projects")
-        except Exception as e:
-            print(f"Error loading projects: {e}")
-            messagebox.showerror("Error", f"Failed to load projects: {e}")
+        except Exception as exc:
+            print(f"Error loading projects: {exc}")
+            messagebox.showerror("Error", f"Failed to load projects: {exc}")
             self.project_combo['values'] = []
 
     def show_project_dialog(self, mode="create", project_id=None):
@@ -6759,43 +6731,17 @@ class NestedProjectSetupTab:
     def create_project_in_db(self, project_data):
         """Create a new project in the database with all collected fields"""
         try:
-            from handlers.database import insert_project_full
-
-            # Prepare complete project data for insert_project_full
-            db_data = {
-                S.Projects.NAME: project_data['name'],
-                S.Projects.FOLDER_PATH: project_data.get('folder_path', ''),
-                S.Projects.IFC_FOLDER_PATH: project_data.get('ifc_folder_path', ''),
-                S.Projects.START_DATE: project_data.get('start_date', datetime.now().strftime('%Y-%m-%d')),
-                S.Projects.END_DATE: project_data.get('end_date', (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
-            }
-
-            # Add optional fields if provided
-            if project_data.get('client_id'):
-                db_data[S.Projects.CLIENT_ID] = project_data['client_id']
-            if project_data.get('status'):
-                db_data[S.Projects.STATUS] = project_data['status']
-            if project_data.get('priority'):
-                # Map priority strings to numeric values
-                priority_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
-                db_data[S.Projects.PRIORITY] = priority_map.get(project_data['priority'], 2)  # Default to Medium
-            
-            # Insert the project
-            project_id = insert_project_full(db_data)
-            
-            if project_id:
-                messagebox.showinfo("Success", f"Project created successfully! (ID: {project_id})")
-                # Refresh the project list
-                self.load_projects()
-                return project_id
-            else:
-                messagebox.showerror("Error", "Failed to create project")
-                return None
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to create project: {str(e)}")
-            print(f"Project creation error: {e}")
-            return None
+            project_service.create_project(project_data)
+            return True
+        except ProjectValidationError as exc:
+            messagebox.showerror("Validation Error", str(exc))
+        except ProjectServiceError as exc:
+            messagebox.showerror("Error", f"Failed to create project: {exc}")
+            logger.exception("Project creation error via service layer")
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to create project: {exc}")
+            logger.exception("Unexpected project creation error")
+        return False
 
     def refresh_data(self):
         """Refresh project data by reloading the project list"""
@@ -6853,111 +6799,34 @@ class DocumentManagementTab:
     def create_project_in_db(self, project_data):
         """Create a new project in the database with all collected fields"""
         try:
-            from handlers.database import insert_project_full
-
-            # Prepare complete project data for insert_project_full
-            db_data = {
-                S.Projects.NAME: project_data['name'],
-                S.Projects.FOLDER_PATH: project_data.get('folder_path', ''),
-                S.Projects.IFC_FOLDER_PATH: project_data.get('ifc_folder_path', ''),
-                S.Projects.START_DATE: project_data.get('start_date', datetime.now().strftime('%Y-%m-%d')),
-                S.Projects.END_DATE: project_data.get('end_date', (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
-            }
-
-            # Add optional fields if provided
-            if project_data.get('client_id'):
-                db_data[S.Projects.CLIENT_ID] = project_data['client_id']
-            if project_data.get('status'):
-                db_data[S.Projects.STATUS] = project_data['status']
-            if project_data.get('priority'):
-                # Map priority strings to numeric values
-                priority_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
-                db_data[S.Projects.PRIORITY] = priority_map.get(project_data['priority'], 2)  # Default to Medium
-
-            # Add project type if provided (this would need mapping to type_id)
-            # For now, store as a comment or handle in future enhancement
-            if project_data.get('project_type'):
-                # TODO: Map project_type to type_id from project_types table
-                pass
-
-            # Add capacity/area information (these might need new columns or separate tables)
-            if project_data.get('area'):
-                db_data[S.Projects.AREA_HECTARES] = project_data['area']
-            if project_data.get('mw_capacity'):
-                db_data[S.Projects.MW_CAPACITY] = project_data['mw_capacity']
-
-            # Add location information (these might need new columns)
-            if project_data.get('address'):
-                db_data[S.Projects.ADDRESS] = project_data['address']
-            if project_data.get('city'):
-                db_data[S.Projects.CITY] = project_data['city']
-            if project_data.get('state'):
-                db_data[S.Projects.STATE] = project_data['state']
-            if project_data.get('postcode'):
-                db_data[S.Projects.POSTCODE] = project_data['postcode']
-
-            # Use insert_project_full for complete project creation
-            success = insert_project_full(db_data)
-
-            if success:
-                print(f"✅ Successfully created project: {project_data['name']}")
-                return True
-            else:
-                print(f"❌ Failed to create project: {project_data['name']}")
-                return False
-
-        except Exception as e:
-            print(f"❌ Error creating project: {e}")
-            messagebox.showerror("Database Error", f"Failed to create project: {str(e)}")
-            return False
+            project_service.create_project(project_data)
+            print(f"✅ Successfully created project: {project_data['name']}")
+            return True
+        except ProjectValidationError as exc:
+            messagebox.showerror("Validation Error", str(exc))
+        except ProjectServiceError as exc:
+            print(f"❌ Failed to create project: {project_data['name']}: {exc}")
+            messagebox.showerror("Database Error", f"Failed to create project: {exc}")
+        except Exception as exc:
+            print(f"❌ Error creating project: {exc}")
+            messagebox.showerror("Database Error", f"Failed to create project: {exc}")
+        return False
     
     def update_project_in_db(self, project_id, project_data):
         """Update an existing project in the database"""
         try:
-            # Map UI fields to database column names
-            db_data = {}
-            
-            # Basic project information
-            if project_data.get('name'):
-                db_data['project_name'] = project_data['name']
-            if project_data.get('client_id'):
-                db_data['client_id'] = project_data['client_id']
-            if project_data.get('status'):
-                db_data['status'] = project_data['status']
-            if project_data.get('priority'):
-                db_data['priority'] = project_data['priority']
-            if project_data.get('start_date'):
-                db_data['start_date'] = project_data['start_date']
-            if project_data.get('end_date'):
-                db_data['end_date'] = project_data['end_date']
-            
-            # Update main project record if we have data to update
-            if db_data:
-                from handlers.database import update_project_record
-                success = update_project_record(project_id, db_data)
-
-                if not success:
-                    print(f"Failed to update project record for project {project_id}")
-                    return False
-            
-            # Update folder paths separately using the dedicated function
-            if project_data.get('folder_path') or project_data.get('ifc_folder_path'):
-                from handlers.database import update_project_folders
-                folder_success = update_project_folders(
-                    project_id,
-                    models_path=project_data.get('folder_path'),
-                    ifc_path=project_data.get('ifc_folder_path')
-                )
-                if not folder_success:
-                    print(f"Failed to update folder paths for project {project_id}")
-            
-            print(f"? Successfully updated project {project_id}")
+            project_service.update_project(project_id, project_data)
+            print(f"✅ Successfully updated project {project_id}")
             return True
-            
-        except Exception as e:
-            print(f"? Error updating project {project_id}: {e}")
-            messagebox.showerror("Database Error", f"Failed to update project: {str(e)}")
-            return False
+        except ProjectValidationError as exc:
+            messagebox.showerror("Validation Error", str(exc))
+        except ProjectServiceError as exc:
+            print(f"❌ Error updating project {project_id}: {exc}")
+            messagebox.showerror("Database Error", f"Failed to update project: {exc}")
+        except Exception as exc:
+            print(f"❌ Unexpected error updating project {project_id}: {exc}")
+            messagebox.showerror("Database Error", f"Failed to update project: {exc}")
+        return False
     
     def configure_paths(self):
         """Configure model and IFC file paths for the selected project"""
