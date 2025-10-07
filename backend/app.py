@@ -35,10 +35,13 @@ from database import (
     get_bep_matrix,
     upsert_bep_section,
     update_bep_status,
-    get_projects_full,
-    update_project_record,
-    insert_project_full,
     get_reference_options,
+)
+from shared.project_service import (
+    ProjectServiceError,
+    ProjectValidationError,
+    create_project,
+    list_projects_full,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -150,16 +153,35 @@ def serve_react_routes(path):
 @app.route('/api/projects', methods=['GET', 'POST'])
 def api_projects():
     if request.method == 'GET':
-        projects = get_projects_full()
+        projects = list_projects_full()
         return jsonify(projects)
 
     body = request.get_json() or {}
-    if not body.get('project_name'):
-        return jsonify({'error': 'project_name required'}), 400
-    success = insert_project_full(body)
-    if success:
-        return jsonify({'success': True}), 201
-    return jsonify({'success': False}), 500
+    try:
+        result = create_project({
+            'name': body.get('project_name') or body.get('name'),
+            'client_id': body.get('client_id'),
+            'project_type': body.get('project_type'),
+            'area': body.get('area'),
+            'mw_capacity': body.get('mw_capacity'),
+            'status': body.get('status'),
+            'priority': body.get('priority') or body.get('priority_label'),
+            'start_date': body.get('start_date'),
+            'end_date': body.get('end_date'),
+            'address': body.get('address'),
+            'city': body.get('city'),
+            'state': body.get('state'),
+            'postcode': body.get('postcode'),
+            'folder_path': body.get('folder_path'),
+            'ifc_folder_path': body.get('ifc_folder_path'),
+        })
+    except ProjectValidationError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except ProjectServiceError as exc:
+        logging.exception("Failed to create project via service layer")
+        return jsonify({'error': str(exc)}), 500
+
+    return jsonify(result), 201
 
 
 @app.route('/api/projects_full', methods=['GET'])
