@@ -248,7 +248,48 @@ SELECT
     -- For troubleshooting
     i.assignee_id,
 
-    -- 🔹 Custom Attributes Expanded - Priority extracted from JSON
+    -- 🔹 Custom Attributes Expanded - All 6 custom attributes extracted from JSON
+    -- Building Level: In-ground, Level 00, Level 00 Mezz, Roof Level
+    (
+        SELECT TOP 1 [value]
+        FROM OPENJSON(ca.custom_attributes_json)
+        WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
+        WHERE [name] = 'Building Level'
+    ) AS [Building_Level],
+    
+    -- Clash Level: L1-Critical, L2-Important, L3-Significant, L4-Minor
+    (
+        SELECT TOP 1 [value]
+        FROM OPENJSON(ca.custom_attributes_json)
+        WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
+        WHERE [name] = 'Clash Level'
+    ) AS [Clash_Level],
+    
+    -- Location: Admin, Fire Pump Building, Gen Yard, MV Room, ROMP 01-04, etc.
+    (
+        SELECT TOP 1 [value]
+        FROM OPENJSON(ca.custom_attributes_json)
+        WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
+        WHERE [name] = 'Location'
+    ) AS [Location],
+    
+    -- Location 01: Same values as Location but used in different project
+    (
+        SELECT TOP 1 [value]
+        FROM OPENJSON(ca.custom_attributes_json)
+        WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
+        WHERE [name] = 'Location 01'
+    ) AS [Location_01],
+    
+    -- Phase: PHASE 01, PHASE 02, PHASE 03, PHASE 04
+    (
+        SELECT TOP 1 [value]
+        FROM OPENJSON(ca.custom_attributes_json)
+        WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
+        WHERE [name] = 'Phase'
+    ) AS [Phase],
+    
+    -- Priority: Blocker, Critical, Major, Minor, Trivial (SINSW project only)
     (
         SELECT TOP 1 [value]
         FROM OPENJSON(ca.custom_attributes_json)
