@@ -152,7 +152,7 @@ AttrBase AS (
      AND icam.bim360_account_id = ica.bim360_account_id
     LEFT JOIN ListValues lv
       ON lv.attribute_mappings_id = ica.attribute_mapping_id
-     AND lv.list_id = ica.attribute_value
+     AND CAST(lv.list_id AS NVARCHAR(MAX)) = ica.attribute_value
      AND lv.bim360_project_id = ica.bim360_project_id
      AND lv.bim360_account_id = ica.bim360_account_id
 )
