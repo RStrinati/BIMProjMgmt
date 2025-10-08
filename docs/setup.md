@@ -66,17 +66,27 @@ load_dotenv()
 
 🔒 Add .env to your .gitignore to keep credentials secure.
 
-## Database Schema Updates
+## Database & API Preparation
 
-After setting up your Python environment and environment variables, run the SQL
-script to ensure the `ReviewSchedule` table includes the latest columns:
+Once the environment variables are configured, run the consolidated preparation
+script to execute the required SQL migrations and verify your React build
+output:
 
 ```bash
-sqlcmd -S <server> -d <database> -i sql/update_review_schedule_schema.sql
+python scripts/prepare_react_api.py
 ```
 
-Run this script whenever setting up a new database or upgrading from an older
-version of the project.
+Use `--dry-run` to print the SQL batches without applying them. The script runs
+the following migrations in order:
+
+1. `sql/update_review_schedule_schema.sql`
+2. `sql/add_project_fields.sql`
+3. `sql/update_projects_view.sql`
+4. `sql/phase1_enhancements.sql`
+
+It also checks that a built React bundle is available in the `frontend/`
+directory (or the directory pointed to by the `FRONTEND_DIR` environment
+variable) so Flask can serve the SPA alongside the API routes.
 
 ## Running the Application
 Once everything is configured:

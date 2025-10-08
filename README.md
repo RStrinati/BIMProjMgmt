@@ -64,6 +64,15 @@ DB_DRIVER={ODBC Driver 18 for SQL Server}
 PROJECT_MGMT_DB=ProjectManagement
 ACC_DB=acc_data_schema
 REVIT_HEALTH_DB=RevitHealthCheckDB
+
+# External Services
+ACC_SERVICE_URL=http://localhost:4000/api/v1
+ACC_SERVICE_TOKEN=your-acc-token
+REVIZTO_SERVICE_URL=http://localhost:5000/api/v1
+REVIZTO_SERVICE_TOKEN=your-revizto-token
+
+# Optional: Custom React build directory served by Flask
+FRONTEND_DIR=/absolute/path/to/react/build
 ```
 
 ### Installation
@@ -85,9 +94,9 @@ REVIT_HEALTH_DB=RevitHealthCheckDB
    pip install -r requirements.txt
    ```
 
-3. **Initialize database schema**
+3. **Prepare the database for the React API**
    ```bash
-   python tools/check_schema.py --autofix --update-constants
+   python scripts/prepare_react_api.py
    ```
 
 4. **Launch the application**

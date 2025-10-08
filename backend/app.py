@@ -32,6 +32,7 @@ from database import (  # noqa: E402
     insert_files_into_tblACCDocs,
     upsert_bep_section,
     update_bep_status,
+    update_service_template,
     update_project_details,
     update_project_folders,
     update_review_cycle,
@@ -46,7 +47,8 @@ from shared.project_service import (  # noqa: E402
     update_project,
 )
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+DEFAULT_FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", DEFAULT_FRONTEND_DIR)).expanduser()
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
@@ -118,18 +120,38 @@ def api_delete_service_template(template_id):
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
 # Serve React app
+def _frontend_file_exists(relative_path: str) -> bool:
+    try:
+        return (FRONTEND_DIR / relative_path).is_file()
+    except OSError:
+        return False
+
+
 @app.route('/')
 def serve_react_app():
-    return app.send_static_file('index.html')
+    if _frontend_file_exists('index.html'):
+        return app.send_static_file('index.html')
+    return (
+        jsonify(
+            {
+                'error': 'Frontend bundle not found',
+                'hint': 'Run your React build (e.g. `npm run build`) and copy the output '
+                        f'into {FRONTEND_DIR} or set FRONTEND_DIR to the build directory.',
+            }
+        ),
+        503,
+    )
 
 # Serve React app for all non-API routes (SPA routing)
 @app.route('/<path:path>')
 def serve_react_routes(path):
     if path.startswith('api/'):
         return {'error': 'API endpoint not found'}, 404
-    if path.startswith('src/') or path.endswith('.js') or path.endswith('.css'):
+    if _frontend_file_exists(path):
         return app.send_static_file(path)
-    return app.send_static_file('index.html')
+    if _frontend_file_exists('index.html'):
+        return app.send_static_file('index.html')
+    return serve_react_app()
 
 
 @app.route('/api/projects', methods=['GET', 'POST'])
