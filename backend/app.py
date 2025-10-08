@@ -1,52 +1,77 @@
-import sys
+import logging
 import os
-from flask import Flask, jsonify, request, send_from_directory
+import sys
 from pathlib import Path
-from flask_cors import CORS
 
 import requests
-import logging
-from config import ACC_SERVICE_URL, ACC_SERVICE_TOKEN, REVIZTO_SERVICE_URL, REVIZTO_SERVICE_TOKEN
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+from config import ACC_SERVICE_TOKEN, ACC_SERVICE_URL, REVIZTO_SERVICE_TOKEN, REVIZTO_SERVICE_URL
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import (
+from database import (  # noqa: E402
+    create_review_cycle,
     create_service_template,
-    get_service_templates,
-    update_service_template,
+    delete_review_cycle,
     delete_service_template,
-    get_review_tasks,
-    update_review_task_assignee,
-    get_users_list,
-    get_project_details,
-    update_project_details,
-    update_project_folders,
-    insert_project,
-    insert_files_into_tblACCDocs,
-    get_project_folders,
-    get_review_summary,
+    get_bep_matrix,
     get_contractual_links,
     get_cycle_ids,
-    get_review_cycles,
-    create_review_cycle,
-    update_review_cycle,
-    delete_review_cycle,
+    get_project_details,
+    get_project_folders,
+    get_projects_full,
+    get_reference_options,
     get_review_cycle_tasks,
-    update_review_cycle_task,
-    get_bep_matrix,
+    get_review_cycles,
+    get_review_summary,
+    get_review_tasks,
+    get_service_templates,
+    get_users_list,
+    insert_files_into_tblACCDocs,
     upsert_bep_section,
     update_bep_status,
-    get_reference_options,
+    update_project_details,
+    update_project_folders,
+    update_review_cycle,
+    update_review_cycle_task,
+    update_review_task_assignee,
 )
-from shared.project_service import (
+from shared.project_service import (  # noqa: E402
     ProjectServiceError,
     ProjectValidationError,
     create_project,
     list_projects_full,
+    update_project,
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
+
+
+def _extract_project_payload(body):
+    """Normalise incoming JSON into a payload for the project service."""
+
+    return {
+        'name': body.get('project_name') or body.get('name'),
+        'client_id': body.get('client_id'),
+        'project_type': body.get('project_type'),
+        'area': body.get('area'),
+        'mw_capacity': body.get('mw_capacity'),
+        'status': body.get('status'),
+        'priority': body.get('priority') or body.get('priority_label'),
+        'start_date': body.get('start_date'),
+        'end_date': body.get('end_date'),
+        'address': body.get('address'),
+        'city': body.get('city'),
+        'state': body.get('state'),
+        'postcode': body.get('postcode'),
+        'folder_path': body.get('folder_path'),
+        'ifc_folder_path': body.get('ifc_folder_path'),
+    }
+
 
 # --- ServiceTemplates API ---
 @app.route('/api/service_templates', methods=['GET'])
@@ -92,49 +117,6 @@ def api_delete_service_template(template_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
-from flask import Flask, jsonify, request, send_from_directory
-from pathlib import Path
-from flask_cors import CORS
-
-import sys
-import os
-import requests
-import logging
-from config import ACC_SERVICE_URL, ACC_SERVICE_TOKEN, REVIZTO_SERVICE_URL, REVIZTO_SERVICE_TOKEN
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from database import (
-    get_review_tasks,
-    update_review_task_assignee,
-    get_users_list,
-    get_project_details,
-    update_project_details,
-    update_project_folders,
-    insert_project,
-    insert_files_into_tblACCDocs,
-    get_project_folders,
-    get_review_summary,
-    get_contractual_links,
-    get_cycle_ids,
-    get_review_cycles,
-    create_review_cycle,
-    update_review_cycle,
-    delete_review_cycle,
-    get_review_cycle_tasks,
-    update_review_cycle_task,
-    get_bep_matrix,
-    upsert_bep_section,
-    update_bep_status,
-    get_projects_full,
-    update_project_record,
-    insert_project_full,
-    get_reference_options,
-)
-
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
-CORS(app)
-
 # Serve React app
 @app.route('/')
 def serve_react_app():
@@ -157,24 +139,9 @@ def api_projects():
         return jsonify(projects)
 
     body = request.get_json() or {}
+    payload = _extract_project_payload(body)
     try:
-        result = create_project({
-            'name': body.get('project_name') or body.get('name'),
-            'client_id': body.get('client_id'),
-            'project_type': body.get('project_type'),
-            'area': body.get('area'),
-            'mw_capacity': body.get('mw_capacity'),
-            'status': body.get('status'),
-            'priority': body.get('priority') or body.get('priority_label'),
-            'start_date': body.get('start_date'),
-            'end_date': body.get('end_date'),
-            'address': body.get('address'),
-            'city': body.get('city'),
-            'state': body.get('state'),
-            'postcode': body.get('postcode'),
-            'folder_path': body.get('folder_path'),
-            'ifc_folder_path': body.get('ifc_folder_path'),
-        })
+        result = create_project(payload)
     except ProjectValidationError as exc:
         return jsonify({'error': str(exc)}), 400
     except ProjectServiceError as exc:
@@ -277,21 +244,32 @@ def api_project_folders(project_id):
 @app.route('/api/project', methods=['POST'])
 def api_create_project():
     body = request.get_json() or {}
-    name = body.get('project_name')
-    if not name:
-        return jsonify({'error': 'project_name required'}), 400
-    success = insert_project(name, body.get('folder_path', ''), body.get('ifc_folder_path'))
-    if success:
-        return jsonify({'success': True}), 201
-    return jsonify({'success': False}), 500
+    payload = _extract_project_payload(body)
+    try:
+        result = create_project(payload)
+    except ProjectValidationError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except ProjectServiceError as exc:
+        logging.exception("Failed to create project via service layer")
+        return jsonify({'error': str(exc)}), 500
+
+    return jsonify(result), 201
 
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
 def api_update_full_project(project_id):
     """Update project fields via a generic PUT."""
     data = request.get_json() or {}
-    update_project_record(project_id, data)
-    return jsonify({'message': 'Project updated'})
+    payload = _extract_project_payload(data)
+    try:
+        result = update_project(project_id, payload)
+    except ProjectValidationError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except ProjectServiceError as exc:
+        logging.exception("Failed to update project via service layer")
+        return jsonify({'error': str(exc)}), 500
+
+    return jsonify(result)
 
 
 @app.route('/api/extract_files', methods=['POST'])
