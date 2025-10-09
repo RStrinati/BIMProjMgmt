@@ -1,10 +1,13 @@
+USE ProjectManagement;
+GO
+
 -- Phase 1 Database Schema Enhancements
 -- Enhanced Task Management, Resource Allocation, and Milestone Tracking
 
 -- 1. Enhance existing tasks table with new columns
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('tasks') AND name = 'priority')
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tasks') AND name = 'priority')
 BEGIN
-    ALTER TABLE tasks ADD 
+    ALTER TABLE dbo.tasks ADD
         priority VARCHAR(20) DEFAULT 'Medium',
         estimated_hours DECIMAL(5,2),
         actual_hours DECIMAL(5,2),
@@ -14,14 +17,14 @@ BEGIN
         updated_at DATETIME DEFAULT GETDATE();
     
     -- Add foreign key constraint for predecessor tasks
-    ALTER TABLE tasks ADD CONSTRAINT FK_tasks_predecessor 
-        FOREIGN KEY (predecessor_task_id) REFERENCES tasks(task_id);
+    ALTER TABLE dbo.tasks ADD CONSTRAINT FK_tasks_predecessor
+        FOREIGN KEY (predecessor_task_id) REFERENCES dbo.tasks(task_id);
 END
 
 -- 2. Create milestones table
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'milestones')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'milestones' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    CREATE TABLE milestones (
+    CREATE TABLE dbo.milestones (
         milestone_id INT IDENTITY(1,1) PRIMARY KEY,
         project_id INT NOT NULL,
         milestone_name NVARCHAR(255) NOT NULL,
@@ -33,18 +36,18 @@ BEGIN
         created_by INT,
         updated_at DATETIME DEFAULT GETDATE(),
         
-        CONSTRAINT FK_milestones_project FOREIGN KEY (project_id) REFERENCES projects(project_id),
-        CONSTRAINT FK_milestones_created_by FOREIGN KEY (created_by) REFERENCES users(user_id)
+        CONSTRAINT FK_milestones_project FOREIGN KEY (project_id) REFERENCES dbo.projects(project_id),
+        CONSTRAINT FK_milestones_created_by FOREIGN KEY (created_by) REFERENCES dbo.users(user_id)
     );
-    
+
     -- Create index for better query performance
-    CREATE INDEX IX_milestones_project_target ON milestones(project_id, target_date);
+    CREATE INDEX IX_milestones_project_target ON dbo.milestones(project_id, target_date);
 END
 
 -- 3. Enhance users table with capacity and skills information
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'hourly_rate')
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.users') AND name = 'hourly_rate')
 BEGIN
-    ALTER TABLE users ADD
+    ALTER TABLE dbo.users ADD
         hourly_rate DECIMAL(8,2),
         weekly_capacity_hours DECIMAL(4,1) DEFAULT 40.0,
         skills NVARCHAR(500),
@@ -55,9 +58,9 @@ BEGIN
 END
 
 -- 4. Create task_assignments table for better resource tracking
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'task_assignments')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'task_assignments' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    CREATE TABLE task_assignments (
+    CREATE TABLE dbo.task_assignments (
         assignment_id INT IDENTITY(1,1) PRIMARY KEY,
         task_id INT NOT NULL,
         user_id INT NOT NULL,
@@ -66,16 +69,16 @@ BEGIN
         role_in_task NVARCHAR(50), -- 'Primary', 'Support', 'Reviewer'
         is_active BIT DEFAULT 1,
         
-        CONSTRAINT FK_task_assignments_task FOREIGN KEY (task_id) REFERENCES tasks(task_id),
-        CONSTRAINT FK_task_assignments_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+        CONSTRAINT FK_task_assignments_task FOREIGN KEY (task_id) REFERENCES dbo.tasks(task_id),
+        CONSTRAINT FK_task_assignments_user FOREIGN KEY (user_id) REFERENCES dbo.users(user_id),
         CONSTRAINT UK_task_assignments UNIQUE (task_id, user_id, is_active)
     );
 END
 
 -- 5. Create project_templates table for standardized project setup
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'project_templates')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'project_templates' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    CREATE TABLE project_templates (
+    CREATE TABLE dbo.project_templates (
         template_id INT IDENTITY(1,1) PRIMARY KEY,
         template_name NVARCHAR(255) NOT NULL,
         project_type NVARCHAR(100), -- 'Residential', 'Commercial', 'Infrastructure'
@@ -85,14 +88,14 @@ BEGIN
         created_at DATETIME DEFAULT GETDATE(),
         created_by INT,
         
-        CONSTRAINT FK_project_templates_created_by FOREIGN KEY (created_by) REFERENCES users(user_id)
+        CONSTRAINT FK_project_templates_created_by FOREIGN KEY (created_by) REFERENCES dbo.users(user_id)
     );
 END
 
 -- 6. Create template_tasks table for predefined task templates
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'template_tasks')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'template_tasks' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    CREATE TABLE template_tasks (
+    CREATE TABLE dbo.template_tasks (
         template_task_id INT IDENTITY(1,1) PRIMARY KEY,
         template_id INT NOT NULL,
         task_name NVARCHAR(255) NOT NULL,
@@ -103,14 +106,14 @@ BEGIN
         required_role NVARCHAR(50),
         description NVARCHAR(1000),
         
-        CONSTRAINT FK_template_tasks_template FOREIGN KEY (template_id) REFERENCES project_templates(template_id)
+        CONSTRAINT FK_template_tasks_template FOREIGN KEY (template_id) REFERENCES dbo.project_templates(template_id)
     );
 END
 
 -- 7. Create task_comments table for collaboration
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'task_comments')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'task_comments' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    CREATE TABLE task_comments (
+    CREATE TABLE dbo.task_comments (
         comment_id INT IDENTITY(1,1) PRIMARY KEY,
         task_id INT NOT NULL,
         user_id INT NOT NULL,
@@ -118,30 +121,30 @@ BEGIN
         created_at DATETIME DEFAULT GETDATE(),
         is_internal BIT DEFAULT 1, -- Internal vs client-visible comments
         
-        CONSTRAINT FK_task_comments_task FOREIGN KEY (task_id) REFERENCES tasks(task_id),
-        CONSTRAINT FK_task_comments_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+        CONSTRAINT FK_task_comments_task FOREIGN KEY (task_id) REFERENCES dbo.tasks(task_id),
+        CONSTRAINT FK_task_comments_user FOREIGN KEY (user_id) REFERENCES dbo.users(user_id)
     );
-    
-    CREATE INDEX IX_task_comments_task ON task_comments(task_id, created_at DESC);
+
+    CREATE INDEX IX_task_comments_task ON dbo.task_comments(task_id, created_at DESC);
 END
 
 -- 8. Insert default project templates
-IF NOT EXISTS (SELECT 1 FROM project_templates)
+IF NOT EXISTS (SELECT 1 FROM dbo.project_templates)
 BEGIN
-    INSERT INTO project_templates (template_name, project_type, description, estimated_duration_days)
-    VALUES 
+    INSERT INTO dbo.project_templates (template_name, project_type, description, estimated_duration_days)
+    VALUES
         ('Standard Residential Project', 'Residential', 'Standard residential BIM project workflow', 120),
         ('Commercial Office Building', 'Commercial', 'Commercial office building project template', 180),
         ('Infrastructure Project', 'Infrastructure', 'Roads, bridges, and infrastructure projects', 240),
         ('Renovation Project', 'Renovation', 'Building renovation and retrofit projects', 90);
-    
+
     -- Get the template IDs for inserting tasks
-    DECLARE @ResidentialTemplateId INT = (SELECT template_id FROM project_templates WHERE template_name = 'Standard Residential Project');
-    DECLARE @CommercialTemplateId INT = (SELECT template_id FROM project_templates WHERE template_name = 'Commercial Office Building');
-    
+    DECLARE @ResidentialTemplateId INT = (SELECT template_id FROM dbo.project_templates WHERE template_name = 'Standard Residential Project');
+    DECLARE @CommercialTemplateId INT = (SELECT template_id FROM dbo.project_templates WHERE template_name = 'Commercial Office Building');
+
     -- Insert template tasks for Residential Project
-    INSERT INTO template_tasks (template_id, task_name, estimated_hours, priority, sequence_order, predecessor_sequence, required_role, description)
-    VALUES 
+    INSERT INTO dbo.template_tasks (template_id, task_name, estimated_hours, priority, sequence_order, predecessor_sequence, required_role, description)
+    VALUES
         (@ResidentialTemplateId, 'Project Initiation', 8, 'High', 1, NULL, 'Manager', 'Set up project structure and team'),
         (@ResidentialTemplateId, 'Site Survey', 16, 'High', 2, 1, 'Senior', 'Conduct site measurements and documentation'),
         (@ResidentialTemplateId, 'Concept Design', 40, 'High', 3, 2, 'Lead', 'Create initial design concepts'),
@@ -152,8 +155,8 @@ BEGIN
         (@ResidentialTemplateId, 'Final Review', 16, 'High', 8, 7, 'Manager', 'Final project review and sign-off');
     
     -- Insert template tasks for Commercial Project
-    INSERT INTO template_tasks (template_id, task_name, estimated_hours, priority, sequence_order, predecessor_sequence, required_role, description)
-    VALUES 
+    INSERT INTO dbo.template_tasks (template_id, task_name, estimated_hours, priority, sequence_order, predecessor_sequence, required_role, description)
+    VALUES
         (@CommercialTemplateId, 'Project Initiation', 16, 'High', 1, NULL, 'Manager', 'Set up commercial project structure'),
         (@CommercialTemplateId, 'Stakeholder Workshop', 8, 'High', 2, 1, 'Manager', 'Conduct stakeholder requirements workshop'),
         (@CommercialTemplateId, 'Site Analysis', 24, 'High', 3, 2, 'Senior', 'Comprehensive site analysis and survey'),
@@ -168,8 +171,8 @@ BEGIN
 END
 
 -- 9. Create views for enhanced reporting
-CREATE OR ALTER VIEW vw_task_progress AS
-SELECT 
+CREATE OR ALTER VIEW dbo.vw_task_progress AS
+SELECT
     t.task_id,
     t.task_name,
     t.project_id,
@@ -192,13 +195,13 @@ SELECT
         ELSE 'On Track'
     END as task_health,
     DATEDIFF(day, GETDATE(), t.end_date) as days_remaining
-FROM tasks t
-JOIN projects p ON t.project_id = p.project_id
-LEFT JOIN users u ON t.assigned_to = u.user_id
-LEFT JOIN tasks pred ON t.predecessor_task_id = pred.task_id;
+FROM dbo.tasks t
+JOIN dbo.projects p ON t.project_id = p.project_id
+LEFT JOIN dbo.users u ON t.assigned_to = u.user_id
+LEFT JOIN dbo.tasks pred ON t.predecessor_task_id = pred.task_id;
 
-CREATE OR ALTER VIEW vw_project_dashboard AS
-SELECT 
+CREATE OR ALTER VIEW dbo.vw_project_dashboard AS
+SELECT
     p.project_id,
     p.project_name,
     p.status as project_status,
@@ -214,13 +217,13 @@ SELECT
     COUNT(m.milestone_id) as total_milestones,
     COUNT(CASE WHEN m.status = 'Achieved' THEN 1 END) as achieved_milestones,
     COUNT(CASE WHEN m.target_date < GETDATE() AND m.status != 'Achieved' THEN 1 END) as overdue_milestones
-FROM projects p
-LEFT JOIN tasks t ON p.project_id = t.project_id
-LEFT JOIN milestones m ON p.project_id = m.project_id
+FROM dbo.projects p
+LEFT JOIN dbo.tasks t ON p.project_id = t.project_id
+LEFT JOIN dbo.milestones m ON p.project_id = m.project_id
 GROUP BY p.project_id, p.project_name, p.status, p.priority, p.start_date, p.end_date;
 
-CREATE OR ALTER VIEW vw_resource_utilization AS
-SELECT 
+CREATE OR ALTER VIEW dbo.vw_resource_utilization AS
+SELECT
     u.user_id,
     u.name,
     u.role_level,
@@ -239,14 +242,14 @@ SELECT
         WHEN SUM(ta.allocated_hours) > (u.weekly_capacity_hours * 0.5) THEN 'Medium'
         ELSE 'Low'
     END as workload_status
-FROM users u
-LEFT JOIN task_assignments ta ON u.user_id = ta.user_id AND ta.is_active = 1
-LEFT JOIN tasks t ON ta.task_id = t.task_id AND t.status NOT IN ('Complete', 'Cancelled')
+FROM dbo.users u
+LEFT JOIN dbo.task_assignments ta ON u.user_id = ta.user_id AND ta.is_active = 1
+LEFT JOIN dbo.tasks t ON ta.task_id = t.task_id AND t.status NOT IN ('Complete', 'Cancelled')
 WHERE u.is_active = 1
 GROUP BY u.user_id, u.name, u.role_level, u.weekly_capacity_hours, u.department;
 
 -- 10. Create stored procedures for common operations
-CREATE OR ALTER PROCEDURE sp_CreateProjectFromTemplate
+CREATE OR ALTER PROCEDURE dbo.sp_CreateProjectFromTemplate
     @ProjectName NVARCHAR(255),
     @TemplateId INT,
     @ProjectStartDate DATE,
@@ -261,17 +264,17 @@ BEGIN
     
     TRY
         -- Create the new project
-        INSERT INTO projects (project_name, start_date, status, priority, created_at)
+        INSERT INTO dbo.projects (project_name, start_date, status, priority, created_at)
         VALUES (@ProjectName, @ProjectStartDate, 'Planning', 'Medium', GETDATE());
-        
+
         SET @NewProjectId = SCOPE_IDENTITY();
-        
+
         -- Create tasks from template
-        INSERT INTO tasks (
-            task_name, project_id, start_date, end_date, estimated_hours, 
+        INSERT INTO dbo.tasks (
+            task_name, project_id, start_date, end_date, estimated_hours,
             priority, description, status, created_at
         )
-        SELECT 
+        SELECT
             tt.task_name,
             @NewProjectId,
             DATEADD(day, (tt.sequence_order - 1) * 7, @ProjectStartDate), -- Rough scheduling
@@ -281,18 +284,18 @@ BEGIN
             tt.description,
             'Not Started',
             GETDATE()
-        FROM template_tasks tt
+        FROM dbo.template_tasks tt
         WHERE tt.template_id = @TemplateId
         ORDER BY tt.sequence_order;
-        
+
         -- Update task dependencies
         UPDATE t
         SET predecessor_task_id = pred.task_id
-        FROM tasks t
-        JOIN template_tasks tt ON t.task_name = tt.task_name
-        JOIN template_tasks pred_tt ON tt.predecessor_sequence = pred_tt.sequence_order 
+        FROM dbo.tasks t
+        JOIN dbo.template_tasks tt ON t.task_name = tt.task_name
+        JOIN dbo.template_tasks pred_tt ON tt.predecessor_sequence = pred_tt.sequence_order
             AND tt.template_id = pred_tt.template_id
-        JOIN tasks pred ON pred.task_name = pred_tt.task_name AND pred.project_id = @NewProjectId
+        JOIN dbo.tasks pred ON pred.task_name = pred_tt.task_name AND pred.project_id = @NewProjectId
         WHERE t.project_id = @NewProjectId AND tt.template_id = @TemplateId;
         
         COMMIT TRANSACTION;

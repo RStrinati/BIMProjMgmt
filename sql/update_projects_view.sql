@@ -5,10 +5,11 @@ USE ProjectManagement;
 GO
 
 -- Drop and recreate the view with new columns
-DROP VIEW IF EXISTS vw_projects_full;
+IF OBJECT_ID('dbo.vw_projects_full', 'V') IS NOT NULL
+    DROP VIEW dbo.vw_projects_full;
 GO
 
-CREATE VIEW vw_projects_full AS
+CREATE VIEW dbo.vw_projects_full AS
 SELECT
     p.project_id,
     p.project_name,
@@ -40,9 +41,14 @@ SELECT
     p.client_id,
     p.type_id,
     p.sector_id,
-    p.method_id
-FROM projects p
-LEFT JOIN clients c ON p.client_id = c.client_id;
+    p.method_id,
+    -- Provide friendly names for project manager/internal lead when available
+    pm.name AS project_manager_name,
+    il.name AS internal_lead_name
+FROM dbo.projects p
+LEFT JOIN dbo.clients c ON p.client_id = c.client_id
+LEFT JOIN dbo.users pm ON p.project_manager = pm.user_id
+LEFT JOIN dbo.users il ON p.internal_lead = il.user_id;
 GO
 
 PRINT 'vw_projects_full view updated successfully with new project fields!';
