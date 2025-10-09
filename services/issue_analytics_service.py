@@ -16,11 +16,15 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from collections import Counter
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+import logging
+
+import numpy as np
+
 from database import connect_to_db
 from config import Config
-from datetime import datetime
-from typing import Dict, List, Tuple, Optional
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -142,7 +146,7 @@ class IssueAnalyticsService:
     def calculate_pain_points_by_discipline(self) -> List[Dict]:
         """
         Calculate pain points aggregated by discipline.
-        
+
         Returns:
             List of dictionaries with discipline pain point metrics
         """
@@ -229,8 +233,253 @@ class IssueAnalyticsService:
             return []
         finally:
             conn.close()
-    
-    def identify_recurring_patterns(self, similarity_threshold: float = 0.8) -> List[Dict]:
+
+    def calculate_pain_points_by_client(self) -> List[Dict]:
+        """Aggregate pain point metrics at the client level."""
+
+        conn = connect_to_db(self.db_name)
+        if conn is None:
+            logger.error("Failed to connect to database")
+            return []
+
+        try:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT
+                    ai.client_id,
+                    COALESCE(ai.client_name, 'Unknown') AS client_name,
+                    COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
+                    COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
+                    COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
+                    COUNT(DISTINCT pi.project_id) AS project_count,
+
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
+
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
+
+                    AVG(pi.urgency_score) AS avg_urgency,
+                    AVG(pi.complexity_score) AS avg_complexity,
+                    AVG(pi.categorization_confidence) AS avg_confidence,
+                    AVG(pi.sentiment_score) AS avg_sentiment,
+                    AVG(CASE
+                        WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
+                        ELSE NULL
+                    END) AS avg_resolution_days
+                FROM ProcessedIssues pi
+                INNER JOIN vw_ProjectManagement_AllIssues ai
+                    ON pi.source_issue_id = CAST(ai.issue_id AS NVARCHAR(255))
+                    AND pi.source = ai.source
+                LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
+                LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
+                WHERE pi.processed_at IS NOT NULL
+                GROUP BY ai.client_id, COALESCE(ai.client_name, 'Unknown')
+                HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
+                ORDER BY total_issues DESC
+            """
+
+            cursor.execute(query)
+            columns = [desc[0] for desc in cursor.description]
+            results: List[Dict] = []
+
+            for row in cursor.fetchall():
+                result = dict(zip(columns, row))
+                total_issues = result['total_issues'] or 0
+                open_issues = result['open_issues'] or 0
+                avg_urgency = float(result['avg_urgency'] or 0)
+                avg_complexity = float(result['avg_complexity'] or 0)
+
+                open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
+                result['pain_point_score'] = (
+                    avg_urgency * 0.3
+                    + avg_complexity * 0.3
+                    + open_ratio * 0.4
+                )
+
+                result['issue_density'] = total_issues
+                results.append(result)
+
+            logger.info("Calculated pain points for %d clients", len(results))
+            return results
+
+        except Exception as e:
+            logger.error("Error calculating client pain points: %s", e)
+            return []
+        finally:
+            conn.close()
+
+    def calculate_pain_points_by_project_type(self) -> List[Dict]:
+        """Aggregate pain point metrics at the project type level."""
+
+        conn = connect_to_db(self.db_name)
+        if conn is None:
+            logger.error("Failed to connect to database")
+            return []
+
+        try:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT
+                    COALESCE(ai.project_type, 'Unknown') AS project_type,
+                    COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
+                    COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
+                    COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
+                    COUNT(DISTINCT pi.project_id) AS project_count,
+
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
+                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
+
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
+                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
+
+                    AVG(pi.urgency_score) AS avg_urgency,
+                    AVG(pi.complexity_score) AS avg_complexity,
+                    AVG(pi.categorization_confidence) AS avg_confidence,
+                    AVG(pi.sentiment_score) AS avg_sentiment,
+                    AVG(CASE
+                        WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
+                        ELSE NULL
+                    END) AS avg_resolution_days
+                FROM ProcessedIssues pi
+                INNER JOIN vw_ProjectManagement_AllIssues ai
+                    ON pi.source_issue_id = CAST(ai.issue_id AS NVARCHAR(255))
+                    AND pi.source = ai.source
+                LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
+                LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
+                WHERE pi.processed_at IS NOT NULL
+                GROUP BY COALESCE(ai.project_type, 'Unknown')
+                HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
+                ORDER BY total_issues DESC
+            """
+
+            cursor.execute(query)
+            columns = [desc[0] for desc in cursor.description]
+            results: List[Dict] = []
+
+            for row in cursor.fetchall():
+                result = dict(zip(columns, row))
+                total_issues = result['total_issues'] or 0
+                open_issues = result['open_issues'] or 0
+                avg_urgency = float(result['avg_urgency'] or 0)
+                avg_complexity = float(result['avg_complexity'] or 0)
+
+                open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
+                result['pain_point_score'] = (
+                    avg_urgency * 0.3
+                    + avg_complexity * 0.3
+                    + open_ratio * 0.4
+                )
+
+                result['issue_density'] = total_issues
+                results.append(result)
+
+            logger.info("Calculated pain points for %d project types", len(results))
+            return results
+
+        except Exception as e:
+            logger.error("Error calculating project type pain points: %s", e)
+            return []
+        finally:
+            conn.close()
+
+    def _compute_issue_embeddings(self, issues: List[Dict]) -> Optional[np.ndarray]:
+        """Compute semantic embeddings for the provided issues.
+
+        Attempts to use a sentence-transformer model when available and falls back to
+        TF-IDF vectors if transformers or the model download is not available. When
+        both approaches fail the function returns ``None`` so the caller can degrade
+        to keyword-only clustering.
+        """
+
+        if not issues:
+            return None
+
+        texts = []
+        for issue in issues:
+            title = issue.get('title') or ''
+            description = issue.get('description') or ''
+            combined = f"{title.strip()} {description.strip()}".strip()
+            texts.append(combined or title or description)
+
+        if not any(texts):
+            return None
+
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            model_name = getattr(Config, 'ISSUE_PATTERN_MODEL', 'all-MiniLM-L6-v2')
+            model = SentenceTransformer(model_name)
+            embeddings = model.encode(texts, normalize_embeddings=True)
+            return np.asarray(embeddings)
+        except Exception as transformer_error:  # pragma: no cover - optional dependency
+            logger.info(
+                "Falling back to TF-IDF similarity for issue clustering: %s",
+                transformer_error,
+            )
+
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.preprocessing import normalize
+
+            vectorizer = TfidfVectorizer(stop_words='english', min_df=1)
+            matrix = vectorizer.fit_transform(texts)
+            normalized = normalize(matrix)
+            return normalized.toarray()
+        except Exception as tfidf_error:  # pragma: no cover - optional dependency
+            logger.warning(
+                "Unable to compute TF-IDF embeddings for recurring patterns: %s",
+                tfidf_error,
+            )
+            return None
+
+    @staticmethod
+    def _jaccard_similarity(first: set, second: set) -> float:
+        if not first and not second:
+            return 1.0
+        if not first or not second:
+            return 0.0
+
+        intersection = first & second
+        union = first | second
+        return len(intersection) / len(union) if union else 0.0
+
+    @staticmethod
+    def _normalize_vector(vector: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        """Normalize a vector to unit length, guarding against zero vectors."""
+
+        if vector is None:
+            return None
+
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            return vector
+
+        return vector / norm
+
+    @staticmethod
+    def _normalize_metric(value: float, max_value: float) -> float:
+        if max_value <= 0:
+            return 0.0
+        return max(0.0, min(1.0, value / max_value))
+
+    @staticmethod
+    def _safe_datetime(value) -> Optional[datetime]:
+        if isinstance(value, datetime):
+            return value
+        return None
+
+    def identify_recurring_patterns(self, similarity_threshold: float = 0.65) -> List[Dict]:
         """
         Identify recurring issue patterns using title similarity.
         
@@ -247,98 +496,300 @@ class IssueAnalyticsService:
         
         try:
             cursor = conn.cursor()
-            
-            # Get issues with their keywords for similarity analysis
-            query = """
-                SELECT 
+
+            enriched_query = """
+                SELECT
                     pi.processed_issue_id,
                     pi.title,
+                    pi.description,
                     pi.extracted_keywords,
                     pi.project_id,
-                    disc.category_name as discipline,
-                    prim.category_name as issue_type,
-                    COUNT(*) as occurrence_count
+                    ai.project_name,
+                    ai.project_type,
+                    ai.client_id,
+                    ai.client_name,
+                    ai.source,
+                    disc.category_name AS discipline,
+                    prim.category_name AS issue_type,
+                    sec.category_name AS phase,
+                    pi.created_at,
+                    pi.closed_at,
+                    pi.status,
+                    pi.priority,
+                    pi.urgency_score,
+                    pi.complexity_score,
+                    pi.sentiment_score
                 FROM ProcessedIssues pi
+                INNER JOIN vw_ProjectManagement_AllIssues ai
+                    ON pi.source_issue_id = CAST(ai.issue_id AS NVARCHAR(255))
+                    AND pi.source = ai.source
                 LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
                 LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
-                WHERE pi.extracted_keywords IS NOT NULL 
-                    AND pi.extracted_keywords != ''
-                GROUP BY 
+                LEFT JOIN IssueCategories sec ON pi.secondary_category_id = sec.category_id
+                WHERE pi.extracted_keywords IS NOT NULL
+                    AND pi.extracted_keywords <> ''
+            """
+
+            fallback_query = """
+                SELECT
                     pi.processed_issue_id,
                     pi.title,
+                    pi.description,
                     pi.extracted_keywords,
                     pi.project_id,
-                    disc.category_name,
-                    prim.category_name
-                HAVING COUNT(*) >= 1
-                ORDER BY occurrence_count DESC
+                    p.project_name,
+                    pt.project_type_name AS project_type,
+                    c.client_id,
+                    c.client_name,
+                    pi.source AS source,
+                    disc.category_name AS discipline,
+                    prim.category_name AS issue_type,
+                    sec.category_name AS phase,
+                    pi.created_at,
+                    pi.closed_at,
+                    pi.status,
+                    pi.priority,
+                    pi.urgency_score,
+                    pi.complexity_score,
+                    pi.sentiment_score
+                FROM ProcessedIssues pi
+                LEFT JOIN projects p ON pi.project_id = p.project_id
+                LEFT JOIN project_types pt ON p.type_id = pt.project_type_id
+                LEFT JOIN clients c ON p.client_id = c.client_id
+                LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
+                LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
+                LEFT JOIN IssueCategories sec ON pi.secondary_category_id = sec.category_id
+                WHERE pi.extracted_keywords IS NOT NULL
+                    AND pi.extracted_keywords <> ''
             """
-            
-            cursor.execute(query)
+
+            try:
+                cursor.execute(enriched_query)
+            except Exception as enriched_error:
+                logger.warning(
+                    "Enhanced issue pattern query failed, falling back to baseline view: %s",
+                    enriched_error,
+                )
+                cursor.execute(fallback_query)
+
             columns = [desc[0] for desc in cursor.description]
-            issues = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            
-            # Simple keyword-based clustering
-            # Group issues by common keywords
-            keyword_clusters = {}
-            for issue in issues:
-                keywords = set(issue['extracted_keywords'].lower().split(','))
-                keywords = {kw.strip() for kw in keywords if kw.strip()}
-                
-                # Find or create cluster
-                matched_cluster = None
-                for cluster_keywords, cluster_issues in keyword_clusters.items():
-                    # Calculate Jaccard similarity
-                    intersection = keywords & cluster_keywords
-                    union = keywords | cluster_keywords
-                    similarity = len(intersection) / len(union) if union else 0
-                    
-                    if similarity >= similarity_threshold:
-                        matched_cluster = cluster_keywords
-                        break
-                
-                if matched_cluster:
-                    keyword_clusters[matched_cluster].append(issue)
+            raw_issues = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            issues = []
+            for issue in raw_issues:
+                keyword_string = issue.get('extracted_keywords') or ''
+                keywords = {kw.strip() for kw in keyword_string.lower().split(',') if kw.strip()}
+                if not keywords:
+                    continue
+
+                issue['_keywords'] = keywords
+                issue['_created_at'] = self._safe_datetime(issue.get('created_at'))
+                issue['_closed_at'] = self._safe_datetime(issue.get('closed_at'))
+                issues.append(issue)
+
+            embeddings = self._compute_issue_embeddings(issues)
+
+            clusters: List[Dict] = []
+            for idx, issue in enumerate(issues):
+                keywords = issue['_keywords']
+                issue_embedding = embeddings[idx] if embeddings is not None else None
+
+                best_cluster = None
+                best_score = 0.0
+
+                for cluster in clusters:
+                    keyword_similarity = self._jaccard_similarity(keywords, cluster['keywords'])
+                    semantic_similarity = 0.0
+
+                    if issue_embedding is not None and cluster['centroid'] is not None:
+                        semantic_similarity = float(np.dot(issue_embedding, cluster['centroid']))
+                        semantic_similarity = max(0.0, min(1.0, semantic_similarity))
+
+                    combined_similarity = (
+                        0.5 * keyword_similarity + 0.5 * semantic_similarity
+                        if issue_embedding is not None and cluster['centroid'] is not None
+                        else keyword_similarity
+                    )
+
+                    if combined_similarity >= similarity_threshold and combined_similarity > best_score:
+                        best_cluster = cluster
+                        best_score = combined_similarity
+
+                if best_cluster:
+                    best_cluster['issues'].append(issue)
+                    best_cluster['keywords'].update(keywords)
+                    if issue_embedding is not None:
+                        best_cluster['embedding_sum'] += issue_embedding
+                        best_cluster['embedding_count'] += 1
+                        average = (
+                            best_cluster['embedding_sum'] / best_cluster['embedding_count']
+                        )
+                        best_cluster['centroid'] = self._normalize_vector(average)
                 else:
-                    keyword_clusters[frozenset(keywords)] = [issue]
-            
-            # Format results for clusters with 3+ issues
-            recurring_patterns = []
-            for keywords, cluster_issues in keyword_clusters.items():
-                if len(cluster_issues) >= 3:
-                    # Aggregate metrics for this pattern
-                    disciplines = {}
-                    issue_types = {}
-                    projects = set()
-                    
-                    for issue in cluster_issues:
-                        disc = issue['discipline'] or 'Unknown'
-                        itype = issue['issue_type'] or 'Unknown'
-                        
-                        disciplines[disc] = disciplines.get(disc, 0) + 1
-                        issue_types[itype] = issue_types.get(itype, 0) + 1
-                        projects.add(issue['project_id'])
-                    
-                    # Get most common discipline and issue type
-                    top_discipline = max(disciplines.items(), key=lambda x: x[1]) if disciplines else ('Unknown', 0)
-                    top_issue_type = max(issue_types.items(), key=lambda x: x[1]) if issue_types else ('Unknown', 0)
-                    
-                    pattern = {
-                        'pattern_id': len(recurring_patterns) + 1,
-                        'common_keywords': ', '.join(sorted(keywords)[:5]),  # Top 5 keywords
-                        'occurrence_count': len(cluster_issues),
-                        'project_count': len(projects),
-                        'top_discipline': top_discipline[0],
-                        'discipline_count': top_discipline[1],
-                        'top_issue_type': top_issue_type[0],
-                        'issue_type_count': top_issue_type[1],
-                        'example_titles': [issue['title'] for issue in cluster_issues[:3]]
-                    }
-                    recurring_patterns.append(pattern)
-            
-            # Sort by occurrence count
-            recurring_patterns.sort(key=lambda x: x['occurrence_count'], reverse=True)
-            
+                    clusters.append(
+                        {
+                            'issues': [issue],
+                            'keywords': set(keywords),
+                            'embedding_sum': issue_embedding.copy() if issue_embedding is not None else None,
+                            'embedding_count': 1 if issue_embedding is not None else 0,
+                            'centroid': self._normalize_vector(
+                                issue_embedding.copy()
+                            ) if issue_embedding is not None else None,
+                        }
+                    )
+
+            recurring_patterns: List[Dict] = []
+
+            for cluster in clusters:
+                cluster_issues = cluster['issues']
+                if len(cluster_issues) < 3:
+                    continue
+
+                keyword_counter: Counter = Counter()
+                discipline_counter: Counter = Counter()
+                issue_type_counter: Counter = Counter()
+                phase_counter: Counter = Counter()
+                client_counter: Counter = Counter()
+                source_counter: Counter = Counter()
+                project_names: set = set()
+                project_ids: set = set()
+
+                created_dates: List[datetime] = []
+                resolution_days: List[float] = []
+                open_count = 0
+                recent_count = 0
+                severity_scores: List[float] = []
+
+                now = datetime.now()
+                for issue in cluster_issues:
+                    keyword_counter.update(issue['_keywords'])
+                    discipline_counter.update([issue.get('discipline') or 'Unknown'])
+                    issue_type_counter.update([issue.get('issue_type') or 'Unknown'])
+                    phase_counter.update([issue.get('phase') or 'Unknown'])
+                    client_counter.update([issue.get('client_name') or 'Unknown'])
+                    source_counter.update([issue.get('source') or 'Unknown'])
+
+                    project_id = issue.get('project_id')
+                    project_ids.add(project_id)
+                    project_names.add(issue.get('project_name') or str(project_id))
+
+                    created_at = issue.get('_created_at')
+                    closed_at = issue.get('_closed_at')
+                    if created_at:
+                        created_dates.append(created_at)
+                        if created_at >= now - timedelta(days=30):
+                            recent_count += 1
+
+                    if issue.get('status', '').lower() in {'open', 'in progress', 'reopened'}:
+                        open_count += 1
+
+                    if created_at and closed_at and closed_at >= created_at:
+                        delta = closed_at - created_at
+                        resolution_days.append(delta.total_seconds() / 86400.0)
+
+                    urgency = float(issue.get('urgency_score') or 0.0)
+                    complexity = float(issue.get('complexity_score') or 0.0)
+                    severity_scores.append((urgency + complexity) / 2.0)
+
+                occurrence_count = len(cluster_issues)
+                project_count = len({pid for pid in project_ids if pid is not None}) or len(project_ids)
+                client_count = len([name for name in client_counter if name != 'Unknown'])
+                if client_count == 0 and client_counter:
+                    client_count = len(client_counter)
+
+                avg_resolution = sum(resolution_days) / len(resolution_days) if resolution_days else None
+                open_rate = open_count / occurrence_count if occurrence_count else 0.0
+                severity_avg = sum(severity_scores) / len(severity_scores) if severity_scores else 0.0
+
+                recurrence_score = self._normalize_metric(occurrence_count, 25)
+                severity_score = self._normalize_metric(severity_avg, 5)
+                breadth_score = self._normalize_metric(project_count + client_count, 10)
+
+                actionability_score = round(
+                    0.4 * recurrence_score + 0.35 * severity_score + 0.25 * breadth_score,
+                    3,
+                )
+
+                top_keywords = [kw for kw, _ in keyword_counter.most_common(5)]
+                top_discipline = discipline_counter.most_common(1)[0] if discipline_counter else ('Unknown', 0)
+                top_issue_type = issue_type_counter.most_common(1)[0] if issue_type_counter else ('Unknown', 0)
+                top_phase = phase_counter.most_common(1)[0] if phase_counter else ('Unknown', 0)
+
+                created_dates.sort()
+                first_seen = created_dates[0].isoformat() if created_dates else None
+                last_seen = created_dates[-1].isoformat() if created_dates else None
+
+                if len(created_dates) >= 2:
+                    recurrence_gaps = [
+                        (later - earlier).total_seconds() / 86400.0
+                        for earlier, later in zip(created_dates[:-1], created_dates[1:])
+                    ]
+                    avg_gap = sum(recurrence_gaps) / len(recurrence_gaps)
+                else:
+                    avg_gap = None
+
+                pattern = {
+                    'pattern_id': len(recurring_patterns) + 1,
+                    'common_keywords': ', '.join(top_keywords),
+                    'occurrence_count': occurrence_count,
+                    'project_count': project_count,
+                    'client_count': client_count,
+                    'top_discipline': top_discipline[0],
+                    'discipline_count': top_discipline[1],
+                    'top_issue_type': top_issue_type[0],
+                    'issue_type_count': top_issue_type[1],
+                    'top_phase': top_phase[0],
+                    'phase_count': top_phase[1],
+                    'example_titles': [issue['title'] for issue in cluster_issues[:3]],
+                    'project_names': sorted(project_names),
+                    'client_breakdown': [
+                        {'client_name': name, 'count': count}
+                        for name, count in client_counter.most_common()
+                    ],
+                    'source_breakdown': [
+                        {'source': name, 'count': count}
+                        for name, count in source_counter.most_common()
+                    ],
+                    'temporal_metrics': {
+                        'first_seen': first_seen,
+                        'last_seen': last_seen,
+                        'avg_days_between_occurrences': avg_gap,
+                        'avg_resolution_days': avg_resolution,
+                        'open_rate': round(open_rate, 3),
+                        'occurrences_last_30_days': recent_count,
+                    },
+                    'severity_summary': {
+                        'average_severity': round(severity_avg, 3),
+                        'average_sentiment': round(
+                            sum(float(issue.get('sentiment_score') or 0.0) for issue in cluster_issues)
+                            / occurrence_count,
+                            3,
+                        )
+                        if occurrence_count
+                        else None,
+                        'priority_distribution': [
+                            {'priority': name, 'count': count}
+                            for name, count in Counter(
+                                (issue.get('priority') or 'unspecified').lower()
+                                for issue in cluster_issues
+                            ).most_common()
+                        ],
+                    },
+                    'actionability': {
+                        'score': actionability_score,
+                        'recurrence_score': recurrence_score,
+                        'severity_score': severity_score,
+                        'breadth_score': breadth_score,
+                    },
+                }
+
+                recurring_patterns.append(pattern)
+
+            recurring_patterns.sort(
+                key=lambda x: (x['actionability']['score'], x['occurrence_count']),
+                reverse=True,
+            )
+
             logger.info(f"Identified {len(recurring_patterns)} recurring patterns")
             return recurring_patterns
             
