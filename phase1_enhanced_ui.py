@@ -42,7 +42,7 @@ class TabOperationManager:
 
 from database import (
     get_projects, save_acc_folder_path, get_acc_folder_path,
-    connect_to_db, get_acc_import_logs, get_project_details,
+    connect_to_db, get_db_connection, get_acc_import_logs, get_project_details,
     get_project_folders, delete_project, get_available_clients,
     get_review_cycles, get_cycle_ids, get_users_list,
     get_bookmark_categories, get_project_bookmarks, add_bookmark,
@@ -138,7 +138,17 @@ class ProjectNotificationSystem:
         for observer in self.observers:
             if hasattr(observer, handler_name):
                 try:
+                    # Call with kwargs - handlers must accept **kwargs or specific named params
                     getattr(observer, handler_name)(**kwargs)
+                except TypeError as e:
+                    # Try calling with just the first positional argument for backwards compatibility
+                    if 'project_selection' in kwargs:
+                        try:
+                            getattr(observer, handler_name)(kwargs['project_selection'])
+                        except Exception as fallback_error:
+                            print(f"⚠️  Error notifying {observer.__class__.__name__}.{handler_name}: {fallback_error}")
+                    else:
+                        print(f"⚠️  Error notifying {observer.__class__.__name__}.{handler_name}: {e}")
                 except Exception as e:
                     print(f"⚠️  Error notifying {observer.__class__.__name__}.{handler_name}: {e}")
     
@@ -146,7 +156,8 @@ class ProjectNotificationSystem:
     
     def notify_project_changed(self, project_selection):
         """Notify that the selected project changed."""
-        self.notify(self.EVENT_TYPES['PROJECT_CHANGED'], project_selection=project_selection)
+        # Send both parameter names for backwards compatibility
+        self.notify(self.EVENT_TYPES['PROJECT_CHANGED'], project_selection=project_selection, new_project=project_selection)
     
     def notify_project_list_changed(self):
         """Notify that the project list was modified."""
@@ -644,10 +655,43 @@ class ProjectSetupTab:
             messagebox.showerror("Error", f"Failed to create project: {exc}")
             logger.exception("Unexpected project creation error")
         return False
-        self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="Project Setup")
-        self.setup_ui()
 
+    def update_project_in_db(self, project_id, project_data):
+        """Update an existing project in the database"""
+        try:
+            project_service.update_project(project_id, project_data)
+            print(f"✅ Successfully updated project {project_id}")
+            return True
+        except ProjectValidationError as exc:
+            messagebox.showerror("Validation Error", str(exc))
+        except ProjectServiceError as exc:
+            print(f"❌ Error updating project {project_id}: {exc}")
+            messagebox.showerror("Database Error", f"Failed to update project: {exc}")
+        except Exception as exc:
+            print(f"❌ Unexpected error updating project {project_id}: {exc}")
+            messagebox.showerror("Database Error", f"Failed to update project: {exc}")
+        return False
+
+    def browse_folder(self, path_var):
+        """Open folder browser dialog and update the path variable"""
+        from tkinter import filedialog
+        import os
+        
+        # Get current path as initial directory
+        current_path = path_var.get()
+        initial_dir = current_path if current_path and os.path.isdir(current_path) else os.path.expanduser("~")
+        
+        # Open folder dialog
+        folder_path = filedialog.askdirectory(
+            title="Select Folder",
+            initialdir=initial_dir
+        )
+        
+        # Update the variable if a folder was selected
+        if folder_path:
+            path_var.set(folder_path)
+            print(f"📁 Selected folder: {folder_path}")
+    
     def setup_ui(self):
         """Set up the project setup interface"""
         # Main container with padding
@@ -970,12 +1014,11 @@ class ProjectSetupTab:
             # Initialize review management service if not available
             if not hasattr(self, 'review_service') or not self.review_service:
                 from review_management_service import ReviewManagementService
-                from database import connect_to_db
-                conn = connect_to_db()
-                if conn:
-                    self.review_service = ReviewManagementService(conn)
-                else:
-                    print("Could not connect to database for KPI dashboard")
+                try:
+                    with get_db_connection() as conn:
+                        self.review_service = ReviewManagementService(conn)
+                except Exception as e:
+                    print(f"Could not connect to database for KPI dashboard: {e}")
                     return
             
             # Get project review KPIs
@@ -1123,9 +1166,8 @@ class ProjectSetupTab:
             self.detail_labels['activities'].config(text=activities_text)
 
             # Get comprehensive billing KPIs
-            conn = connect_to_db()
-            if conn:
-                try:
+            try:
+                with get_db_connection() as conn:
                     review_service = ReviewManagementService(conn)
                     
                     # Get service progress summary for overall KPIs
@@ -1165,14 +1207,9 @@ class ProjectSetupTab:
                         phase = stage_data.get('phase', 'Unknown')
                         billed = stage_data.get('billed_amount', 0)
                         self.stage_billing_tree.insert('', 'end', values=(phase, f"${billed:,.0f}"))
-                    
-                except Exception as e:
-                    print(f"Error getting billing KPIs: {e}")
-                    self.detail_labels['billing_summary'].config(text="Error loading billing data", foreground="red")
-                finally:
-                    conn.close()
-            else:
-                # Fallback to basic billing if no connection
+            except Exception as e:
+                print(f"Error getting billing KPIs: {e}")
+                # Fallback to basic billing if error occurs
                 current_month = datetime.now().strftime('%B')
                 if details['billing_amount'] > 0:
                     billing_text = f"${details['billing_amount']:,.0f} to bill for {current_month} ({len(details['current_activities'])}x reviews in {current_month})"
@@ -1474,103 +1511,101 @@ class ProjectSetupTab:
                 status_label.config(text="Connecting to database...")
                 progress_window.update()
                 
-                from database import connect_to_db
-                conn = connect_to_db()
-                if not conn:
-                    raise Exception("Failed to connect to database")
-                
-                progress_var.set(30)
-                progress_text.config(text="30% - Database connected")
-                progress_window.update()
-                
-                # Step 3: Clear existing project files (override)
-                status_label.config(text="Clearing existing file records...")
-                progress_window.update()
-                
-                cursor = conn.cursor()
-                
-                # Import schema constants
-                from constants import schema as S
-                
-                # Clear existing records for this project
-                cursor.execute(f"DELETE FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?", (project_id,))
-                conn.commit()
-                
-                progress_var.set(40)
-                progress_text.config(text="40% - Existing records cleared")
-                progress_window.update()
-                
-                # Step 4: Insert file metadata into tblACCDocs
-                total_files = len(files_found)
-                
-                for i, file_info in enumerate(files_found):
-                    status_label.config(text=f"Processing: {file_info['file_name']}")
-                    progress_window.update()
-                    
-                    try:
-                        # Debug: Print file info
-                        print(f"Inserting file: {file_info['file_name']}")
-                        print(f"File path: {file_info['file_path']}")
-                        print(f"File type: {file_info['file_type']}")
-                        print(f"File size: {file_info['file_size_kb']} KB")
-                        print(f"Project ID: {project_id}")
-                        
-                        # Build the SQL statement
-                        sql_statement = f"""
-                            INSERT INTO {S.ACCDocs.TABLE} 
-                            ({S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, {S.ACCDocs.DATE_MODIFIED}, 
-                             {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB}, {S.ACCDocs.CREATED_AT}, {S.ACCDocs.PROJECT_ID})
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """
-                        
-                        print(f"SQL Statement: {sql_statement}")
-                        
-                        # Insert file metadata into tblACCDocs
-                        cursor.execute(sql_statement, (
-                            file_info['file_name'],
-                            file_info['file_path'],
-                            file_info['date_modified'],
-                            file_info['file_type'],
-                            round(file_info['file_size_kb'], 2),  # Round to 2 decimal places
-                            datetime.now(),
-                            int(project_id)  # Ensure project_id is integer
-                        ))
-                        
-                        print(f"Successfully inserted: {file_info['file_name']}")
-                        
-                        # Update progress
-                        file_progress = 40 + ((i + 1) / total_files) * 50
-                        progress_var.set(file_progress)
-                        progress_text.config(text=f"{file_progress:.0f}% - {i + 1}/{total_files} files")
+                try:
+                    with get_db_connection() as conn:
+                        progress_var.set(30)
+                        progress_text.config(text="30% - Database connected")
                         progress_window.update()
                         
-                    except Exception as e:
-                        print(f"ERROR: Failed to insert file {file_info['file_name']}: {str(e)}")
-                        print(f"File info: {file_info}")
-                        # Continue with next file instead of stopping
-                        continue
-                
-                # Step 5: Finalize
-                conn.commit()
-                conn.close()
-                
-                progress_var.set(100)
-                progress_text.config(text="100% - Complete")
-                status_label.config(text="File extraction completed successfully!")
-                progress_window.update()
-                
-                time.sleep(2)
-                progress_window.destroy()
-                
-                # Show success message
-                messagebox.showinfo("Success", 
-                    f"Successfully extracted metadata for {total_files} files from Desktop Connector folder.\n\n"
-                    f"Project: {project_name}\n"
-                    f"Files processed: {total_files}\n"
-                    f"Data updated in tblACCDocs table")
-                
-                # Refresh the project data in UI
-                self.refresh_projects()
+                        # Step 3: Clear existing project files (override)
+                        status_label.config(text="Clearing existing file records...")
+                        progress_window.update()
+                        
+                        cursor = conn.cursor()
+                        
+                        # Import schema constants
+                        from constants import schema as S
+                        
+                        # Clear existing records for this project
+                        cursor.execute(f"DELETE FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?", (project_id,))
+                        conn.commit()
+                        
+                        progress_var.set(40)
+                        progress_text.config(text="40% - Existing records cleared")
+                        progress_window.update()
+                        
+                        # Step 4: Insert file metadata into tblACCDocs
+                        total_files = len(files_found)
+                        
+                        for i, file_info in enumerate(files_found):
+                            status_label.config(text=f"Processing: {file_info['file_name']}")
+                            progress_window.update()
+                            
+                            try:
+                                # Debug: Print file info
+                                print(f"Inserting file: {file_info['file_name']}")
+                                print(f"File path: {file_info['file_path']}")
+                                print(f"File type: {file_info['file_type']}")
+                                print(f"File size: {file_info['file_size_kb']} KB")
+                                print(f"Project ID: {project_id}")
+                                
+                                # Build the SQL statement
+                                sql_statement = f"""
+                                    INSERT INTO {S.ACCDocs.TABLE} 
+                                    ({S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, {S.ACCDocs.DATE_MODIFIED}, 
+                                     {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB}, {S.ACCDocs.CREATED_AT}, {S.ACCDocs.PROJECT_ID})
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                """
+                                
+                                print(f"SQL Statement: {sql_statement}")
+                                
+                                # Insert file metadata into tblACCDocs
+                                cursor.execute(sql_statement, (
+                                    file_info['file_name'],
+                                    file_info['file_path'],
+                                    file_info['date_modified'],
+                                    file_info['file_type'],
+                                    round(file_info['file_size_kb'], 2),  # Round to 2 decimal places
+                                    datetime.now(),
+                                    int(project_id)  # Ensure project_id is integer
+                                ))
+                                
+                                print(f"Successfully inserted: {file_info['file_name']}")
+                                
+                                # Update progress
+                                file_progress = 40 + ((i + 1) / total_files) * 50
+                                progress_var.set(file_progress)
+                                progress_text.config(text=f"{file_progress:.0f}% - {i + 1}/{total_files} files")
+                                progress_window.update()
+                                
+                            except Exception as e:
+                                print(f"ERROR: Failed to insert file {file_info['file_name']}: {str(e)}")
+                                print(f"File info: {file_info}")
+                                # Continue with next file instead of stopping
+                                continue
+                        
+                        # Step 5: Finalize
+                        conn.commit()
+                        
+                        progress_var.set(100)
+                        progress_text.config(text="100% - Complete")
+                        status_label.config(text="File extraction completed successfully!")
+                        progress_window.update()
+                        
+                        time.sleep(2)
+                        progress_window.destroy()
+                        
+                        # Show success message
+                        messagebox.showinfo("Success", 
+                            f"Successfully extracted metadata for {total_files} files from Desktop Connector folder.\n\n"
+                            f"Project: {project_name}\n"
+                            f"Files processed: {total_files}\n"
+                            f"Data updated in tblACCDocs table")
+                        
+                        # Refresh the project data in UI
+                        self.refresh_projects()
+                except Exception as e:
+                    raise Exception(f"Failed to connect to database: {e}")
                 
             except Exception as e:
                 progress_window.destroy()
@@ -2506,88 +2541,77 @@ class ACCFolderManagementTab:
     def show_issues_import_summary(self):
         """Show summary of imported issues data"""
         try:
-            conn = connect_to_db("acc_data_schema")
-            if conn is None:
-                return
-            
-            cursor = conn.cursor()
-            
-            # Query the issues view for summary
-            cursor.execute("""
-                SELECT TOP 5
-                    issue_number,
-                    title,
-                    issue_type,
-                    status,
-                    created_at
-                FROM dbo.vw_issues_expanded_pm
-                ORDER BY created_at DESC
-            """)
-            
-            results = cursor.fetchall()
-            
-            if results:
-                summary = "Latest 5 imported issues:\n\n"
-                for issue_num, title, issue_type, status, created_at in results:
-                    summary += f"#{issue_num}: {title[:50]}... ({issue_type}, {status})\n"
+            with get_db_connection("acc_data_schema") as conn:
+                cursor = conn.cursor()
                 
-                messagebox.showinfo("Import Summary", summary)
-            else:
-                messagebox.showinfo("Import Summary", "No issues found in the imported data")
+                # Query the issues view for summary
+                cursor.execute("""
+                    SELECT TOP 5
+                        issue_number,
+                        title,
+                        issue_type,
+                        status,
+                        created_at
+                    FROM dbo.vw_issues_expanded_pm
+                    ORDER BY created_at DESC
+                """)
                 
+                results = cursor.fetchall()
+                
+                if results:
+                    summary = "Latest 5 imported issues:\n\n"
+                    for issue_num, title, issue_type, status, created_at in results:
+                        summary += f"#{issue_num}: {title[:50]}... ({issue_type}, {status})\n"
+                    
+                    messagebox.showinfo("Import Summary", summary)
+                else:
+                    messagebox.showinfo("Import Summary", "No issues found in the imported data")
         except Exception as e:
             logger.error("Error showing issues summary: %s", e)
-        finally:
-            if conn:
-                conn.close()
     
     def preview_issues_data(self):
         """Preview issues data from acc_data_schema database"""
         try:
-            conn = connect_to_db("acc_data_schema")
-            if conn is None:
+            try:
+                with get_db_connection("acc_data_schema") as conn:
+                    cursor = conn.cursor()
+                    
+                    # Query the issues view
+                    cursor.execute("""
+                        SELECT TOP 10
+                            issue_number,
+                            title,
+                            issue_type,
+                            status,
+                            assigned_to,
+                            created_at
+                        FROM dbo.vw_issues_expanded_pm
+                        ORDER BY created_at DESC
+                    """)
+                    
+                    results = cursor.fetchall()
+                    
+                    # Display results
+                    self.preview_text.delete(1.0, tk.END)
+                    
+                    if results:
+                        preview_content = f"Found {len(results)} recent issues in acc_data_schema.dbo.vw_issues_expanded_pm:\n\n"
+                        
+                        for issue_num, title, issue_type, status, assigned_to, created_at in results:
+                            preview_content += f"#{issue_num}: {title[:40]}...\n"
+                            preview_content += f"   Type: {issue_type} | Status: {status} | Assigned: {assigned_to}\n"
+                            preview_content += f"   Created: {created_at}\n\n"
+                        
+                        self.preview_text.insert(1.0, preview_content)
+                    else:
+                        self.preview_text.insert(1.0, "No issues data found in acc_data_schema.dbo.vw_issues_expanded_pm\n\nPlease import ACC Issues ZIP file first.")
+            except Exception as e:
                 self.preview_text.delete(1.0, tk.END)
-                self.preview_text.insert(1.0, "? Cannot connect to acc_data_schema database")
-                return
-            
-            cursor = conn.cursor()
-            
-            # Query the issues view
-            cursor.execute("""
-                SELECT TOP 10
-                    issue_number,
-                    title,
-                    issue_type,
-                    status,
-                    assigned_to,
-                    created_at
-                FROM dbo.vw_issues_expanded_pm
-                ORDER BY created_at DESC
-            """)
-            
-            results = cursor.fetchall()
-            
-            # Display results
-            self.preview_text.delete(1.0, tk.END)
-            
-            if results:
-                preview_content = f"Found {len(results)} recent issues in acc_data_schema.dbo.vw_issues_expanded_pm:\n\n"
-                
-                for issue_num, title, issue_type, status, assigned_to, created_at in results:
-                    preview_content += f"#{issue_num}: {title[:40]}...\n"
-                    preview_content += f"   Type: {issue_type} | Status: {status} | Assigned: {assigned_to}\n"
-                    preview_content += f"   Created: {created_at}\n\n"
-                
-                self.preview_text.insert(1.0, preview_content)
-            else:
-                self.preview_text.insert(1.0, "No issues data found in acc_data_schema.dbo.vw_issues_expanded_pm\n\nPlease import ACC Issues ZIP file first.")
+                self.preview_text.insert(1.0, f"? Cannot connect to acc_data_schema database: {str(e)}")
                 
         except Exception as e:
             self.preview_text.delete(1.0, tk.END)
             self.preview_text.insert(1.0, f"? Error querying issues data: {str(e)}")
-        finally:
-            if conn:
-                conn.close()
     
     def refresh_data(self):
         """Refresh all data in the tab"""
@@ -3182,10 +3206,12 @@ class ReviewManagementTab:
         """Refresh all data in the tab"""
         try:
             # Initialize review service connection
-            from database import connect_to_db
-            db_conn = connect_to_db()
-            if db_conn:
-                self.review_service = ReviewManagementService(db_conn)
+            try:
+                with get_db_connection() as db_conn:
+                    self.review_service = ReviewManagementService(db_conn)
+            except Exception as e:
+                logger.error(f"Error connecting to database: {e}")
+                self.review_service = None
             
             # Load projects
             projects = get_projects()
@@ -3221,13 +3247,9 @@ class ReviewManagementTab:
             
             # Initialize review service with database connection
             try:
-                db_conn = connect_to_db()
-                if db_conn:
+                with get_db_connection() as db_conn:
                     self.review_service = ReviewManagementService(db_conn)
                     print(f"? Review service initialized for project {self.current_project_id}")
-                else:
-                    print("? Failed to connect to database for review service")
-                    self.review_service = None
             except Exception as e:
                 print(f"? Error initializing review service: {e}")
                 self.review_service = None
@@ -5203,12 +5225,12 @@ Traceback:
                 else:
                     # Create service instance if not available
                     from handlers.review_management_service import ReviewManagementService
-                    db_conn = connect_to_db()
-                    if db_conn:
-                        service = ReviewManagementService(db_conn)
-                        success = service.update_review_status_to(review_id, new_status, evidence_link)
-                    else:
-                        messagebox.showerror("Error", "Could not connect to database")
+                    try:
+                        with get_db_connection() as db_conn:
+                            service = ReviewManagementService(db_conn)
+                            success = service.update_review_status_to(review_id, new_status, evidence_link)
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Could not connect to database: {e}")
                         return
                 
                 if success:
@@ -5568,132 +5590,110 @@ Traceback:
     def update_review_in_database(self, review_id, planned_start, status, stage, notes):
         """Update review cycle in database"""
         try:
-            conn = connect_to_db()
-            if conn is None:
-                return False
-            
-            cursor = conn.cursor()
-            
-            # FIX 1: Update BOTH planned_date AND due_date (due_date is used by refresh logic)
-            # FIX 2: Add status_override flag to mark as manual override
-            # FIX 3: Store notes in evidence_links with timestamp
-            from datetime import datetime
-            
-            # Format notes with timestamp if provided
-            note_entry = ""
-            if notes:
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-                note_entry = f"[{timestamp}] {notes}"
-            
-            update_sql = """
-            UPDATE ServiceReviews 
-            SET planned_date = ?, 
-                due_date = ?,  -- CRITICAL FIX: Also update due_date (used by refresh logic)
-                status = ?, 
-                disciplines = ?,
-                evidence_links = CASE 
-                    WHEN evidence_links IS NULL OR evidence_links = '' THEN ?
-                    ELSE evidence_links + CHAR(10) + ?
-                END,
-                status_override = 1,  -- CRITICAL FIX: Mark as manual override
-                status_override_by = SYSTEM_USER,
-                status_override_at = SYSDATETIME()
-            WHERE review_id = ?
-            """
-            
-            cursor.execute(update_sql, (
-                planned_start, 
-                planned_start,  # Use same date for due_date
-                status, 
-                stage,
-                note_entry,
-                note_entry,
-                review_id
-            ))
-            conn.commit()
-            
-            print(f"✅ Review {review_id} updated with manual override flag")
-            return cursor.rowcount > 0
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # FIX 1: Update BOTH planned_date AND due_date (due_date is used by refresh logic)
+                # FIX 2: Add status_override flag to mark as manual override
+                # FIX 3: Store notes in evidence_links with timestamp
+                from datetime import datetime
+                
+                # Format notes with timestamp if provided
+                note_entry = ""
+                if notes:
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    note_entry = f"[{timestamp}] {notes}"
+                
+                update_sql = """
+                UPDATE ServiceReviews 
+                SET planned_date = ?, 
+                    due_date = ?,  -- CRITICAL FIX: Also update due_date (used by refresh logic)
+                    status = ?, 
+                    disciplines = ?,
+                    evidence_links = CASE 
+                        WHEN evidence_links IS NULL OR evidence_links = '' THEN ?
+                        ELSE evidence_links + CHAR(10) + ?
+                    END,
+                    status_override = 1,  -- CRITICAL FIX: Mark as manual override
+                    status_override_by = SYSTEM_USER,
+                    status_override_at = SYSDATETIME()
+                WHERE review_id = ?
+                """
+                
+                cursor.execute(update_sql, (
+                    planned_start, 
+                    planned_start,  # Use same date for due_date
+                    status, 
+                    stage,
+                    note_entry,
+                    note_entry,
+                    review_id
+                ))
+                conn.commit()
+                
+                print(f"✅ Review {review_id} updated with manual override flag")
+                return cursor.rowcount > 0
             
         except Exception as e:
             print(f"Error updating review in database: {e}")
-            if conn:
-                conn.rollback()
             return False
-        finally:
-            if conn:
-                conn.close()
     
     def delete_review_from_database(self, review_id):
         """Delete review cycle from handlers.database"""
         try:
-            conn = connect_to_db()
-            if conn is None:
-                return False
-            
-            cursor = conn.cursor()
-            
-            # Delete from ServiceReviews table
-            delete_sql = "DELETE FROM ServiceReviews WHERE review_id = ?"
-            cursor.execute(delete_sql, (review_id,))
-            conn.commit()
-            
-            return cursor.rowcount > 0
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Delete from ServiceReviews table
+                delete_sql = "DELETE FROM ServiceReviews WHERE review_id = ?"
+                cursor.execute(delete_sql, (review_id,))
+                conn.commit()
+                
+                return cursor.rowcount > 0
             
         except Exception as e:
             print(f"Error deleting review from handlers.database: {e}")
             return False
-        finally:
-            if conn:
-                conn.close()
     
     def delete_all_reviews_from_database(self):
         """Delete all review cycles for the current project from handlers.database"""
         try:
-            conn = connect_to_db()
-            if conn is None:
-                return False
-            
-            cursor = conn.cursor()
-            
-            # First, get all service IDs that are auto-generated review services for this project
-            get_services_sql = """
-            SELECT service_id FROM ProjectServices 
-            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
-            """
-            cursor.execute(get_services_sql, (self.current_project_id,))
-            service_ids = [row[0] for row in cursor.fetchall()]
-            
-            # Delete all ServiceReviews for this project (CASCADE should handle this, but be explicit)
-            delete_reviews_sql = """
-            DELETE sr FROM ServiceReviews sr
-            INNER JOIN ProjectServices ps ON sr.service_id = ps.service_id
-            WHERE ps.project_id = ?
-            """
-            cursor.execute(delete_reviews_sql, (self.current_project_id,))
-            reviews_deleted = cursor.rowcount
-            
-            # Delete auto-generated services (those with service_code = 'STAGE_REVIEW')
-            delete_services_sql = """
-            DELETE FROM ProjectServices 
-            WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
-            """
-            cursor.execute(delete_services_sql, (self.current_project_id,))
-            services_deleted = cursor.rowcount
-            
-            conn.commit()
-            
-            print(f"? Deleted {reviews_deleted} reviews and {services_deleted} auto-generated services")
-            return True
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # First, get all service IDs that are auto-generated review services for this project
+                get_services_sql = """
+                SELECT service_id FROM ProjectServices 
+                WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
+                """
+                cursor.execute(get_services_sql, (self.current_project_id,))
+                service_ids = [row[0] for row in cursor.fetchall()]
+                
+                # Delete all ServiceReviews for this project (CASCADE should handle this, but be explicit)
+                delete_reviews_sql = """
+                DELETE sr FROM ServiceReviews sr
+                INNER JOIN ProjectServices ps ON sr.service_id = ps.service_id
+                WHERE ps.project_id = ?
+                """
+                cursor.execute(delete_reviews_sql, (self.current_project_id,))
+                reviews_deleted = cursor.rowcount
+                
+                # Delete auto-generated services (those with service_code = 'STAGE_REVIEW')
+                delete_services_sql = """
+                DELETE FROM ProjectServices 
+                WHERE project_id = ? AND service_code = 'STAGE_REVIEW'
+                """
+                cursor.execute(delete_services_sql, (self.current_project_id,))
+                services_deleted = cursor.rowcount
+                
+                conn.commit()
+                
+                print(f"? Deleted {reviews_deleted} reviews and {services_deleted} auto-generated services")
+                return True
             
         except Exception as e:
             print(f"Error deleting all reviews from handlers.database: {e}")
-            if conn:
-                conn.rollback()
             return False
-        finally:
-            if conn:
-                conn.close()
     
     def on_project_changed(self, new_project):
         """Handle project change notification from other tabs"""
@@ -5878,28 +5878,30 @@ All status percentages in Project Setup and Service Review Planning have been up
                 return
             
             # NEW: Check for manual overrides and show confirmation
-            conn = connect_to_db()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM ServiceReviews sr
-                    INNER JOIN ProjectServices ps ON sr.service_id = ps.service_id
-                    WHERE ps.project_id = ? AND ISNULL(sr.status_override, 0) = 1
-                """, (self.current_project_id,))
-                override_count = cursor.fetchone()[0]
-                conn.close()
-                
-                if override_count > 0:
-                    result = messagebox.askyesno(
-                        "Refresh Status", 
-                        f"This will auto-update review statuses based on meeting dates.\n\n"
-                        f"⚠️  {override_count} review(s) have manual status overrides.\n"
-                        f"These will NOT be changed.\n\n"
-                        f"Continue with refresh?"
-                    )
-                    if not result:
-                        return
+            try:
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT COUNT(*) 
+                        FROM ServiceReviews sr
+                        INNER JOIN ProjectServices ps ON sr.service_id = ps.service_id
+                        WHERE ps.project_id = ? AND ISNULL(sr.status_override, 0) = 1
+                    """, (self.current_project_id,))
+                    override_count = cursor.fetchone()[0]
+                    
+                    if override_count > 0:
+                        result = messagebox.askyesno(
+                            "Refresh Status", 
+                            f"This will auto-update review statuses based on meeting dates.\n\n"
+                            f"⚠️  {override_count} review(s) have manual status overrides.\n"
+                            f"These will NOT be changed.\n\n"
+                            f"Continue with refresh?"
+                        )
+                        if not result:
+                            return
+            except Exception as e:
+                print(f"Error checking override count: {e}")
+                result = True  # Continue anyway if can't check
                 
             results = self.review_service.refresh_all_project_statuses(self.current_project_id)
             
@@ -5960,29 +5962,30 @@ Planned: {results['overall_status'].get('planned_reviews', 0)}"""
                 return
             
             # Clear override flag
-            conn = connect_to_db()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE ServiceReviews 
-                    SET status_override = 0,
-                        status_override_by = NULL,
-                        status_override_at = NULL
-                    WHERE review_id = ?
-                """, (review_id,))
-                conn.commit()
-                conn.close()
-                
-                # Trigger refresh to recalculate status
-                if self.review_service:
-                    # Force recalculation for this review
-                    self.review_service.update_service_statuses_by_date(
-                        self.current_project_id, 
-                        respect_overrides=False  # Force recalculation
-                    )
-                
-                messagebox.showinfo("Success", "Review reset to automatic status management")
-                self.refresh_cycles()
+            try:
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE ServiceReviews 
+                        SET status_override = 0,
+                            status_override_by = NULL,
+                            status_override_at = NULL
+                        WHERE review_id = ?
+                    """, (review_id,))
+                    conn.commit()
+                    
+                    # Trigger refresh to recalculate status
+                    if self.review_service:
+                        # Force recalculation for this review
+                        self.review_service.update_service_statuses_by_date(
+                            self.current_project_id, 
+                            respect_overrides=False  # Force recalculation
+                        )
+                    
+                    messagebox.showinfo("Success", "Review reset to automatic status management")
+                    self.refresh_cycles()
+            except Exception as e:
+                messagebox.showerror("Error", f"Error resetting to auto: {e}")
             
         except Exception as e:
             messagebox.showerror("Error", f"Error resetting to auto: {e}")

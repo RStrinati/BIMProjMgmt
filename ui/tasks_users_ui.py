@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from database import connect_to_db, get_projects, get_cycle_ids, fetch_data
+from database import connect_to_db, get_db_connection, get_projects, get_cycle_ids, fetch_data
 from constants import schema as S
 
 # Function to fetch users for dropdown
@@ -10,35 +10,29 @@ def get_users():
 
 # Function to add a user
 def add_user(name, role, email):
-    conn = connect_to_db()
-    if conn is None:
-        return
-    
     try:
-        cursor = conn.cursor()
-        
-        # Check if email already exists
-        cursor.execute(
-            f"SELECT COUNT(*) FROM {S.Users.TABLE} WHERE {S.Users.EMAIL} = ?",
-            (email,),
-        )
-        if cursor.fetchone()[0] > 0:
-            messagebox.showerror("Error", "This email is already registered!")
-            return
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if email already exists
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {S.Users.TABLE} WHERE {S.Users.EMAIL} = ?",
+                (email,),
+            )
+            if cursor.fetchone()[0] > 0:
+                messagebox.showerror("Error", "This email is already registered!")
+                return
 
-        # Insert new user if email is unique
-        cursor.execute(
-            f"INSERT INTO {S.Users.TABLE} ({S.Users.NAME}, {S.Users.ROLE}, {S.Users.EMAIL}) VALUES (?, ?, ?)",
-            (name, role, email),
-        )
-        conn.commit()
-        messagebox.showinfo("Success", "User added successfully!")
+            # Insert new user if email is unique
+            cursor.execute(
+                f"INSERT INTO {S.Users.TABLE} ({S.Users.NAME}, {S.Users.ROLE}, {S.Users.EMAIL}) VALUES (?, ?, ?)",
+                (name, role, email),
+            )
+            conn.commit()
+            messagebox.showinfo("Success", "User added successfully!")
     
     except Exception as e:
         messagebox.showerror("Error", str(e))
-    
-    finally:
-        conn.close()
 
 
 
@@ -167,40 +161,34 @@ def main():
             return
         pid = project_var.get().split(" - ")[0]
         cid = cycle_var.get()
-        conn = connect_to_db()
-        if conn is None:
-            return
         try:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT {S.Tasks.NAME}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO} FROM {S.Tasks.TABLE} WHERE {S.Tasks.PROJECT_ID} = ? AND {S.Tasks.CYCLE_ID} = ?",
-                (pid, cid),
-            )
-            rows = cursor.fetchall()
-            for item in task_tree.get_children():
-                task_tree.delete(item)
-            for r in rows:
-                task_tree.insert("", tk.END, values=r)
-        finally:
-            conn.close()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT {S.Tasks.NAME}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO} FROM {S.Tasks.TABLE} WHERE {S.Tasks.PROJECT_ID} = ? AND {S.Tasks.CYCLE_ID} = ?",
+                    (pid, cid),
+                )
+                rows = cursor.fetchall()
+                for item in task_tree.get_children():
+                    task_tree.delete(item)
+                for r in rows:
+                    task_tree.insert("", tk.END, values=r)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to refresh tasks: {e}")
 
     def add_task(task_name, project_id, cycle_id, start_date, end_date, assigned_to):
-        conn = connect_to_db()
-        if conn is None:
-            return
         try:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"INSERT INTO {S.Tasks.TABLE} ({S.Tasks.NAME}, {S.Tasks.PROJECT_ID}, {S.Tasks.CYCLE_ID}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO}) VALUES (?, ?, ?, ?, ?, ?)",
-                (task_name, project_id, cycle_id, start_date, end_date, assigned_to),
-            )
-            conn.commit()
-            messagebox.showinfo("Success", "Task added successfully!")
-            refresh_tasks()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"INSERT INTO {S.Tasks.TABLE} ({S.Tasks.NAME}, {S.Tasks.PROJECT_ID}, {S.Tasks.CYCLE_ID}, {S.Tasks.START_DATE}, {S.Tasks.END_DATE}, {S.Tasks.ASSIGNED_TO}) VALUES (?, ?, ?, ?, ?, ?)",
+                    (task_name, project_id, cycle_id, start_date, end_date, assigned_to),
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Task added successfully!")
+                refresh_tasks()
         except Exception as e:
             messagebox.showerror("Error", str(e))
-        finally:
-            conn.close()
 
     project_dropdown.bind("<<ComboboxSelected>>", lambda e: [load_cycles(), refresh_tasks()])
     cycle_dropdown.bind("<<ComboboxSelected>>", lambda e: refresh_tasks())

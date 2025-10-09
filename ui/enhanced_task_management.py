@@ -284,30 +284,31 @@ class MilestoneManager:
 # Usage Examples:
 if __name__ == "__main__":
     # This would be called from your main application
-    from database import connect_to_db
+    from database import get_db_connection
     
-    conn = connect_to_db("ProjectManagement")
-    if conn:
-        task_mgr = TaskManager(conn)
-        milestone_mgr = MilestoneManager(conn)
-        
-        # Create a task with dependencies
-        task_data = {
-            'task_name': 'Design Review',
-            'project_id': 1,
-            'start_date': datetime(2025, 9, 15),
-            'end_date': datetime(2025, 9, 20),
-            'assigned_to': 101,
-            'priority': 'High',
-            'estimated_hours': 40,
-            'predecessor_task_id': 100,  # Depends on task 100
-            'description': 'Review architectural designs for compliance'
-        }
-        
-        success = task_mgr.create_task_with_dependencies(task_data)
-        if success:
-            print("Task created successfully")
-        
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            task_mgr = TaskManager(conn)
+            milestone_mgr = MilestoneManager(conn)
+            
+            # Create a task with dependencies
+            task_data = {
+                'task_name': 'Design Review',
+                'project_id': 1,
+                'start_date': datetime(2025, 9, 15),
+                'end_date': datetime(2025, 9, 20),
+                'assigned_to': 101,
+                'priority': 'High',
+                'estimated_hours': 40,
+                'predecessor_task_id': 100,  # Depends on task 100
+                'description': 'Review architectural designs for compliance'
+            }
+            
+            success = task_mgr.create_task_with_dependencies(task_data)
+            if success:
+                print("Task created successfully")
+    except Exception as e:
+        print(f"Error: {e}")
         # Get resource workload
         workload = task_mgr.get_resource_workload(
             user_id=101,
