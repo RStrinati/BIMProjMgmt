@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, List
@@ -77,16 +79,22 @@ def _connect() -> "pyodbc.Connection":
     return connection
 
 
-def _execute_batches(cursor: "pyodbc.Cursor", batches: Iterable[str], *, dry_run: bool) -> None:
+def _execute_batches(
+    cursor: "pyodbc.Cursor | None", batches: Iterable[str], *, dry_run: bool
+) -> None:
     for idx, statement in enumerate(batches, start=1):
+        if dry_run:
+            logging.info("Dry run - batch %s (not executed):\n%s", idx, statement)
+            continue
         logging.info("Executing batch %s", idx)
         logging.debug(statement)
-        if dry_run:
-            continue
+        assert cursor is not None
         cursor.execute(statement)
 
 
-def _run_sql_file(cursor: "pyodbc.Cursor", sql_path: Path, *, dry_run: bool) -> None:
+def _run_sql_file(
+    cursor: "pyodbc.Cursor | None", sql_path: Path, *, dry_run: bool
+) -> None:
     if not sql_path.exists():
         raise FileNotFoundError(f"SQL file not found: {sql_path}")
     logging.info("Applying %s", sql_path.relative_to(REPO_ROOT))
@@ -147,6 +155,33 @@ def _report_frontend_status() -> None:
     logging.info("Found React bundle entrypoint at %s", index_file)
 
 
+def _check_frontend_toolchain() -> None:
+    logging.info("Checking Node.js toolchain for React builds")
+    required_commands = {
+        "node": "Install Node.js from https://nodejs.org/ to build the React app.",
+        "npm": "npm ships with Node.js and is required for running npm scripts like `npm run build`.",
+    }
+    missing: List[str] = []
+    for command, guidance in required_commands.items():
+        command_path = shutil.which(command)
+        if command_path is None:
+            missing.append(f"{command} – {guidance}")
+            continue
+        try:
+            output = subprocess.check_output(
+                [command, "--version"], text=True, stderr=subprocess.STDOUT
+            ).strip()
+        except Exception as exc:  # pragma: no cover - informational logging only
+            logging.warning("Detected %s at %s but could not determine version: %s", command, command_path, exc)
+            continue
+        version = output.splitlines()[-1] if output else "unknown"
+        logging.info("Detected %s at %s (version %s)", command, command_path, version)
+    if missing:
+        logging.warning("Missing Node.js tooling required to build the React frontend:")
+        for message in missing:
+            logging.warning("  %s", message)
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepare the Flask API for the React frontend")
     parser.add_argument(
@@ -156,7 +191,7 @@ def main(argv: List[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if PYODBC_IMPORT_ERROR is not None:
+    if PYODBC_IMPORT_ERROR is not None and not args.dry_run:
         parser.error(
             "pyodbc is not installed. Run ./setup_env.sh first to create the virtual environment "
             "and install dependencies.",
@@ -164,19 +199,29 @@ def main(argv: List[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     _check_env_configuration()
+    _check_frontend_toolchain()
 
-    logging.info("Connecting to SQL Server %s / %s", Config.DB_SERVER, Config.PROJECT_MGMT_DB)
-    try:
-        with _connect() as connection:
-            cursor = connection.cursor()
-            for sql_path in SQL_FILES:
-                _run_sql_file(cursor, sql_path, dry_run=args.dry_run)
-    except Exception as exc:  # pragma: no cover - surfaced to operator for remediation
-        logging.error("Database preparation failed: %s", exc)
-        return 1
     if args.dry_run:
+        if PYODBC_IMPORT_ERROR is not None:
+            logging.warning(
+                "pyodbc is not installed; continuing because --dry-run was requested."
+            )
+        logging.info("Dry run requested; skipping database connection.")
+        for sql_path in SQL_FILES:
+            _run_sql_file(None, sql_path, dry_run=True)
         logging.info("Dry run complete. No changes were applied.")
     else:
+        logging.info(
+            "Connecting to SQL Server %s / %s", Config.DB_SERVER, Config.PROJECT_MGMT_DB
+        )
+        try:
+            with _connect() as connection:
+                cursor = connection.cursor()
+                for sql_path in SQL_FILES:
+                    _run_sql_file(cursor, sql_path, dry_run=False)
+        except Exception as exc:  # pragma: no cover - surfaced to operator for remediation
+            logging.error("Database preparation failed: %s", exc)
+            return 1
         logging.info("Database preparation scripts executed successfully.")
 
     _report_frontend_status()
