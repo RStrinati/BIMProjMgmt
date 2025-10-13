@@ -89,8 +89,6 @@ def test_template_loading():
             print(f"⚠️  Unexpected success for invalid name")
         else:
             print(f"✅ Correctly rejected invalid name")
-    
-    conn.close()
     print("\n" + "=" * 50)
     print("🎉 Template loading system test completed!")
     return True

@@ -328,11 +328,30 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the detailed development roadmap.
 
 ## 📖 Documentation
 
+### Core Documentation
 - [Database Schema](docs/database_schema.md) - Complete schema reference
 - [Implementation Guide](docs/IMPLEMENTATION_COMPLETE.md) - Implementation details
 - [Issue Analytics Guide](docs/ISSUE_ANALYTICS_QUICKSTART.md) - Analytics dashboard usage
 - [Review Management](docs/enhanced_review_management_overview.md) - Review workflow guide
 - [Roadmap](docs/ROADMAP.md) - Development roadmap and future features
+
+### Developer Guides (NEW)
+- **[Database Connection Guide](docs/DATABASE_CONNECTION_GUIDE.md)** ⭐ - **MANDATORY** database patterns for all developers
+  - Connection pool usage (100% migrated as of October 2025)
+  - Code examples and best practices
+  - Migration patterns and troubleshooting
+  - Performance optimization guidelines
+  
+- **[React Integration Roadmap](docs/REACT_INTEGRATION_ROADMAP.md)** - Complete frontend development plan
+  - Phase-by-phase implementation guide (4-6 months)
+  - Technology stack recommendations
+  - API enhancement requirements
+  - Testing and deployment strategy
+  
+### Migration Reports
+- [DB Migration Phase 4 Complete](docs/DB_MIGRATION_PHASE4_COMPLETE.md) - Latest migration (October 2025)
+- [DB Migration Session 3](docs/DB_MIGRATION_SESSION3_COMPLETE.md) - Previous migration session
+- [Database Migration Complete](docs/DATABASE_MIGRATION_COMPLETE.md) - Overall migration summary
 
 ## 🤝 Contributing
 

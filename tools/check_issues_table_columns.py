@@ -5,9 +5,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
-conn = connect_to_db('acc_data_schema')
+with get_db_connection('acc_data_schema') as conn:
 cursor = conn.cursor()
 
 # Get all columns from issues_issues
@@ -42,5 +42,3 @@ if custom_cols:
                 print(f"    Issue {sample[0][:20]}...: {str(sample[1])[:100]}")
 else:
     print("\n❌ No custom attribute columns found in issues_issues")
-
-conn.close()

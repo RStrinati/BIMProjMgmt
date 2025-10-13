@@ -5,12 +5,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from config import ACC_DB
 
 def test_priority_extraction():
     """Test that Priority column is extracting values correctly."""
-    conn = connect_to_db(ACC_DB)
+    with get_db_connection(ACC_DB) as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return
@@ -83,7 +83,6 @@ def test_priority_extraction():
         print("="*70)
         
     finally:
-        conn.close()
 
 if __name__ == '__main__':
     test_priority_extraction()

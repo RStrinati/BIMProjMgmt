@@ -8,10 +8,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def main():
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     if not conn:
         print("Failed to connect to acc_data_schema")
         return
@@ -241,8 +241,6 @@ def main():
             print(f"{row[0]:<38} | {row[1]:<20} | {row[2]:<10} | {row[3] or 0:<10} | {row[5] or 0:<10} | {options}")
     else:
         print("No 'Priority' attributes found")
-    
-    conn.close()
     print("\n" + "=" * 120)
     print("ANALYSIS COMPLETE")
     print("=" * 120)

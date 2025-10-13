@@ -112,10 +112,7 @@ def generate_migration_batch():
     print("=" * 80)
     print("""
 OLD PATTERN:
-    conn = connect_to_db()
-    if conn is None:
-        return []
-    try:
+    with get_db_connection() as conn:    try:
         cursor = conn.cursor()
         # ... query ...
         conn.commit()
@@ -123,7 +120,6 @@ OLD PATTERN:
         print(f"❌ Error: {e}")
         return []
     finally:
-        conn.close()
 
 NEW PATTERN:
     try:

@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from review_management_service import ReviewManagementService
 from datetime import datetime, timedelta
 
@@ -17,7 +17,7 @@ def test_non_destructive_updates():
     print("🧪 Testing non-destructive review cycle updates...")
     
     # Connect to database
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if not conn:
         print("❌ Failed to connect to database")
         return False
@@ -106,7 +106,6 @@ def test_non_destructive_updates():
         print(f"❌ Test failed with error: {e}")
         return False
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     success = test_non_destructive_updates()

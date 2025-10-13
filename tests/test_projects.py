@@ -1,4 +1,4 @@
-from database import get_projects, connect_to_db
+from database import get_projects, get_db_connection
 from constants import schema as S
 
 print("Testing project loading...")
@@ -13,8 +13,7 @@ except Exception as e:
 
 # Test direct query
 try:
-    conn = connect_to_db()
-    if conn:
+    with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM {S.Projects.TABLE}")
         count = cursor.fetchone()[0]
@@ -25,8 +24,5 @@ try:
             rows = cursor.fetchall()
             print(f"Sample projects: {rows}")
 
-        conn.close()
-    else:
-        print("Database connection failed")
 except Exception as e:
     print(f"Error with direct query: {e}")

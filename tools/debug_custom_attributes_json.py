@@ -6,12 +6,12 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
-from database import connect_to_db
+from database_pool import get_db_connection
 from config import ACC_DB
 
 def analyze_json_structure():
     """Examine the actual JSON structure in detail."""
-    conn = connect_to_db(ACC_DB)
+    with get_db_connection(ACC_DB) as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return
@@ -122,7 +122,6 @@ def analyze_json_structure():
                 print(f"  ❌ All NULL")
         
     finally:
-        conn.close()
 
 if __name__ == '__main__':
     analyze_json_structure()

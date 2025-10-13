@@ -6,7 +6,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from review_management_service import ReviewManagementService
 
 def test_delete_all_reviews_method():
@@ -23,7 +23,7 @@ def test_delete_all_reviews_method():
         print(f"   Method signature: {sig}")
         
         # Test with database connection
-        conn = connect_to_db()
+        with get_db_connection() as conn:
         if conn is None:
             print("❌ Failed to connect to database")
             return False
@@ -49,7 +49,6 @@ def test_delete_all_reviews_method():
             print(f"❌ Error testing method: {e}")
             return False
         finally:
-            conn.close()
     else:
         print("❌ delete_all_project_reviews method NOT found!")
         return False

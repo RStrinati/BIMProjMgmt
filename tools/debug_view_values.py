@@ -11,12 +11,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def debug_view_values():
     """Debug the view value extraction."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -154,8 +154,6 @@ def debug_view_values():
         print(f'    Building Level: {row[3] if row[3] else "NULL"}')
         print(f'    Location: {row[4] if row[4] else "NULL"}')
         print(f'    Phase: {row[5] if row[5] else "NULL"}')
-    
-    conn.close()
 
 if __name__ == '__main__':
     debug_view_values()

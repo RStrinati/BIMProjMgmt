@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from services.issue_text_processor import IssueTextProcessor
 from services.issue_categorizer import IssueCategorizer
 
@@ -21,7 +21,7 @@ def test_acc_issues():
     categorizer = IssueCategorizer()
     
     # Get sample issues
-    conn = connect_to_db('ProjectManagement')
+    with get_db_connection('ProjectManagement') as conn:
     if not conn:
         print("❌ Database connection failed")
         return
@@ -178,7 +178,6 @@ def test_acc_issues():
         traceback.print_exc()
     
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     test_acc_issues()

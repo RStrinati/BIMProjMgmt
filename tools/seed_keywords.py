@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def get_category_id(cursor, name, level):
     """Get category ID by name and level."""
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     print("Seeding Issue Category Keywords")
     print("=" * 70)
     
-    conn = connect_to_db('ProjectManagement')
+    with get_db_connection('ProjectManagement') as conn:
     if not conn:
         print("❌ Database connection failed")
         exit(1)
@@ -234,4 +234,3 @@ if __name__ == "__main__":
         traceback.print_exc()
     
     finally:
-        conn.close()

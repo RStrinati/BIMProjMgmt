@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from config import ACC_DB
 
 def deploy_updated_view():
@@ -36,7 +36,7 @@ def deploy_updated_view():
     print("  ✅ Fixed syntax errors in SELECT list")
     print("  ✅ Uses OPENJSON to parse JSON array structure")
     
-    conn = connect_to_db(ACC_DB)
+    with get_db_connection(ACC_DB) as conn:
     if conn is None:
         print("\n❌ Failed to connect to database")
         return False
@@ -91,7 +91,6 @@ def deploy_updated_view():
         print(f"\n❌ Error deploying view: {e}")
         return False
     finally:
-        conn.close()
 
 if __name__ == '__main__':
     deploy_updated_view()

@@ -7,12 +7,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def show_issues_with_attributes():
     """Show which issues have custom attributes."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -105,8 +105,6 @@ def show_issues_with_attributes():
         print(f'\n❌ MISMATCH! {attr_count - view_count} issues missing from view!')
     else:
         print(f'\n✅ COUNTS MATCH!')
-    
-    conn.close()
 
 if __name__ == '__main__':
     show_issues_with_attributes()

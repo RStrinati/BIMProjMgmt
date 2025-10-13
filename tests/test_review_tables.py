@@ -2,13 +2,12 @@
 """Test script to check database tables and review data"""
 
 try:
-    from database import connect_to_db
+    from database import get_db_connection
     
     print("Checking review-related tables and data...")
     
     # Test database connection
-    db_conn = connect_to_db()
-    if db_conn:
+    with get_db_connection() as db_conn:
         cursor = db_conn.cursor()
         
         # Check ServiceReviews table
@@ -68,10 +67,6 @@ try:
                 
         except Exception as e:
             print(f"   Error: {e}")
-        
-        db_conn.close()
-    else:
-        print("❌ Database connection failed")
         
 except Exception as e:
     print(f"❌ Error: {e}")

@@ -28,6 +28,7 @@ def main():
             IssueManagementTab,
         )
         from ui.project_alias_tab import ProjectAliasManagementTab
+        from ui.enhanced_data_imports_tab import EnhancedDataImportsTab
 
         # Create main window
         root = tk.Tk()
@@ -41,6 +42,9 @@ def main():
         # Create and add tabs in proper order - Project Setup first
         logger.info("Creating Project Setup tab...")
         ProjectSetupTab(notebook)
+
+        logger.info("Creating Enhanced Data Imports tab...")
+        EnhancedDataImportsTab(notebook)
 
         logger.info("Creating Enhanced Task Management tab...")
         EnhancedTaskManagementTab(notebook)

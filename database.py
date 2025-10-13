@@ -166,9 +166,11 @@ def get_project_details(project_id):
                 f"""
                 SELECT p.{S.Projects.NAME}, p.{S.Projects.START_DATE}, p.{S.Projects.END_DATE}, 
                        p.{S.Projects.STATUS}, p.{S.Projects.PRIORITY},
-                       c.{S.Clients.CLIENT_NAME}, c.{S.Clients.CONTACT_NAME}, c.{S.Clients.CONTACT_EMAIL}
+                       c.{S.Clients.CLIENT_NAME}, c.{S.Clients.CONTACT_NAME}, c.{S.Clients.CONTACT_EMAIL},
+                       pt.{S.ProjectTypes.TYPE_NAME}
                 FROM dbo.{S.Projects.TABLE} p
                 LEFT JOIN dbo.{S.Clients.TABLE} c ON p.{S.Projects.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
+                LEFT JOIN dbo.{S.ProjectTypes.TABLE} pt ON p.{S.Projects.TYPE_ID} = pt.{S.ProjectTypes.TYPE_ID}
                 WHERE p.{S.Projects.ID} = ?;
                 """,
                 (project_id,),
@@ -184,7 +186,8 @@ def get_project_details(project_id):
                     "priority": row[4],
                     "client_name": row[5],
                     "client_contact": row[6],
-                    "contact_email": row[7]
+                    "contact_email": row[7],
+                    "project_type": row[8]
                 }
                 return result
             else:
@@ -1943,12 +1946,12 @@ def delete_project(project_id):
 
 
 if __name__ == "__main__":
-    conn = connect_to_db()
-    if conn:
-        print("✅ Connected to database successfully.")
-        conn.close()
-    else:
-        print("❌ Failed to connect.")
+    from database_pool import get_db_connection
+    try:
+        with get_db_connection() as conn:
+            print("✅ Connected to database successfully.")
+    except Exception as e:
+        print(f"❌ Failed to connect: {e}")
 
 
 def delete_project_service(service_id: int) -> bool:

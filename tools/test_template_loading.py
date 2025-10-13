@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db, get_projects
+from database_pool import get_db_connection, get_projects
 from review_management_service import ReviewManagementService
 import json
 
@@ -38,7 +38,7 @@ def test_template_loading():
             return False
         
         # Test 3: Connect to database
-        conn = connect_to_db()
+        with get_db_connection() as conn:
         if not conn:
             print("❌ Database connection failed")
             return False
@@ -106,7 +106,6 @@ def test_template_loading():
         return False
     finally:
         if 'conn' in locals() and conn:
-            conn.close()
 
 if __name__ == "__main__":
     success = test_template_loading()

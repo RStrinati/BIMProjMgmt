@@ -56,10 +56,10 @@ def test_date_generation_logic():
     
     try:
         from review_management_service import ReviewManagementService
-        from database import connect_to_db
+        from database_pool import get_db_connection
         
         # Create service instance
-        conn = connect_to_db()
+        with get_db_connection() as conn:
         if not conn:
             print("⚠️  Could not connect to database, skipping date tests")
             return True
@@ -108,8 +108,6 @@ def test_date_generation_logic():
         
         print("✅ Weekly review generation working correctly")
         print("✅ Date generation logic tests passed")
-        
-        conn.close()
         return True
         
     except Exception as e:

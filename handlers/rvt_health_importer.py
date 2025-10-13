@@ -40,9 +40,12 @@ def import_health_data(json_folder, db_name=None):
     # connect
     if db_name is None:
         db_name = REVIT_HEALTH_DB
-    conn = connect_to_db(db_name)
-    cursor = conn.cursor()
-    log(f"Connected to DB: {cursor.execute('SELECT DB_NAME()').fetchone()[0]}")
+    
+    from database_pool import get_db_connection
+    
+    with get_db_connection(db_name) as conn:
+        cursor = conn.cursor()
+        log(f"Connected to DB: {cursor.execute('SELECT DB_NAME()').fetchone()[0]}")
 
     # define the JSON→DB columns we want
     #
@@ -157,6 +160,4 @@ def import_health_data(json_folder, db_name=None):
         except Exception as e:
             log(f"[ERROR] {fn}: {e}")
 
-    cursor.close()
-    conn.close()
     log("All done.")

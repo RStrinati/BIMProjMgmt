@@ -2,15 +2,14 @@
 """Test the fixed generate_review_cycles method"""
 
 try:
-    from database import connect_to_db
+    from database import get_db_connection
     from review_management_service import ReviewManagementService
     from datetime import datetime, timedelta
     
     print("🔧 Testing FIXED review cycle generation...")
     
     # Test database connection
-    db_conn = connect_to_db()
-    if db_conn:
+    with get_db_connection() as db_conn:
         review_service = ReviewManagementService(db_conn)
         
         # Test the fix with specific parameters
@@ -98,7 +97,6 @@ try:
         for test_id in [test_service_id, test_service_id + 1, test_service_id + 2]:
             review_service.delete_service_reviews(test_id)
         
-        db_conn.close()
         print("\n✅ Fix testing completed!")
         
 except Exception as e:

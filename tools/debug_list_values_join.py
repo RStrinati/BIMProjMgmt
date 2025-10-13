@@ -9,12 +9,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def debug_list_values_join():
     """Debug the ListValues join."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -121,8 +121,6 @@ def debug_list_values_join():
     if attr_value_type != list_id_type:
         print(f'\n⚠️  DATA TYPE MISMATCH!')
         print(f'   This could prevent the join from working!')
-    
-    conn.close()
 
 if __name__ == '__main__':
     debug_list_values_join()

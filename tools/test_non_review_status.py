@@ -11,7 +11,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from review_management_service import ReviewManagementService
 
 def test_non_review_status_updates():
@@ -19,7 +19,7 @@ def test_non_review_status_updates():
     print("\n🧪 Testing Non-Review Service Status Updates")
     print("=" * 70)
     
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if not conn:
         print("❌ Failed to connect to database")
         return False
@@ -113,7 +113,6 @@ def test_non_review_status_updates():
         return False
     
     finally:
-        conn.close()
 
 
 def test_billing_integration():
@@ -121,7 +120,7 @@ def test_billing_integration():
     print("\n\n💰 Testing Billing Integration")
     print("=" * 70)
     
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if not conn:
         print("❌ Failed to connect to database")
         return False
@@ -213,7 +212,6 @@ def test_billing_integration():
         return False
     
     finally:
-        conn.close()
 
 
 if __name__ == "__main__":

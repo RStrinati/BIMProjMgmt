@@ -4,7 +4,8 @@
 def test_review_generation():
     """Test review generation and stage schedule functionality"""
     try:
-        from database import connect_to_db, get_review_cycles
+        from database_pool import get_db_connection
+        from database import get_review_cycles
         from review_management_service import ReviewManagementService
         from datetime import datetime, timedelta
         
@@ -13,21 +14,18 @@ def test_review_generation():
         
         # Test database connection
         print("\n1. Testing database connection...")
-        db_conn = connect_to_db()
-        if not db_conn:
-            print("❌ Database connection failed")
-            return False
         
-        print("✅ Database connection successful")
-        
-        # Initialize review service
-        print("\n2. Initializing review service...")
-        review_service = ReviewManagementService(db_conn)
-        print("✅ Review service initialized")
-        
-        # Test project 2 (NFPS) - has services
-        project_id = 2
-        print(f"\n3. Testing with project {project_id} (NFPS)...")
+        with get_db_connection() as db_conn:
+            print("✅ Database connection successful")
+            
+            # Initialize review service
+            print("\n2. Initializing review service...")
+            review_service = ReviewManagementService(db_conn)
+            print("✅ Review service initialized")
+            
+            # Test project 2 (NFPS) - has services
+            project_id = 2
+            print(f"\n3. Testing with project {project_id} (NFPS)...")
         
         # Check project services
         services = review_service.get_project_services(project_id)
@@ -75,16 +73,14 @@ def test_review_generation():
         else:
             print("❌ Stage schedule generation failed")
         
-        # Test final cycles count
-        print("\n7. Final verification...")
-        final_cycles = get_review_cycles(project_id)
-        print(f"✅ Total review cycles after all tests: {len(final_cycles)}")
-        
-        db_conn.close()
-        
-        print("\n" + "=" * 50)
-        print("🎉 All tests completed successfully!")
-        return True
+            # Test final cycles count
+            print("\n7. Final verification...")
+            final_cycles = get_review_cycles(project_id)
+            print(f"✅ Total review cycles after all tests: {len(final_cycles)}")
+            
+            print("\n" + "=" * 50)
+            print("🎉 All tests completed successfully!")
+            return True
         
     except Exception as e:
         print(f"❌ Test failed with error: {e}")

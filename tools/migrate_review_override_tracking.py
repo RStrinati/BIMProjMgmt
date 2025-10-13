@@ -13,77 +13,70 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection, get_db_connection
 
 def migrate_add_override_columns():
     """Add status_override tracking columns to ServiceReviews"""
-    conn = connect_to_db()
-    if not conn:
-        print("❌ Could not connect to database")
-        return False
-    
     try:
-        cursor = conn.cursor()
-        
-        print("📋 Checking if columns already exist...")
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'ServiceReviews' 
-            AND COLUMN_NAME = 'status_override'
-        """)
-        
-        if cursor.fetchone()[0] > 0:
-            print("✅ Columns already exist, migration not needed")
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            print("📋 Checking if columns already exist...")
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = 'ServiceReviews' 
+                AND COLUMN_NAME = 'status_override'
+            """)
+            
+            if cursor.fetchone()[0] > 0:
+                print("✅ Columns already exist, migration not needed")
+                return True
+            
+            print("🔧 Adding status_override tracking columns...")
+            cursor.execute("""
+                ALTER TABLE ServiceReviews
+                ADD status_override BIT DEFAULT 0,
+                    status_override_by VARCHAR(100),
+                    status_override_at DATETIME2;
+            """)
+            
+            conn.commit()
+            print("✅ Columns added successfully!")
+            
+            # Set default values for existing records
+            print("🔧 Setting defaults for existing records...")
+            cursor.execute("""
+                UPDATE ServiceReviews
+                SET status_override = 0
+                WHERE status_override IS NULL
+            """)
+            conn.commit()
+            
+            rows_updated = cursor.rowcount
+            print(f"✅ Updated {rows_updated} existing records with default values")
+            
+            # Verify the changes
+            print("\n📋 Verifying new columns...")
+            cursor.execute("""
+                SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = 'ServiceReviews' 
+                AND COLUMN_NAME IN ('status_override', 'status_override_by', 'status_override_at')
+                ORDER BY COLUMN_NAME
+            """)
+            
+            print("\nNew columns:")
+            for row in cursor.fetchall():
+                print(f"  - {row[0]}: {row[1]} (Nullable: {row[2]}, Default: {row[3]})")
+            
             return True
-        
-        print("🔧 Adding status_override tracking columns...")
-        cursor.execute("""
-            ALTER TABLE ServiceReviews
-            ADD status_override BIT DEFAULT 0,
-                status_override_by VARCHAR(100),
-                status_override_at DATETIME2;
-        """)
-        
-        conn.commit()
-        print("✅ Columns added successfully!")
-        
-        # Set default values for existing records
-        print("🔧 Setting defaults for existing records...")
-        cursor.execute("""
-            UPDATE ServiceReviews
-            SET status_override = 0
-            WHERE status_override IS NULL
-        """)
-        conn.commit()
-        
-        rows_updated = cursor.rowcount
-        print(f"✅ Updated {rows_updated} existing records with default values")
-        
-        # Verify the changes
-        print("\n📋 Verifying new columns...")
-        cursor.execute("""
-            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'ServiceReviews' 
-            AND COLUMN_NAME IN ('status_override', 'status_override_by', 'status_override_at')
-            ORDER BY COLUMN_NAME
-        """)
-        
-        print("\nNew columns:")
-        for row in cursor.fetchall():
-            print(f"  - {row[0]}: {row[1]} (Nullable: {row[2]}, Default: {row[3]})")
-        
-        return True
         
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         import traceback
         traceback.print_exc()
-        conn.rollback()
         return False
-    finally:
-        conn.close()
 
 def rollback_migration():
     """Rollback the migration (remove columns) - USE WITH CAUTION"""
@@ -95,30 +88,23 @@ def rollback_migration():
         print("Rollback cancelled")
         return False
     
-    conn = connect_to_db()
-    if not conn:
-        print("❌ Could not connect to database")
-        return False
-    
     try:
-        cursor = conn.cursor()
-        
-        print("🔧 Removing status_override tracking columns...")
-        cursor.execute("""
-            ALTER TABLE ServiceReviews
-            DROP COLUMN status_override, status_override_by, status_override_at;
-        """)
-        
-        conn.commit()
-        print("✅ Columns removed successfully!")
-        return True
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            print("🔧 Removing status_override tracking columns...")
+            cursor.execute("""
+                ALTER TABLE ServiceReviews
+                DROP COLUMN status_override, status_override_by, status_override_at;
+            """)
+            
+            conn.commit()
+            print("✅ Columns removed successfully!")
+            return True
         
     except Exception as e:
         print(f"❌ Rollback failed: {e}")
-        conn.rollback()
         return False
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
     print("=" * 70)

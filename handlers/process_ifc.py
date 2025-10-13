@@ -133,57 +133,56 @@ def extract_ifc_data(ifc_file_path):
 
 def insert_ifc_data_to_db(data):
     """Insert IFC data into the database."""
-    conn = connect_to_db("RevitHealthCheckDB")  # ✅ Ensure correct DB connection
-    cursor = conn.cursor()
+    from database_pool import get_db_connection
     current_date = datetime.now()
 
     try:
-        if not data["site_coordinates"] and not data["levels"]:
-            print("⚠️ No valid IFC data found. Skipping database insertion.")
-            return  # ✅ Prevent empty `executemany()`
-
-        # ✅ Insert site coordinates
-        for lat, lon in data["site_coordinates"]:
-            cursor.execute("""
-                INSERT INTO dbo.tblIFCData (file_name, description, schema_name, site_latitude, site_longitude, date_exported)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, 
-            data["file_name"], 
-            data["file_description"], 
-            data["file_schema"], 
-            lat if lat is not None else 0,  # ✅ Replace None with 0
-            lon if lon is not None else 0,  # ✅ Replace None with 0
-            current_date)
-
-        # ✅ Insert levels
-        for level_name, elevation in data["levels"]:
-            cursor.execute("""
-                INSERT INTO dbo.tblIFCData (file_name, description, schema_name, level_name, level_elevation, date_exported)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, data["file_name"], data["file_description"], data["file_schema"], level_name, elevation, current_date)
+        with get_db_connection("RevitHealthCheckDB") as conn:
+            cursor = conn.cursor()
             
-    # Insert SINSW / Uniclass properties
-        for item in data.get("sin_uniclass", []):
-            cursor.execute("""
-                INSERT INTO dbo.tblIFCSharedParams 
-                (file_name, element_id, pset_name, prop_name, prop_value, date_exported)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            data["file_name"],
-            item["element_id"],
-            item["pset_name"],
-            item["prop_name"],
-            item["prop_value"],
-            current_date)
-            
-        conn.commit()
-        print("✅ Data committed to the database.")
+            if not data["site_coordinates"] and not data["levels"]:
+                print("⚠️ No valid IFC data found. Skipping database insertion.")
+                return  # ✅ Prevent empty `executemany()`
 
-    except pyodbc.Error as e:
+            # ✅ Insert site coordinates
+            for lat, lon in data["site_coordinates"]:
+                cursor.execute("""
+                    INSERT INTO dbo.tblIFCData (file_name, description, schema_name, site_latitude, site_longitude, date_exported)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, 
+                data["file_name"], 
+                data["file_description"], 
+                data["file_schema"], 
+                lat if lat is not None else 0,  # ✅ Replace None with 0
+                lon if lon is not None else 0,  # ✅ Replace None with 0
+                current_date)
+
+            # ✅ Insert levels
+            for level_name, elevation in data["levels"]:
+                cursor.execute("""
+                    INSERT INTO dbo.tblIFCData (file_name, description, schema_name, level_name, level_elevation, date_exported)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, data["file_name"], data["file_description"], data["file_schema"], level_name, elevation, current_date)
+                
+        # Insert SINSW / Uniclass properties
+            for item in data.get("sin_uniclass", []):
+                cursor.execute("""
+                    INSERT INTO dbo.tblIFCSharedParams 
+                    (file_name, element_id, pset_name, prop_name, prop_value, date_exported)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                data["file_name"],
+                item["element_id"],
+                item["pset_name"],
+                item["prop_name"],
+                item["prop_value"],
+                current_date)
+                
+            conn.commit()
+            print("✅ Data committed to the database.")
+
+    except Exception as e:
         print(f"❌ Error inserting data: {e}")
-
-    finally:
-        conn.close()
 
 def process_folder(folder_path):
     """Process all IFC files in a folder."""

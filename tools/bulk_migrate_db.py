@@ -20,17 +20,13 @@ def migrate_simple_function(func_text):
     Migrate a simple function from old pattern to new pattern.
     
     OLD PATTERN:
-        conn = connect_to_db()
-        if conn is None:
-            return []
-        try:
+        with get_db_connection() as conn:        try:
             cursor = conn.cursor()
             # ... query ...
         except Exception as e:
             print(f"❌ Error: {e}")
             return []
         finally:
-            conn.close()
     
     NEW PATTERN:
         try:
@@ -62,7 +58,7 @@ def migrate_simple_function(func_text):
         func_text
     )
     
-    # Step 4: Remove finally: conn.close()
+    # Step 4: Remove finally:
     func_text = re.sub(
         r'\s+finally:\s+conn\.close\(\)',
         '',
@@ -131,10 +127,7 @@ MIGRATION TEMPLATE - Copy this pattern for manual migrations
 BEFORE (OLD PATTERN):
 ```python
 def function_name(params):
-    conn = connect_to_db()
-    if conn is None:
-        return []
-    try:
+    with get_db_connection() as conn:    try:
         cursor = conn.cursor()
         cursor.execute("SELECT ...")
         result = cursor.fetchall()
@@ -143,7 +136,6 @@ def function_name(params):
         print(f"❌ Error: {e}")
         return []
     finally:
-        conn.close()
 ```
 
 AFTER (NEW PATTERN):
@@ -163,7 +155,7 @@ def function_name(params):
 KEY CHANGES:
 1. ✅ Replace `conn = connect_to_db()` with `with get_db_connection() as conn:`
 2. ✅ Remove `if conn is None:` check (context manager handles this)
-3. ✅ Remove `finally: conn.close()` (context manager handles this)
+3. ✅ Remove `finally:` (context manager handles this)
 4. ✅ Replace `print(f"❌...` with `logger.error(f"...`
 5. ✅ Indent code inside `with` block by 4 spaces
 6. ✅ Context manager automatically commits on success, rollsback on error

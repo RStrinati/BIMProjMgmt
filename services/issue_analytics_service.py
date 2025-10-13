@@ -23,7 +23,7 @@ import logging
 
 import numpy as np
 
-from database import connect_to_db, get_db_connection
+from database_pool import get_db_connection
 from config import Config
 
 # Configure logging
@@ -226,70 +226,68 @@ class IssueAnalyticsService:
         """Aggregate pain point metrics at the client level."""
 
         try:
-
-
             with get_db_connection(self.db_name) as conn:
-            cursor = conn.cursor()
+                cursor = conn.cursor()
 
-            query = """
-                SELECT
-                    ai.client_id,
-                    COALESCE(ai.client_name, 'Unknown') AS client_name,
-                    COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
-                    COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
-                    COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
-                    COUNT(DISTINCT pi.project_id) AS project_count,
+                query = """
+                    SELECT
+                        ai.client_id,
+                        COALESCE(ai.client_name, 'Unknown') AS client_name,
+                        COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
+                        COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
+                        COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
+                        COUNT(DISTINCT pi.project_id) AS project_count,
 
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
 
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
 
-                    AVG(pi.urgency_score) AS avg_urgency,
-                    AVG(pi.complexity_score) AS avg_complexity,
-                    AVG(pi.categorization_confidence) AS avg_confidence,
-                    AVG(pi.sentiment_score) AS avg_sentiment,
-                    AVG(CASE
-                        WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
-                        ELSE NULL
-                    END) AS avg_resolution_days
-                FROM ProcessedIssues pi
-                INNER JOIN vw_ProjectManagement_AllIssues ai
-                    ON pi.source_issue_id = CAST(ai.issue_id AS NVARCHAR(255))
-                    AND pi.source = ai.source
-                LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
-                LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
-                WHERE pi.processed_at IS NOT NULL
-                GROUP BY ai.client_id, COALESCE(ai.client_name, 'Unknown')
-                HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
-                ORDER BY total_issues DESC
-            """
+                        AVG(pi.urgency_score) AS avg_urgency,
+                        AVG(pi.complexity_score) AS avg_complexity,
+                        AVG(pi.categorization_confidence) AS avg_confidence,
+                        AVG(pi.sentiment_score) AS avg_sentiment,
+                        AVG(CASE
+                            WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
+                            ELSE NULL
+                        END) AS avg_resolution_days
+                    FROM ProcessedIssues pi
+                    INNER JOIN vw_ProjectManagement_AllIssues ai
+                        ON pi.source_issue_id = CAST(ai.issue_id AS NVARCHAR(255))
+                        AND pi.source = ai.source
+                    LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
+                    LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
+                    WHERE pi.processed_at IS NOT NULL
+                    GROUP BY ai.client_id, COALESCE(ai.client_name, 'Unknown')
+                    HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
+                    ORDER BY total_issues DESC
+                """
 
-            cursor.execute(query)
-            columns = [desc[0] for desc in cursor.description]
-            results: List[Dict] = []
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                results: List[Dict] = []
 
-            for row in cursor.fetchall():
-                result = dict(zip(columns, row))
-                total_issues = result['total_issues'] or 0
-                open_issues = result['open_issues'] or 0
-                avg_urgency = float(result['avg_urgency'] or 0)
-                avg_complexity = float(result['avg_complexity'] or 0)
+                for row in cursor.fetchall():
+                    result = dict(zip(columns, row))
+                    total_issues = result['total_issues'] or 0
+                    open_issues = result['open_issues'] or 0
+                    avg_urgency = float(result['avg_urgency'] or 0)
+                    avg_complexity = float(result['avg_complexity'] or 0)
 
-                open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
-                result['pain_point_score'] = (
-                    avg_urgency * 0.3
-                    + avg_complexity * 0.3
-                    + open_ratio * 0.4
-                )
+                    open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
+                    result['pain_point_score'] = (
+                        avg_urgency * 0.3
+                        + avg_complexity * 0.3
+                        + open_ratio * 0.4
+                    )
 
-                result['issue_density'] = total_issues
-                results.append(result)
+                    result['issue_density'] = total_issues
+                    results.append(result)
 
             logger.info("Calculated pain points for %d clients", len(results))
             return results
@@ -302,71 +300,69 @@ class IssueAnalyticsService:
         """Aggregate pain point metrics at the project type level."""
 
         try:
-
-
             with get_db_connection(self.db_name) as conn:
-            cursor = conn.cursor()
+                cursor = conn.cursor()
 
-            # Use proper table joins instead of the view which lacks project_type column
-            # Note: project_id in ProcessedIssues may be NVARCHAR (GUIDs) while projects.project_id is INT
-            # We use TRY_CAST to safely convert only valid integer project_ids
-            query = """
-                SELECT
-                    COALESCE(pt.project_type_name, 'Unknown') AS project_type,
-                    COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
-                    COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
-                    COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
-                    COUNT(DISTINCT TRY_CAST(pi.project_id AS INT)) AS project_count,
+                # Use proper table joins instead of the view which lacks project_type column
+                # Note: project_id in ProcessedIssues may be NVARCHAR (GUIDs) while projects.project_id is INT
+                # We use TRY_CAST to safely convert only valid integer project_ids
+                query = """
+                    SELECT
+                        COALESCE(pt.project_type_name, 'Unknown') AS project_type,
+                        COUNT(DISTINCT pi.processed_issue_id) AS total_issues,
+                        COUNT(DISTINCT CASE WHEN pi.status = 'open' THEN pi.processed_issue_id END) AS open_issues,
+                        COUNT(DISTINCT CASE WHEN pi.status = 'closed' THEN pi.processed_issue_id END) AS closed_issues,
+                        COUNT(DISTINCT TRY_CAST(pi.project_id AS INT)) AS project_count,
 
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
-                    COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Electrical' THEN pi.processed_issue_id END) AS electrical_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Hydraulic/Plumbing' THEN pi.processed_issue_id END) AS hydraulic_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Mechanical (HVAC)' THEN pi.processed_issue_id END) AS mechanical_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Structural' THEN pi.processed_issue_id END) AS structural_issues,
+                        COUNT(DISTINCT CASE WHEN disc.category_name = 'Architectural' THEN pi.processed_issue_id END) AS architectural_issues,
 
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
-                    COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Clash%' THEN pi.processed_issue_id END) AS clash_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Information%' THEN pi.processed_issue_id END) AS info_issues,
+                        COUNT(DISTINCT CASE WHEN prim.category_name LIKE '%Design%' THEN pi.processed_issue_id END) AS design_issues,
 
-                    AVG(pi.urgency_score) AS avg_urgency,
-                    AVG(pi.complexity_score) AS avg_complexity,
-                    AVG(pi.categorization_confidence) AS avg_confidence,
-                    AVG(pi.sentiment_score) AS avg_sentiment,
-                    AVG(CASE
-                        WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
-                        ELSE NULL
-                    END) AS avg_resolution_days
-                FROM ProcessedIssues pi
-                LEFT JOIN projects p ON TRY_CAST(pi.project_id AS INT) = p.project_id
-                LEFT JOIN project_types pt ON p.type_id = pt.project_type_id
-                LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
-                LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
-                WHERE pi.processed_at IS NOT NULL
-                GROUP BY COALESCE(pt.project_type_name, 'Unknown')
-                HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
-                ORDER BY total_issues DESC
-            """
+                        AVG(pi.urgency_score) AS avg_urgency,
+                        AVG(pi.complexity_score) AS avg_complexity,
+                        AVG(pi.categorization_confidence) AS avg_confidence,
+                        AVG(pi.sentiment_score) AS avg_sentiment,
+                        AVG(CASE
+                            WHEN pi.closed_at IS NOT NULL AND pi.created_at IS NOT NULL THEN DATEDIFF(day, pi.created_at, pi.closed_at)
+                            ELSE NULL
+                        END) AS avg_resolution_days
+                    FROM ProcessedIssues pi
+                    LEFT JOIN projects p ON TRY_CAST(pi.project_id AS INT) = p.project_id
+                    LEFT JOIN project_types pt ON p.type_id = pt.project_type_id
+                    LEFT JOIN IssueCategories disc ON pi.discipline_category_id = disc.category_id
+                    LEFT JOIN IssueCategories prim ON pi.primary_category_id = prim.category_id
+                    WHERE pi.processed_at IS NOT NULL
+                    GROUP BY COALESCE(pt.project_type_name, 'Unknown')
+                    HAVING COUNT(DISTINCT pi.processed_issue_id) > 0
+                    ORDER BY total_issues DESC
+                """
 
-            cursor.execute(query)
-            columns = [desc[0] for desc in cursor.description]
-            results: List[Dict] = []
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                results: List[Dict] = []
 
-            for row in cursor.fetchall():
-                result = dict(zip(columns, row))
-                total_issues = result['total_issues'] or 0
-                open_issues = result['open_issues'] or 0
-                avg_urgency = float(result['avg_urgency'] or 0)
-                avg_complexity = float(result['avg_complexity'] or 0)
+                for row in cursor.fetchall():
+                    result = dict(zip(columns, row))
+                    total_issues = result['total_issues'] or 0
+                    open_issues = result['open_issues'] or 0
+                    avg_urgency = float(result['avg_urgency'] or 0)
+                    avg_complexity = float(result['avg_complexity'] or 0)
 
-                open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
-                result['pain_point_score'] = (
-                    avg_urgency * 0.3
-                    + avg_complexity * 0.3
-                    + open_ratio * 0.4
-                )
+                    open_ratio = (open_issues / total_issues) if total_issues > 0 else 0
+                    result['pain_point_score'] = (
+                        avg_urgency * 0.3
+                        + avg_complexity * 0.3
+                        + open_ratio * 0.4
+                    )
 
-                result['issue_density'] = total_issues
-                results.append(result)
+                    result['issue_density'] = total_issues
+                    results.append(result)
 
             logger.info("Calculated pain points for %d project types", len(results))
             return results

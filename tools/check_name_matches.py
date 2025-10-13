@@ -9,9 +9,9 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db, get_projects
+from database_pool import get_db_connection, get_projects
 
-conn = connect_to_db()
+with get_db_connection() as conn:
 cursor = conn.cursor()
 
 print("=== Project Name Comparison ===")
@@ -37,5 +37,3 @@ for issue_project in issue_project_names:
         print(f"✅ MATCH: '{issue_project}' -> ID {project_id}")
     else:
         print(f"❌ NO MATCH: '{issue_project}'")
-
-conn.close()

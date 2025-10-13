@@ -13,7 +13,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from handlers.acc_handler import import_acc_data
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def import_mel071_mel081():
     """Import MEL071 and MEL081 data."""
@@ -60,42 +60,40 @@ def import_mel071_mel081():
     print('VERIFYING CUSTOM ATTRIBUTES')
     print('=' * 80)
     
-    conn = connect_to_db('acc_data_schema')
-    cursor = conn.cursor()
-    
-    # Check MEL071
-    cursor.execute("""
-        SELECT COUNT(*) as total
-        FROM dbo.issues_custom_attributes
-        WHERE bim360_project_id = '648AFD41-A9BA-4909-8D4F-8F4477FE3AE8'
-    """)
-    mel071_count = cursor.fetchone()[0]
-    print(f'\nMEL071 custom attributes: {mel071_count} rows')
-    
-    # Check MEL081
-    cursor.execute("""
-        SELECT COUNT(*) as total
-        FROM dbo.issues_custom_attributes
-        WHERE bim360_project_id = 'B6706F13-8A3A-4C98-9382-1148051059E7'
-    """)
-    mel081_count = cursor.fetchone()[0]
-    print(f'MEL081 custom attributes: {mel081_count} rows')
-    
-    # Check view
-    cursor.execute("""
-        SELECT 
-            project_name,
-            COUNT(CASE WHEN Clash_Level IS NOT NULL THEN 1 END) as clash_count
-        FROM dbo.vw_issues_expanded
-        WHERE project_name IN ('MEL071 - Site A', 'MEL081 - Site A')
-        GROUP BY project_name
-    """)
-    
-    print('\nView verification:')
-    for row in cursor.fetchall():
-        print(f'  {row[0]}: {row[1]} issues with Clash Level')
-    
-    conn.close()
+    with get_db_connection('acc_data_schema') as conn:
+        cursor = conn.cursor()
+        
+        # Check MEL071
+        cursor.execute("""
+            SELECT COUNT(*) as total
+            FROM dbo.issues_custom_attributes
+            WHERE bim360_project_id = '648AFD41-A9BA-4909-8D4F-8F4477FE3AE8'
+        """)
+        mel071_count = cursor.fetchone()[0]
+        print(f'\nMEL071 custom attributes: {mel071_count} rows')
+        
+        # Check MEL081
+        cursor.execute("""
+            SELECT COUNT(*) as total
+            FROM dbo.issues_custom_attributes
+            WHERE bim360_project_id = 'B6706F13-8A3A-4C98-9382-1148051059E7'
+        """)
+        mel081_count = cursor.fetchone()[0]
+        print(f'MEL081 custom attributes: {mel081_count} rows')
+        
+        # Check view
+        cursor.execute("""
+            SELECT 
+                project_name,
+                COUNT(CASE WHEN Clash_Level IS NOT NULL THEN 1 END) as clash_count
+            FROM dbo.vw_issues_expanded
+            WHERE project_name IN ('MEL071 - Site A', 'MEL081 - Site A')
+            GROUP BY project_name
+        """)
+        
+        print('\nView verification:')
+        for row in cursor.fetchall():
+            print(f'  {row[0]}: {row[1]} issues with Clash Level')
     
     print('\n' + '=' * 80)
     print('NEXT STEPS')

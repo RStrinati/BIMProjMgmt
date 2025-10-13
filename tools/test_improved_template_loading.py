@@ -6,7 +6,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from review_management_service import ReviewManagementService
 
 def test_template_loading():
@@ -14,7 +14,7 @@ def test_template_loading():
     print("🔍 Testing improved template loading...")
     
     # Connect to database
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return
@@ -65,7 +65,6 @@ def test_template_loading():
                 print(f"   ❌ No match")
         
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     test_template_loading()

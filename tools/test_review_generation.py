@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from review_management_service import ReviewManagementService
-from database import connect_to_db
+from database_pool import get_db_connection
 from datetime import datetime, timedelta
 
 def test_review_generation():

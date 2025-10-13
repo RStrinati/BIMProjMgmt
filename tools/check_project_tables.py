@@ -9,12 +9,12 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 import pyodbc
 
 def check_table_structure_and_data(table_name):
     """Check table structure and sample data"""
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if conn is None:
         print(f"❌ Failed to connect to database")
         return
@@ -90,11 +90,10 @@ def check_table_structure_and_data(table_name):
         traceback.print_exc()
     
     finally:
-        conn.close()
 
 def check_relationships():
     """Check relationships between projects and project_aliases tables"""
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if conn is None:
         print(f"❌ Failed to connect to database")
         return
@@ -188,7 +187,6 @@ def check_relationships():
         traceback.print_exc()
     
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     print("🔍 CHECKING PROJECT MANAGEMENT TABLES")

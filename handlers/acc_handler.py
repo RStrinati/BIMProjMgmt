@@ -297,58 +297,55 @@ def import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=Tru
     if db is None:
         db = ACC_DB
 
-    conn = connect_to_db(db)
-    cursor = conn.cursor()
-    cursor.fast_executemany = True
+    from database_pool import get_db_connection
+    
+    with get_db_connection(db) as conn:
+        cursor = conn.cursor()
+        cursor.fast_executemany = True
 
-    csv_bases = {f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")}
-    sql_bases = {
-        f.replace("merge_", "").replace(".sql", "")
-        for f in os.listdir(merge_dir)
-        if f.startswith("merge_") and f.endswith(".sql")
-    }
-    all_bases = sorted(csv_bases | sql_bases)
+        csv_bases = {f.replace(".csv", "") for f in os.listdir(folder_path) if f.endswith(".csv")}
+        sql_bases = {
+            f.replace("merge_", "").replace(".sql", "")
+            for f in os.listdir(merge_dir)
+            if f.startswith("merge_") and f.endswith(".sql")
+        }
+        all_bases = sorted(csv_bases | sql_bases)
 
-    for base in all_bases:
-        csv_file = os.path.join(folder_path, f"{base}.csv")
-        merge_sql_file = f"merge_{base}.sql"
-        merge_sql_path = os.path.join(merge_dir, merge_sql_file)
-        table_name = f"staging.{base}"
+        for base in all_bases:
+            csv_file = os.path.join(folder_path, f"{base}.csv")
+            merge_sql_file = f"merge_{base}.sql"
+            merge_sql_path = os.path.join(merge_dir, merge_sql_file)
+            table_name = f"staging.{base}"
 
-        csv_exists = os.path.exists(csv_file)
-        merge_exists = os.path.exists(merge_sql_path)
+            csv_exists = os.path.exists(csv_file)
+            merge_exists = os.path.exists(merge_sql_path)
 
-        if csv_exists and merge_exists:
-            start = time.time()
-            result = import_csv_to_sql(cursor, conn, csv_file, table_name)
-            if result:
-                summary.append(result)
-                run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
-            log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
-        else:
-            missing = []
-            if not csv_exists:
-                missing.append("CSV")
-            if not merge_exists:
-                missing.append("merge SQL")
-            reason = " and ".join(missing)
-            log(f"[SKIP] {base}: missing {reason}")
-            skipped.append((base, reason))
+            if csv_exists and merge_exists:
+                start = time.time()
+                result = import_csv_to_sql(cursor, conn, csv_file, table_name)
+                if result:
+                    summary.append(result)
+                    run_merge_script(cursor, conn, merge_sql_file, merge_dir=merge_dir)
+                log(f"[DONE] Processed {base} in {round(time.time() - start, 2)}s")
+            else:
+                missing = []
+                if not csv_exists:
+                    missing.append("CSV")
+                if not merge_exists:
+                    missing.append("merge SQL")
+                reason = " and ".join(missing)
+                log(f"[SKIP] {base}: missing {reason}")
+                skipped.append((base, reason))
 
-    if show_skip_summary and skipped:
-        log("Skipped table summary:")
-        for base, reason in skipped:
-            log(f" - {base}: missing {reason}")
-
-    cursor.close()
-    conn.close()
+        if show_skip_summary and skipped:
+            log("Skipped table summary:")
+            for base, reason in skipped:
+                log(f" - {base}: missing {reason}")
 
     if temp_dir:
         shutil.rmtree(temp_dir)
 
     return summary
-
-
 def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
     selected = project_dropdown.get()
     if " - " not in selected:

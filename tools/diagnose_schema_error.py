@@ -75,7 +75,6 @@ def diagnose_schema():
                 print(f"{col}: {type(val).__name__} = {repr(val)[:100]}")
         
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     diagnose_schema()

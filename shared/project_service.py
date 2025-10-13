@@ -61,19 +61,27 @@ class ProjectPayload:
     city: Optional[str] = None
     state: Optional[str] = None
     postcode: Optional[str] = None
+    project_number: Optional[str] = None
+    description: Optional[str] = None
+    project_type: Optional[str] = None
 
     def to_db_payload(self) -> Dict[str, Any]:
         """Convert to a payload suitable for database helpers."""
+        from database import get_db_connection
 
         default_start = datetime.now().strftime("%Y-%m-%d")
         default_end = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
 
+        # Handle dates: convert empty strings to None for SQL Server
+        start_date_val = self.start_date.strip() if self.start_date else ""
+        end_date_val = self.end_date.strip() if self.end_date else ""
+        
         payload: Dict[str, Any] = {
             S.Projects.NAME: self.name,
             S.Projects.FOLDER_PATH: self.folder_path or "",
             S.Projects.IFC_FOLDER_PATH: self.ifc_folder_path or "",
-            S.Projects.START_DATE: self.start_date or default_start,
-            S.Projects.END_DATE: self.end_date or default_end,
+            S.Projects.START_DATE: start_date_val if start_date_val else None,
+            S.Projects.END_DATE: end_date_val if end_date_val else None,
         }
 
         if self.client_id:
@@ -94,6 +102,25 @@ class ProjectPayload:
             payload[S.Projects.STATE] = self.state
         if self.postcode not in (None, ""):
             payload[S.Projects.POSTCODE] = self.postcode
+        if self.project_number not in (None, ""):
+            payload[S.Projects.CONTRACT_NUMBER] = self.project_number
+        
+        # Convert project_type name to type_id
+        if self.project_type not in (None, ""):
+            try:
+                conn = get_db_connection()
+                if conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        f"SELECT {S.ProjectTypes.TYPE_ID} FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_NAME} = ?",
+                        (self.project_type,)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        payload[S.Projects.TYPE_ID] = row[0]
+                    conn.close()
+            except Exception:
+                pass  # If lookup fails, just don't set the type_id
 
         return payload
 
@@ -117,12 +144,19 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
     except (TypeError, ValueError) as exc:
         raise ProjectValidationError("client_id must be numeric if provided") from exc
 
+    # Safely handle dates that might be None
+    start_date = raw_payload.get("start_date")
+    end_date = raw_payload.get("end_date")
+    
+    start_date_str = start_date.strip() if start_date and isinstance(start_date, str) else ""
+    end_date_str = end_date.strip() if end_date and isinstance(end_date, str) else ""
+
     return ProjectPayload(
         name=raw_payload.get("name", "").strip(),
         folder_path=(raw_payload.get("folder_path") or "").strip(),
         ifc_folder_path=(raw_payload.get("ifc_folder_path") or "").strip(),
-        start_date=(raw_payload.get("start_date") or "").strip(),
-        end_date=(raw_payload.get("end_date") or "").strip(),
+        start_date=start_date_str,
+        end_date=end_date_str,
         client_id=client_id_int,
         status=raw_payload.get("status") or None,
         priority=priority,
@@ -132,6 +166,9 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
         city=(raw_payload.get("city") or "").strip() or None,
         state=(raw_payload.get("state") or "").strip() or None,
         postcode=(raw_payload.get("postcode") or "").strip() or None,
+        project_number=(raw_payload.get("project_number") or "").strip() or None,
+        description=(raw_payload.get("description") or "").strip() or None,
+        project_type=(raw_payload.get("project_type") or "").strip() or None,
     )
 
 

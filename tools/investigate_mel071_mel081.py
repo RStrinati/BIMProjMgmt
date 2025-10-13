@@ -7,12 +7,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def investigate_mel071_mel081():
     """Investigate MEL071 and MEL081 custom attributes."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -190,8 +190,6 @@ def investigate_mel071_mel081():
                     print(f'    JSON:           {view_row[5][:200]}...')
                 else:
                     print(f'    JSON:           NULL')
-    
-    conn.close()
 
 if __name__ == '__main__':
     investigate_mel071_mel081()

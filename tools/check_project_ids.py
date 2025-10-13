@@ -1,6 +1,6 @@
-from database import connect_to_db
+from database_pool import get_db_connection
 
-conn = connect_to_db()
+with get_db_connection() as conn:
 cursor = conn.cursor()
 
 print("=== Checking project_id data types ===")
@@ -12,5 +12,3 @@ print("\n=== Checking Projects table ===")
 cursor.execute("SELECT TOP 3 ProjectID, ProjectName FROM Projects")
 for row in cursor.fetchall():
     print(f"Project ID: {row[0]} (type: {type(row[0])}) - Project: {row[1]}")
-    
-conn.close()

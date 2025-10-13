@@ -173,16 +173,15 @@ def create_sample_data():
             EnhancedTaskManager, MilestoneManager, 
             ResourceManager, ProjectTemplateManager
         )
-        from database import connect_to_db
+        from database_pool import get_db_connection
         
         # Test database connection
-        conn = connect_to_db("ProjectManagement")
-        if not conn:
-            print("❌ Cannot connect to database")
+        try:
+            with get_db_connection("ProjectManagement") as conn:
+                print("✅ Database connection successful")
+        except Exception as e:
+            print(f"❌ Cannot connect to database: {e}")
             return
-        
-        conn.close()
-        print("✅ Database connection successful")
         
         # Initialize managers
         task_mgr = EnhancedTaskManager()

@@ -9,11 +9,11 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def analyze_project_aliases_relationship():
     """Analyze the relationship between projects and project_aliases tables"""
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return
@@ -98,7 +98,6 @@ def analyze_project_aliases_relationship():
         traceback.print_exc()
     
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     analyze_project_aliases_relationship()

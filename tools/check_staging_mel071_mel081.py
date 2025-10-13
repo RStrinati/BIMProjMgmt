@@ -6,12 +6,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def check_staging_for_mel071_mel081():
     """Check staging table for MEL071 and MEL081 data."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -81,8 +81,6 @@ def check_staging_for_mel071_mel081():
         print('  3. Verify custom attributes are set in ACC web interface')
     else:
         print(f'\n✅ {count} rows found in staging - run merge again!')
-    
-    conn.close()
 
 if __name__ == '__main__':
     check_staging_for_mel071_mel081()

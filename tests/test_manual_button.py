@@ -16,47 +16,42 @@ def test_manual_button_scenario():
     print("=" * 40)
     
     try:
-        from database import connect_to_db
+        from database import get_db_connection
         from review_management_service import ReviewManagementService
         
         # Connect to database
-        db_connection = connect_to_db()
-        if not db_connection:
-            print("❌ Failed to connect to database")
-            return False
+        with get_db_connection() as db_connection:
+            # Create review service
+            review_service = ReviewManagementService(db_connection)
+            project_id = 1  # Test with project 1
             
-        # Create review service
-        review_service = ReviewManagementService(db_connection)
-        project_id = 1  # Test with project 1
+            print(f"🔄 Testing manual refresh for project {project_id}...")
+            
+            # This is exactly what the UI button calls
+            results = review_service.refresh_review_cycles_by_date(project_id)
+            
+            print(f"📋 Manual refresh results:")
+            print(f"   Type: {type(results)}")
+            
+            for key, value in results.items():
+                print(f"   {key}: {value}")
+            
+            # Check success specifically
+            success = results.get('success', 'NOT SET')
+            reviews_updated = results.get('reviews_updated', 'NOT SET')
+            error = results.get('error', 'NONE')
+            
+            print(f"\n🎯 Key Results:")
+            print(f"   Success: {success}")
+            print(f"   Reviews Updated: {reviews_updated}")
+            print(f"   Error: {error}")
+            
+            # Simulate UI logic
+            if results.get('success', False):
+                print("✅ UI would show success message")
+            else:
+                print(f"❌ UI would show error: {results.get('error', 'Unknown error')}")
         
-        print(f"🔄 Testing manual refresh for project {project_id}...")
-        
-        # This is exactly what the UI button calls
-        results = review_service.refresh_review_cycles_by_date(project_id)
-        
-        print(f"📋 Manual refresh results:")
-        print(f"   Type: {type(results)}")
-        
-        for key, value in results.items():
-            print(f"   {key}: {value}")
-        
-        # Check success specifically
-        success = results.get('success', 'NOT SET')
-        reviews_updated = results.get('reviews_updated', 'NOT SET')
-        error = results.get('error', 'NONE')
-        
-        print(f"\n🎯 Key Results:")
-        print(f"   Success: {success}")
-        print(f"   Reviews Updated: {reviews_updated}")
-        print(f"   Error: {error}")
-        
-        # Simulate UI logic
-        if results.get('success', False):
-            print("✅ UI would show success message")
-        else:
-            print(f"❌ UI would show error: {results.get('error', 'Unknown error')}")
-        
-        db_connection.close()
         return True
         
     except Exception as e:

@@ -6,12 +6,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def quick_check_view():
     """Quick check of view values."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 80)
@@ -91,8 +91,6 @@ def quick_check_view():
             print(f'  JSON: {json_preview}...')
         else:
             print('  JSON: NULL')
-    
-    conn.close()
 
 if __name__ == '__main__':
     quick_check_view()

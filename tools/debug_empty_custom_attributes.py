@@ -6,10 +6,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def main():
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     if not conn:
         print("❌ Failed to connect")
         return
@@ -264,8 +264,6 @@ def main():
        → Verify Building Level actually has a value selected
        → If not set → that's why it's empty (user hasn't filled it in)
     """)
-    
-    conn.close()
     print("=" * 120)
 
 if __name__ == "__main__":

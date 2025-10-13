@@ -6,12 +6,12 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def show_attributes_by_project():
     """Show custom attribute usage by project."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     cursor = conn.cursor()
     
     print('=' * 100)
@@ -75,8 +75,6 @@ def show_attributes_by_project():
         if row[5]: print(f'    Location: {row[5]}')
         if row[6]: print(f'    Phase: {row[6]}')
         if row[7]: print(f'    Priority: {row[7]}')
-    
-    conn.close()
 
 if __name__ == '__main__':
     show_attributes_by_project()

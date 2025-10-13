@@ -6,10 +6,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def main():
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     if not conn:
         print("Failed to connect to acc_data_schema")
         return
@@ -228,8 +228,6 @@ CONFUSION ABOUT NAMING:
 - Other projects have different custom attributes (Building Level, Clash Level, Location, Phase)
 - You may have confused the attribute name with the project name
 """)
-    
-    conn.close()
     print("\n" + "=" * 120)
     print("ANALYSIS COMPLETE")
     print("=" * 120)

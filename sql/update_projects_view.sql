@@ -39,10 +39,12 @@ SELECT
     p.postcode,
     p.client_id,
     p.type_id,
+    pt.type_name as project_type,
     p.sector_id,
     p.method_id
 FROM projects p
-LEFT JOIN clients c ON p.client_id = c.client_id;
+LEFT JOIN clients c ON p.client_id = c.client_id
+LEFT JOIN project_types pt ON p.type_id = pt.type_id;
 GO
 
 PRINT 'vw_projects_full view updated successfully with new project fields!';

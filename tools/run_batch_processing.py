@@ -26,7 +26,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.issue_batch_processor import IssueBatchProcessor
-from database import connect_to_db
+from database_pool import get_db_connection, get_db_connection
 import argparse
 from datetime import datetime
 
@@ -41,64 +41,61 @@ def print_header():
 
 def get_database_stats():
     """Get current database statistics."""
-    conn = connect_to_db('ProjectManagement')
-    if conn is None:
-        return None
-    
     try:
-        cursor = conn.cursor()
-        
-        # Total issues in view
-        cursor.execute("SELECT COUNT(*) FROM vw_ProjectManagement_AllIssues")
-        total_issues = cursor.fetchone()[0]
-        
-        # Processed issues
-        cursor.execute("SELECT COUNT(*) FROM ProcessedIssues")
-        processed_issues = cursor.fetchone()[0]
-        
-        # ACC vs Revizto breakdown
-        cursor.execute("""
-            SELECT source, COUNT(*) as count
-            FROM vw_ProjectManagement_AllIssues
-            GROUP BY source
-        """)
-        source_breakdown = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        # Processed breakdown
-        cursor.execute("""
-            SELECT source, COUNT(*) as count
-            FROM ProcessedIssues
-            GROUP BY source
-        """)
-        processed_breakdown = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        # Last processing run
-        try:
+        with get_db_connection('ProjectManagement') as conn:
+            cursor = conn.cursor()
+            
+            # Total issues in view
+            cursor.execute("SELECT COUNT(*) FROM vw_ProjectManagement_AllIssues")
+            total_issues = cursor.fetchone()[0]
+            
+            # Processed issues
+            cursor.execute("SELECT COUNT(*) FROM ProcessedIssues")
+            processed_issues = cursor.fetchone()[0]
+            
+            # ACC vs Revizto breakdown
             cursor.execute("""
-                SELECT TOP 1 
-                    batch_name, 
-                    start_time, 
-                    end_time, 
-                    issues_processed, 
-                    status
-                FROM IssueProcessingLog
-                ORDER BY start_time DESC
+                SELECT source, COUNT(*) as count
+                FROM vw_ProjectManagement_AllIssues
+                GROUP BY source
             """)
-            last_run = cursor.fetchone()
-        except:
-            last_run = None
-        
-        return {
-            'total_issues': total_issues,
-            'processed_issues': processed_issues,
-            'unprocessed_issues': total_issues - processed_issues,
-            'source_breakdown': source_breakdown,
-            'processed_breakdown': processed_breakdown,
-            'last_run': last_run
-        }
-        
-    finally:
-        conn.close()
+            source_breakdown = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Processed breakdown
+            cursor.execute("""
+                SELECT source, COUNT(*) as count
+                FROM ProcessedIssues
+                GROUP BY source
+            """)
+            processed_breakdown = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Last processing run
+            try:
+                cursor.execute("""
+                    SELECT TOP 1 
+                        batch_name, 
+                        start_time, 
+                        end_time, 
+                        issues_processed, 
+                        status
+                    FROM IssueProcessingLog
+                    ORDER BY start_time DESC
+                """)
+                last_run = cursor.fetchone()
+            except:
+                last_run = None
+            
+            return {
+                'total_issues': total_issues,
+                'processed_issues': processed_issues,
+                'unprocessed_issues': total_issues - processed_issues,
+                'source_breakdown': source_breakdown,
+                'processed_breakdown': processed_breakdown,
+                'last_run': last_run
+            }
+    except Exception as e:
+        print(f"⚠️  Error retrieving database statistics: {e}")
+        return None
 
 
 def print_stats(stats):
@@ -149,110 +146,106 @@ def confirm_processing(stats, args):
 
 def print_category_distribution():
     """Print distribution of categories in processed issues."""
-    conn = connect_to_db('ProjectManagement')
-    if conn is None:
-        return
-    
     try:
-        cursor = conn.cursor()
-        
-        print("\n📈 CATEGORIZATION RESULTS")
-        print("-" * 70)
-        
-        # Discipline distribution
-        cursor.execute("""
-            SELECT 
-                c.category_name,
-                COUNT(*) as count,
-                AVG(pi.categorization_confidence) as avg_confidence
-            FROM ProcessedIssues pi
-            JOIN IssueCategories c ON pi.discipline_category_id = c.category_id
-            WHERE c.category_level = 1
-            GROUP BY c.category_name
-            ORDER BY count DESC
-        """)
-        
-        print("\nDiscipline Distribution:")
-        total = 0
-        for row in cursor.fetchall():
-            print(f"  {row[0]:25s} {row[1]:5,} issues (avg confidence: {row[2]:.2f})")
-            total += row[1]
-        
-        # Issue type distribution
-        cursor.execute("""
-            SELECT 
-                c.category_name,
-                COUNT(*) as count
-            FROM ProcessedIssues pi
-            JOIN IssueCategories c ON pi.primary_category_id = c.category_id
-            WHERE c.category_level = 2
-            GROUP BY c.category_name
-            ORDER BY count DESC
-        """)
-        
-        print("\nTop Issue Types:")
-        for row in cursor.fetchall()[:10]:
-            print(f"  {row[0]:35s} {row[1]:5,} issues")
-        
-        # Confidence distribution
-        cursor.execute("""
-            SELECT 
-                CASE 
-                    WHEN categorization_confidence >= 0.7 THEN 'Very High (≥0.7)'
-                    WHEN categorization_confidence >= 0.5 THEN 'High (0.5-0.7)'
-                    WHEN categorization_confidence >= 0.3 THEN 'Medium (0.3-0.5)'
-                    ELSE 'Low (<0.3)'
-                END as confidence_level,
-                COUNT(*) as count,
-                MAX(CASE 
-                    WHEN categorization_confidence >= 0.7 THEN 4
-                    WHEN categorization_confidence >= 0.5 THEN 3
-                    WHEN categorization_confidence >= 0.3 THEN 2
-                    ELSE 1
-                END) as sort_order
-            FROM ProcessedIssues
-            GROUP BY 
-                CASE 
-                    WHEN categorization_confidence >= 0.7 THEN 'Very High (≥0.7)'
-                    WHEN categorization_confidence >= 0.5 THEN 'High (0.5-0.7)'
-                    WHEN categorization_confidence >= 0.3 THEN 'Medium (0.3-0.5)'
-                    ELSE 'Low (<0.3)'
-                END
-            ORDER BY sort_order DESC
-        """)
-        
-        print("\nConfidence Score Distribution:")
-        for row in cursor.fetchall():
-            pct = (row[1] / total) * 100 if total > 0 else 0
-            print(f"  {row[0]:25s} {row[1]:5,} issues ({pct:5.1f}%)")
-        
-        # Sentiment distribution
-        cursor.execute("""
-            SELECT 
-                CASE 
-                    WHEN sentiment_score > 0.3 THEN 'Positive'
-                    WHEN sentiment_score < -0.3 THEN 'Negative'
-                    ELSE 'Neutral'
-                END as sentiment,
-                COUNT(*) as count,
-                AVG(urgency_score) as avg_urgency
-            FROM ProcessedIssues
-            GROUP BY 
-                CASE 
-                    WHEN sentiment_score > 0.3 THEN 'Positive'
-                    WHEN sentiment_score < -0.3 THEN 'Negative'
-                    ELSE 'Neutral'
-                END
-        """)
-        
-        print("\nSentiment Analysis:")
-        for row in cursor.fetchall():
-            print(f"  {row[0]:15s} {row[1]:5,} issues (avg urgency: {row[2]:.2f})")
-        
-        print("-" * 70)
-        
-    finally:
-        conn.close()
+        with get_db_connection('ProjectManagement') as conn:
+            cursor = conn.cursor()
+            
+            print("\n📈 CATEGORIZATION RESULTS")
+            print("-" * 70)
+            
+            # Discipline distribution
+            cursor.execute("""
+                SELECT 
+                    c.category_name,
+                    COUNT(*) as count,
+                    AVG(pi.categorization_confidence) as avg_confidence
+                FROM ProcessedIssues pi
+                JOIN IssueCategories c ON pi.discipline_category_id = c.category_id
+                WHERE c.category_level = 1
+                GROUP BY c.category_name
+                ORDER BY count DESC
+            """)
+            
+            print("\nDiscipline Distribution:")
+            total = 0
+            for row in cursor.fetchall():
+                print(f"  {row[0]:25s} {row[1]:5,} issues (avg confidence: {row[2]:.2f})")
+                total += row[1]
+            
+            # Issue type distribution
+            cursor.execute("""
+                SELECT 
+                    c.category_name,
+                    COUNT(*) as count
+                FROM ProcessedIssues pi
+                JOIN IssueCategories c ON pi.primary_category_id = c.category_id
+                WHERE c.category_level = 2
+                GROUP BY c.category_name
+                ORDER BY count DESC
+            """)
+            
+            print("\nTop Issue Types:")
+            for row in cursor.fetchall()[:10]:
+                print(f"  {row[0]:35s} {row[1]:5,} issues")
+            
+            # Confidence distribution
+            cursor.execute("""
+                SELECT 
+                    CASE 
+                        WHEN categorization_confidence >= 0.7 THEN 'Very High (≥0.7)'
+                        WHEN categorization_confidence >= 0.5 THEN 'High (0.5-0.7)'
+                        WHEN categorization_confidence >= 0.3 THEN 'Medium (0.3-0.5)'
+                        ELSE 'Low (<0.3)'
+                    END as confidence_level,
+                    COUNT(*) as count,
+                    MAX(CASE 
+                        WHEN categorization_confidence >= 0.7 THEN 4
+                        WHEN categorization_confidence >= 0.5 THEN 3
+                        WHEN categorization_confidence >= 0.3 THEN 2
+                        ELSE 1
+                    END) as sort_order
+                FROM ProcessedIssues
+                GROUP BY 
+                    CASE 
+                        WHEN categorization_confidence >= 0.7 THEN 'Very High (≥0.7)'
+                        WHEN categorization_confidence >= 0.5 THEN 'High (0.5-0.7)'
+                        WHEN categorization_confidence >= 0.3 THEN 'Medium (0.3-0.5)'
+                        ELSE 'Low (<0.3)'
+                    END
+                ORDER BY sort_order DESC
+            """)
+            
+            print("\nConfidence Score Distribution:")
+            for row in cursor.fetchall():
+                pct = (row[1] / total) * 100 if total > 0 else 0
+                print(f"  {row[0]:25s} {row[1]:5,} issues ({pct:5.1f}%)")
+            
+            # Sentiment distribution
+            cursor.execute("""
+                SELECT 
+                    CASE 
+                        WHEN sentiment_score > 0.3 THEN 'Positive'
+                        WHEN sentiment_score < -0.3 THEN 'Negative'
+                        ELSE 'Neutral'
+                    END as sentiment,
+                    COUNT(*) as count,
+                    AVG(urgency_score) as avg_urgency
+                FROM ProcessedIssues
+                GROUP BY 
+                    CASE 
+                        WHEN sentiment_score > 0.3 THEN 'Positive'
+                        WHEN sentiment_score < -0.3 THEN 'Negative'
+                        ELSE 'Neutral'
+                    END
+            """)
+            
+            print("\nSentiment Analysis:")
+            for row in cursor.fetchall():
+                print(f"  {row[0]:15s} {row[1]:5,} issues (avg urgency: {row[2]:.2f})")
+            
+            print("-" * 70)
+    except Exception as e:
+        print(f"⚠️  Error retrieving categorization results: {e}")
 
 
 def main():

@@ -8,13 +8,13 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 import logging
 
 def migrate_regeneration_signature():
     """Add regeneration_signature column and update existing records"""
     
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if not conn:
         print("❌ Failed to connect to database")
         return False
@@ -63,7 +63,6 @@ def migrate_regeneration_signature():
         conn.rollback()
         return False
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     success = migrate_regeneration_signature()

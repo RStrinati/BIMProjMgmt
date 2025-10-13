@@ -2,15 +2,14 @@
 """Test script to check ReviewManagementService functionality"""
 
 try:
-    from database import connect_to_db, get_projects
+    from database import get_db_connection, get_projects
     from review_management_service import ReviewManagementService
     
     print("Testing ReviewManagementService...")
     
     # Test database connection
     print("1. Testing database connection...")
-    db_conn = connect_to_db()
-    if db_conn:
+    with get_db_connection() as db_conn:
         print("✅ Database connection successful")
         
         # Test ReviewManagementService initialization
@@ -57,8 +56,6 @@ try:
                     print(f"❌ Method {method} is missing")
         else:
             print("❌ No projects found")
-    else:
-        print("❌ Database connection failed")
         
 except ImportError as e:
     print(f"❌ Import error: {e}")

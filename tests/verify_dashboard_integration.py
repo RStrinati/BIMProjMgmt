@@ -83,14 +83,10 @@ def verify_integration():
     checks_total += 1
     print("\n✓ Check 6: Database connectivity")
     try:
-        from database import connect_to_db
-        conn = connect_to_db('ProjectManagement')
-        if conn:
+        from database import get_db_connection
+        with get_db_connection('ProjectManagement') as conn:
             print("  ✅ Database connection successful")
-            conn.close()
             checks_passed += 1
-        else:
-            print("  ❌ Database connection failed")
     except Exception as e:
         print(f"  ❌ Database error: {e}")
     

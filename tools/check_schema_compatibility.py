@@ -5,9 +5,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
-conn = connect_to_db('ProjectManagement')
+with get_db_connection('ProjectManagement') as conn:
 cursor = conn.cursor()
 
 print("="*70)
@@ -121,5 +121,3 @@ if project_id_type and project_id_type[0] not in ['uniqueidentifier', 'nvarchar'
 
 print("\n✓ Run the generated SQL script to fix the schema")
 print("="*70)
-
-conn.close()

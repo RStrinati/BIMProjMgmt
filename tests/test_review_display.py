@@ -2,14 +2,13 @@
 """Test script to verify review generation functionality"""
 
 try:
-    from database import connect_to_db, get_review_cycles
+    from database import get_db_connection, get_review_cycles
     from review_management_service import ReviewManagementService
     
     print("Testing review cycle display...")
     
     # Test database connection
-    db_conn = connect_to_db()
-    if db_conn:
+    with get_db_connection() as db_conn:
         # Test get_review_cycles for project 2
         print("1. Testing get_review_cycles for project 2 (NFPS)...")
         cycles = get_review_cycles(2)
@@ -35,10 +34,6 @@ try:
             print("Sample service reviews:")
             for i, review in enumerate(service_reviews[:3]):
                 print(f"  Review {i+1}: {review}")
-        
-        db_conn.close()
-    else:
-        print("❌ Database connection failed")
         
 except Exception as e:
     print(f"❌ Error: {e}")

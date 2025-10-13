@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
-from database import connect_to_db
+from database_pool import get_db_connection
 from review_management_service import ReviewManagementService
 
 def debug_template_lookup():
@@ -15,7 +15,7 @@ def debug_template_lookup():
     print("🔍 Debugging template lookup...")
     
     # Connect to database
-    conn = connect_to_db()
+    with get_db_connection() as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return
@@ -77,7 +77,6 @@ def debug_template_lookup():
             print(f"  Length difference: search={len(problem_template)} vs json={len(json_template)}")
     
     finally:
-        conn.close()
 
 if __name__ == "__main__":
     debug_template_lookup()

@@ -3,33 +3,47 @@ import os
 import sys
 from pathlib import Path
 
+# Add parent directory to path FIRST so we can import config and database
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import ACC_SERVICE_TOKEN, ACC_SERVICE_URL, REVIZTO_SERVICE_TOKEN, REVIZTO_SERVICE_URL
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from database import (  # noqa: E402
+    add_bookmark,
     create_review_cycle,
     create_service_template,
+    delete_bookmark,
     delete_review_cycle,
     delete_service_template,
+    get_acc_folder_path,
+    get_acc_import_logs,
     get_bep_matrix,
     get_contractual_links,
     get_cycle_ids,
+    get_db_connection,
+    get_last_revizto_extraction_run,
+    get_project_bookmarks,
     get_project_details,
     get_project_folders,
+    get_project_health_files,
     get_projects_full,
     get_reference_options,
     get_review_cycle_tasks,
     get_review_cycles,
     get_review_summary,
     get_review_tasks,
+    get_revizto_extraction_runs,
     get_service_templates,
     get_users_list,
     insert_files_into_tblACCDocs,
+    log_acc_import,
+    save_acc_folder_path,
+    start_revizto_extraction_run,
+    update_bookmark,
     upsert_bep_section,
     update_bep_status,
     update_project_details,
@@ -37,6 +51,7 @@ from database import (  # noqa: E402
     update_review_cycle,
     update_review_cycle_task,
     update_review_task_assignee,
+    update_service_template,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -45,6 +60,7 @@ from shared.project_service import (  # noqa: E402
     list_projects_full,
     update_project,
 )
+from constants import schema as S  # noqa: E402
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
@@ -53,23 +69,39 @@ CORS(app)
 
 def _extract_project_payload(body):
     """Normalise incoming JSON into a payload for the project service."""
+    
+    # Handle dates - convert empty strings to None, and extract date part from ISO strings
+    def normalize_date(date_value):
+        if not date_value or date_value == '':
+            return None
+        if isinstance(date_value, str):
+            # If it's an ISO datetime string, extract just the date part
+            if 'T' in date_value:
+                return date_value.split('T')[0]
+            return date_value
+        return None
+    
+    start_date = normalize_date(body.get('start_date'))
+    end_date = normalize_date(body.get('end_date'))
 
     return {
         'name': body.get('project_name') or body.get('name'),
+        'project_number': body.get('project_number'),
         'client_id': body.get('client_id'),
         'project_type': body.get('project_type'),
         'area': body.get('area'),
         'mw_capacity': body.get('mw_capacity'),
         'status': body.get('status'),
         'priority': body.get('priority') or body.get('priority_label'),
-        'start_date': body.get('start_date'),
-        'end_date': body.get('end_date'),
+        'start_date': start_date,
+        'end_date': end_date,
         'address': body.get('address'),
         'city': body.get('city'),
         'state': body.get('state'),
         'postcode': body.get('postcode'),
         'folder_path': body.get('folder_path'),
         'ifc_folder_path': body.get('ifc_folder_path'),
+        'description': body.get('description'),
     }
 
 
@@ -158,6 +190,25 @@ def api_get_projects_full():
     return jsonify(projects)
 
 
+@app.route('/api/projects/stats', methods=['GET'])
+def api_projects_stats():
+    """Get project statistics for dashboard"""
+    try:
+        projects = get_projects_full()
+        
+        stats = {
+            'total': len(projects),
+            'active': len([p for p in projects if p.get('status') == 'Active']),
+            'completed': len([p for p in projects if p.get('status') == 'Completed']),
+            'on_hold': len([p for p in projects if p.get('status') == 'On Hold']),
+        }
+        
+        return jsonify(stats)
+    except Exception as e:
+        logging.exception("Failed to get project stats")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/users', methods=['GET'])
 def api_get_users():
     users = get_users_list()
@@ -169,6 +220,119 @@ def api_get_users():
 def api_reference_table(table):
     rows = get_reference_options(table)
     return jsonify([{'id': r[0], 'name': r[1]} for r in rows])
+
+
+@app.route('/api/reference/project_types', methods=['GET'])
+def api_get_project_types():
+    """Get all project types"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT {S.ProjectTypes.TYPE_ID}, {S.ProjectTypes.TYPE_NAME} FROM {S.ProjectTypes.TABLE} ORDER BY {S.ProjectTypes.TYPE_NAME}"
+            )
+            types = [{'type_id': row[0], 'type_name': row[1]} for row in cursor.fetchall()]
+            return jsonify(types)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reference/project_types', methods=['POST'])
+def api_create_project_type():
+    """Create a new project type"""
+    body = request.get_json() or {}
+    type_name = body.get('name', '').strip()
+    
+    if not type_name:
+        return jsonify({'error': 'Project type name is required'}), 400
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Check if already exists
+            cursor.execute(
+                f"SELECT {S.ProjectTypes.TYPE_ID} FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_NAME} = ?",
+                (type_name,)
+            )
+            if cursor.fetchone():
+                return jsonify({'error': 'Project type already exists'}), 409
+            
+            # Insert new type
+            cursor.execute(
+                f"INSERT INTO {S.ProjectTypes.TABLE} ({S.ProjectTypes.TYPE_NAME}) VALUES (?)",
+                (type_name,)
+            )
+            conn.commit()
+            
+            # Get the new ID
+            cursor.execute(
+                f"SELECT {S.ProjectTypes.TYPE_ID} FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_NAME} = ?",
+                (type_name,)
+            )
+            new_id = cursor.fetchone()[0]
+            
+            return jsonify({'id': new_id, 'name': type_name}), 201
+    except Exception as e:
+        logging.exception("Failed to create project type")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reference/project_types/<int:type_id>', methods=['PUT'])
+def api_update_project_type(type_id):
+    """Update a project type name"""
+    body = request.get_json() or {}
+    type_name = body.get('name', '').strip()
+    
+    if not type_name:
+        return jsonify({'error': 'Project type name is required'}), 400
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE {S.ProjectTypes.TABLE} SET {S.ProjectTypes.TYPE_NAME} = ? WHERE {S.ProjectTypes.TYPE_ID} = ?",
+                (type_name, type_id)
+            )
+            conn.commit()
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Project type not found'}), 404
+            
+            return jsonify({'id': type_id, 'name': type_name})
+    except Exception as e:
+        logging.exception("Failed to update project type")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reference/project_types/<int:type_id>', methods=['DELETE'])
+def api_delete_project_type(type_id):
+    """Delete a project type"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if any projects use this type
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {S.Projects.TABLE} WHERE {S.Projects.TYPE_ID} = ?",
+                (type_id,)
+            )
+            count = cursor.fetchone()[0]
+            if count > 0:
+                return jsonify({'error': f'Cannot delete: {count} project(s) are using this type'}), 409
+            
+            cursor.execute(
+                f"DELETE FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_ID} = ?",
+                (type_id,)
+            )
+            conn.commit()
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Project type not found'}), 404
+            
+            return jsonify({'success': True})
+    except Exception as e:
+        logging.exception("Failed to delete project type")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/review_tasks', methods=['GET'])
@@ -204,10 +368,16 @@ def api_update_review_task(schedule_id):
 
 @app.route('/api/project/<int:project_id>', methods=['GET'])
 def api_get_project_details_endpoint(project_id):
-    details = get_project_details(project_id)
-    if details is None:
-        return jsonify({'error': 'project not found'}), 404
-    return jsonify(details)
+    """Get full project details by ID"""
+    try:
+        projects = get_projects_full()
+        project = next((p for p in projects if p.get('project_id') == project_id), None)
+        if project is None:
+            return jsonify({'error': 'project not found'}), 404
+        return jsonify(project)
+    except Exception as e:
+        logging.exception("Failed to get project details")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/project/<int:project_id>', methods=['PATCH'])
@@ -260,7 +430,19 @@ def api_create_project():
 def api_update_full_project(project_id):
     """Update project fields via a generic PUT."""
     data = request.get_json() or {}
+    
+    # Debug logging
+    print(f"\n=== PROJECT UPDATE DEBUG ===")
+    print(f"Project ID: {project_id}")
+    print(f"Raw start_date: {repr(data.get('start_date'))}")
+    print(f"Raw end_date: {repr(data.get('end_date'))}")
+    
     payload = _extract_project_payload(data)
+    
+    print(f"Normalized start_date: {repr(payload.get('start_date'))}")
+    print(f"Normalized end_date: {repr(payload.get('end_date'))}")
+    print(f"=== END DEBUG ===\n")
+
     try:
         result = update_project(project_id, payload)
     except ProjectValidationError as exc:
@@ -671,6 +853,545 @@ def api_get_resources():
         return jsonify(mock_resources)
 
 
+# ============================================================================
+# DATA IMPORTS API ENDPOINTS
+# ============================================================================
+
+# --- ACC Desktop Connector File Extraction ---
+
+@app.route('/api/projects/<int:project_id>/acc-connector-folder', methods=['GET'])
+def get_project_acc_connector_folder(project_id):
+    """Get configured ACC Desktop Connector folder path for project"""
+    try:
+        # Use model folder path (same as Tkinter app)
+        folder_path, _ = get_project_folders(project_id)
+        exists = os.path.exists(folder_path) if folder_path else False
+        
+        return jsonify({
+            'project_id': project_id,
+            'folder_path': folder_path,
+            'exists': exists
+        })
+    except Exception as e:
+        logging.exception(f"Error getting ACC connector folder for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-connector-folder', methods=['POST'])
+def save_project_acc_connector_folder(project_id):
+    """Save ACC Desktop Connector folder path for project"""
+    try:
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
+        
+        # Save to model folder path (same as Tkinter app)
+        success = update_project_folders(project_id, models_path=folder_path)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'project_id': project_id,
+                'folder_path': folder_path
+            })
+        else:
+            return jsonify({'error': 'Failed to save folder path'}), 500
+            
+    except Exception as e:
+        logging.exception(f"Error saving ACC connector folder for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-connector-extract', methods=['POST'])
+def extract_acc_connector_files(project_id):
+    """Extract files from ACC Desktop Connector folder and insert into tblACCDocs"""
+    try:
+        import time
+        start_time = time.time()
+        
+        # Use the same logic as Tkinter app: get_project_folders for model folder path
+        folder_path, _ = get_project_folders(project_id)
+        
+        if not folder_path:
+            return jsonify({'error': 'No model folder configured for this project'}), 400
+        
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'Model folder does not exist: {folder_path}'}), 400
+        
+        # Extract files (this function handles DELETE and INSERT)
+        success = insert_files_into_tblACCDocs(project_id, folder_path)
+        
+        execution_time = time.time() - start_time
+        
+        if success:
+            # Get count of inserted files
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT COUNT(*) FROM {S.ACCDocs.TABLE} WHERE {S.ACCDocs.PROJECT_ID} = ?", (project_id,))
+                file_count = cursor.fetchone()[0]
+            
+            return jsonify({
+                'success': True,
+                'files_extracted': file_count,
+                'folder_path': folder_path,
+                'execution_time_seconds': round(execution_time, 2)
+            })
+        else:
+            return jsonify({'error': 'File extraction failed'}), 500
+            
+    except Exception as e:
+        logging.exception(f"Error extracting ACC connector files for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-connector-files', methods=['GET'])
+def get_acc_connector_files(project_id):
+    """Get list of files extracted from ACC Desktop Connector"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        file_type = request.args.get('file_type', None)
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build query with optional file type filter
+            where_clause = f"{S.ACCDocs.PROJECT_ID} = ?"
+            params = [project_id]
+            
+            if file_type:
+                where_clause += f" AND {S.ACCDocs.FILE_TYPE} = ?"
+                params.append(file_type)
+            
+            # Get total count
+            cursor.execute(f"SELECT COUNT(*) FROM {S.ACCDocs.TABLE} WHERE {where_clause}", params)
+            total_count = cursor.fetchone()[0]
+            
+            # Get paginated files
+            query = f"""
+                SELECT {S.ACCDocs.ID}, {S.ACCDocs.FILE_NAME}, {S.ACCDocs.FILE_PATH}, 
+                       {S.ACCDocs.FILE_TYPE}, {S.ACCDocs.FILE_SIZE_KB}, 
+                       {S.ACCDocs.DATE_MODIFIED}, {S.ACCDocs.CREATED_AT}
+                FROM {S.ACCDocs.TABLE}
+                WHERE {where_clause}
+                ORDER BY {S.ACCDocs.DATE_MODIFIED} DESC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+            """
+            
+            cursor.execute(query, params + [offset, limit])
+            rows = cursor.fetchall()
+            
+            files = []
+            for row in rows:
+                file_size_kb = float(row[4]) if row[4] else 0
+                files.append({
+                    'id': row[0],
+                    'project_id': project_id,
+                    'file_name': row[1],
+                    'file_path': row[2],
+                    'file_extension': row[3],  # file_type -> file_extension
+                    'file_size': int(file_size_kb * 1024) if file_size_kb > 0 else None,  # Convert KB to bytes
+                    'date_modified': row[5].isoformat() if row[5] else None,
+                    'date_extracted': row[6].isoformat() if row[6] else None,  # created_at -> date_extracted
+                    'extracted_by': None  # Add this field (not stored currently)
+                })
+        
+        return jsonify({
+            'files': files,
+            'total_count': total_count,
+            'page': (offset // limit) + 1,
+            'page_size': limit
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error getting ACC connector files for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- ACC Data Download Import (CSV/ZIP Schema Import) ---
+
+@app.route('/api/projects/<int:project_id>/acc-data-folder', methods=['GET'])
+def get_acc_data_folder(project_id):
+    """Get configured ACC data export folder path"""
+    try:
+        # Note: ACC data folder is stored differently than connector folder
+        # Using get_acc_folder_path for consistency
+        folder_path = get_acc_folder_path(project_id)
+        exists = os.path.exists(folder_path) if folder_path else False
+        
+        return jsonify({
+            'project_id': project_id,
+            'folder_path': folder_path,
+            'exists': exists
+        })
+    except Exception as e:
+        logging.exception(f"Error getting ACC data folder for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-data-folder', methods=['POST'])
+def save_acc_data_folder(project_id):
+    """Save ACC data export folder path"""
+    try:
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
+        
+        success = save_acc_folder_path(project_id, folder_path)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'project_id': project_id,
+                'folder_path': folder_path
+            })
+        else:
+            return jsonify({'error': 'Failed to save folder path'}), 500
+            
+    except Exception as e:
+        logging.exception(f"Error saving ACC data folder for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-data-import', methods=['POST'])
+def import_acc_data_endpoint(project_id):
+    """Import ACC data from CSV/ZIP export to acc_data_schema database"""
+    try:
+        import time
+        from handlers.acc_handler import import_acc_data
+        
+        start_time = time.time()
+        
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        
+        if not folder_path:
+            # Try to get saved folder path
+            folder_path = get_acc_folder_path(project_id)
+        
+        if not folder_path:
+            return jsonify({'error': 'No ACC data folder configured'}), 400
+        
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'ACC data folder does not exist: {folder_path}'}), 400
+        
+        # Run the import (this imports to acc_data_schema database)
+        # Import returns True/False or raises exception
+        result = import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=False)
+        
+        execution_time = time.time() - start_time
+        
+        # Log the import
+        summary = f"Imported ACC data from {folder_path} in {execution_time:.2f}s"
+        log_acc_import(project_id, os.path.basename(folder_path), summary)
+        
+        return jsonify({
+            'success': True,
+            'project_id': project_id,
+            'folder_path': folder_path,
+            'execution_time_seconds': round(execution_time, 2),
+            'message': 'ACC data imported successfully'
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error importing ACC data for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-data-import-logs', methods=['GET'])
+def get_acc_data_import_logs_endpoint(project_id):
+    """Get ACC data import log history for project"""
+    try:
+        logs = get_acc_import_logs(project_id)
+        return jsonify({'logs': logs})
+    except Exception as e:
+        logging.exception(f"Error getting ACC import logs for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- ACC Issues Display (Query acc_data_schema) ---
+
+@app.route('/api/projects/<int:project_id>/acc-issues', methods=['GET'])
+def get_acc_issues(project_id):
+    """Get ACC issues from acc_data_schema database"""
+    try:
+        from config import Config
+        
+        limit = request.args.get('limit', 100, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        status = request.args.get('status', None)
+        priority = request.args.get('priority', None)
+        assigned_to = request.args.get('assigned_to', None)
+        
+        # Connect to acc_data_schema database
+        with get_db_connection(Config.ACC_DB) as conn:
+            cursor = conn.cursor()
+            
+            # Build where clause
+            where_clauses = []
+            params = []
+            
+            if status:
+                where_clauses.append("status = ?")
+                params.append(status)
+            
+            if priority:
+                where_clauses.append("priority = ?")
+                params.append(priority)
+            
+            if assigned_to:
+                where_clauses.append("assigned_to = ?")
+                params.append(assigned_to)
+            
+            where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+            
+            # Get total count
+            count_query = f"SELECT COUNT(*) FROM acc_data_schema.dbo.vw_issues_expanded_pm {where_sql}"
+            cursor.execute(count_query, params)
+            total_count = cursor.fetchone()[0]
+            
+            # Get paginated issues
+            issues_query = f"""
+                SELECT issue_id, title, description, status, priority, 
+                       assigned_to, created_at, due_date, owner, project_name
+                FROM acc_data_schema.dbo.vw_issues_expanded_pm
+                {where_sql}
+                ORDER BY created_at DESC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+            """
+            
+            cursor.execute(issues_query, params + [offset, limit])
+            rows = cursor.fetchall()
+            
+            issues = []
+            for row in rows:
+                issues.append({
+                    'issue_id': row[0],
+                    'title': row[1],
+                    'description': row[2],
+                    'status': row[3],
+                    'priority': row[4],
+                    'assigned_to': row[5],
+                    'created_at': row[6].isoformat() if row[6] else None,
+                    'due_date': row[7].isoformat() if row[7] else None,
+                    'owner': row[8],
+                    'project_name': row[9]
+                })
+        
+        return jsonify({
+            'issues': issues,
+            'total_count': total_count,
+            'page': (offset // limit) + 1,
+            'page_size': limit
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error getting ACC issues for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/acc-issues/stats', methods=['GET'])
+def get_acc_issues_stats(project_id):
+    """Get ACC issues statistics"""
+    try:
+        from config import Config
+        
+        with get_db_connection(Config.ACC_DB) as conn:
+            cursor = conn.cursor()
+            
+            # Get issue counts by status
+            cursor.execute("""
+                SELECT status, COUNT(*) as count
+                FROM acc_data_schema.dbo.vw_issues_expanded_pm
+                GROUP BY status
+            """)
+            
+            status_counts = {}
+            for row in cursor.fetchall():
+                status_counts[row[0] or 'Unknown'] = row[1]
+            
+            # Get issue counts by priority
+            cursor.execute("""
+                SELECT priority, COUNT(*) as count
+                FROM acc_data_schema.dbo.vw_issues_expanded_pm
+                GROUP BY priority
+            """)
+            
+            priority_counts = {}
+            for row in cursor.fetchall():
+                priority_counts[row[0] or 'Unknown'] = row[1]
+            
+            # Get total count
+            cursor.execute("SELECT COUNT(*) FROM acc_data_schema.dbo.vw_issues_expanded_pm")
+            total_count = cursor.fetchone()[0]
+        
+        return jsonify({
+            'total_issues': total_count,
+            'by_status': status_counts,
+            'by_priority': priority_counts
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error getting ACC issues stats for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- Revizto Issue Import ---
+
+@app.route('/api/revizto/start-extraction', methods=['POST'])
+def start_revizto_extraction():
+    """Start a Revizto extraction run"""
+    try:
+        body = request.get_json() or {}
+        export_folder = body.get('export_folder')
+        notes = body.get('notes', '')
+        
+        run_id = start_revizto_extraction_run(export_folder, notes)
+        
+        if run_id:
+            return jsonify({
+                'success': True,
+                'run_id': run_id,
+                'export_folder': export_folder,
+                'notes': notes
+            })
+        else:
+            return jsonify({'error': 'Failed to start extraction'}), 500
+            
+    except Exception as e:
+        logging.exception("Error starting Revizto extraction")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/revizto/extraction-runs', methods=['GET'])
+def get_revizto_runs():
+    """Get Revizto extraction run history"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        runs = get_revizto_extraction_runs(limit)
+        
+        return jsonify({'runs': runs})
+        
+    except Exception as e:
+        logging.exception("Error getting Revizto extraction runs")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/revizto/extraction-runs/last', methods=['GET'])
+def get_last_revizto_run():
+    """Get the most recent Revizto extraction run"""
+    try:
+        run = get_last_revizto_extraction_run()
+        
+        if run:
+            return jsonify(run)
+        else:
+            return jsonify({'message': 'No extraction runs found'}), 404
+            
+    except Exception as e:
+        logging.exception("Error getting last Revizto extraction run")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- Revit Health Check Import ---
+
+@app.route('/api/projects/<int:project_id>/health-import', methods=['POST'])
+def import_revit_health_data(project_id):
+    """Import Revit health check data"""
+    try:
+        from handlers.rvt_health_importer import import_health_data
+        import time
+        
+        body = request.get_json() or {}
+        file_path = body.get('file_path')
+        
+        if not file_path:
+            return jsonify({'error': 'file_path is required'}), 400
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': f'Health check file does not exist: {file_path}'}), 400
+        
+        start_time = time.time()
+        
+        # Import health data
+        result = import_health_data(file_path, project_id)
+        
+        execution_time = time.time() - start_time
+        
+        return jsonify({
+            'success': True,
+            'project_id': project_id,
+            'file_path': file_path,
+            'execution_time_seconds': round(execution_time, 2),
+            'message': 'Health data imported successfully'
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error importing Revit health data for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/health-files', methods=['GET'])
+def get_project_health_files_endpoint(project_id):
+    """Get list of health check files for project"""
+    try:
+        files = get_project_health_files(project_id)
+        return jsonify({'files': files})
+        
+    except Exception as e:
+        logging.exception(f"Error getting health files for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/health-summary', methods=['GET'])
+def get_health_summary(project_id):
+    """Get health check summary statistics"""
+    try:
+        from config import Config
+        
+        with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
+            cursor = conn.cursor()
+            
+            # Get summary statistics (adjust query based on actual schema)
+            cursor.execute("""
+                SELECT COUNT(*) as total_checks,
+                       SUM(CASE WHEN status = 'Passed' THEN 1 ELSE 0 END) as passed,
+                       SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END) as failed,
+                       SUM(CASE WHEN status = 'Warning' THEN 1 ELSE 0 END) as warnings
+                FROM RevitHealthCheckDB.dbo.HealthChecks
+                WHERE project_id = ?
+            """, (project_id,))
+            
+            row = cursor.fetchone()
+        
+        if row:
+            return jsonify({
+                'total_checks': row[0] or 0,
+                'passed': row[1] or 0,
+                'failed': row[2] or 0,
+                'warnings': row[3] or 0
+            })
+        else:
+            return jsonify({
+                'total_checks': 0,
+                'passed': 0,
+                'failed': 0,
+                'warnings': 0
+            })
+        
+    except Exception as e:
+        logging.exception(f"Error getting health summary for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# END DATA IMPORTS API ENDPOINTS
+# ============================================================================
+
 
 # --- ACC Service Proxy Endpoints ---
 @app.route('/api/acc/<path:path>', methods=['GET', 'POST', 'PATCH', 'PUT', 'DELETE'])
@@ -711,6 +1432,237 @@ def proxy_revizto_service(path):
     except Exception as e:
         logging.exception("Revizto proxy error")
         return jsonify({"error": "Revizto service unavailable", "details": str(e)}), 502
+
+
+# --- File/Folder Browser Endpoints ---
+
+@app.route('/api/file-browser/select-file', methods=['POST'])
+def select_file():
+    """Open file dialog and return selected file path"""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        body = request.get_json() or {}
+        title = body.get('title', 'Select File')
+        file_types = body.get('file_types', [('All Files', '*.*')])
+        initial_dir = body.get('initial_dir', os.path.expanduser('~'))
+        
+        # Create hidden root window
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        
+        # Open file dialog
+        file_path = filedialog.askopenfilename(
+            title=title,
+            initialdir=initial_dir,
+            filetypes=file_types
+        )
+        
+        root.destroy()
+        
+        if file_path:
+            return jsonify({
+                'success': True,
+                'file_path': file_path,
+                'file_name': os.path.basename(file_path),
+                'exists': os.path.exists(file_path)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No file selected'
+            }), 400
+            
+    except Exception as e:
+        logging.exception("Error opening file dialog")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/file-browser/select-folder', methods=['POST'])
+def select_folder():
+    """Open folder dialog and return selected folder path"""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        body = request.get_json() or {}
+        title = body.get('title', 'Select Folder')
+        initial_dir = body.get('initial_dir', os.path.expanduser('~'))
+        
+        # Create hidden root window
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        
+        # Open folder dialog
+        folder_path = filedialog.askdirectory(
+            title=title,
+            initialdir=initial_dir
+        )
+        
+        root.destroy()
+        
+        if folder_path:
+            return jsonify({
+                'success': True,
+                'folder_path': folder_path,
+                'folder_name': os.path.basename(folder_path),
+                'exists': os.path.exists(folder_path)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No folder selected'
+            }), 400
+            
+    except Exception as e:
+        logging.exception("Error opening folder dialog")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/applications/launch', methods=['POST'])
+def launch_application():
+    """Launch an external application with optional arguments"""
+    try:
+        import subprocess
+        
+        body = request.get_json() or {}
+        app_path = body.get('app_path')
+        args = body.get('args', [])
+        working_dir = body.get('working_dir')
+        
+        if not app_path:
+            return jsonify({'error': 'app_path is required'}), 400
+        
+        if not os.path.exists(app_path):
+            return jsonify({'error': f'Application not found: {app_path}'}), 404
+        
+        # Build command
+        command = [app_path] + args
+        
+        # Launch application in background
+        if os.name == 'nt':  # Windows
+            subprocess.Popen(
+                command,
+                cwd=working_dir,
+                creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS,
+                shell=False
+            )
+        else:  # Unix-like
+            subprocess.Popen(
+                command,
+                cwd=working_dir,
+                start_new_session=True
+            )
+        
+        return jsonify({
+            'success': True,
+            'app_path': app_path,
+            'args': args,
+            'message': 'Application launched successfully'
+        })
+        
+    except Exception as e:
+        logging.exception("Error launching application")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/applications/revizto-exporter', methods=['POST'])
+def launch_revizto_exporter():
+    """Launch Revizto Data Exporter application"""
+    try:
+        # Common installation paths for Revizto Data Exporter
+        # Get project root (one level up from backend)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        possible_paths = [
+            # Local development path (same as Tkinter app)
+            os.path.join(project_root, "tools", "ReviztoDataExporter.exe"),
+            # Local development path alternative
+            os.path.join(project_root, "services", "revizto-dotnet", "ReviztoDataExporter", "bin", "Debug", "net9.0-windows", "win-x64", "ReviztoDataExporter.exe"),
+            # Standard installation paths
+            r"C:\Program Files\Revizto\DataExporter\ReviztoDataExporter.exe",
+            r"C:\Program Files (x86)\Revizto\DataExporter\ReviztoDataExporter.exe",
+            r"C:\Revizto\DataExporter\ReviztoDataExporter.exe",
+        ]
+        
+        # Check for custom path in request
+        body = request.get_json() or {}
+        custom_path = body.get('app_path')
+        
+        if custom_path:
+            possible_paths.insert(0, custom_path)
+        
+        # Find the executable
+        app_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                app_path = path
+                break
+        
+        if not app_path:
+            return jsonify({
+                'error': 'Revizto Data Exporter not found',
+                'searched_paths': possible_paths,
+                'message': 'Please install Revizto Data Exporter or provide the path in the request'
+            }), 404
+        
+        # Launch application (same method as Tkinter)
+        import subprocess
+        subprocess.Popen([app_path])
+        
+        return jsonify({
+            'success': True,
+            'app_path': app_path,
+            'message': 'Revizto Data Exporter launched successfully'
+        })
+        
+    except Exception as e:
+        logging.exception("Error launching Revizto Data Exporter")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scripts/run-health-importer', methods=['POST'])
+def run_health_importer():
+    """Run Revit health check importer on a folder"""
+    try:
+        from handlers.rvt_health_importer import import_health_data
+        import time
+        
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        project_id = body.get('project_id')
+        
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
+        
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'Folder does not exist: {folder_path}'}), 400
+        
+        if not os.path.isdir(folder_path):
+            return jsonify({'error': f'Path is not a folder: {folder_path}'}), 400
+        
+        start_time = time.time()
+        
+        # Import health data from folder
+        result = import_health_data(folder_path, db_name=None)
+        
+        execution_time = time.time() - start_time
+        
+        return jsonify({
+            'success': True,
+            'folder_path': folder_path,
+            'project_id': project_id,
+            'execution_time_seconds': round(execution_time, 2),
+            'message': 'Health data import completed successfully'
+        })
+        
+    except Exception as e:
+        logging.exception("Error running health importer")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

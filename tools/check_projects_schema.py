@@ -3,10 +3,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from config import Config
 
-conn = connect_to_db(Config.PROJECT_MGMT_DB)
+with get_db_connection(Config.PROJECT_MGMT_DB) as conn:
 cursor = conn.cursor()
 
 print("\n" + "="*60)
@@ -40,5 +40,3 @@ for row in cursor:
         print(f"{row[0]}: {row[1]}({row[2]})")
     else:
         print(f"{row[0]}: {row[1]}")
-
-conn.close()

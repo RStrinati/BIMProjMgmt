@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pyodbc
 from datetime import datetime, timedelta
-from database import connect_to_db, update_project_details
+from database import connect_to_db, get_db_connection, update_project_details
 from constants import schema as S
 from review_management_service import ReviewManagementService
 import argparse
@@ -52,12 +52,13 @@ class CriticalGapTester:
         print("CRITICAL GAP TESTING - SETUP")
         print("=" * 70)
         
-        self.conn = connect_to_db("ProjectManagement")
-        if self.conn is None:
-            raise Exception("❌ Failed to connect to database")
-        
-        print("✅ Database connection established")
-        return True
+        try:
+            self.conn = get_db_connection("ProjectManagement").__enter__()
+            print("✅ Database connection established")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to connect to database: {e}")
+            raise
     
     def teardown(self):
         """Clean up test data."""
@@ -101,10 +102,12 @@ class CriticalGapTester:
         
         except Exception as e:
             print(f"⚠️  Teardown error (may be normal): {e}")
-            self.conn.rollback()
+            if hasattr(self.conn, 'rollback'):
+                self.conn.rollback()
         
         finally:
-            self.conn.close()
+            if hasattr(self.conn, '__exit__'):
+                self.conn.__exit__(None, None, None)
     
     def create_test_client(self, name="Test Client CASCADE"):
         """Create a test client."""

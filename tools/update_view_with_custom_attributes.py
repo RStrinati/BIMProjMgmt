@@ -16,7 +16,7 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def update_view():
     """Execute the view update SQL script."""
@@ -31,43 +31,39 @@ def update_view():
     
     # Connect to database
     print("🔌 Connecting to acc_data_schema database...")
-    conn = connect_to_db('acc_data_schema')
-    
-    if conn is None:
-        print("❌ Failed to connect to database")
-        return False
     
     try:
-        cursor = conn.cursor()
-        
-        # Execute the SQL script in batches (split by GO)
-        print("🚀 Executing view update...")
-        batches = [batch.strip() for batch in sql_script.split('GO') if batch.strip()]
-        
-        for i, batch in enumerate(batches, 1):
-            print(f"  Executing batch {i}/{len(batches)}...")
-            cursor.execute(batch)
-        
-        conn.commit()
-        
-        print("✅ View updated successfully!")
-        print("\nNew columns available in vw_issues_expanded:")
-        print("  - Building_Level")
-        print("  - Clash_Level")
-        print("  - Location")
-        print("  - Location_01")
-        print("  - Phase")
-        print("  - Priority")
-        
-        # Test the view
-        print("\n🧪 Testing view with sample query...")
-        cursor.execute("""
-            SELECT TOP 5
-                issue_id,
-                title,
-                Building_Level,
-                Clash_Level,
-                Location,
+        with get_db_connection('acc_data_schema') as conn:
+            cursor = conn.cursor()
+            
+            # Execute the SQL script in batches (split by GO)
+            print("🚀 Executing view update...")
+            batches = [batch.strip() for batch in sql_script.split('GO') if batch.strip()]
+            
+            for i, batch in enumerate(batches, 1):
+                print(f"  Executing batch {i}/{len(batches)}...")
+                cursor.execute(batch)
+            
+            conn.commit()
+            
+            print("✅ View updated successfully!")
+            print("\nNew columns available in vw_issues_expanded:")
+            print("  - Building_Level")
+            print("  - Clash_Level")
+            print("  - Location")
+            print("  - Location_01")
+            print("  - Phase")
+            print("  - Priority")
+            
+            # Test the view
+            print("\n🧪 Testing view with sample query...")
+            cursor.execute("""
+                SELECT TOP 5
+                    issue_id,
+                    title,
+                    Building_Level,
+                    Clash_Level,
+                    Location,
                 Location_01,
                 Phase,
                 Priority
@@ -90,21 +86,17 @@ def update_view():
                 if row[5]: print(f"    Location 01: {row[5]}")
                 if row[6]: print(f"    Phase: {row[6]}")
                 if row[7]: print(f"    Priority: {row[7]}")
-        else:
-            print("\n⚠️  No issues found with custom attribute values")
-            print("    (This is expected if custom attributes haven't been populated in ACC)")
-        
-        return True
-        
+            else:
+                print("\n⚠️  No issues found with custom attribute values")
+                print("    (This is expected if custom attributes haven't been populated in ACC)")
+            
+            return True
+            
     except Exception as e:
         print(f"❌ Error updating view: {e}")
         import traceback
         traceback.print_exc()
         return False
-        
-    finally:
-        conn.close()
-        print("\n🔌 Database connection closed")
 
 if __name__ == '__main__':
     success = update_view()

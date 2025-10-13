@@ -15,7 +15,7 @@ content = re.sub(
     content
 )
 
-# Pattern 2: Remove finally blocks with conn.close()
+# Pattern 2: Remove finally blocks with
 content = re.sub(
     r'(\s+)(finally:)\n(\s+)(conn\.close\(\))',
     '',

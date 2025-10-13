@@ -5,13 +5,13 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 import json
 
 def test_openjson_pattern():
     """Test that the OPENJSON extraction pattern will work."""
     
-    conn = connect_to_db('acc_data_schema')
+    with get_db_connection('acc_data_schema') as conn:
     if not conn:
         print("❌ Failed to connect")
         return False
@@ -129,8 +129,6 @@ def test_openjson_pattern():
         print("   ✅ Dataset size is reasonable, OPENJSON performance should be fine")
     else:
         print("   ⚠️  Large dataset - monitor query performance after implementation")
-    
-    conn.close()
     
     print("\n" + "=" * 80)
     print("CONCLUSION")

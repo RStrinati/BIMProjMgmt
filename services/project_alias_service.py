@@ -12,6 +12,7 @@ Key Features:
 - Monitoring and reporting tools
 """
 
+from database_pool import get_db_connection as _get_pool_connection
 from database import connect_to_db
 from constants import schema as S
 import csv

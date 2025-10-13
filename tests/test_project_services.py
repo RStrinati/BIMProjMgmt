@@ -2,14 +2,13 @@
 """Test script to check which projects have services"""
 
 try:
-    from database import connect_to_db, get_projects
+    from database import get_db_connection, get_projects
     from review_management_service import ReviewManagementService
     
     print("Checking which projects have services...")
     
     # Test database connection
-    db_conn = connect_to_db()
-    if db_conn:
+    with get_db_connection() as db_conn:
         review_service = ReviewManagementService(db_conn)
         
         # Test all projects
@@ -43,9 +42,6 @@ try:
                 break
         else:
             print("\nNo projects have services - cannot test review generation")
-        
-    else:
-        print("❌ Database connection failed")
         
 except Exception as e:
     print(f"❌ Error: {e}")

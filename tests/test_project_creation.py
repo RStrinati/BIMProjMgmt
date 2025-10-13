@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from database import insert_project, update_project_record, get_projects, connect_to_db
+from database import insert_project, update_project_record, get_projects, get_db_connection
 from config import Config
 
 def test_project_creation():
@@ -94,14 +94,9 @@ def test_database_connection():
     """Test basic database connectivity"""
     print("🔌 Testing database connection...")
     try:
-        conn = connect_to_db(Config.PROJECT_MGMT_DB)
-        if conn:
+        with get_db_connection(Config.PROJECT_MGMT_DB) as conn:
             print("✅ Database connection successful")
-            conn.close()
             return True
-        else:
-            print("❌ Database connection failed")
-            return False
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         return False

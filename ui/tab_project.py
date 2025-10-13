@@ -53,6 +53,7 @@ def build_project_tab(tab, status_var):
 
     summary_vars = {
         "Name": tk.StringVar(),
+        "Project Type": tk.StringVar(),
         "Status": tk.StringVar(),
         "Priority": tk.StringVar(),
         "Start Date": tk.StringVar(),
@@ -229,6 +230,7 @@ def build_project_tab(tab, status_var):
             start_entry.set_date(datetime.strptime(details["start_date"], "%Y-%m-%d").date())
             end_entry.set_date(datetime.strptime(details["end_date"], "%Y-%m-%d").date())
             summary_vars["Name"].set(details["project_name"])
+            summary_vars["Project Type"].set(details.get("project_type") or "")
             summary_vars["Status"].set(details["status"] or "")
             summary_vars["Priority"].set(details["priority"] or "")
             summary_vars["Start Date"].set(details["start_date"])

@@ -6,12 +6,12 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
-from database import connect_to_db
+from database_pool import get_db_connection
 from config import ACC_DB
 
 def get_all_custom_attribute_names():
     """Extract all unique custom attribute names from the ACC database."""
-    conn = connect_to_db(ACC_DB)
+    with get_db_connection(ACC_DB) as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return []
@@ -57,7 +57,6 @@ def get_all_custom_attribute_names():
         print(f"✅ Analyzed {row_count} rows with custom attributes")
         return sorted(all_attrs), sample_values
     finally:
-        conn.close()
 
 def sanitize_column_name(name):
     """Sanitize attribute name for SQL column usage."""
@@ -144,7 +143,7 @@ FROM [dbo].[vw_issues_expanded] i;
 
 def create_view_in_database(sql):
     """Execute the SQL to create the view in the database."""
-    conn = connect_to_db(ACC_DB)
+    with get_db_connection(ACC_DB) as conn:
     if conn is None:
         print("❌ Failed to connect to database")
         return False
@@ -160,7 +159,6 @@ def create_view_in_database(sql):
         print(f"❌ Error creating view: {e}")
         return False
     finally:
-        conn.close()
 
 if __name__ == '__main__':
     print("="*70)

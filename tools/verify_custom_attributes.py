@@ -6,30 +6,30 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database import connect_to_db
+from database_pool import get_db_connection
 
 def verify_custom_attributes():
     """Verify custom attributes in view."""
     
-    conn = connect_to_db('acc_data_schema')
-    cursor = conn.cursor()
-    
-    print('=' * 80)
-    print('FINAL VERIFICATION: Custom Attributes in View')
-    print('=' * 80)
-    
-    # Get counts
-    cursor.execute("""
-        SELECT 
-            COUNT(*) as total_issues,
-            COUNT(CASE WHEN Building_Level IS NOT NULL THEN 1 END) as building_level_count,
-            COUNT(CASE WHEN Clash_Level IS NOT NULL THEN 1 END) as clash_level_count,
-            COUNT(CASE WHEN Location IS NOT NULL THEN 1 END) as location_count,
-            COUNT(CASE WHEN Location_01 IS NOT NULL THEN 1 END) as location_01_count,
-            COUNT(CASE WHEN Phase IS NOT NULL THEN 1 END) as phase_count,
-            COUNT(CASE WHEN Priority IS NOT NULL THEN 1 END) as priority_count
-        FROM acc_data_schema.dbo.vw_issues_expanded
-    """)
+    with get_db_connection('acc_data_schema') as conn:
+        cursor = conn.cursor()
+        
+        print('=' * 80)
+        print('FINAL VERIFICATION: Custom Attributes in View')
+        print('=' * 80)
+        
+        # Get counts
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_issues,
+                COUNT(CASE WHEN Building_Level IS NOT NULL THEN 1 END) as building_level_count,
+                COUNT(CASE WHEN Clash_Level IS NOT NULL THEN 1 END) as clash_level_count,
+                COUNT(CASE WHEN Location IS NOT NULL THEN 1 END) as location_count,
+                COUNT(CASE WHEN Location_01 IS NOT NULL THEN 1 END) as location_01_count,
+                COUNT(CASE WHEN Phase IS NOT NULL THEN 1 END) as phase_count,
+                COUNT(CASE WHEN Priority IS NOT NULL THEN 1 END) as priority_count
+            FROM acc_data_schema.dbo.vw_issues_expanded
+        """)
     row = cursor.fetchone()
     print()
     print(f'Total Issues: {row[0]}')
@@ -92,8 +92,6 @@ def verify_custom_attributes():
     
     print()
     print('✅ SUCCESS! All custom attributes are working in the view!')
-    
-    conn.close()
 
 if __name__ == '__main__':
     verify_custom_attributes()

@@ -13,7 +13,7 @@ import json
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from constants import schema as S
 from services.issue_text_processor import IssueTextProcessor
 
@@ -33,7 +33,7 @@ class IssueCategorizer:
     
     def load_categories(self):
         """Load category taxonomy from database."""
-        conn = connect_to_db()
+        with get_db_connection() as conn:
         if conn is None:
             print("❌ Failed to connect to database")
             return
@@ -67,11 +67,10 @@ class IssueCategorizer:
             print(f"❌ Error loading categories: {e}")
         
         finally:
-            conn.close()
     
     def load_keywords(self):
         """Load keyword mappings from database."""
-        conn = connect_to_db()
+        with get_db_connection() as conn:
         if conn is None:
             print("❌ Failed to connect to database")
             return
@@ -105,7 +104,6 @@ class IssueCategorizer:
             print(f"❌ Error loading keywords: {e}")
         
         finally:
-            conn.close()
     
     def match_keywords(self, text: str) -> Dict[int, float]:
         """

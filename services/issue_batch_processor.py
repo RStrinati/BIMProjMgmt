@@ -21,7 +21,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 from services.issue_text_processor import IssueTextProcessor
 from services.issue_categorizer import IssueCategorizer
 from datetime import datetime
@@ -63,7 +63,7 @@ class IssueBatchProcessor:
         Returns:
             List of issue dictionaries
         """
-        conn = connect_to_db(self.db_name)
+        with get_db_connection(self.db_name) as conn:
         if conn is None:
             raise Exception("Failed to connect to database")
             
@@ -130,7 +130,6 @@ class IssueBatchProcessor:
             return issues
             
         finally:
-            conn.close()
     
     def get_updated_issues(self, since_date=None):
         """
@@ -142,7 +141,7 @@ class IssueBatchProcessor:
         Returns:
             List of issue dictionaries
         """
-        conn = connect_to_db(self.db_name)
+        with get_db_connection(self.db_name) as conn:
         if conn is None:
             raise Exception("Failed to connect to database")
             
@@ -193,7 +192,6 @@ class IssueBatchProcessor:
             return issues
             
         finally:
-            conn.close()
     
     def process_issue(self, issue):
         """
@@ -282,10 +280,7 @@ class IssueBatchProcessor:
         if not result.get('success', False):
             return False
             
-        conn = connect_to_db(self.db_name)
-        if conn is None:
-            return False
-            
+        with get_db_connection(self.db_name) as conn:            
         try:
             cursor = conn.cursor()
             
@@ -383,7 +378,6 @@ class IssueBatchProcessor:
             traceback.print_exc()
             return False
         finally:
-            conn.close()
     
     def create_processing_log(self, batch_name='manual'):
         """

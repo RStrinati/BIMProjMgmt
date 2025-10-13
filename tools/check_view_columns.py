@@ -2,9 +2,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import connect_to_db
+from database_pool import get_db_connection
 
-conn = connect_to_db('ProjectManagement')
+with get_db_connection('ProjectManagement') as conn:
 cursor = conn.cursor()
 
 # Check columns in the view
@@ -24,5 +24,3 @@ try:
         print(f"  - {col}")
 except Exception as e:
     print(f"\nProcessedIssues table check failed: {e}")
-
-conn.close()
