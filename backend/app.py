@@ -2,41 +2,52 @@ import logging
 import os
 import sys
 from pathlib import Path
+from datetime import date, datetime
+from decimal import Decimal
 
 # Add parent directory to path FIRST so we can import config and database
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from flask import Flask, jsonify, request
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 
 from config import ACC_SERVICE_TOKEN, ACC_SERVICE_URL, REVIZTO_SERVICE_TOKEN, REVIZTO_SERVICE_URL
 
 from database import (  # noqa: E402
     add_bookmark,
+    create_project_service,
     create_review_cycle,
+    create_service_review,
     create_service_template,
     delete_bookmark,
+    delete_project_service,
     delete_review_cycle,
+    delete_service_review,
     delete_service_template,
     get_acc_folder_path,
     get_acc_import_logs,
+    get_all_projects_issues_overview,
     get_bep_matrix,
     get_contractual_links,
     get_cycle_ids,
     get_db_connection,
     get_last_revizto_extraction_run,
     get_project_bookmarks,
+    get_project_combined_issues_overview,
     get_project_details,
     get_project_folders,
     get_project_health_files,
     get_projects_full,
+    get_project_services,
     get_reference_options,
     get_review_cycle_tasks,
     get_review_cycles,
     get_review_summary,
     get_review_tasks,
     get_revizto_extraction_runs,
+    get_service_reviews,
     get_service_templates,
     get_users_list,
     insert_files_into_tblACCDocs,
@@ -44,14 +55,16 @@ from database import (  # noqa: E402
     save_acc_folder_path,
     start_revizto_extraction_run,
     update_bookmark,
+    update_project_service,
+    update_review_cycle,
+    update_review_cycle_task,
+    update_review_task_assignee,
+    update_service_review,
+    update_service_template,
     upsert_bep_section,
     update_bep_status,
     update_project_details,
     update_project_folders,
-    update_review_cycle,
-    update_review_cycle_task,
-    update_review_task_assignee,
-    update_service_template,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -62,8 +75,25 @@ from shared.project_service import (  # noqa: E402
 )
 from constants import schema as S  # noqa: E402
 
+def _extract_project_payload(body):
+    """Extract and normalize project payload from request body."""
+    return body
+
+
+class CustomJSONProvider(DefaultJSONProvider):
+    """Custom JSON provider to handle date, datetime, and Decimal objects."""
+    
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
+
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
+app.json = CustomJSONProvider(app)
 CORS(app)
 
 
@@ -88,7 +118,7 @@ def _extract_project_payload(body):
         'name': body.get('project_name') or body.get('name'),
         'project_number': body.get('project_number'),
         'client_id': body.get('client_id'),
-        'project_type': body.get('project_type'),
+        'type_id': body.get('type_id'),
         'area': body.get('area'),
         'mw_capacity': body.get('mw_capacity'),
         'status': body.get('status'),
@@ -149,6 +179,98 @@ def api_delete_service_template(template_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
+
+
+# --- Project Services API ---
+@app.route('/api/projects/<int:project_id>/services', methods=['GET'])
+def api_get_project_services(project_id):
+    services = get_project_services(project_id)
+    return jsonify(services)
+
+@app.route('/api/projects/<int:project_id>/services', methods=['POST'])
+def api_create_project_service(project_id):
+    body = request.get_json() or {}
+    required = ['service_code', 'service_name']
+    if not all(body.get(k) for k in required):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    service_id = create_project_service(
+        project_id,
+        body['service_code'],
+        body['service_name'],
+        phase=body.get('phase'),
+        unit_type=body.get('unit_type'),
+        unit_qty=body.get('unit_qty'),
+        unit_rate=body.get('unit_rate'),
+        lump_sum_fee=body.get('lump_sum_fee'),
+        agreed_fee=body.get('agreed_fee'),
+        bill_rule=body.get('bill_rule'),
+        notes=body.get('notes')
+    )
+    if service_id:
+        return jsonify({'service_id': service_id}), 201
+    return jsonify({'error': 'Failed to create service'}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>', methods=['PATCH'])
+def api_update_project_service(project_id, service_id):
+    body = request.get_json() or {}
+    success = update_project_service(service_id, **body)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to update service'}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>', methods=['DELETE'])
+def api_delete_project_service(project_id, service_id):
+    success = delete_project_service(service_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to delete service'}), 500
+
+
+# --- Service Reviews API ---
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews', methods=['GET'])
+def api_get_service_reviews(project_id, service_id):
+    reviews = get_service_reviews(service_id)
+    return jsonify(reviews)
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews', methods=['POST'])
+def api_create_service_review(project_id, service_id):
+    body = request.get_json() or {}
+    required = ['cycle_no', 'planned_date']
+    if not all(body.get(k) for k in required):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    review_id = create_service_review(
+        service_id,
+        body['cycle_no'],
+        body['planned_date'],
+        due_date=body.get('due_date'),
+        disciplines=body.get('disciplines'),
+        deliverables=body.get('deliverables'),
+        status=body.get('status', 'planned'),
+        weight_factor=body.get('weight_factor', 1.0),
+        evidence_links=body.get('evidence_links')
+    )
+    if review_id:
+        return jsonify({'review_id': review_id}), 201
+    return jsonify({'error': 'Failed to create review'}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/<int:review_id>', methods=['PATCH'])
+def api_update_service_review(project_id, service_id, review_id):
+    body = request.get_json() or {}
+    success = update_service_review(review_id, **body)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to update review'}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/<int:review_id>', methods=['DELETE'])
+def api_delete_service_review(project_id, service_id, review_id):
+    success = delete_service_review(review_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to delete review'}), 500
+
+
 # Serve React app
 @app.route('/')
 def serve_react_app():
@@ -1240,6 +1362,30 @@ def get_acc_issues_stats(project_id):
         return jsonify({'error': str(e)}), 500
 
 
+# --- Combined Issues Overview ---
+
+@app.route('/api/issues/overview', methods=['GET'])
+def get_all_issues_overview():
+    """Get combined issues overview for all projects"""
+    try:
+        overview_data = get_all_projects_issues_overview()
+        return jsonify(overview_data)
+    except Exception as e:
+        logging.exception("Error getting all issues overview")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/issues/overview', methods=['GET'])
+def get_project_issues_overview(project_id):
+    """Get combined issues overview for a specific project"""
+    try:
+        overview_data = get_project_combined_issues_overview(project_id)
+        return jsonify(overview_data)
+    except Exception as e:
+        logging.exception(f"Error getting issues overview for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
 # --- Revizto Issue Import ---
 
 @app.route('/api/revizto/start-extraction', methods=['POST'])
@@ -1307,25 +1453,28 @@ def import_revit_health_data(project_id):
         import time
         
         body = request.get_json() or {}
-        file_path = body.get('file_path')
+        folder_path = body.get('folder_path') or body.get('file_path')  # Support both for compatibility
         
-        if not file_path:
-            return jsonify({'error': 'file_path is required'}), 400
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
         
-        if not os.path.exists(file_path):
-            return jsonify({'error': f'Health check file does not exist: {file_path}'}), 400
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'Health check folder does not exist: {folder_path}'}), 400
+            
+        if not os.path.isdir(folder_path):
+            return jsonify({'error': f'Path must be a directory containing JSON files: {folder_path}'}), 400
         
         start_time = time.time()
         
-        # Import health data
-        result = import_health_data(file_path, project_id)
+        # Import health data (folder_path should be a folder containing JSON files)
+        result = import_health_data(folder_path, project_id=project_id)
         
         execution_time = time.time() - start_time
         
         return jsonify({
             'success': True,
             'project_id': project_id,
-            'file_path': file_path,
+            'folder_path': folder_path,
             'execution_time_seconds': round(execution_time, 2),
             'message': 'Health data imported successfully'
         })
@@ -1339,9 +1488,9 @@ def import_revit_health_data(project_id):
 def get_project_health_files_endpoint(project_id):
     """Get list of health check files for project"""
     try:
+        # Use the proper database function to get health files
         files = get_project_health_files(project_id)
         return jsonify({'files': files})
-        
     except Exception as e:
         logging.exception(f"Error getting health files for project {project_id}")
         return jsonify({'error': str(e)}), 500
@@ -1352,37 +1501,39 @@ def get_health_summary(project_id):
     """Get health check summary statistics"""
     try:
         from config import Config
-        
         with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
             cursor = conn.cursor()
-            
-            # Get summary statistics (adjust query based on actual schema)
+            # Get all records first (project association may need to be handled differently)
             cursor.execute("""
-                SELECT COUNT(*) as total_checks,
-                       SUM(CASE WHEN status = 'Passed' THEN 1 ELSE 0 END) as passed,
-                       SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END) as failed,
-                       SUM(CASE WHEN status = 'Warning' THEN 1 ELSE 0 END) as warnings
-                FROM RevitHealthCheckDB.dbo.HealthChecks
-                WHERE project_id = ?
-            """, (project_id,))
-            
+                SELECT MAX(nExportedOn) as latest_check_date,
+                       COUNT(*) as total_checks,
+                       SUM(CAST(nWarningsCount as INT)) as total_warnings,
+                       SUM(CAST(nCriticalWarningsCount as INT)) as total_errors,
+                       AVG(CASE 
+                               WHEN TRY_CAST(nWarningsCount as INT) IS NOT NULL THEN 
+                                   CAST(100 - CASE WHEN TRY_CAST(nWarningsCount as INT) > 100 THEN 100 ELSE TRY_CAST(nWarningsCount as INT) END AS FLOAT)
+                               ELSE NULL 
+                          END) as avg_health_score
+                FROM tblRvtProjHealth
+            """)
             row = cursor.fetchone()
-        
-        if row:
-            return jsonify({
-                'total_checks': row[0] or 0,
-                'passed': row[1] or 0,
-                'failed': row[2] or 0,
-                'warnings': row[3] or 0
-            })
-        else:
-            return jsonify({
-                'total_checks': 0,
-                'passed': 0,
-                'failed': 0,
-                'warnings': 0
-            })
-        
+            
+            if row:
+                return jsonify({
+                    'latest_check_date': row[0],
+                    'total_checks': row[1] or 0,
+                    'total_warnings': row[2] or 0,
+                    'total_errors': row[3] or 0,
+                    'avg_health_score': row[4] or 0
+                })
+            else:
+                return jsonify({
+                    'latest_check_date': None,
+                    'total_checks': 0,
+                    'avg_health_score': 0,
+                    'total_warnings': 0,
+                    'total_errors': 0
+                })
     except Exception as e:
         logging.exception(f"Error getting health summary for project {project_id}")
         return jsonify({'error': str(e)}), 500
@@ -1647,7 +1798,7 @@ def run_health_importer():
         start_time = time.time()
         
         # Import health data from folder
-        result = import_health_data(folder_path, db_name=None)
+        result = import_health_data(folder_path, project_id=project_id, db_name=None)
         
         execution_time = time.time() - start_time
         
@@ -1661,6 +1812,119 @@ def run_health_importer():
         
     except Exception as e:
         logging.exception("Error running health importer")
+        return jsonify({'error': str(e)}), 500
+
+
+# ===================== Service Items API =====================
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/items', methods=['GET'])
+def api_get_service_items(project_id, service_id):
+    """Get service items for a specific service."""
+    try:
+        from database import get_service_items
+        item_type = request.args.get('type')
+        items = get_service_items(service_id, item_type)
+        return jsonify(items)
+    except Exception as e:
+        logging.exception("Error fetching service items")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/items', methods=['POST'])
+def api_create_service_item(project_id, service_id):
+    """Create a new service item."""
+    try:
+        from database import create_service_item
+        data = request.get_json() or {}
+        
+        required = ['item_type', 'title', 'planned_date']
+        if not all(k in data for k in required):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        item_id = create_service_item(
+            service_id=service_id,
+            item_type=data['item_type'],
+            title=data['title'],
+            planned_date=data['planned_date'],
+            description=data.get('description'),
+            due_date=data.get('due_date'),
+            actual_date=data.get('actual_date'),
+            status=data.get('status', 'planned'),
+            priority=data.get('priority', 'medium'),
+            assigned_to=data.get('assigned_to'),
+            evidence_links=data.get('evidence_links'),
+            notes=data.get('notes')
+        )
+        
+        if item_id:
+            return jsonify({'item_id': item_id, 'message': 'Service item created successfully'}), 201
+        else:
+            return jsonify({'error': 'Failed to create service item'}), 500
+            
+    except Exception as e:
+        logging.exception("Error creating service item")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/items/<int:item_id>', methods=['PATCH'])
+def api_update_service_item(project_id, service_id, item_id):
+    """Update a service item."""
+    try:
+        from database import update_service_item
+        data = request.get_json() or {}
+        
+        success = update_service_item(item_id, **data)
+        
+        if success:
+            return jsonify({'message': 'Service item updated successfully'})
+        else:
+            return jsonify({'error': 'Service item not found or no changes made'}), 404
+            
+    except Exception as e:
+        logging.exception("Error updating service item")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/items/<int:item_id>', methods=['DELETE'])
+def api_delete_service_item(project_id, service_id, item_id):
+    """Delete a service item."""
+    try:
+        from database import delete_service_item
+        
+        success = delete_service_item(item_id)
+        
+        if success:
+            return jsonify({'message': 'Service item deleted successfully'})
+        else:
+            return jsonify({'error': 'Service item not found'}), 404
+            
+    except Exception as e:
+        logging.exception("Error deleting service item")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/service_items_statistics', methods=['GET'])
+def api_get_service_items_statistics():
+    """Get statistics for all service items."""
+    try:
+        from database import get_service_items_statistics
+        service_id = request.args.get('service_id', type=int)
+        stats = get_service_items_statistics(service_id)
+        return jsonify(stats)
+    except Exception as e:
+        logging.exception("Error fetching service items statistics")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/project_review_statistics', methods=['GET'])
+def api_get_project_review_statistics():
+    """Get review statistics for all projects."""
+    try:
+        from database import get_project_review_statistics
+        stats = get_project_review_statistics()
+        return jsonify(stats)
+    except Exception as e:
+        logging.exception("Error fetching project review statistics")
         return jsonify({'error': str(e)}), 500
 
 

@@ -1,0 +1,12 @@
+{
+  "project_name": "NFPS-DPE-ZZ-ZZ-M3-E-0001",
+  "exported_on": "2025-10-12T23:03:16.385974Z",
+  "data_type": "placed_families",
+  "data": [
+    {
+      "FamilyName": "Some Family",
+      "Category": "Generic Model",
+      "Count": 10
+    }
+  ]
+}

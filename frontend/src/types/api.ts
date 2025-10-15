@@ -13,15 +13,16 @@ export interface Project {
   priority?: string;
   start_date?: string;
   end_date?: string;
-  area_hectares?: number;
+  area_m2?: number;
   mw_capacity?: number;
   address?: string;
   city?: string;
   state?: string;
   postcode?: string;
-  folder_path?: string;
-  ifc_folder_path?: string;
-  description?: string;
+    folder_path?: string;
+    ifc_folder_path?: string;
+    description?: string;
+    internal_lead?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -134,4 +135,67 @@ export interface TaskFilters {
   priority?: string;
   due_date_from?: string;
   due_date_to?: string;
+}
+
+export interface ServiceTemplate {
+  id: number;
+  template_name: string;
+  description: string;
+  service_type: string;
+  parameters: any;
+  created_by: number;
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface ProjectService {
+  service_id: number;
+  project_id: number;
+  phase?: string;
+  service_code: string;
+  service_name: string;
+  unit_type?: string;
+  unit_qty?: number;
+  unit_rate?: number;
+  lump_sum_fee?: number;
+  agreed_fee?: number;
+  bill_rule?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  progress_pct?: number;
+  claimed_to_date?: number;
+}
+
+export interface ServiceReview {
+  review_id: number;
+  service_id: number;
+  cycle_no: number;
+  planned_date: string;
+  due_date?: string;
+  disciplines?: string;
+  deliverables?: string;
+  status: string;
+  weight_factor: number;
+  evidence_links?: string;
+  actual_issued_at?: string;
+}
+
+export interface ServiceItem {
+  item_id: number;
+  service_id: number;
+  item_type: 'review' | 'audit' | 'deliverable' | 'milestone' | 'inspection' | 'meeting' | string;
+  title: string;
+  description?: string;
+  planned_date?: string;
+  due_date?: string;
+  actual_date?: string;
+  status: 'planned' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  assigned_to?: string;
+  evidence_links?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }

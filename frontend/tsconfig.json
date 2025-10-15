@@ -26,6 +26,11 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"],
+  "include": [
+    "src",
+  ],
+  "exclude": [
+    "src/components/dataImports/ACCDataImportPanel_broken.tsx"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

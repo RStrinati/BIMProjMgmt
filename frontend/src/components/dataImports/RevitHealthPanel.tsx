@@ -115,17 +115,14 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
       setImporting(true);
       setImportError(null);
       setImportSuccess(null);
-      
       const result = await scriptApi.runHealthImporter({
         folder_path: importFolder,
         project_id: projectId,
       });
-      
       if (result.success) {
         setImportSuccess(
-          `Import completed successfully in ${result.execution_time_seconds}s`
+          `Import of combined file completed successfully in ${result.execution_time_seconds}s`
         );
-        // Refresh data
         refetchFiles();
         refetchSummary();
         setImportFolder('');

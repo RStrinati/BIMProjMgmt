@@ -1,0 +1,61 @@
+{
+  "project_name": "NFPS-DPE-ZZ-ZZ-M3-E-0001",
+  "exported_on": "2025-10-12T23:03:04.964160Z",
+  "data_type": "metadata",
+  "data": {
+    "strRvtUserName": "Rico.StrinatiJTVSG",
+    "strSysName": "P-NB-USER-028",
+    "strRvtVersion": "Autodesk Revit 2024",
+    "strRvtBuildVersion": "24.2.10.64",
+    "strRvtFileName": "NFPS-DPE-ZZ-ZZ-M3-E-0001",
+    "nExportedOn": 1760270584,
+    "strProjectName": "NIRIMBA FIELDS PUBLIC SCHOOL",
+    "strProjectNumber": "25071",
+    "strClientName": "DAVID POWER ELECTRICAL",
+    "ModelFileSizeMB": 301.24,
+    "surveyPoint": {
+      "ElementId": 1369,
+      "XYZ": {
+        "X": -169.04133943887427,
+        "Y": 348.859139572829,
+        "Z": 74.96719160104989
+      },
+      "EastWest": 993682.4278364159,
+      "NorthSouth": 20562297.84776238,
+      "Elevation": 74.9671916010498,
+      "AngleToTrueNorth": null,
+      "Name": ""
+    },
+    "projectBasePoint": {
+      "ElementId": 1372,
+      "XYZ": {
+        "X": 0.00019638380035758018,
+        "Y": -0.0005040094256401062,
+        "Z": 74.96719160104986
+      },
+      "EastWest": 993803.2670752605,
+      "NorthSouth": 20561929.505570788,
+      "Elevation": 74.96719160104978,
+      "AngleToTrueNorth": 0.13421581947836358,
+      "Name": ""
+    },
+    "internalOrigin": {
+      "OriginXYZ": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 0.0
+      },
+      "EastWest": 993803.266948086,
+      "NorthSouth": 20561929.506096542,
+      "Elevation": -7.105427357601e-14,
+      "AngleToTrueNorth": -0.13421581947836358
+    },
+    "nRvtLinkCount": 9,
+    "nTotalElementsCount": 40567,
+    "nFamilyCount": 184,
+    "nSheetsCount": 31,
+    "nGroupCount": 222,
+    "nWarningsCount": 365,
+    "nCriticalWarningsCount": 0
+  }
+}

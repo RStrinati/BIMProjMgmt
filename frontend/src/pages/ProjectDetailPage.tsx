@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { projectsApi } from '../api/projects';
 import type { Project } from '../types/api';
+import { ProjectServicesTab } from '@/components/ProjectServicesTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -136,6 +137,7 @@ const ProjectDetailPage: React.FC = () => {
           <Paper>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="Details" />
+              <Tab label="Services" />
               <Tab label="Reviews" />
               <Tab label="Tasks" />
               <Tab label="Files" />
@@ -188,7 +190,7 @@ const ProjectDetailPage: React.FC = () => {
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Area (Hectares)
                   </Typography>
-                  <Typography variant="body1">{project.area_hectares || 'N/A'}</Typography>
+                  <Typography variant="body1">{project.area_m2 || 'N/A'}</Typography>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
@@ -249,18 +251,25 @@ const ProjectDetailPage: React.FC = () => {
               </Grid>
             </TabPanel>
 
-            {/* Reviews Tab */}
+            {/* Services Tab */}
             <TabPanel value={tabValue} index={1}>
-              <Alert severity="info">Reviews functionality coming soon</Alert>
+              <ProjectServicesTab projectId={Number(id)} />
+            </TabPanel>
+
+            {/* Reviews Tab */}
+            <TabPanel value={tabValue} index={2}>
+              <Alert severity="info">
+                Reviews are now managed within the Services tab. Please go to the Services tab and select a service to view and manage its reviews.
+              </Alert>
             </TabPanel>
 
             {/* Tasks Tab */}
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={3}>
               <Alert severity="info">Tasks functionality coming soon</Alert>
             </TabPanel>
 
             {/* Files Tab */}
-            <TabPanel value={tabValue} index={3}>
+            <TabPanel value={tabValue} index={4}>
               <Alert severity="info">File management coming soon</Alert>
             </TabPanel>
           </Paper>

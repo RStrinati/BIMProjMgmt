@@ -75,13 +75,488 @@ def update_service_template(template_id, template_name=None, description=None, s
 def delete_service_template(template_id):
     """Soft delete a service template by setting is_active to 0."""
     return update_service_template(template_id, is_active=0)
-import logging
+
+
+# --- Project Services Functions ---
+
+def get_project_services(project_id):
+    """Get all services for a project."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectServices.SERVICE_ID}, {S.ProjectServices.PROJECT_ID}, 
+                       {S.ProjectServices.PHASE}, {S.ProjectServices.SERVICE_CODE}, 
+                       {S.ProjectServices.SERVICE_NAME}, {S.ProjectServices.UNIT_TYPE}, 
+                       {S.ProjectServices.UNIT_QTY}, {S.ProjectServices.UNIT_RATE}, 
+                       {S.ProjectServices.LUMP_SUM_FEE}, {S.ProjectServices.AGREED_FEE}, 
+                       {S.ProjectServices.BILL_RULE}, {S.ProjectServices.NOTES}, 
+                       {S.ProjectServices.CREATED_AT}, {S.ProjectServices.UPDATED_AT}, 
+                       {S.ProjectServices.STATUS}, {S.ProjectServices.PROGRESS_PCT}, 
+                       {S.ProjectServices.CLAIMED_TO_DATE}
+                FROM {S.ProjectServices.TABLE} 
+                WHERE {S.ProjectServices.PROJECT_ID} = ?
+                ORDER BY {S.ProjectServices.CREATED_AT}
+                """,
+                (project_id,)
+            )
+            services = [dict(
+                service_id=row[0],
+                project_id=row[1],
+                phase=row[2],
+                service_code=row[3],
+                service_name=row[4],
+                unit_type=row[5],
+                unit_qty=row[6],
+                unit_rate=row[7],
+                lump_sum_fee=row[8],
+                agreed_fee=row[9],
+                bill_rule=row[10],
+                notes=row[11],
+                created_at=row[12],
+                updated_at=row[13],
+                status=row[14],
+                progress_pct=row[15],
+                claimed_to_date=row[16]
+            ) for row in cursor.fetchall()]
+            return services
+    except Exception as e:
+        logger.error(f"Error fetching project services: {e}")
+        return []
+
+
+def create_project_service(project_id, service_code, service_name, phase=None, unit_type=None, 
+                          unit_qty=None, unit_rate=None, lump_sum_fee=None, agreed_fee=None, 
+                          bill_rule=None, notes=None):
+    """Create a new service for a project."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.ProjectServices.TABLE} (
+                    {S.ProjectServices.PROJECT_ID}, {S.ProjectServices.SERVICE_CODE}, 
+                    {S.ProjectServices.SERVICE_NAME}, {S.ProjectServices.PHASE}, 
+                    {S.ProjectServices.UNIT_TYPE}, {S.ProjectServices.UNIT_QTY}, 
+                    {S.ProjectServices.UNIT_RATE}, {S.ProjectServices.LUMP_SUM_FEE}, 
+                    {S.ProjectServices.AGREED_FEE}, {S.ProjectServices.BILL_RULE}, 
+                    {S.ProjectServices.NOTES}
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (project_id, service_code, service_name, phase, unit_type, unit_qty, 
+                 unit_rate, lump_sum_fee, agreed_fee, bill_rule, notes)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as e:
+        logger.error(f"Error creating project service: {e}")
+        return None
+
+
+def update_project_service(service_id, **kwargs):
+    """Update an existing project service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            update_fields = {}
+            allowed_fields = [
+                S.ProjectServices.PHASE, S.ProjectServices.SERVICE_CODE, 
+                S.ProjectServices.SERVICE_NAME, S.ProjectServices.UNIT_TYPE, 
+                S.ProjectServices.UNIT_QTY, S.ProjectServices.UNIT_RATE, 
+                S.ProjectServices.LUMP_SUM_FEE, S.ProjectServices.AGREED_FEE, 
+                S.ProjectServices.BILL_RULE, S.ProjectServices.NOTES, 
+                S.ProjectServices.STATUS, S.ProjectServices.PROGRESS_PCT, 
+                S.ProjectServices.CLAIMED_TO_DATE
+            ]
+            
+            for key, value in kwargs.items():
+                if key in allowed_fields:
+                    update_fields[key] = value
+            
+            if not update_fields:
+                return False
+                
+            set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+            values = list(update_fields.values()) + [service_id]
+            cursor.execute(
+                f"UPDATE {S.ProjectServices.TABLE} SET {set_clause}, {S.ProjectServices.UPDATED_AT} = GETDATE() WHERE {S.ProjectServices.SERVICE_ID} = ?",
+                values
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating project service: {e}")
+        return False
+
+
+def delete_project_service(service_id):
+    """Delete a project service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.ProjectServices.TABLE} WHERE {S.ProjectServices.SERVICE_ID} = ?",
+                (service_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting project service: {e}")
+        return False
+
+
+# --- Service Reviews Functions ---
+
+def get_service_reviews(service_id):
+    """Get all reviews for a service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
+                       {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
+                       {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
+                       {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
+                       {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
+                       {S.ServiceReviews.ACTUAL_ISSUED_AT}
+                FROM {S.ServiceReviews.TABLE} 
+                WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                ORDER BY {S.ServiceReviews.CYCLE_NO}
+                """,
+                (service_id,)
+            )
+            reviews = [dict(
+                review_id=row[0],
+                service_id=row[1],
+                cycle_no=row[2],
+                planned_date=row[3],
+                due_date=row[4],
+                disciplines=row[5],
+                deliverables=row[6],
+                status=row[7],
+                weight_factor=row[8],
+                evidence_links=row[9],
+                actual_issued_at=row[10]
+            ) for row in cursor.fetchall()]
+            return reviews
+    except Exception as e:
+        logger.error(f"Error fetching service reviews: {e}")
+        return []
+
+
+def create_service_review(service_id, cycle_no, planned_date, due_date=None, 
+                         disciplines=None, deliverables=None, status='planned', 
+                         weight_factor=1.0, evidence_links=None):
+    """Create a new review for a service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.ServiceReviews.TABLE} (
+                    {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.CYCLE_NO}, 
+                    {S.ServiceReviews.PLANNED_DATE}, {S.ServiceReviews.DUE_DATE}, 
+                    {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
+                    {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
+                    {S.ServiceReviews.EVIDENCE_LINKS}
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (service_id, cycle_no, planned_date, due_date, disciplines, 
+                 deliverables, status, weight_factor, evidence_links)
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as e:
+        logger.error(f"Error creating service review: {e}")
+        return None
+
+
+def update_service_review(review_id, **kwargs):
+    """Update an existing service review."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            update_fields = {}
+            allowed_fields = [
+                S.ServiceReviews.CYCLE_NO, S.ServiceReviews.PLANNED_DATE, 
+                S.ServiceReviews.DUE_DATE, S.ServiceReviews.DISCIPLINES, 
+                S.ServiceReviews.DELIVERABLES, S.ServiceReviews.STATUS, 
+                S.ServiceReviews.WEIGHT_FACTOR, S.ServiceReviews.EVIDENCE_LINKS, 
+                S.ServiceReviews.ACTUAL_ISSUED_AT
+            ]
+            
+            for key, value in kwargs.items():
+                if key in allowed_fields:
+                    update_fields[key] = value
+            
+            if not update_fields:
+                return False
+                
+            set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+            values = list(update_fields.values()) + [review_id]
+            cursor.execute(
+                f"UPDATE {S.ServiceReviews.TABLE} SET {set_clause} WHERE {S.ServiceReviews.REVIEW_ID} = ?",
+                values
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating service review: {e}")
+        return False
+
+
+def delete_service_review(review_id):
+    """Delete a service review."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.ServiceReviews.TABLE} WHERE {S.ServiceReviews.REVIEW_ID} = ?",
+                (review_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting service review: {e}")
+        return False
+
+
+# ===================== Service Items Functions =====================
+
+def get_service_items(service_id, item_type=None):
+    """Get service items for a service, optionally filtered by type."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = f"""
+                SELECT {S.ServiceItems.ITEM_ID}, {S.ServiceItems.SERVICE_ID}, {S.ServiceItems.ITEM_TYPE},
+                       {S.ServiceItems.TITLE}, {S.ServiceItems.DESCRIPTION}, {S.ServiceItems.PLANNED_DATE},
+                       {S.ServiceItems.DUE_DATE}, {S.ServiceItems.ACTUAL_DATE}, {S.ServiceItems.STATUS},
+                       {S.ServiceItems.PRIORITY}, {S.ServiceItems.ASSIGNED_TO}, {S.ServiceItems.EVIDENCE_LINKS},
+                       {S.ServiceItems.NOTES}, {S.ServiceItems.CREATED_AT}, {S.ServiceItems.UPDATED_AT}
+                FROM {S.ServiceItems.TABLE}
+                WHERE {S.ServiceItems.SERVICE_ID} = ?
+            """
+            params = [service_id]
+            
+            if item_type:
+                query += f" AND {S.ServiceItems.ITEM_TYPE} = ?"
+                params.append(item_type)
+            
+            query += f" ORDER BY {S.ServiceItems.PLANNED_DATE} ASC"
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            items = []
+            for row in rows:
+                items.append({
+                    'item_id': row[0],
+                    'service_id': row[1],
+                    'item_type': row[2],
+                    'title': row[3],
+                    'description': row[4],
+                    'planned_date': row[5].isoformat() if row[5] else None,
+                    'due_date': row[6].isoformat() if row[6] else None,
+                    'actual_date': row[7].isoformat() if row[7] else None,
+                    'status': row[8],
+                    'priority': row[9],
+                    'assigned_to': row[10],
+                    'evidence_links': row[11],
+                    'notes': row[12],
+                    'created_at': row[13].isoformat() if row[13] else None,
+                    'updated_at': row[14].isoformat() if row[14] else None,
+                })
+            
+            return items
+            
+    except Exception as e:
+        logger.error(f"Error fetching service items: {e}")
+        return []
+
+
+def create_service_item(service_id, item_type, title, planned_date, **kwargs):
+    """Create a new service item."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build dynamic insert query
+            columns = [S.ServiceItems.SERVICE_ID, S.ServiceItems.ITEM_TYPE, S.ServiceItems.TITLE, 
+                      S.ServiceItems.PLANNED_DATE, S.ServiceItems.CREATED_AT, S.ServiceItems.UPDATED_AT]
+            values = [service_id, item_type, title, planned_date, datetime.now(), datetime.now()]
+            placeholders = ['?'] * len(values)
+            
+            # Add optional fields
+            optional_fields = {
+                'description': S.ServiceItems.DESCRIPTION,
+                'due_date': S.ServiceItems.DUE_DATE,
+                'actual_date': S.ServiceItems.ACTUAL_DATE,
+                'status': S.ServiceItems.STATUS,
+                'priority': S.ServiceItems.PRIORITY,
+                'assigned_to': S.ServiceItems.ASSIGNED_TO,
+                'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
+                'notes': S.ServiceItems.NOTES
+            }
+            
+            for field, column in optional_fields.items():
+                if field in kwargs and kwargs[field] is not None:
+                    columns.append(column)
+                    values.append(kwargs[field])
+                    placeholders.append('?')
+            
+            query = f"""
+                INSERT INTO {S.ServiceItems.TABLE} ({', '.join(columns)})
+                VALUES ({', '.join(placeholders)})
+            """
+            
+            cursor.execute(query, values)
+            conn.commit()
+            
+            # Get the inserted item ID
+            cursor.execute("SELECT @@IDENTITY")
+            item_id = cursor.fetchone()[0]
+            
+            return item_id
+            
+    except Exception as e:
+        logger.error(f"Error creating service item: {e}")
+        return None
+
+
+def update_service_item(item_id, **kwargs):
+    """Update a service item."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build dynamic update query
+            updates = []
+            values = []
+            
+            field_mappings = {
+                'item_type': S.ServiceItems.ITEM_TYPE,
+                'title': S.ServiceItems.TITLE,
+                'description': S.ServiceItems.DESCRIPTION,
+                'planned_date': S.ServiceItems.PLANNED_DATE,
+                'due_date': S.ServiceItems.DUE_DATE,
+                'actual_date': S.ServiceItems.ACTUAL_DATE,
+                'status': S.ServiceItems.STATUS,
+                'priority': S.ServiceItems.PRIORITY,
+                'assigned_to': S.ServiceItems.ASSIGNED_TO,
+                'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
+                'notes': S.ServiceItems.NOTES
+            }
+            
+            for field, column in field_mappings.items():
+                if field in kwargs:
+                    updates.append(f"{column} = ?")
+                    values.append(kwargs[field])
+            
+            if not updates:
+                return False
+            
+            # Always update the updated_at timestamp
+            updates.append(f"{S.ServiceItems.UPDATED_AT} = ?")
+            values.append(datetime.now())
+            
+            query = f"""
+                UPDATE {S.ServiceItems.TABLE}
+                SET {', '.join(updates)}
+                WHERE {S.ServiceItems.ITEM_ID} = ?
+            """
+            values.append(item_id)
+            
+            cursor.execute(query, values)
+            conn.commit()
+            
+            return cursor.rowcount > 0
+            
+    except Exception as e:
+        logger.error(f"Error updating service item: {e}")
+        return False
+
+
+def delete_service_item(item_id):
+    """Delete a service item."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.ServiceItems.TABLE} WHERE {S.ServiceItems.ITEM_ID} = ?",
+                (item_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting service item: {e}")
+        return False
+
+
+def get_service_items_statistics(service_id=None):
+    """Get statistics for service items, optionally filtered by service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            where_clause = ""
+            params = []
+            if service_id:
+                where_clause = f"WHERE {S.ServiceItems.SERVICE_ID} = ?"
+                params = [service_id]
+            
+            query = f"""
+                SELECT 
+                    {S.ServiceItems.ITEM_TYPE},
+                    COUNT(*) as total_items,
+                    SUM(CASE WHEN {S.ServiceItems.STATUS} = 'completed' THEN 1 ELSE 0 END) as completed_items,
+                    SUM(CASE WHEN {S.ServiceItems.STATUS} = 'in_progress' THEN 1 ELSE 0 END) as in_progress_items,
+                    SUM(CASE WHEN {S.ServiceItems.STATUS} = 'planned' THEN 1 ELSE 0 END) as planned_items,
+                    SUM(CASE WHEN {S.ServiceItems.STATUS} = 'overdue' THEN 1 ELSE 0 END) as overdue_items,
+                    SUM(CASE WHEN {S.ServiceItems.STATUS} = 'cancelled' THEN 1 ELSE 0 END) as cancelled_items,
+                    MIN({S.ServiceItems.PLANNED_DATE}) as earliest_date,
+                    MAX({S.ServiceItems.PLANNED_DATE}) as latest_date,
+                    COUNT(CASE WHEN {S.ServiceItems.PLANNED_DATE} >= GETDATE() AND {S.ServiceItems.PLANNED_DATE} <= DATEADD(day, 30, GETDATE()) THEN 1 END) as upcoming_30_days
+                FROM {S.ServiceItems.TABLE}
+                {where_clause}
+                GROUP BY {S.ServiceItems.ITEM_TYPE}
+            """
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            stats = {}
+            for row in rows:
+                item_type = row[0]
+                stats[item_type] = {
+                    'total_items': row[1],
+                    'completed_items': row[2] or 0,
+                    'in_progress_items': row[3] or 0,
+                    'planned_items': row[4] or 0,
+                    'overdue_items': row[5] or 0,
+                    'cancelled_items': row[6] or 0,
+                    'earliest_date': row[7].isoformat() if row[7] else None,
+                    'latest_date': row[8].isoformat() if row[8] else None,
+                    'upcoming_30_days': row[9] or 0
+                }
+            
+            return stats
+            
+    except Exception as e:
+        logger.error(f"Error fetching service items statistics: {e}")
+        return {}
+
+
 import pyodbc
 import os
 import pandas as pd
 from datetime import datetime, timedelta
 
 from config import Config
+import logging
 from constants import schema as S
 from database_pool import get_db_connection, connect_to_db  # Import both for gradual migration
 
@@ -165,7 +640,9 @@ def get_project_details(project_id):
             cursor.execute(
                 f"""
                 SELECT p.{S.Projects.NAME}, p.{S.Projects.START_DATE}, p.{S.Projects.END_DATE}, 
-                       p.{S.Projects.STATUS}, p.{S.Projects.PRIORITY},
+                       p.{S.Projects.STATUS}, p.{S.Projects.PRIORITY}, p.{S.Projects.CONTRACT_NUMBER},
+                       p.{S.Projects.AREA_HECTARES}, p.{S.Projects.MW_CAPACITY},
+                       p.{S.Projects.ADDRESS}, p.{S.Projects.CITY}, p.{S.Projects.STATE}, p.{S.Projects.POSTCODE},
                        c.{S.Clients.CLIENT_NAME}, c.{S.Clients.CONTACT_NAME}, c.{S.Clients.CONTACT_EMAIL},
                        pt.{S.ProjectTypes.TYPE_NAME}
                 FROM dbo.{S.Projects.TABLE} p
@@ -178,16 +655,27 @@ def get_project_details(project_id):
             row = cursor.fetchone()
             
             if row:
+                # Convert priority number to name
+                priority_map = {1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical'}
+                priority_name = priority_map.get(row[4], 'Medium')
+                
                 result = {
                     "project_name": row[0],
                     "start_date": row[1].strftime('%Y-%m-%d') if row[1] else "",
                     "end_date": row[2].strftime('%Y-%m-%d') if row[2] else "",
                     "status": row[3],
-                    "priority": row[4],
-                    "client_name": row[5],
-                    "client_contact": row[6],
-                    "contact_email": row[7],
-                    "project_type": row[8]
+                    "priority": priority_name,
+                    "contract_number": row[5],
+                    "area": row[6],
+                    "mw_capacity": row[7],
+                    "address": row[8],
+                    "city": row[9],
+                    "state": row[10],
+                    "postcode": row[11],
+                    "client_name": row[12],
+                    "client_contact": row[13],
+                    "contact_email": row[14],
+                    "project_type": row[15]
                 }
                 return result
             else:
@@ -482,7 +970,7 @@ def get_acc_import_logs(project_id):
 def get_project_folders(project_id):
     """Fetch both the standard and IFC folder paths for a given project from dbo.projects."""
     try:
-        with get_db_connection("ProjectManagement") as conn:  # ✅ Ensure it queries the correct DB
+        with get_db_connection("ProjectManagement") as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT {S.Projects.FOLDER_PATH}, {S.Projects.IFC_FOLDER_PATH} FROM dbo.{S.Projects.TABLE} WHERE {S.Projects.ID} = ?",
@@ -513,7 +1001,7 @@ def get_cycle_ids(project_id):
                 WHERE {S.ReviewParameters.PROJECT_ID} = ?
                 ORDER BY {S.ReviewParameters.CYCLE_ID} DESC;
                 """,
-                (project_id,),
+                (project_id,)
             )
             
             cycles = [str(row[0]) for row in cursor.fetchall()]
@@ -706,7 +1194,7 @@ def get_acc_folder_path(project_id):
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT {S.ACCImportFolders.ACC_FOLDER_PATH} FROM {S.ACCImportFolders.TABLE} WHERE {S.ACCImportFolders.PROJECT_ID} = ?",
-                (project_id,),
+                (project_id,)
             )
             row = cursor.fetchone()
             return row[0] if row else None
@@ -1180,7 +1668,7 @@ def get_review_cycles(project_id):
 
 
 def create_review_cycle(project_id, stage_id, start_date, end_date, num_reviews, created_by):
-    """Insert a new review cycle and return its ID."""
+    """Insert a new review cycle and return the cycle ID."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1252,7 +1740,7 @@ def get_review_cycle_tasks(schedule_id):
                 WHERE {S.ReviewTasks.SCHEDULE_ID} = ?
                 ORDER BY {S.ReviewTasks.ID};
                 """,
-                (schedule_id,),
+                (schedule_id,)
             )
             return [tuple(row) for row in cursor.fetchall()]
     except Exception as e:
@@ -1293,7 +1781,7 @@ def get_bep_matrix(project_id):
                 LEFT JOIN project_bep_sections p ON s.id = p.section_id AND p.project_id = ?
                 ORDER BY s.id;
                 """,
-                (project_id,),
+                (project_id,)
             )
             return [tuple(row) for row in cursor.fetchall()]
     except Exception as e:
@@ -1703,6 +2191,7 @@ def insert_project_full(data):
             values = []
             for c in cols:
                 val = data.get(c)
+
                 if val in ("", None):
                     values.append(None)
                 elif c in numeric_fields:
@@ -2566,3 +3055,166 @@ def get_project_issues_by_status(project_id, status='open'):
     except Exception as e:
         logger.error(f"Error fetching project issues by status: {e}")
         return []
+
+
+def get_all_projects_issues_overview():
+    """Get combined ACC and Revizto issues overview for all projects."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get issue summary statistics for all projects
+            cursor.execute(f"""
+                SELECT 
+                    source,
+                    status,
+                    COUNT(*) as count
+                FROM vw_ProjectManagement_AllIssues
+                GROUP BY source, status
+            """)
+            
+            stats = cursor.fetchall()
+            
+            # Build summary statistics
+            summary = {
+                'total_issues': 0,
+                'acc_issues': {'total': 0, 'open': 0, 'closed': 0},
+                'revizto_issues': {'total': 0, 'open': 0, 'closed': 0},
+                'overall': {'open': 0, 'closed': 0}
+            }
+            
+            for source, status, count in stats:
+                summary['total_issues'] += count
+                if source == 'ACC':
+                    summary['acc_issues']['total'] += count
+                    summary['acc_issues'][status] = count
+                elif source == 'Revizto':
+                    summary['revizto_issues']['total'] += count
+                    summary['revizto_issues'][status] = count
+                
+                summary['overall'][status] = summary['overall'].get(status, 0) + count
+            
+            # Get issues summary by project
+            cursor.execute(f"""
+                SELECT 
+                    project_name,
+                    source,
+                    status,
+                    COUNT(*) as count
+                FROM vw_ProjectManagement_AllIssues
+                GROUP BY project_name, source, status
+                ORDER BY project_name
+            """)
+            
+            project_stats = cursor.fetchall()
+            
+            # Group by project
+            projects_summary = {}
+            for project_name, source, status, count in project_stats:
+                if project_name not in projects_summary:
+                    projects_summary[project_name] = {
+                        'total_issues': 0,
+                        'acc_issues': {'total': 0, 'open': 0, 'closed': 0},
+                        'revizto_issues': {'total': 0, 'open': 0, 'closed': 0},
+                        'overall': {'open': 0, 'closed': 0}
+                    }
+                
+                projects_summary[project_name]['total_issues'] += count
+                if source == 'ACC':
+                    projects_summary[project_name]['acc_issues']['total'] += count
+                    projects_summary[project_name]['acc_issues'][status] = count
+                elif source == 'Revizto':
+                    projects_summary[project_name]['revizto_issues']['total'] += count
+                    projects_summary[project_name]['revizto_issues'][status] = count
+                
+                projects_summary[project_name]['overall'][status] = projects_summary[project_name]['overall'].get(status, 0) + count
+            
+            # Get recent issues (last 20 across all projects)
+            cursor.execute(f"""
+                SELECT TOP 20
+                    project_name,
+                    source,
+                    issue_id,
+                    title,
+                    status,
+                    created_at,
+                    assignee,
+                    priority
+                FROM vw_ProjectManagement_AllIssues
+                ORDER BY created_at DESC
+            """)
+            
+            recent_issues = []
+            for row in cursor.fetchall():
+                recent_issues.append({
+                    'project_name': row[0],
+                    'source': row[1],
+                    'issue_id': row[2],
+                    'title': row[3],
+                    'status': row[4],
+                    'created_at': row[5],
+                    'assignee': row[6],
+                    'priority': row[7]
+                })
+            
+            return {
+                'summary': summary,
+                'projects': projects_summary,
+                'recent_issues': recent_issues
+            }
+            
+    except Exception as e:
+        logger.error(f"Error fetching all projects issues overview: {e}")
+        return {
+            'summary': {'total_issues': 0},
+            'projects': {},
+            'recent_issues': []
+        }
+
+
+def get_project_review_statistics():
+    """Get review statistics for all projects."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get review statistics per project
+            query = f"""
+                SELECT 
+                    ps.{S.ProjectServices.PROJECT_ID},
+                    COUNT(sr.{S.ServiceReviews.REVIEW_ID}) as total_reviews,
+                    SUM(CASE WHEN sr.{S.ServiceReviews.STATUS} = 'completed' THEN 1 ELSE 0 END) as completed_reviews,
+                    SUM(CASE WHEN sr.{S.ServiceReviews.STATUS} = 'planned' THEN 1 ELSE 0 END) as planned_reviews,
+                    SUM(CASE WHEN sr.{S.ServiceReviews.STATUS} = 'in_progress' THEN 1 ELSE 0 END) as in_progress_reviews,
+                    SUM(CASE WHEN sr.{S.ServiceReviews.STATUS} = 'overdue' THEN 1 ELSE 0 END) as overdue_reviews,
+                    MIN(sr.{S.ServiceReviews.PLANNED_DATE}) as earliest_review_date,
+                    MAX(sr.{S.ServiceReviews.PLANNED_DATE}) as latest_review_date,
+                    COUNT(CASE WHEN sr.{S.ServiceReviews.PLANNED_DATE} >= GETDATE() AND sr.{S.ServiceReviews.PLANNED_DATE} <= DATEADD(day, 30, GETDATE()) THEN 1 END) as upcoming_reviews_30_days
+                FROM {S.ProjectServices.TABLE} ps
+                LEFT JOIN {S.ServiceReviews.TABLE} sr ON ps.{S.ProjectServices.SERVICE_ID} = sr.{S.ServiceReviews.SERVICE_ID}
+                GROUP BY ps.{S.ProjectServices.PROJECT_ID}
+            """
+            
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+            # Convert to dictionary format
+            stats = {}
+            for row in results:
+                project_id = row[0]
+                stats[project_id] = {
+                    'total_reviews': row[1] or 0,
+                    'completed_reviews': row[2] or 0,
+                    'planned_reviews': row[3] or 0,
+                    'in_progress_reviews': row[4] or 0,
+                    'overdue_reviews': row[5] or 0,
+                    'earliest_review_date': row[6].isoformat() if row[6] else None,
+                    'latest_review_date': row[7].isoformat() if row[7] else None,
+                    'upcoming_reviews_30_days': row[8] or 0
+                }
+            
+            return stats
+            
+    except Exception as e:
+        logger.error(f"Error fetching project review statistics: {e}")
+        return {}

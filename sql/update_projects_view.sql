@@ -12,6 +12,7 @@ CREATE VIEW vw_projects_full AS
 SELECT
     p.project_id,
     p.project_name,
+    p.contract_number as project_number,
     c.client_name,
     c.contact_name as client_contact,
     c.contact_email,

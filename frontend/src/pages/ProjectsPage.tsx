@@ -27,6 +27,8 @@ import { projectsApi } from '@/api';
 import type { Project } from '@/types/api';
 import ProjectFormDialog from '@/components/ProjectFormDialog';
 
+const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
+
 export function ProjectsPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +51,12 @@ export function ProjectsPage() {
   const { data: stats } = useQuery({
     queryKey: ['projects', 'stats'],
     queryFn: () => projectsApi.getStats(),
+  });
+
+  // Fetch review statistics
+  const { data: reviewStats } = useQuery({
+    queryKey: ['projects', 'review-stats'],
+    queryFn: () => projectsApi.getReviewStats(),
   });
 
   // Filter projects based on search
@@ -221,11 +229,28 @@ export function ProjectsPage() {
                     )}
                   </Box>
 
-                  {project.project_number && (
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      #{project.project_number}
-                    </Typography>
+                  {project.priority && (
+                    <Chip
+                      label={`Priority: ${(() => {
+                        let p = project.priority;
+                        if (typeof p === 'number') {
+                          return REVERSE_PRIORITY_MAP[p] || 'Medium';
+                        } else if (typeof p === 'string' && /^\d+$/.test(p)) {
+                          const num = parseInt(p);
+                          return REVERSE_PRIORITY_MAP[num] || 'Medium';
+                        } else {
+                          return p || 'Medium';
+                        }
+                      })()}`}
+                      color="info"
+                      size="small"
+                      sx={{ mb: 1 }}
+                    />
                   )}
+
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Project #: {project.project_number || 'N/A'}
+                  </Typography>
 
                   {project.client_name && (
                     <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -233,9 +258,9 @@ export function ProjectsPage() {
                     </Typography>
                   )}
 
-                  {project.type_name && (
+                  {project.project_type && (
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Type: {project.type_name}
+                      Type: {project.project_type}
                     </Typography>
                   )}
 
@@ -254,6 +279,37 @@ export function ProjectsPage() {
                     >
                       {project.description}
                     </Typography>
+                  )}
+
+                  {/* Review Statistics */}
+                  {reviewStats && reviewStats[project.project_id] && (
+                    <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                        Reviews
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip
+                          label={`${reviewStats[project.project_id].total_reviews} Total`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`${reviewStats[project.project_id].completed_reviews} Completed`}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                        />
+                        {reviewStats[project.project_id].upcoming_reviews_30_days > 0 && (
+                          <Chip
+                            label={`${reviewStats[project.project_id].upcoming_reviews_30_days} Upcoming`}
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Box>
                   )}
                 </CardContent>
 
@@ -292,6 +348,7 @@ export function ProjectsPage() {
 
       {/* Project Form Dialog */}
       <ProjectFormDialog
+        key={selectedProject?.project_id || 'new'}
         open={dialogOpen}
         onClose={handleCloseDialog}
         project={selectedProject}

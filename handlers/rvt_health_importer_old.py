@@ -39,7 +39,7 @@ def import_health_data(json_folder, project_id=None, db_name=None):
     os.makedirs(processed, exist_ok=True)
 
     # Group JSON files by project_name
-    project_data = defaultdict(lambda: {"data": {}, "files": []})
+    combined_by_project = defaultdict(dict)
     json_files = [fn for fn in os.listdir(json_folder)
                  if fn.lower().endswith('.json') and fn != os.path.basename(LOG_FILE)]
     if not json_files:
@@ -57,8 +57,7 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 log(f"[WARNING] No project_name in {fn}, skipping")
                 continue
             
-            combined_data = project_data[project_name]["data"]
-            project_data[project_name]["files"].append(fn)
+            combined_data = combined_by_project[project_name]
             
             if data_type == "metadata":
                 # Extract metadata fields to top level
@@ -94,9 +93,7 @@ def import_health_data(json_folder, project_id=None, db_name=None):
             log(f"[ERROR] {fn}: {e}")
 
     # Process each project
-    for project_file_name, project_info in project_data.items():
-        combined_data = project_info["data"]
-        project_files = project_info["files"]
+    for project_file_name, combined_data in combined_by_project.items():
         # Save combined file
         file_identifier = project_file_name.replace(" ", "_").replace("/", "-")
         combined_fn = f"combined_{file_identifier}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -223,16 +220,123 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 log(f"[OK] inserted {combined_fn} for project {project_file_name}")
                 shutil.move(combined_path, os.path.join(processed, combined_fn))
                 log(f"[MOVED] {combined_fn}")
-                
-                # Move individual files for this project to processed folder
-                for individual_file in project_files:
-                    src_path = os.path.join(json_folder, individual_file)
-                    dst_path = os.path.join(processed, individual_file)
-                    if os.path.exists(src_path):
-                        shutil.move(src_path, dst_path)
-                        log(f"[MOVED] {individual_file} (individual file)")
         except Exception as e:
             log(f"ERROR: Database operation failed for project {project_file_name}: {e}")
             raise
     
     log("All projects processed.")
+            cursor = conn.cursor()
+            log(f"Connected to DB: {cursor.execute('SELECT DB_NAME()').fetchone()[0]}")
+
+            # define the JSON→DB columns we want
+            MAPPING = [
+                ("strRvtVersion",       "strRvtVersion"),
+                ("strRvtBuildVersion",  "strRvtBuildVersion"),
+                ("strRvtFileName",      "strRvtFileName"),
+                ("strProjectName",      "strProjectName"),
+                ("strProjectNumber",    "strProjectNumber"),
+                ("strClientName",       "strClientName"),
+                ("nRvtLinkCount",       "nRvtLinkCount"),
+                ("nDwgLinkCount",       "nDwgLinkCount"),
+                ("nDwgImportCount",     "nDwgImportCount"),
+                ("nTotalViewCount",     "nTotalViewCount"),
+                ("nCopiedViewCount",    "nCopiedViewCount"),
+                ("nDependentViewCount", "nDependentViewCount"),
+                ("nViewsNotOnSheetsCount", "nViewsNotOnSheetsCount"),
+                ("nViewTemplateCount",  "nViewTemplateCount"),
+                ("nWarningsCount",      "nWarningsCount"),
+                ("nCriticalWarningsCount","nCriticalWarningsCount"),
+                ("nFamilyCount",        "nFamilyCount"),
+                ("nGroupCount",         "nGroupCount"),
+                ("nDetailGroupTypeCount","nDetailGroupTypeCount"),
+                ("nModelGroupTypeCount","nModelGroupTypeCount"),
+                ("nTotalElementsCount", "nTotalElementsCount"),
+                ("nModelFileSizeMB",    "nModelFileSizeMB"),
+                # the big JSON blobs
+                ("jsonDesignOptions",      "jsonDesignOptions"),
+                ("jsonFamily_sizes",       "jsonFamily_sizes"),
+                ("jsonGrids",              "jsonGrids"),
+                ("jsonLevels",             "jsonLevels"),
+                ("jsonPhases",             "jsonPhases"),
+                ("jsonFamilies",           "jsonFamilies"),
+                ("jsonRooms",              "jsonRooms"),
+                ("jsonSchedules",          "jsonSchedules"),
+                ("jsonProjectBasePoint",   "jsonProjectBasePoint"),
+                ("jsonSurveyPoint",        "jsonSurveyPoint"),
+                ("jsonTitleBlocksSummary", "jsonTitleBlocksSummary"),
+                ("jsonViews",              "jsonViews"),
+                ("jsonWarnings",           "jsonWarnings"),
+                ("jsonWorksets",           "jsonWorksets"),
+                # extra counts / timestamps
+                ("nInPlaceFamiliesCount",  "nInPlaceFamiliesCount"),
+                ("nSketchupImportsCount",  "nSketchupImportsCount"),
+                ("nSheetsCount",           "nSheetsCount"),
+                ("nDesignOptionSetCount",  "nDesignOptionSetCount"),
+                ("nDesignOptionCount",     "nDesignOptionCount"),
+                ("nExportedOn",            "nExportedOn"),
+            ]
+
+            # upsert user
+            user_name = (
+                combined_data.get("strRvtUserName")
+                or combined_data.get("rvtUserName")
+                or combined_data.get("user")
+                or "UnknownUser"
+            )
+            cursor.execute(
+                f"SELECT {TblRvtUser.NID} FROM {TblRvtUser.TABLE} WHERE {TblRvtUser.RVT_USERNAME}=?", 
+                user_name
+            )
+            r = cursor.fetchone()
+            user_id = r[0] if r else cursor.execute(
+                f"INSERT INTO {TblRvtUser.TABLE} ({TblRvtUser.RVT_USERNAME}) OUTPUT INSERTED.{TblRvtUser.NID} VALUES (?)",
+                user_name
+            ).fetchone()[0]
+
+            # upsert sysname
+            sys_name = (
+                combined_data.get("strSysName")
+                or combined_data.get("sysUserName")
+                or os.path.splitext(combined_fn)[0]
+            )
+            cursor.execute(
+                f"SELECT {TblSysName.NID} FROM {TblSysName.TABLE} WHERE {TblSysName.SYS_USERNAME}=?", 
+                sys_name
+            )
+            r = cursor.fetchone()
+            sys_id = r[0] if r else cursor.execute(
+                f"INSERT INTO {TblSysName.TABLE} ({TblSysName.SYS_USERNAME}) OUTPUT INSERTED.{TblSysName.NID} VALUES (?)",
+                sys_name
+            ).fetchone()[0]
+
+            # Add project association if project_id provided
+            if project_id is not None:
+                log(f"Associating data with project ID: {project_id}")
+
+            # build columns + values
+            cols = ["nRvtUserId", "nSysNameId"] + [db_col for _,db_col in MAPPING]
+            vals = [user_id, sys_id]
+            for json_key, _ in MAPPING:
+                v = combined_data.get(json_key)
+                if json_key in ("jsonProjectBasePoint","jsonSurveyPoint") and v is not None:
+                    vals.append(json.dumps(v))
+                else:
+                    vals.append(v)
+
+            # placeholders
+            ph = ",".join("?" for _ in vals)
+
+            sql = f"""
+                INSERT INTO {TblRvtProjHealth.TABLE} (
+                  {','.join(cols)}
+                ) VALUES ({ph})
+            """
+            cursor.execute(sql, vals)
+            conn.commit()
+            log(f"[OK] inserted {combined_fn}")
+            shutil.move(combined_path, os.path.join(processed, combined_fn))
+            log(f"[MOVED] {combined_fn}")
+            log("All done.")
+    except Exception as e:
+        log(f"ERROR: Database operation failed: {e}")
+        raise

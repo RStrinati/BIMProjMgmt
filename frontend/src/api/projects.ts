@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Project, ProjectFilters, ApiResponse } from '@/types/api';
+import type { Project, ProjectFilters } from '@/types/api';
 
 export const projectsApi = {
   // Get all projects
@@ -39,6 +39,21 @@ export const projectsApi = {
     on_hold: number;
   }> => {
     const response = await apiClient.get('/projects/stats');
+    return response.data;
+  },
+
+  // Get review statistics for all projects
+  getReviewStats: async (): Promise<Record<number, {
+    total_reviews: number;
+    completed_reviews: number;
+    planned_reviews: number;
+    in_progress_reviews: number;
+    overdue_reviews: number;
+    earliest_review_date: string | null;
+    latest_review_date: string | null;
+    upcoming_reviews_30_days: number;
+  }>> => {
+    const response = await apiClient.get('/project_review_statistics');
     return response.data;
   },
 };

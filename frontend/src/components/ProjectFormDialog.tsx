@@ -32,6 +32,8 @@ interface ProjectFormDialogProps {
   mode: 'create' | 'edit';
 }
 
+const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
+
 const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, project, mode }) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +43,12 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
     project_name: '',
     project_number: '',
     client_id: '',
-    project_type: '',
+    project_type_id: '',
     status: 'Active',
     priority: 'Medium',
     start_date: '',
     end_date: '',
-    area_hectares: '',
+    area_m2: '',
     mw_capacity: '',
     address: '',
     city: '',
@@ -55,8 +57,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
     folder_path: '',
     ifc_folder_path: '',
     description: '',
+    internal_lead: '',
   });
-
   // Load reference data
   const { data: clients = [] } = useQuery<ReferenceOption[]>({
     queryKey: ['reference', 'clients'],
@@ -75,12 +77,22 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
         project_name: project.project_name || '',
         project_number: project.project_number || '',
         client_id: project.client_id?.toString() || '',
-        project_type: project.project_type || '',
+        project_type_id: project.type_id?.toString() || '',
         status: project.status || 'Active',
-        priority: project.priority || 'Medium',
-        start_date: project.start_date ? project.start_date.split('T')[0] : '',
-        end_date: project.end_date ? project.end_date.split('T')[0] : '',
-        area_hectares: project.area_hectares?.toString() || '',
+        priority: (() => {
+          let p = project.priority;
+          if (typeof p === 'number') {
+            return REVERSE_PRIORITY_MAP[p] || 'Medium';
+          } else if (typeof p === 'string' && /^\d+$/.test(p)) {
+            const num = parseInt(p);
+            return REVERSE_PRIORITY_MAP[num] || 'Medium';
+          } else {
+            return p || 'Medium';
+          }
+        })(),
+        start_date: project.start_date ? new Date(project.start_date).toISOString().slice(0, 10) : '',
+        end_date: project.end_date ? new Date(project.end_date).toISOString().slice(0, 10) : '',
+        area_m2: project.area_m2?.toString() || '',
         mw_capacity: project.mw_capacity?.toString() || '',
         address: project.address || '',
         city: project.city || '',
@@ -89,6 +101,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
         folder_path: project.folder_path || '',
         ifc_folder_path: project.ifc_folder_path || '',
         description: project.description || '',
+        internal_lead: project.internal_lead?.toString() || '',
       });
     } else if (mode === 'create') {
       // Reset form for create mode
@@ -96,12 +109,12 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
         project_name: '',
         project_number: '',
         client_id: '',
-        project_type: '',
+        project_type_id: '',
         status: 'Active',
         priority: 'Medium',
         start_date: '',
         end_date: '',
-        area_hectares: '',
+        area_m2: '',
         mw_capacity: '',
         address: '',
         city: '',
@@ -110,9 +123,10 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
         folder_path: '',
         ifc_folder_path: '',
         description: '',
+        internal_lead: '',
       });
     }
-  }, [mode, project, open]);
+  }, [mode, project]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -161,12 +175,12 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       name: formData.project_name,
       project_number: formData.project_number,
       client_id: formData.client_id ? Number(formData.client_id) : null,
-      project_type: formData.project_type || null,
+      type_id: formData.project_type_id ? Number(formData.project_type_id) : null,
       status: formData.status,
       priority: formData.priority,
       start_date: formData.start_date || null,
       end_date: formData.end_date || null,
-      area: formData.area_hectares ? Number(formData.area_hectares) : null,
+      area_m2: formData.area_m2 ? Number(formData.area_m2) : null,
       mw_capacity: formData.mw_capacity ? Number(formData.mw_capacity) : null,
       address: formData.address || null,
       city: formData.city || null,
@@ -175,6 +189,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       folder_path: formData.folder_path || null,
       ifc_folder_path: formData.ifc_folder_path || null,
       description: formData.description || null,
+      internal_lead: formData.internal_lead ? Number(formData.internal_lead) : null,
     };
 
     if (mode === 'create') {
@@ -243,8 +258,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
           <Grid item xs={12} sm={6}>
             <TextField
               label="Project Type"
-              value={formData.project_type}
-              onChange={handleChange('project_type')}
+              value={formData.project_type_id}
+              onChange={handleChange('project_type_id')}
               fullWidth
               select
               disabled={isLoading}
@@ -253,7 +268,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
                 <em>None</em>
               </MenuItem>
               {projectTypes.map((type) => (
-                <MenuItem key={type.type_id} value={type.type_name}>
+                <MenuItem key={type.type_id} value={type.type_id.toString()}>
                   {type.type_name}
                 </MenuItem>
               ))}
@@ -320,10 +335,10 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
           {/* Project Specs */}
           <Grid item xs={12} sm={6}>
             <TextField
-              label="Area (Hectares)"
+              label="Area (m²)"
               type="number"
-              value={formData.area_hectares}
-              onChange={handleChange('area_hectares')}
+              value={formData.area_m2}
+              onChange={handleChange('area_m2')}
               fullWidth
               disabled={isLoading}
             />
@@ -411,6 +426,17 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
               fullWidth
               multiline
               rows={3}
+              disabled={isLoading}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Project Lead (User ID)"
+              type="number"
+              value={formData.internal_lead}
+              onChange={handleChange('internal_lead')}
+              fullWidth
               disabled={isLoading}
             />
           </Grid>

@@ -6,6 +6,7 @@ import { theme } from './theme/theme';
 import { MainLayout } from './components/layout/MainLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import DataImportsPage from './pages/DataImportsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -34,9 +35,9 @@ function App() {
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/projects/:id/data-imports" element={<DataImportsPage />} />
               <Route path="/data-imports" element={<DataImportsPage />} />
-              <Route path="/reviews" element={<ComingSoonPage title="Reviews" />} />
-              <Route path="/tasks" element={<ComingSoonPage title="Tasks" />} />
-              <Route path="/analytics" element={<ComingSoonPage title="Analytics" />} />
+              <Route path="/reviews" element={<Navigate to="/projects" replace />} />
+              <Route path="/tasks" element={<Navigate to="/projects" replace />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -44,16 +45,6 @@ function App() {
         </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
-  );
-}
-
-// Placeholder component for unimplemented pages
-function ComingSoonPage({ title }: { title: string }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '4rem' }}>
-      <h1>{title}</h1>
-      <p>This page is coming soon!</p>
-    </div>
   );
 }
 

@@ -1,0 +1,20 @@
+{
+  "project_name": "NFPS-DPE-ZZ-ZZ-M3-E-0001",
+  "exported_on": "2025-10-12T23:04:25.615253Z",
+  "data_type": "family_sizes",
+  "family_count": 87,
+  "data": [
+    {
+      "FamilyName": "Cable Tray Vertical Inside Bend",
+      "SizeMB": "Unavailable (in-place or system family)",
+      "FilePath": "Unavailable",
+      "SharedParameters": []
+    },
+    {
+      "FamilyName": "Cable Tray Vertical Outside Bend",
+      "SizeMB": "Unavailable (in-place or system family)",
+      "FilePath": "Unavailable",
+      "SharedParameters": []
+    }
+  ]
+}
