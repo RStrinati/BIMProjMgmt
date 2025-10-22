@@ -80,7 +80,15 @@ def delete_service_template(template_id):
 # --- Project Services Functions ---
 
 def get_project_services(project_id):
-    """Get all services for a project."""
+    """Get all services for a project with billing metrics and derived status."""
+
+    status_buckets = ('planned', 'in_progress', 'completed', 'overdue', 'cancelled')
+
+    def _empty_counts():
+        counts = {key: 0 for key in status_buckets}
+        counts['total'] = 0
+        return counts
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -101,6 +109,7 @@ def get_project_services(project_id):
                 """,
                 (project_id,)
             )
+            rows = cursor.fetchall()
             services = [dict(
                 service_id=row[0],
                 project_id=row[1],
@@ -119,7 +128,195 @@ def get_project_services(project_id):
                 status=row[14],
                 progress_pct=row[15],
                 claimed_to_date=row[16]
-            ) for row in cursor.fetchall()]
+            ) for row in rows]
+
+            if not services:
+                return services
+
+            service_ids = [svc['service_id'] for svc in services]
+            activity_counts = {sid: _empty_counts() for sid in service_ids}
+            billing_tracker = {sid: {'billable': 0, 'billed': 0} for sid in service_ids}
+
+            placeholders = ', '.join('?' for _ in service_ids)
+
+            # Aggregate review statuses
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.STATUS}, COUNT(*)
+                    FROM {S.ServiceReviews.TABLE}
+                    WHERE {S.ServiceReviews.SERVICE_ID} IN ({placeholders})
+                    GROUP BY {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.STATUS}
+                    """,
+                    service_ids
+                )
+                for service_id, status_value, count in cursor.fetchall():
+                    counts = activity_counts.get(service_id)
+                    if not counts:
+                        continue
+                    status_key = (status_value or '').lower()
+                    count = int(count or 0)
+                    counts['total'] += count
+                    if status_key in counts:
+                        counts[status_key] += count
+            except Exception as review_err:
+                logger.warning(f"Failed to aggregate review statuses for services {service_ids}: {review_err}")
+
+            # Aggregate billed review counts
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        {S.ServiceReviews.SERVICE_ID},
+                        SUM(CASE WHEN LOWER(ISNULL({S.ServiceReviews.STATUS}, '')) <> 'cancelled' THEN 1 ELSE 0 END) AS active_count,
+                        SUM(CASE WHEN ISNULL({S.ServiceReviews.IS_BILLED}, 0) = 1 THEN 1 ELSE 0 END) AS billed_count
+                    FROM {S.ServiceReviews.TABLE}
+                    WHERE {S.ServiceReviews.SERVICE_ID} IN ({placeholders})
+                    GROUP BY {S.ServiceReviews.SERVICE_ID}
+                    """,
+                    service_ids
+                )
+                for service_id, active_count, billed_count in cursor.fetchall():
+                    tracker = billing_tracker.get(service_id)
+                    if not tracker:
+                        continue
+                    tracker['billable'] += int(active_count or 0)
+                    tracker['billed'] += int(billed_count or 0)
+            except Exception as review_billing_err:
+                logger.warning(f"Failed to aggregate review billing for services {service_ids}: {review_billing_err}")
+
+            # Aggregate service item statuses
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT {S.ServiceItems.SERVICE_ID}, {S.ServiceItems.STATUS}, COUNT(*)
+                    FROM {S.ServiceItems.TABLE}
+                    WHERE {S.ServiceItems.SERVICE_ID} IN ({placeholders})
+                    GROUP BY {S.ServiceItems.SERVICE_ID}, {S.ServiceItems.STATUS}
+                    """,
+                    service_ids
+                )
+                for service_id, status_value, count in cursor.fetchall():
+                    counts = activity_counts.get(service_id)
+                    if not counts:
+                        continue
+                    status_key = (status_value or '').lower()
+                    count = int(count or 0)
+                    counts['total'] += count
+                    if status_key in counts:
+                        counts[status_key] += count
+            except Exception as item_err:
+                logger.warning(f"Failed to aggregate item statuses for services {service_ids}: {item_err}")
+
+            # Aggregate billed service items
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        {S.ServiceItems.SERVICE_ID},
+                        SUM(CASE WHEN LOWER(ISNULL({S.ServiceItems.STATUS}, '')) <> 'cancelled' THEN 1 ELSE 0 END) AS active_count,
+                        SUM(CASE WHEN ISNULL({S.ServiceItems.IS_BILLED}, 0) = 1 THEN 1 ELSE 0 END) AS billed_count
+                    FROM {S.ServiceItems.TABLE}
+                    WHERE {S.ServiceItems.SERVICE_ID} IN ({placeholders})
+                    GROUP BY {S.ServiceItems.SERVICE_ID}
+                    """,
+                    service_ids
+                )
+                for service_id, active_count, billed_count in cursor.fetchall():
+                    tracker = billing_tracker.get(service_id)
+                    if not tracker:
+                        continue
+                    tracker['billable'] += int(active_count or 0)
+                    tracker['billed'] += int(billed_count or 0)
+            except Exception as item_billing_err:
+                logger.warning(f"Failed to aggregate item billing for services {service_ids}: {item_billing_err}")
+
+            status_updates = []
+            now = datetime.now()
+
+            for service in services:
+                counts = activity_counts.get(service['service_id'], _empty_counts())
+                original_status = service['status']
+                original_progress_pct = float(service['progress_pct'] or 0.0)
+
+                active_total = counts['total'] - counts.get('cancelled', 0)
+                derived_status = original_status or 'planned'
+
+                if counts.get('overdue', 0) > 0:
+                    derived_status = 'overdue'
+                elif active_total <= 0:
+                    derived_status = original_status or 'planned'
+                elif counts.get('completed', 0) >= active_total:
+                    derived_status = 'completed'
+                elif counts.get('in_progress', 0) > 0 or counts.get('completed', 0) > 0:
+                    derived_status = 'in_progress'
+                else:
+                    derived_status = 'planned'
+
+                agreed_fee_raw = service.get('agreed_fee')
+                agreed_fee = float(agreed_fee_raw) if agreed_fee_raw is not None else 0.0
+
+                claimed_raw = service.get('claimed_to_date')
+                claimed_to_date = float(claimed_raw) if claimed_raw is not None else 0.0
+
+                billing_snapshot = billing_tracker.get(service['service_id'], {'billable': 0, 'billed': 0})
+                billable_units = int(billing_snapshot.get('billable') or 0)
+                billed_units = int(billing_snapshot.get('billed') or 0)
+
+                progress_from_flags = None
+                if billable_units > 0:
+                    billed_units = min(billed_units, billable_units)
+                    if derived_status == 'completed':
+                        billed_units = billable_units
+                    progress_from_flags = (billed_units / billable_units) * 100.0
+                elif derived_status == 'completed':
+                    progress_from_flags = 100.0
+
+                billed_amount = None
+                if claimed_to_date > 0:
+                    billed_amount = claimed_to_date
+                elif progress_from_flags is not None and agreed_fee > 0:
+                    billed_amount = agreed_fee * (progress_from_flags / 100.0)
+                else:
+                    billed_amount = agreed_fee * (original_progress_pct / 100.0)
+
+                if derived_status == 'completed' and agreed_fee > 0:
+                    billed_amount = max(billed_amount, agreed_fee)
+
+                billed_amount = min(max(billed_amount, 0.0), agreed_fee) if agreed_fee else max(billed_amount, 0.0)
+                billed_amount = round(billed_amount, 2)
+
+                billing_progress_pct = (billed_amount / agreed_fee * 100.0) if agreed_fee else 0.0
+                billing_progress_pct = max(min(billing_progress_pct, 100.0), 0.0)
+                billing_progress_pct = round(billing_progress_pct, 2)
+
+                remaining_fee = agreed_fee - billed_amount if agreed_fee else 0.0
+                remaining_fee = max(round(remaining_fee, 2), 0.0)
+
+                service['status'] = derived_status
+                service['progress_pct'] = billing_progress_pct
+                service['billing_progress_pct'] = billing_progress_pct
+                service['billed_amount'] = billed_amount
+                service['agreed_fee_remaining'] = remaining_fee
+
+                if derived_status != original_status or abs(billing_progress_pct - original_progress_pct) > 0.01:
+                    status_updates.append((derived_status, billing_progress_pct, now, service['service_id']))
+
+            if status_updates:
+                try:
+                    cursor.executemany(
+                        f"""
+                        UPDATE {S.ProjectServices.TABLE}
+                        SET {S.ProjectServices.STATUS} = ?, {S.ProjectServices.PROGRESS_PCT} = ?, 
+                            {S.ProjectServices.UPDATED_AT} = ?
+                        WHERE {S.ProjectServices.SERVICE_ID} = ?
+                        """,
+                        status_updates
+                    )
+                    conn.commit()
+                except Exception as update_err:
+                    logger.warning(f"Failed to persist service status updates: {update_err}")
+
             return services
     except Exception as e:
         logger.error(f"Error fetching project services: {e}")
@@ -220,7 +417,7 @@ def get_service_reviews(service_id):
                        {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
                        {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
                        {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
-                       {S.ServiceReviews.ACTUAL_ISSUED_AT}
+                       {S.ServiceReviews.ACTUAL_ISSUED_AT}, {S.ServiceReviews.IS_BILLED}
                 FROM {S.ServiceReviews.TABLE} 
                 WHERE {S.ServiceReviews.SERVICE_ID} = ?
                 ORDER BY {S.ServiceReviews.CYCLE_NO}
@@ -238,7 +435,8 @@ def get_service_reviews(service_id):
                 status=row[7],
                 weight_factor=row[8],
                 evidence_links=row[9],
-                actual_issued_at=row[10]
+                actual_issued_at=row[10],
+                is_billed=bool(row[11]) if row[11] is not None else False
             ) for row in cursor.fetchall()]
             return reviews
     except Exception as e:
@@ -248,11 +446,15 @@ def get_service_reviews(service_id):
 
 def create_service_review(service_id, cycle_no, planned_date, due_date=None, 
                          disciplines=None, deliverables=None, status='planned', 
-                         weight_factor=1.0, evidence_links=None):
+                         weight_factor=1.0, evidence_links=None, is_billed=None):
     """Create a new review for a service."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            effective_is_billed = is_billed
+            if effective_is_billed is None:
+                effective_is_billed = 1 if (status or '').lower() == 'completed' else 0
+
             cursor.execute(
                 f"""
                 INSERT INTO {S.ServiceReviews.TABLE} (
@@ -260,11 +462,11 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                     {S.ServiceReviews.PLANNED_DATE}, {S.ServiceReviews.DUE_DATE}, 
                     {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
                     {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
-                    {S.ServiceReviews.EVIDENCE_LINKS}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.IS_BILLED}
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (service_id, cycle_no, planned_date, due_date, disciplines, 
-                 deliverables, status, weight_factor, evidence_links)
+                 deliverables, status, weight_factor, evidence_links, int(bool(effective_is_billed)))
             )
             conn.commit()
             return cursor.lastrowid
@@ -284,18 +486,30 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.DUE_DATE, S.ServiceReviews.DISCIPLINES, 
                 S.ServiceReviews.DELIVERABLES, S.ServiceReviews.STATUS, 
                 S.ServiceReviews.WEIGHT_FACTOR, S.ServiceReviews.EVIDENCE_LINKS, 
-                S.ServiceReviews.ACTUAL_ISSUED_AT
+                S.ServiceReviews.ACTUAL_ISSUED_AT, S.ServiceReviews.IS_BILLED
             ]
             
+            status_update = None
             for key, value in kwargs.items():
                 if key in allowed_fields:
-                    update_fields[key] = value
+                    if key == S.ServiceReviews.STATUS:
+                        status_update = (value or '').lower()
+                        update_fields[key] = value
+                    elif key == S.ServiceReviews.IS_BILLED:
+                        update_fields[key] = int(bool(value))
+                    else:
+                        update_fields[key] = value
+            
+            if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
+                # Auto-align billed flag with completed status if not explicitly provided.
+                update_fields[S.ServiceReviews.IS_BILLED] = 1 if status_update == 'completed' else 0
             
             if not update_fields:
                 return False
                 
             set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
-            values = list(update_fields.values()) + [review_id]
+            values = [int(bool(v)) if key == S.ServiceReviews.IS_BILLED else v
+                      for key, v in update_fields.items()] + [review_id]
             cursor.execute(
                 f"UPDATE {S.ServiceReviews.TABLE} SET {set_clause} WHERE {S.ServiceReviews.REVIEW_ID} = ?",
                 values
@@ -336,7 +550,8 @@ def get_service_items(service_id, item_type=None):
                        {S.ServiceItems.TITLE}, {S.ServiceItems.DESCRIPTION}, {S.ServiceItems.PLANNED_DATE},
                        {S.ServiceItems.DUE_DATE}, {S.ServiceItems.ACTUAL_DATE}, {S.ServiceItems.STATUS},
                        {S.ServiceItems.PRIORITY}, {S.ServiceItems.ASSIGNED_TO}, {S.ServiceItems.EVIDENCE_LINKS},
-                       {S.ServiceItems.NOTES}, {S.ServiceItems.CREATED_AT}, {S.ServiceItems.UPDATED_AT}
+                       {S.ServiceItems.NOTES}, {S.ServiceItems.CREATED_AT}, {S.ServiceItems.UPDATED_AT},
+                       {S.ServiceItems.IS_BILLED}
                 FROM {S.ServiceItems.TABLE}
                 WHERE {S.ServiceItems.SERVICE_ID} = ?
             """
@@ -369,6 +584,7 @@ def get_service_items(service_id, item_type=None):
                     'notes': row[12],
                     'created_at': row[13].isoformat() if row[13] else None,
                     'updated_at': row[14].isoformat() if row[14] else None,
+                    'is_billed': bool(row[15]) if row[15] is not None else False,
                 })
             
             return items
@@ -389,6 +605,13 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
                       S.ServiceItems.PLANNED_DATE, S.ServiceItems.CREATED_AT, S.ServiceItems.UPDATED_AT]
             values = [service_id, item_type, title, planned_date, datetime.now(), datetime.now()]
             placeholders = ['?'] * len(values)
+
+            if 'is_billed' not in kwargs or kwargs.get('is_billed') is None:
+                status_hint = kwargs.get('status')
+                if status_hint and status_hint.lower() == 'completed':
+                    kwargs['is_billed'] = 1
+                else:
+                    kwargs['is_billed'] = 0
             
             # Add optional fields
             optional_fields = {
@@ -399,13 +622,17 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
                 'priority': S.ServiceItems.PRIORITY,
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
-                'notes': S.ServiceItems.NOTES
+                'notes': S.ServiceItems.NOTES,
+                'is_billed': S.ServiceItems.IS_BILLED
             }
             
             for field, column in optional_fields.items():
                 if field in kwargs and kwargs[field] is not None:
                     columns.append(column)
-                    values.append(kwargs[field])
+                    if field == 'is_billed':
+                        values.append(int(bool(kwargs[field])))
+                    else:
+                        values.append(kwargs[field])
                     placeholders.append('?')
             
             query = f"""
@@ -436,6 +663,7 @@ def update_service_item(item_id, **kwargs):
             # Build dynamic update query
             updates = []
             values = []
+            status_update = None
             
             field_mappings = {
                 'item_type': S.ServiceItems.ITEM_TYPE,
@@ -448,13 +676,23 @@ def update_service_item(item_id, **kwargs):
                 'priority': S.ServiceItems.PRIORITY,
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
-                'notes': S.ServiceItems.NOTES
+                'notes': S.ServiceItems.NOTES,
+                'is_billed': S.ServiceItems.IS_BILLED
             }
             
             for field, column in field_mappings.items():
                 if field in kwargs:
                     updates.append(f"{column} = ?")
-                    values.append(kwargs[field])
+                    if field == 'is_billed':
+                        values.append(int(bool(kwargs[field])))
+                    else:
+                        if field == 'status':
+                            status_update = (kwargs[field] or '').lower()
+                        values.append(kwargs[field])
+            
+            if status_update is not None and 'is_billed' not in kwargs:
+                updates.append(f"{S.ServiceItems.IS_BILLED} = ?")
+                values.append(1 if status_update == 'completed' else 0)
             
             if not updates:
                 return False
@@ -554,6 +792,7 @@ import pyodbc
 import os
 import pandas as pd
 from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple
 
 from config import Config
 import logging
@@ -561,6 +800,8 @@ from constants import schema as S
 from database_pool import get_db_connection, connect_to_db  # Import both for gradual migration
 
 logger = logging.getLogger(__name__)
+
+_table_column_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""
@@ -589,6 +830,36 @@ def connect_to_db(db_name=None):
 
 
     
+
+
+
+def table_has_column(table_name: str, column_name: str, db_name: str | None = None) -> bool:
+    """Check whether a given table contains the specified column."""
+    key = (table_name.lower(), column_name.lower(), db_name.lower() if isinstance(db_name, str) else db_name)
+    if key in _table_column_cache:
+        return _table_column_cache[key]
+
+    exists = False
+    try:
+        with get_db_connection(db_name) as conn:
+            if conn is None:
+                return False
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
+                """,
+                (table_name, column_name),
+            )
+            exists = cursor.fetchone() is not None
+    except Exception as e:
+        logger.error(f"Error checking column {table_name}.{column_name}: {e}")
+
+    _table_column_cache[key] = exists
+    return exists
+
 def insert_project(project_name, folder_path, ifc_folder_path=None):
     """Insert a new project into the database with an optional IFC folder path."""
     if not os.path.exists(folder_path):
@@ -1928,7 +2199,8 @@ def get_available_clients():
             cursor.execute(
                 f"""
                 SELECT {S.Clients.CLIENT_ID}, {S.Clients.CLIENT_NAME}, 
-                       {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL}
+                       {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
+                       {S.Clients.NAMING_CONVENTION}
                 FROM dbo.{S.Clients.TABLE}
                 ORDER BY {S.Clients.CLIENT_NAME};
                 """
@@ -1937,6 +2209,207 @@ def get_available_clients():
     except Exception as e:
         logger.error(f"Error fetching clients: {e}")
         return []
+
+
+CLIENT_DB_FIELD_MAP = {
+    'client_name': S.Clients.CLIENT_NAME,
+    'contact_name': S.Clients.CONTACT_NAME,
+    'contact_email': S.Clients.CONTACT_EMAIL,
+    'contact_phone': S.Clients.CONTACT_PHONE,
+    'address': S.Clients.ADDRESS,
+    'city': S.Clients.CITY,
+    'state': S.Clients.STATE,
+    'postcode': S.Clients.POSTCODE,
+    'country': S.Clients.COUNTRY,
+    'naming_convention': S.Clients.NAMING_CONVENTION,
+}
+
+
+def _prepare_client_payload(client_data):
+    """Normalise client payload by trimming strings and coalescing blanks to None."""
+    if not client_data:
+        return {}
+    prepared = {}
+    for key, value in client_data.items():
+        if isinstance(value, str):
+            value = value.strip()
+            if value == '':
+                value = None
+        prepared[key] = value
+
+    # Support both 'name' and 'client_name' keys from different callers
+    if 'name' in prepared and 'client_name' not in prepared:
+        prepared['client_name'] = prepared.pop('name')
+
+    return prepared
+
+
+def _row_to_client_dict(row):
+    """Convert a database client row into a dictionary."""
+    if row is None:
+        return None
+    return {
+        'client_id': row[0],
+        'client_name': row[1],
+        'contact_name': row[2],
+        'contact_email': row[3],
+        'contact_phone': row[4],
+        'address': row[5],
+        'city': row[6],
+        'state': row[7],
+        'postcode': row[8],
+        'country': row[9],
+        'naming_convention': row[10],
+    }
+
+
+def get_client_by_id(client_id):
+    """Fetch a single client by ID."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.Clients.CLIENT_ID}, {S.Clients.CLIENT_NAME},
+                       {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
+                       {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS},
+                       {S.Clients.CITY}, {S.Clients.STATE},
+                       {S.Clients.POSTCODE}, {S.Clients.COUNTRY},
+                       {S.Clients.NAMING_CONVENTION}
+                FROM dbo.{S.Clients.TABLE}
+                WHERE {S.Clients.CLIENT_ID} = ?
+                """,
+                (client_id,)
+            )
+            row = cursor.fetchone()
+            return _row_to_client_dict(row)
+    except Exception as e:
+        logger.error(f"Error fetching client {client_id}: {e}")
+        return None
+
+
+def get_clients_detailed():
+    """Fetch all clients with detailed fields as dictionaries."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.Clients.CLIENT_ID}, {S.Clients.CLIENT_NAME},
+                       {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
+                       {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS},
+                       {S.Clients.CITY}, {S.Clients.STATE},
+                       {S.Clients.POSTCODE}, {S.Clients.COUNTRY},
+                       {S.Clients.NAMING_CONVENTION}
+                FROM dbo.{S.Clients.TABLE}
+                ORDER BY {S.Clients.CLIENT_NAME}
+                """
+            )
+            return [_row_to_client_dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Error fetching detailed clients: {e}")
+        return []
+
+
+def create_client(client_data):
+    """Create a client record and return the inserted client."""
+    data = _prepare_client_payload(client_data or {})
+    client_name = data.get('client_name')
+    if not client_name:
+        raise ValueError("Client name is required")
+
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            columns = []
+            values = []
+            for key, column in CLIENT_DB_FIELD_MAP.items():
+                if key in data:
+                    columns.append(column)
+                    values.append(data[key])
+
+            placeholders = ', '.join(['?'] * len(values))
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{S.Clients.TABLE} ({', '.join(columns)})
+                VALUES ({placeholders})
+                """,
+                values
+            )
+            conn.commit()
+
+            cursor.execute("SELECT @@IDENTITY")
+            client_id = cursor.fetchone()[0]
+            return get_client_by_id(client_id)
+    except Exception as e:
+        logger.error(f"Error creating client '{client_name}': {e}")
+        return None
+
+
+def update_client(client_id, client_data):
+    """Update a client and return the updated record."""
+    data = _prepare_client_payload(client_data or {})
+    if not data:
+        return get_client_by_id(client_id)
+
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            sets = []
+            values = []
+            for key, column in CLIENT_DB_FIELD_MAP.items():
+                if key in data:
+                    sets.append(f"{column} = ?")
+                    values.append(data[key])
+
+            if not sets:
+                return get_client_by_id(client_id)
+
+            values.append(client_id)
+            cursor.execute(
+                f"""
+                UPDATE dbo.{S.Clients.TABLE}
+                SET {', '.join(sets)}
+                WHERE {S.Clients.CLIENT_ID} = ?
+                """,
+                values
+            )
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                return None
+
+            return get_client_by_id(client_id)
+    except Exception as e:
+        logger.error(f"Error updating client {client_id}: {e}")
+        return None
+
+
+def delete_client(client_id):
+    """Delete a client record if it is not attached to any projects."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) FROM dbo.{S.Projects.TABLE}
+                WHERE {S.Projects.CLIENT_ID} = ?
+                """,
+                (client_id,)
+            )
+            if cursor.fetchone()[0] > 0:
+                return False, "Client is assigned to one or more projects."
+
+            cursor.execute(
+                f"DELETE FROM dbo.{S.Clients.TABLE} WHERE {S.Clients.CLIENT_ID} = ?",
+                (client_id,)
+            )
+            conn.commit()
+            return cursor.rowcount > 0, None
+    except Exception as e:
+        logger.error(f"Error deleting client {client_id}: {e}")
+        return False, str(e)
 
 
 def get_available_project_types():
@@ -2048,33 +2521,10 @@ def get_available_users():
 
 
 def insert_client(client_data):
-    """Insert a new client into the database."""
+    """Insert a new client into the database (backwards compatible wrapper)."""
     try:
-        with get_db_connection("ProjectManagement") as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                INSERT INTO {S.Clients.TABLE} (
-                    {S.Clients.CLIENT_NAME}, {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
-                    {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS}, {S.Clients.CITY},
-                    {S.Clients.STATE}, {S.Clients.POSTCODE}, {S.Clients.COUNTRY}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """,
-                (
-                    client_data.get('name', ''),
-                    client_data.get('contact_name', ''),
-                    client_data.get('contact_email', ''),
-                    client_data.get('contact_phone', ''),
-                    client_data.get('address', ''),
-                    client_data.get('city', ''),
-                    client_data.get('state', ''),
-                    client_data.get('postcode', ''),
-                    client_data.get('country', '')
-                )
-            )
-            conn.commit()
-            logger.info(f"Client '{client_data.get('name')}' created successfully")
-            return True
+        client = create_client(client_data)
+        return client is not None
     except Exception as e:
         logger.error(f"Error creating client: {e}")
         return False
@@ -2103,41 +2553,11 @@ def assign_client_to_project(project_id, client_id):
 
 def create_new_client(client_data):
     """Create a new client in the database and return the client_id."""
-    try:
-        with get_db_connection("ProjectManagement") as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                INSERT INTO dbo.{S.Clients.TABLE} (
-                    {S.Clients.CLIENT_NAME}, {S.Clients.CONTACT_NAME}, {S.Clients.CONTACT_EMAIL},
-                    {S.Clients.CONTACT_PHONE}, {S.Clients.ADDRESS}, {S.Clients.CITY},
-                    {S.Clients.STATE}, {S.Clients.POSTCODE}, {S.Clients.COUNTRY}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    client_data['client_name'],
-                    client_data['contact_name'], 
-                    client_data['contact_email'],
-                    client_data['contact_phone'],
-                    client_data['address'],
-                    client_data['city'],
-                    client_data['state'],
-                    client_data['postcode'],
-                    client_data['country']
-                )
-            )
-            conn.commit()
-            
-            # Get the newly created client_id
-            cursor.execute("SELECT @@IDENTITY")
-            client_id = cursor.fetchone()[0]
-            
-            logger.info(f"Created new client: {client_data['client_name']} (ID: {client_id})")
-            return client_id
-            
-    except Exception as e:
-        logger.error(f"Error creating client: {e}")
-        return None
+    client = create_client(client_data)
+    if client:
+        logger.info(f"Created new client: {client.get('client_name')} (ID: {client.get('client_id')})")
+        return client.get('client_id')
+    return None
 
 
 def get_reference_options(table):
@@ -2220,15 +2640,45 @@ def update_project_record(project_id, data):
             cols = [c for c in data.keys() if c]
             if not cols:
                 return False
+
+            numeric_fields = {
+                S.Projects.CLIENT_ID,
+                S.Projects.TYPE_ID,
+                S.Projects.SECTOR_ID,
+                S.Projects.METHOD_ID,
+                S.Projects.PHASE_ID,
+                S.Projects.STAGE_ID,
+                S.Projects.PROJECT_MANAGER,
+                S.Projects.INTERNAL_LEAD,
+                S.Projects.CONTRACT_VALUE,
+                S.Projects.AGREED_FEE,
+                S.Projects.PRIORITY,
+                S.Projects.AREA_HECTARES,
+                S.Projects.MW_CAPACITY,
+            }
+
+            values = []
+            for c in cols:
+                val = data.get(c)
+                if val in ('', None):
+                    values.append(None)
+                elif c in numeric_fields:
+                    try:
+                        str_val = str(val)
+                        values.append(float(str_val) if '.' in str_val else int(str_val))
+                    except (ValueError, TypeError):
+                        values.append(None)
+                else:
+                    values.append(val)
+
             set_clause = ', '.join([f"{c} = ?" for c in cols])
             sql = f"UPDATE projects SET {set_clause} WHERE project_id = ?"
-            cursor.execute(sql, [data[c] for c in cols] + [project_id])
+            cursor.execute(sql, values + [project_id])
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"❌ Error updating project: {e}")
+        logger.error(f"Error updating project: {e}")
         return False
-        
 # ===================== Project Bookmarks Functions =====================
 
 def get_project_bookmarks(project_id):
@@ -3218,3 +3668,8 @@ def get_project_review_statistics():
     except Exception as e:
         logger.error(f"Error fetching project review statistics: {e}")
         return {}
+
+
+
+
+

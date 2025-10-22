@@ -26,6 +26,7 @@ from database import (
     insert_project_full,
     update_project_record,
     get_db_connection,
+    table_has_column,
 )
 
 PRIORITY_MAP = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
@@ -66,6 +67,7 @@ class ProjectPayload:
     description: Optional[str] = None
     type_id: Optional[int] = None
     internal_lead: Optional[int] = None
+    naming_convention: Optional[str] = None
 
     def to_db_payload(self) -> Dict[str, Any]:
         """Convert to a payload suitable for database helpers."""
@@ -112,6 +114,11 @@ class ProjectPayload:
             payload[S.Projects.TYPE_ID] = self.type_id
         if self.internal_lead is not None:
             payload[S.Projects.INTERNAL_LEAD] = self.internal_lead
+        if (
+            self.naming_convention not in (None, "")
+            and table_has_column(S.Projects.TABLE, S.Projects.NAMING_CONVENTION)
+        ):
+            payload[S.Projects.NAMING_CONVENTION] = self.naming_convention
 
         return payload
 
@@ -180,7 +187,12 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
         client_id=client_id_int,
         status=raw_payload.get("status") or None,
         priority=priority,
-        area=safe_strip(raw_payload.get("area") or raw_payload.get("area_m2") or "") or None,
+        area=safe_strip(
+            raw_payload.get("area")
+            or raw_payload.get("area_m2")
+            or raw_payload.get("area_hectares")
+            or ""
+        ) or None,
         mw_capacity=safe_strip(raw_payload.get("mw_capacity") or raw_payload.get("mw_capacity_mw") or "") or None,
         address=safe_strip(raw_payload.get("address") or raw_payload.get("project_address") or "") or None,
         city=safe_strip(raw_payload.get("city") or raw_payload.get("project_city") or "") or None,
@@ -190,6 +202,7 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
         description=safe_strip(raw_payload.get("description") or raw_payload.get("project_description") or "") or None,
         type_id=type_id_int,
         internal_lead=raw_payload.get("internal_lead"),
+        naming_convention=raw_payload.get("naming_convention"),
     )
 
 
@@ -207,6 +220,10 @@ def list_projects_full() -> List[Dict[str, Any]]:
 
     projects = get_projects_full() or []
     for project in projects:
+        # Ensure project number is always exposed with the new key even if the view still uses contract_number.
+        if not project.get("project_number") and project.get(S.Projects.CONTRACT_NUMBER):
+            project["project_number"] = project.get(S.Projects.CONTRACT_NUMBER)
+
         priority_value = project.get(S.Projects.PRIORITY)
         if priority_value in REVERSE_PRIORITY_MAP:
             project["priority_label"] = REVERSE_PRIORITY_MAP[priority_value]
@@ -232,6 +249,10 @@ def get_project(project_id: int) -> Dict[str, Any]:
         "ifc_folder_path": ifc_folder_path,
         "priority_label": REVERSE_PRIORITY_MAP.get(details.get("priority"), details.get("priority")),
     })
+
+    if not details.get("project_number") and details.get("contract_number"):
+        details["project_number"] = details.get("contract_number")
+
     return details
 
 

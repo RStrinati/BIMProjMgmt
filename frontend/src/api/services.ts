@@ -1,7 +1,11 @@
 // API functions for service templates, project services, and service reviews
 
 import apiClient from './client';
-import type { ServiceItem } from '@/types/api';
+import type {
+  ServiceItem,
+  FileServiceTemplate,
+  FileServiceTemplatePayload,
+} from '@/types/api';
 
 export interface ServiceTemplate {
   id: number;
@@ -32,6 +36,9 @@ export interface ProjectService {
   status: string;
   progress_pct?: number;
   claimed_to_date?: number;
+  billing_progress_pct?: number;
+  billed_amount?: number;
+  agreed_fee_remaining?: number;
 }
 
 export interface ServiceReview {
@@ -46,6 +53,7 @@ export interface ServiceReview {
   weight_factor: number;
   evidence_links?: string;
   actual_issued_at?: string;
+  is_billed?: boolean;
 }
 
 // Service Templates API
@@ -65,6 +73,20 @@ export const serviceTemplatesApi = {
 
   delete: (id: number) =>
     apiClient.delete<{ success: boolean }>(`/service_templates/${id}`),
+};
+
+export const fileServiceTemplatesApi = {
+  getAll: () => apiClient.get<FileServiceTemplate[]>('/service_templates/file'),
+  save: (data: {
+    template: FileServiceTemplatePayload;
+    overwrite?: boolean;
+    original_name?: string;
+    force?: boolean;
+  }) => apiClient.post<FileServiceTemplate>('/service_templates/file', data),
+  delete: (name: string) =>
+    apiClient.delete<{ deleted: string }>('/service_templates/file', {
+      data: { name },
+    }),
 };
 
 // Project Services API
@@ -106,6 +128,7 @@ export const serviceReviewsApi = {
     status?: string;
     weight_factor?: number;
     evidence_links?: string;
+    is_billed?: boolean;
   }) => apiClient.post<{ review_id: number }>(`/projects/${projectId}/services/${serviceId}/reviews`, data),
 
   update: (projectId: number, serviceId: number, reviewId: number, data: Partial<ServiceReview>) =>
@@ -132,6 +155,7 @@ export const serviceItemsApi = {
     assigned_to?: string;
     evidence_links?: string;
     notes?: string;
+    is_billed?: boolean;
   }) => apiClient.post<{ item_id: number }>(`/projects/${projectId}/services/${serviceId}/items`, data),
 
   update: (projectId: number, serviceId: number, itemId: number, data: Partial<ServiceItem>) =>

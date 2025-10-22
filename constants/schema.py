@@ -84,6 +84,7 @@ class Clients:
     STATE = "state"
     POSTCODE = "postcode"
     COUNTRY = "country"
+    NAMING_CONVENTION = "naming_convention"
 
 
 class ConstructionStages:
@@ -191,6 +192,7 @@ class Projects:
     CITY = "city"
     STATE = "state"
     POSTCODE = "postcode"
+    NAMING_CONVENTION = "naming_convention"
 
 
 class ReviewCycles:
@@ -724,6 +726,7 @@ class ServiceReviews:
     WEIGHT_FACTOR = "weight_factor"
     EVIDENCE_LINKS = "evidence_links"
     ACTUAL_ISSUED_AT = "actual_issued_at"
+    IS_BILLED = "is_billed"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"
@@ -772,6 +775,7 @@ class ServiceItems:
     NOTES = "notes"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+    IS_BILLED = "is_billed"
 
 
 class ProjectBookmarks:

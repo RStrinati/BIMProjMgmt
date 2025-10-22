@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -23,11 +23,46 @@ import {
   Visibility as VisibilityIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
-import { projectsApi } from '@/api';
-import type { Project } from '@/types/api';
+import { projectsApi, usersApi } from '@/api';
+import type { Project, User } from '@/types/api';
 import ProjectFormDialog from '@/components/ProjectFormDialog';
 
 const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
+
+const resolvePriorityLabel = (
+  priority: Project['priority'],
+  fallbackLabel?: string | null
+): string | null => {
+  if (fallbackLabel && fallbackLabel.trim() !== '') {
+    return fallbackLabel;
+  }
+
+  if (typeof priority === 'number') {
+    return REVERSE_PRIORITY_MAP[priority] || 'Medium';
+  }
+
+  if (typeof priority === 'string' && priority.trim() !== '') {
+    const trimmed = priority.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const numericPriority = parseInt(trimmed, 10);
+      return REVERSE_PRIORITY_MAP[numericPriority] || 'Medium';
+    }
+    return trimmed;
+  }
+
+  return fallbackLabel ?? null;
+};
+
+const formatNumericDisplay = (value: number | string | null | undefined): string => {
+  if (value === undefined || value === null || value === '') {
+    return '';
+  }
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return numericValue.toLocaleString();
+  }
+  return String(value);
+};
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -59,12 +94,46 @@ export function ProjectsPage() {
     queryFn: () => projectsApi.getReviewStats(),
   });
 
-  // Filter projects based on search
-  const filteredProjects = projects?.filter((project) =>
-    project.project_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.project_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  const { data: users } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
+  });
+
+  const userNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    (users ?? []).forEach((user) => {
+      const label = user.name || user.full_name || user.username || `User ${user.user_id}`;
+      map.set(user.user_id, label);
+    });
+    return map;
+  }, [users]);
+
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
+    []
   );
+  const formatCurrency = (value?: number | null) => currencyFormatter.format(value ?? 0);
+
+  // Filter projects based on search
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+
+  const filteredProjects = projects?.filter((project) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const searchableValues = [
+      project.project_name,
+      project.project_number,
+      project.contract_number,
+      project.client_name,
+      project.naming_convention,
+    ];
+
+    return searchableValues
+      .map((value) => (value ? value.toString().toLowerCase() : ''))
+      .some((value) => value.includes(normalizedSearch));
+  });
 
   const getStatusColor = (status?: string): 'success' | 'warning' | 'error' | 'default' => {
     switch (status?.toLowerCase()) {
@@ -212,122 +281,224 @@ export function ProjectsPage() {
       {/* Projects Grid */}
       {!isLoading && !error && (
         <Grid container spacing={3}>
-          {filteredProjects?.map((project) => (
-            <Grid item xs={12} sm={6} md={4} key={project.project_id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                    <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-                      {project.project_name}
-                    </Typography>
-                    {project.status && (
-                      <Chip
-                        label={project.status}
-                        color={getStatusColor(project.status)}
-                        size="small"
-                      />
-                    )}
-                  </Box>
+          {filteredProjects?.map((project) => {
+            const projectNumber =
+              project.project_number ?? project.contract_number ?? null;
+            const priorityLabel = resolvePriorityLabel(project.priority, project.priority_label) ?? undefined;
+            const projectLeadName =
+              project.internal_lead !== undefined && project.internal_lead !== null
+                ? userNameById.get(project.internal_lead) ?? `User ${project.internal_lead}`
+                : null;
+            const areaDisplay = formatNumericDisplay(project.area_hectares);
+            const capacityDisplay = formatNumericDisplay(project.mw_capacity);
+            const totalServiceAgreedRaw = Number(project.total_service_agreed_fee ?? project.agreed_fee ?? 0);
+            const totalServiceBilledRaw = Number(project.total_service_billed_amount ?? 0);
+            const totalServiceAgreed = Number.isFinite(totalServiceAgreedRaw) ? Math.max(totalServiceAgreedRaw, 0) : 0;
+            const totalServiceBilled = Number.isFinite(totalServiceBilledRaw) ? Math.max(totalServiceBilledRaw, 0) : 0;
+            const serviceBilledPctRaw =
+              project.service_billed_pct !== undefined && project.service_billed_pct !== null
+                ? Number(project.service_billed_pct)
+                : Number.NaN;
+            let billedPercent =
+              Number.isFinite(serviceBilledPctRaw) && !Number.isNaN(serviceBilledPctRaw)
+                ? serviceBilledPctRaw
+                : totalServiceAgreed > 0
+                  ? (totalServiceBilled / totalServiceAgreed) * 100
+                  : 0;
+            if (!Number.isFinite(billedPercent)) {
+              billedPercent = 0;
+            }
+            const clampedBilledPercent = Math.min(Math.max(billedPercent, 0), 100);
+            const unbilledAmount = Math.max(totalServiceAgreed - totalServiceBilled, 0);
+            const showBillingSummary = totalServiceAgreed > 0.01;
 
-                  {project.priority && (
-                    <Chip
-                      label={`Priority: ${(() => {
-                        let p = project.priority;
-                        if (typeof p === 'number') {
-                          return REVERSE_PRIORITY_MAP[p] || 'Medium';
-                        } else if (typeof p === 'string' && /^\d+$/.test(p)) {
-                          const num = parseInt(p);
-                          return REVERSE_PRIORITY_MAP[num] || 'Medium';
-                        } else {
-                          return p || 'Medium';
-                        }
-                      })()}`}
-                      color="info"
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                  )}
-
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Project #: {project.project_number || 'N/A'}
-                  </Typography>
-
-                  {project.client_name && (
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Client: {project.client_name}
-                    </Typography>
-                  )}
-
-                  {project.project_type && (
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Type: {project.project_type}
-                    </Typography>
-                  )}
-
-                  {project.description && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
+            return (
+              <Grid item xs={12} sm={6} md={4} key={project.project_id}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box
                       sx={{
-                        mt: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 2,
+                        mb: showBillingSummary ? 2 : 1.5,
                       }}
                     >
-                      {project.description}
-                    </Typography>
-                  )}
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+                            {project.project_name}
+                          </Typography>
+                          {project.status && (
+                            <Chip
+                              label={project.status}
+                              color={getStatusColor(project.status)}
+                              size="small"
+                            />
+                          )}
+                          {priorityLabel && (
+                            <Chip
+                              label={`Priority: ${priorityLabel}`}
+                              color="info"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          Project #: {projectNumber || 'N/A'}
+                        </Typography>
+                      </Box>
+                      {showBillingSummary && (
+                        <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                            <CircularProgress
+                              variant="determinate"
+                              value={100}
+                              size={70}
+                              thickness={4}
+                              sx={{ color: 'grey.200' }}
+                            />
+                            <CircularProgress
+                              variant="determinate"
+                              value={clampedBilledPercent}
+                              size={70}
+                              thickness={4}
+                              sx={{
+                                color: clampedBilledPercent >= 99 ? 'success.main' : 'primary.main',
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                top: 0,
+                                left: 0,
+                                bottom: 0,
+                                right: 0,
+                                position: 'absolute',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Typography variant="subtitle2" component="span" sx={{ fontWeight: 600 }}>
+                                {Math.round(clampedBilledPercent)}%
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                            {formatCurrency(totalServiceBilled)} / {formatCurrency(totalServiceAgreed)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {unbilledAmount > 0 ? `Unbilled ${formatCurrency(unbilledAmount)}` : 'Fully billed'}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
 
-                  {/* Review Statistics */}
-                  {reviewStats && reviewStats[project.project_id] && (
-                    <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                        Reviews
+                    {project.client_name && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Client: {project.client_name}
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Chip
-                          label={`${reviewStats[project.project_id].total_reviews} Total`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`${reviewStats[project.project_id].completed_reviews} Completed`}
-                          size="small"
-                          color="success"
-                          variant="outlined"
-                        />
-                        {reviewStats[project.project_id].upcoming_reviews_30_days > 0 && (
+                    )}
+
+                    {project.project_type && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Type: {project.project_type}
+                      </Typography>
+                    )}
+
+                    {areaDisplay && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Area: {areaDisplay} ha
+                      </Typography>
+                    )}
+
+                    {capacityDisplay && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Capacity: {capacityDisplay} MW
+                      </Typography>
+                    )}
+
+                    {project.naming_convention && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Naming: {project.naming_convention}
+                      </Typography>
+                    )}
+
+                    {projectLeadName && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Lead: {projectLeadName}
+                      </Typography>
+                    )}
+
+                    {project.description && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mt: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {project.description}
+                      </Typography>
+                    )}
+
+                    {/* Review Statistics */}
+                    {reviewStats && reviewStats[project.project_id] && (
+                      <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                          Reviews
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                           <Chip
-                            label={`${reviewStats[project.project_id].upcoming_reviews_30_days} Upcoming`}
+                            label={`${reviewStats[project.project_id].total_reviews} Total`}
                             size="small"
-                            color="warning"
+                            color="primary"
                             variant="outlined"
                           />
-                        )}
+                          <Chip
+                            label={`${reviewStats[project.project_id].completed_reviews} Completed`}
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                          />
+                          {reviewStats[project.project_id].upcoming_reviews_30_days > 0 && (
+                            <Chip
+                              label={`${reviewStats[project.project_id].upcoming_reviews_30_days} Upcoming`}
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
                       </Box>
-                    </Box>
-                  )}
-                </CardContent>
+                    )}
+                  </CardContent>
 
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                  <Button
-                    size="small"
-                    startIcon={<VisibilityIcon />}
-                    onClick={() => handleViewProject(project.project_id)}
-                  >
-                    View
-                  </Button>
-                  <IconButton size="small" onClick={() => handleEditProject(project)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                    <Button
+                      size="small"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => handleViewProject(project.project_id)}
+                    >
+                      View
+                    </Button>
+                    <IconButton size="small" onClick={() => handleEditProject(project)}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </CardActions>
+                </Card>
+              </Grid>
+            );
+          })}
         </Grid>
       )}
 
