@@ -1,0 +1,93 @@
+{
+  "institution": "SINSW",
+  "standard": "ISO 19650-2 + SINSW National Annex 2021",
+  "delimiter": "-",
+  "regex_pattern": "^[A-Z0-9]{3,6}-[A-Z]{3,6}-[A-Z0-9]{2,4}-[A-Z0-9]{2,3}-[A-Z0-9]{2}-[A-Z]{1,2}-\\d{4,6}$",
+  "fields": [
+    {
+      "name": "Project",
+      "position": 0,
+      "allowed_values": ["NFPS", "EVHS", "SPS", "RHS", "MPHS", "NEPS", "CWPS"],
+      "case_sensitive": true
+    },
+    {
+      "name": "Originator",
+      "position": 1,
+      "allowed_values": ["SINSW", "BAT", "TTW", "ACO", "SCF", "DLA", "EPM", "PKA", "ELA", "IMB", "WSC", "COL", "MGP", "PDG", "DPA", "INE", "CTP", "EVH", "SES", "REH", "FLU", "SMS", "DPE", "PRF", "JHA", "BSE", "BGE", "NDY", "WSCE"]
+    },
+    {
+      "name": "Functional Breakdown",
+      "position": 2,
+      "allowed_values": ["00", "B00A", "B00B", "B00C", "XX", "ZZ", "B00H"],
+      "mapped_values": {
+        "00": "Site-wide",
+        "B00A": "Building A - GLS",
+        "B00B": "Building B - Hall and Library",
+        "B00C": "Building C - Preschool",
+        "B00H": "Building H",
+        "XX": "Not Applicable",
+        "ZZ": "All Included"
+      }
+    },
+    {
+      "name": "Spatial Breakdown",
+      "position": 3,
+      "allowed_values": ["00", "R0", "R1", "R2", "RF", "XX", "ZZ"],
+      "mapped_values": {
+        "00": "Site Wide",
+        "GF": "Ground Floor",
+        "R0": "Ground Floor",
+        "R1": "Level 1",
+        "L1": "Level 1",
+        "L2": "Level 2",
+        "R2": "Level 2",
+        "RF": "Roof Level",
+        "XX": "No Level Applicable",
+        "ZZ": "Multiple Levels"
+      }
+    },
+    {
+      "name": "Container Type",
+      "position": 4,
+      "allowed_values": ["AF", "BM", "BQ", "BR", "CA", "CC", "CM", "CO", "CP", "CR", "CT", "CW", "DB", "DR", "FA", "FE", "FM", "FN", "FT", "GV", "HS", "IC", "IE", "IP", "IN", "IS", "KN", "M2", "M3", "MA", "MI", "MR", "MS", "PL", "PP", "PR", "RA", "RD", "RI", "RL", "RP", "SA", "SC", "SH", "SK", "SN", "SP", "SU", "TN", "TP", "TQ", "TR", "TS", "VL", "VO", "VS"]
+    },
+    {
+      "name": "Discipline",
+      "position": 5,
+      "allowed_values": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+      "mapped_values": {
+        "A": "Architect",
+        "B": "Building Surveyor",
+        "C": "Civil Engineer",
+        "D": "Drainage & Highways Engineer",
+        "E": "Electrical Engineer",
+        "F": "Fire Services Engineer",
+        "G": "Surveyor",
+        "H": "Hydraulic Engineer",
+        "I": "Interior Designer",
+        "J": "Information Manager",
+        "K": "Client Agent",
+        "L": "Landscape Architect",
+        "M": "Mechanical Engineer",
+        "N": "MEP Engineer",
+        "O": "Geologist/Ecologist",
+        "P": "Public Health Engineer",
+        "Q": "Quantity Surveyor",
+        "R": "Programme Manager",
+        "S": "Structural Engineer",
+        "T": "Planner",
+        "U": "H&S Advisor",
+        "V": "Sustainability",
+        "W": "Contractor",
+        "X": "Sub-contractor",
+        "Y": "Specialist Designer",
+        "Z": "General"
+      }
+    },
+    {
+      "name": "Sequential Number",
+      "position": 6,
+      "regex": "^\\d{4,6}$"
+    }
+  ]
+}

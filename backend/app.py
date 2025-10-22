@@ -1,3 +1,5 @@
+import copy
+import json
 import logging
 import os
 import sys
@@ -17,11 +19,13 @@ from config import ACC_SERVICE_TOKEN, ACC_SERVICE_URL, REVIZTO_SERVICE_TOKEN, RE
 
 from database import (  # noqa: E402
     add_bookmark,
+    create_client,
     create_project_service,
     create_review_cycle,
     create_service_review,
     create_service_template,
     delete_bookmark,
+    delete_client,
     delete_project_service,
     delete_review_cycle,
     delete_service_review,
@@ -40,6 +44,8 @@ from database import (  # noqa: E402
     get_project_folders,
     get_project_health_files,
     get_projects_full,
+    get_client_by_id,
+    get_clients_detailed,
     get_project_services,
     get_reference_options,
     get_review_cycle_tasks,
@@ -65,6 +71,7 @@ from database import (  # noqa: E402
     update_bep_status,
     update_project_details,
     update_project_folders,
+    update_client,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -74,6 +81,8 @@ from shared.project_service import (  # noqa: E402
     update_project,
 )
 from constants import schema as S  # noqa: E402
+from review_validation import validate_template  # noqa: E402
+from services.project_alias_service import ProjectAliasManager  # noqa: E402
 
 def _extract_project_payload(body):
     """Extract and normalize project payload from request body."""
@@ -92,6 +101,7 @@ class CustomJSONProvider(DefaultJSONProvider):
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "service_templates.json"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.json = CustomJSONProvider(app)
 CORS(app)
@@ -119,7 +129,7 @@ def _extract_project_payload(body):
         'project_number': body.get('project_number'),
         'client_id': body.get('client_id'),
         'type_id': body.get('type_id'),
-        'area': body.get('area'),
+        'area': body.get('area') or body.get('area_m2') or body.get('area_hectares'),
         'mw_capacity': body.get('mw_capacity'),
         'status': body.get('status'),
         'priority': body.get('priority') or body.get('priority_label'),
@@ -132,7 +142,279 @@ def _extract_project_payload(body):
         'folder_path': body.get('folder_path'),
         'ifc_folder_path': body.get('ifc_folder_path'),
         'description': body.get('description'),
+        'internal_lead': body.get('internal_lead'),
+        'naming_convention': body.get('naming_convention'),
     }
+
+
+def _serialize_client_response(client):
+    """Convert database client representation into API response structure."""
+    if not client:
+        return None
+    return {
+        'id': client['client_id'],
+        'client_id': client['client_id'],
+        'name': client['client_name'],
+        'client_name': client['client_name'],
+        'contact_name': client.get('contact_name'),
+        'contact_email': client.get('contact_email'),
+        'contact_phone': client.get('contact_phone'),
+        'address': client.get('address'),
+        'city': client.get('city'),
+        'state': client.get('state'),
+        'postcode': client.get('postcode'),
+        'country': client.get('country'),
+        'naming_convention': client.get('naming_convention'),
+    }
+
+
+def _read_service_template_file():
+    """Read file-based service templates."""
+    try:
+        if not TEMPLATE_FILE_PATH.exists():
+            TEMPLATE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            return []
+
+        with open(TEMPLATE_FILE_PATH, 'r', encoding='utf-8') as handle:
+            data = json.load(handle)
+
+        templates = data.get('templates', [])
+        if isinstance(templates, list):
+            return templates
+
+        logging.error("Service template file missing 'templates' array")
+        return []
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError as exc:
+        logging.error("Invalid JSON in service template file: %s", exc)
+        return []
+    except Exception as exc:
+        logging.exception("Unexpected error reading service template file")
+        return []
+
+
+def _write_service_template_file(templates):
+    """Persist file-based service templates."""
+    TEMPLATE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(TEMPLATE_FILE_PATH, 'w', encoding='utf-8') as handle:
+            json.dump({'templates': templates}, handle, indent=2, ensure_ascii=False)
+    except Exception:
+        logging.exception("Failed to write service template file")
+        raise
+
+
+def _normalise_file_template_payload(template_payload):
+    """Validate and normalise incoming template payload for file storage."""
+    if not isinstance(template_payload, dict):
+        raise ValueError("Template payload must be an object")
+
+    name = (template_payload.get('name') or '').strip()
+    if not name:
+        raise ValueError("Template name is required")
+
+    sector = (template_payload.get('sector') or '').strip()
+    notes = template_payload.get('notes')
+    if notes is None:
+        notes = template_payload.get('description') or ''
+
+    items = template_payload.get('items') or []
+    if not isinstance(items, list):
+        raise ValueError("Template items must be a list")
+
+    cleaned_items = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ValueError(f"Template item at index {index} must be an object")
+        cleaned_items.append(copy.deepcopy(item))
+
+    return {
+        'name': name,
+        'sector': sector,
+        'notes': notes,
+        'items': cleaned_items,
+    }
+
+
+def _compute_template_summary(items):
+    """Compute summary statistics for a template's service items."""
+    total_items = len(items)
+    lump_sum_items = 0
+    review_items = 0
+    total_reviews = 0
+    estimated_value = 0.0
+
+    for item in items:
+        unit_type = item.get('unit_type')
+        default_units = item.get('default_units') or 0
+        try:
+            default_units = float(default_units)
+        except (TypeError, ValueError):
+            default_units = 0
+
+        if unit_type == 'lump_sum':
+            lump_sum_items += 1
+            fee = item.get('lump_sum_fee') or 0
+            try:
+                estimated_value += float(fee)
+            except (TypeError, ValueError):
+                pass
+        else:
+            if unit_type == 'review':
+                review_items += 1
+                total_reviews += int(default_units)
+
+            rate = item.get('unit_rate') or 0
+            try:
+                estimated_value += float(default_units) * float(rate)
+            except (TypeError, ValueError):
+                pass
+
+    return {
+        'total_items': total_items,
+        'lump_sum_items': lump_sum_items,
+        'review_items': review_items,
+        'total_reviews': total_reviews,
+        'estimated_value': estimated_value,
+    }
+
+
+def _serialize_file_template(template, index):
+    """Convert a file-based service template into API representation."""
+    items = copy.deepcopy(template.get('items') or [])
+    summary = _compute_template_summary(items)
+    validation_errors = validate_template(template)
+
+    return {
+        'key': template.get('name'),
+        'index': index,
+        'name': template.get('name'),
+        'sector': template.get('sector'),
+        'notes': template.get('notes'),
+        'description': template.get('notes'),
+        'items': items,
+        'summary': summary,
+        'is_valid': len(validation_errors) == 0,
+        'validation_errors': validation_errors,
+        'source': 'file',
+    }
+
+
+def _get_alias_usage_stats_by_project():
+    """Return alias usage statistics keyed by project ID."""
+    manager = ProjectAliasManager()
+    try:
+        stats = manager.get_alias_usage_stats()
+        return {stat['project_id']: stat for stat in stats}
+    except Exception as exc:
+        logging.error("Error retrieving alias usage stats: %s", exc)
+        return {}
+    finally:
+        manager.close_connection()
+
+
+def _fetch_project_alias_rows():
+    """Fetch raw alias rows from the database."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT pa.{S.ProjectAliases.ALIAS_NAME},
+                       pa.{S.ProjectAliases.PM_PROJECT_ID},
+                       p.{S.Projects.NAME},
+                       p.{S.Projects.STATUS},
+                       p.{S.Projects.PROJECT_MANAGER},
+                       p.created_at
+                FROM dbo.{S.ProjectAliases.TABLE} pa
+                LEFT JOIN dbo.{S.Projects.TABLE} p
+                  ON pa.{S.ProjectAliases.PM_PROJECT_ID} = p.{S.Projects.ID}
+                ORDER BY p.{S.Projects.NAME}, pa.{S.ProjectAliases.ALIAS_NAME}
+                """
+            )
+            return cursor.fetchall()
+    except Exception as exc:
+        logging.error("Error fetching project aliases: %s", exc)
+        return []
+
+
+def _serialize_alias_row(row, stats_lookup):
+    """Convert alias row into API response with issue summary."""
+    alias_name, project_id, project_name, project_status, project_manager, created_at = row
+
+    if isinstance(created_at, (datetime, date)):
+        created_value = created_at.isoformat()
+    else:
+        created_value = created_at
+
+    stats = stats_lookup.get(project_id, {})
+    return {
+        'alias_name': alias_name,
+        'project_id': project_id,
+        'project_name': project_name,
+        'project_status': project_status,
+        'project_manager': project_manager,
+        'project_created_at': created_value,
+        'issue_summary': {
+            'total_issues': stats.get('total_issues', 0),
+            'open_issues': stats.get('open_issues', 0),
+            'alias_count': stats.get('alias_count', 0),
+            'aliases': stats.get('aliases', ''),
+            'has_issues': stats.get('has_issues', False),
+        },
+    }
+
+
+def _get_aliases_with_stats():
+    """Return all aliases enriched with issue statistics."""
+    stats_lookup = _get_alias_usage_stats_by_project()
+    rows = _fetch_project_alias_rows()
+    return [_serialize_alias_row(row, stats_lookup) for row in rows]
+
+
+def _get_alias_by_name(alias_name):
+    """Find a single alias by name."""
+    for alias in _get_aliases_with_stats():
+        if alias['alias_name'] == alias_name:
+            return alias
+    return None
+
+
+def _alias_exists(alias_name):
+    """Check if alias already exists."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT 1 FROM dbo.{S.ProjectAliases.TABLE}
+                WHERE {S.ProjectAliases.ALIAS_NAME} = ?
+                """,
+                (alias_name,)
+            )
+            return cursor.fetchone() is not None
+    except Exception as exc:
+        logging.error("Error checking alias existence: %s", exc)
+        return False
+
+
+def _project_exists(project_id):
+    """Check if a project exists."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) FROM dbo.{S.Projects.TABLE}
+                WHERE {S.Projects.ID} = ?
+                """,
+                (project_id,)
+            )
+            return cursor.fetchone()[0] > 0
+    except Exception as exc:
+        logging.error("Error checking project existence: %s", exc)
+        return False
 
 
 # --- ServiceTemplates API ---
@@ -179,6 +461,82 @@ def api_delete_service_template(template_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
+
+
+# --- File-based Service Templates API ---
+@app.route('/api/service_templates/file', methods=['GET'])
+def api_get_file_service_templates():
+    templates = _read_service_template_file()
+    response = [_serialize_file_template(template, index) for index, template in enumerate(templates)]
+    return jsonify(response)
+
+
+@app.route('/api/service_templates/file', methods=['POST'])
+def api_save_file_service_template():
+    body = request.get_json() or {}
+    payload = body.get('template') or {}
+    overwrite = bool(body.get('overwrite'))
+    original_name = body.get('original_name')
+
+    try:
+        template = _normalise_file_template_payload(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    validation_errors = validate_template(template)
+    if validation_errors and not body.get('force'):
+        return jsonify({'error': 'Template validation failed', 'details': validation_errors}), 400
+
+    templates = _read_service_template_file()
+
+    original_index = None
+    if original_name:
+        original_index = next((idx for idx, tpl in enumerate(templates) if tpl.get('name') == original_name), None)
+        if original_index is None:
+            return jsonify({'error': f"Template '{original_name}' not found"}), 404
+        templates.pop(original_index)
+
+    existing_index = next((idx for idx, tpl in enumerate(templates) if tpl.get('name') == template['name']), None)
+    created = original_name is None and existing_index is None
+
+    if existing_index is not None:
+        if not overwrite:
+            return jsonify({'error': f"Template '{template['name']}' already exists"}), 409
+        templates.pop(existing_index)
+        insert_index = existing_index
+    else:
+        insert_index = original_index if original_index is not None else len(templates)
+
+    templates.insert(insert_index, template)
+
+    try:
+        _write_service_template_file(templates)
+    except Exception:
+        return jsonify({'error': 'Failed to save template file'}), 500
+
+    response = _serialize_file_template(templates[insert_index], insert_index)
+    return jsonify(response), 201 if created else 200
+
+
+@app.route('/api/service_templates/file', methods=['DELETE'])
+def api_delete_file_service_template():
+    body = request.get_json(silent=True) or {}
+    template_name = (body.get('name') or request.args.get('name') or '').strip()
+    if not template_name:
+        return jsonify({'error': 'Template name is required'}), 400
+
+    templates = _read_service_template_file()
+    delete_index = next((idx for idx, tpl in enumerate(templates) if tpl.get('name') == template_name), None)
+    if delete_index is None:
+        return jsonify({'error': f"Template '{template_name}' not found"}), 404
+
+    templates.pop(delete_index)
+    try:
+        _write_service_template_file(templates)
+    except Exception:
+        return jsonify({'error': 'Failed to delete template'}), 500
+
+    return jsonify({'deleted': template_name})
 
 
 # --- Project Services API ---
@@ -249,7 +607,8 @@ def api_create_service_review(project_id, service_id):
         deliverables=body.get('deliverables'),
         status=body.get('status', 'planned'),
         weight_factor=body.get('weight_factor', 1.0),
-        evidence_links=body.get('evidence_links')
+        evidence_links=body.get('evidence_links'),
+        is_billed=body.get('is_billed')
     )
     if review_id:
         return jsonify({'review_id': review_id}), 201
@@ -340,8 +699,256 @@ def api_get_users():
 
 @app.route('/api/reference/<table>', methods=['GET'])
 def api_reference_table(table):
+    # Special handling for clients to include naming_convention
+    if table == 'clients':
+        return api_get_clients()
+    
     rows = get_reference_options(table)
     return jsonify([{'id': r[0], 'name': r[1]} for r in rows])
+
+
+@app.route('/api/naming-conventions', methods=['GET'])
+def api_get_naming_conventions():
+    """Get all available naming conventions"""
+    try:
+        from services.naming_convention_service import get_available_conventions, get_convention_summary
+        
+        conventions = get_available_conventions()
+        result = []
+        
+        for code, institution in conventions:
+            summary = get_convention_summary(code)
+            if summary:
+                result.append({
+                    'code': code,
+                    'name': institution,
+                    'standard': summary.get('standard', ''),
+                    'field_count': summary.get('field_count', 0)
+                })
+            else:
+                result.append({
+                    'code': code,
+                    'name': institution,
+                    'standard': '',
+                    'field_count': 0
+                })
+        
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"Error fetching naming conventions: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/clients', methods=['GET'])
+def api_get_clients():
+    """Get all clients with detailed contact information."""
+    try:
+        clients = get_clients_detailed()
+        response = [_serialize_client_response(client) for client in clients]
+        return jsonify(response)
+    except Exception as exc:
+        logging.error("Error fetching clients: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/clients', methods=['POST'])
+def api_create_client_route():
+    """Create a new client."""
+    body = request.get_json() or {}
+    try:
+        client = create_client(body)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.error("Error creating client: %s", exc)
+        return jsonify({'error': 'Failed to create client'}), 500
+
+    if not client:
+        return jsonify({'error': 'Failed to create client'}), 500
+
+    return jsonify(_serialize_client_response(client)), 201
+
+
+@app.route('/api/clients/<int:client_id>', methods=['GET'])
+def api_get_client(client_id):
+    """Get a single client by ID."""
+    client = get_client_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+    return jsonify(_serialize_client_response(client))
+
+
+@app.route('/api/clients/<int:client_id>', methods=['PUT', 'PATCH'])
+def api_update_client_route(client_id):
+    """Update an existing client."""
+    existing = get_client_by_id(client_id)
+    if not existing:
+        return jsonify({'error': 'Client not found'}), 404
+
+    body = request.get_json() or {}
+    client = update_client(client_id, body)
+    if client is None:
+        return jsonify({'error': 'Failed to update client'}), 500
+    return jsonify(_serialize_client_response(client))
+
+
+@app.route('/api/clients/<int:client_id>', methods=['DELETE'])
+def api_delete_client_route(client_id):
+    """Delete a client record if it has no linked projects."""
+    if not get_client_by_id(client_id):
+        return jsonify({'error': 'Client not found'}), 404
+
+    success, message = delete_client(client_id)
+    if success:
+        return jsonify({'success': True})
+    if message:
+        return jsonify({'error': message}), 400
+    return jsonify({'error': 'Failed to delete client'}), 500
+
+
+# --- Project Aliases API ---
+@app.route('/api/project_aliases', methods=['GET'])
+def api_get_project_aliases():
+    """List all project aliases with linked issue statistics."""
+    try:
+        aliases = _get_aliases_with_stats()
+        return jsonify(aliases)
+    except Exception as exc:
+        logging.error("Error fetching project aliases: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/project_aliases', methods=['POST'])
+def api_create_project_alias():
+    """Create a new project alias."""
+    data = request.get_json() or {}
+    alias_name = (data.get('alias_name') or '').strip()
+    project_id_raw = data.get('project_id')
+
+    if not alias_name or project_id_raw is None:
+        return jsonify({'error': 'alias_name and project_id are required'}), 400
+
+    try:
+        project_id = int(project_id_raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'project_id must be an integer'}), 400
+
+    if _alias_exists(alias_name):
+        return jsonify({'error': 'Alias already exists'}), 409
+
+    if not _project_exists(project_id):
+        return jsonify({'error': 'Project not found'}), 404
+
+    manager = ProjectAliasManager()
+    try:
+        success = manager.add_alias(project_id, alias_name)
+    finally:
+        manager.close_connection()
+
+    if not success:
+        return jsonify({'error': 'Failed to create alias'}), 500
+
+    alias = _get_alias_by_name(alias_name)
+    return jsonify(alias), 201
+
+
+@app.route('/api/project_aliases/<path:alias_name>', methods=['PUT', 'PATCH'])
+def api_update_project_alias(alias_name):
+    """Update an existing alias (rename and/or reassign project)."""
+    current_alias = _get_alias_by_name(alias_name)
+    if not current_alias:
+        return jsonify({'error': 'Alias not found'}), 404
+
+    data = request.get_json() or {}
+    new_alias_name = (data.get('alias_name') or data.get('new_alias_name') or alias_name).strip()
+    project_id_raw = data.get('project_id')
+
+    if new_alias_name != alias_name and _alias_exists(new_alias_name):
+        return jsonify({'error': 'Alias name already in use'}), 409
+
+    if project_id_raw is None:
+        new_project_id = current_alias['project_id']
+    else:
+        try:
+            new_project_id = int(project_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'project_id must be an integer'}), 400
+
+        if not _project_exists(new_project_id):
+            return jsonify({'error': 'Project not found'}), 404
+
+    manager = ProjectAliasManager()
+    try:
+        success = manager.update_alias(alias_name, new_alias_name, new_project_id)
+    finally:
+        manager.close_connection()
+
+    if not success:
+        return jsonify({'error': 'Failed to update alias'}), 500
+
+    alias = _get_alias_by_name(new_alias_name)
+    return jsonify(alias)
+
+
+@app.route('/api/project_aliases/<path:alias_name>', methods=['DELETE'])
+def api_delete_project_alias(alias_name):
+    """Delete a project alias."""
+    alias = _get_alias_by_name(alias_name)
+    if not alias:
+        return jsonify({'error': 'Alias not found'}), 404
+
+    manager = ProjectAliasManager()
+    try:
+        success = manager.delete_alias(alias_name)
+    finally:
+        manager.close_connection()
+
+    if not success:
+        return jsonify({'error': 'Failed to delete alias'}), 500
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/project_aliases/stats', methods=['GET'])
+def api_get_project_alias_stats():
+    """Return per-project alias usage statistics."""
+    manager = ProjectAliasManager()
+    try:
+        stats = manager.get_alias_usage_stats()
+        return jsonify(stats)
+    except Exception as exc:
+        logging.error("Error fetching alias usage stats: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        manager.close_connection()
+
+
+@app.route('/api/project_aliases/unmapped', methods=['GET'])
+def api_get_unmapped_alias_projects():
+    """Return list of unmapped external project names."""
+    manager = ProjectAliasManager()
+    try:
+        unmapped = manager.discover_unmapped_projects()
+        return jsonify(unmapped)
+    except Exception as exc:
+        logging.error("Error discovering unmapped projects: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        manager.close_connection()
+
+
+@app.route('/api/project_aliases/validation', methods=['GET'])
+def api_validate_project_aliases():
+    """Run validation on project aliases and report issues."""
+    manager = ProjectAliasManager()
+    try:
+        validation = manager.validate_aliases()
+        return jsonify(validation)
+    except Exception as exc:
+        logging.error("Error validating project aliases: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        manager.close_connection()
 
 
 @app.route('/api/reference/project_types', methods=['GET'])
@@ -1201,9 +1808,14 @@ def import_acc_data_endpoint(project_id):
         if not os.path.exists(folder_path):
             return jsonify({'error': f'ACC data folder does not exist: {folder_path}'}), 400
         
+        # Compute absolute path to sql directory (relative to project root)
+        # backend/app.py is one level down from project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        merge_dir = os.path.join(project_root, "sql")
+        
         # Run the import (this imports to acc_data_schema database)
         # Import returns True/False or raises exception
-        result = import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=False)
+        result = import_acc_data(folder_path, db=None, merge_dir=merge_dir, show_skip_summary=False)
         
         execution_time = time.time() - start_time
         
@@ -1853,7 +2465,8 @@ def api_create_service_item(project_id, service_id):
             priority=data.get('priority', 'medium'),
             assigned_to=data.get('assigned_to'),
             evidence_links=data.get('evidence_links'),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            is_billed=data.get('is_billed')
         )
         
         if item_id:

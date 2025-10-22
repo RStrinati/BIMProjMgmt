@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -13,6 +13,9 @@ import {
   Chip,
   Alert,
   CircularProgress,
+  LinearProgress,
+  Checkbox,
+  FormControlLabel,
   Table,
   TableBody,
   TableCell,
@@ -123,6 +126,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     status: 'planned',
     weight_factor: 1.0,
     evidence_links: '',
+    is_billed: false,
   });
   const [itemFormData, setItemFormData] = useState({
     item_type: 'review',
@@ -136,6 +140,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     assigned_to: '',
     evidence_links: '',
     notes: '',
+    is_billed: false,
   });
 
   // Fetch project services
@@ -173,6 +178,61 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     },
     enabled: !!selectedService,
   });
+
+  const servicesData: ProjectService[] = services?.data ?? [];
+
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
+    []
+  );
+
+  const formatCurrency = (value?: number | null) =>
+    currencyFormatter.format(value === undefined || value === null ? 0 : value);
+
+  const formatPercent = (value?: number | null) => {
+    const numeric = value === undefined || value === null ? 0 : value;
+    return `${numeric.toFixed(1)}%`;
+  };
+
+  const billingSummary = useMemo(() => {
+    const totals = servicesData.reduce(
+      (acc, service) => {
+        const agreed = service.agreed_fee ?? 0;
+        const billed =
+          service.billed_amount ?? service.claimed_to_date ?? 0;
+        acc.totalAgreed += agreed;
+        acc.totalBilled += billed;
+        return acc;
+      },
+      { totalAgreed: 0, totalBilled: 0 }
+    );
+    const totalRemaining = Math.max(totals.totalAgreed - totals.totalBilled, 0);
+    const progress =
+      totals.totalAgreed > 0 ? (totals.totalBilled / totals.totalAgreed) * 100 : 0;
+    return {
+      totalAgreed: totals.totalAgreed,
+      totalBilled: totals.totalBilled,
+      totalRemaining,
+      progress: Math.min(Math.max(progress, 0), 100),
+    };
+  }, [servicesData]);
+
+  const getStatusColor = (
+    status: string
+  ): 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning' => {
+    switch (status) {
+      case 'completed':
+        return 'success';
+      case 'in_progress':
+        return 'primary';
+      case 'overdue':
+        return 'error';
+      case 'cancelled':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
 
   // Service mutations
   const createServiceMutation = useMutation({
@@ -303,6 +363,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         status: review.status,
         weight_factor: review.weight_factor,
         evidence_links: review.evidence_links || '',
+        is_billed: review.is_billed ?? (review.status === 'completed'),
       });
     } else {
       setSelectedReview(null);
@@ -315,6 +376,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         status: 'planned',
         weight_factor: 1.0,
         evidence_links: '',
+        is_billed: false,
       });
     }
     setReviewDialogOpen(true);
@@ -340,6 +402,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         assigned_to: item.assigned_to || '',
         evidence_links: item.evidence_links || '',
         notes: item.notes || '',
+        is_billed: item.is_billed ?? (item.status === 'completed'),
       });
     } else {
       setSelectedItem(null);
@@ -355,6 +418,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         assigned_to: '',
         evidence_links: '',
         notes: '',
+        is_billed: false,
       });
     }
     setItemDialogOpen(true);
@@ -445,6 +509,43 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         </Button>
       </Box>
 
+      <Box display="flex" flexWrap="wrap" gap={2} mb={3}>
+        <Paper sx={{ p: 2, flex: '1 1 220px', minWidth: 200 }} elevation={1}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Total Contract Sum
+          </Typography>
+          <Typography variant="h6">
+            {formatCurrency(billingSummary.totalAgreed)}
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2, flex: '1 1 220px', minWidth: 200 }} elevation={1}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Fee Billed
+          </Typography>
+          <Typography variant="h6">
+            {formatCurrency(billingSummary.totalBilled)}
+          </Typography>
+        </Paper>
+        <Paper sx={{ p: 2, flex: '1 1 240px', minWidth: 220 }} elevation={1}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Agreed Fee Remaining
+          </Typography>
+          <Typography variant="h6">
+            {formatCurrency(billingSummary.totalRemaining)}
+          </Typography>
+          <Box mt={1}>
+            <LinearProgress
+              variant="determinate"
+              value={billingSummary.progress}
+              sx={{ height: 8, borderRadius: 4 }}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {formatPercent(billingSummary.progress)} billed
+            </Typography>
+          </Box>
+        </Paper>
+      </Box>
+
       <Tabs value={serviceTabValue} onChange={(_, newValue) => {
         // Prevent switching to reviews/items tabs if no service is selected
         if ((newValue === 1 || newValue === 2) && !selectedService) return;
@@ -465,12 +566,14 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                 <TableCell>Phase</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Agreed Fee</TableCell>
+                <TableCell>Billed</TableCell>
+                <TableCell>Remaining</TableCell>
                 <TableCell>Progress</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {services?.data?.map((service) => (
+              {servicesData.map((service) => (
                 <TableRow key={service.service_id}>
                   <TableCell>{service.service_code}</TableCell>
                   <TableCell>{service.service_name}</TableCell>
@@ -478,12 +581,25 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                   <TableCell>
                     <Chip
                       label={service.status}
-                      color={service.status === 'completed' ? 'success' : service.status === 'active' ? 'primary' : 'default'}
+                      color={getStatusColor(service.status)}
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>${service.agreed_fee?.toLocaleString() || 0}</TableCell>
-                  <TableCell>{service.progress_pct || 0}%</TableCell>
+                  <TableCell>{formatCurrency(service.agreed_fee)}</TableCell>
+                  <TableCell>{formatCurrency(service.billed_amount ?? service.claimed_to_date)}</TableCell>
+                  <TableCell>{formatCurrency(service.agreed_fee_remaining)}</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>
+                    <Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={service.billing_progress_pct ?? service.progress_pct ?? 0}
+                        sx={{ height: 8, borderRadius: 4, mb: 0.5 }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {formatPercent(service.billing_progress_pct ?? service.progress_pct)} billed
+                      </Typography>
+                    </Box>
+                  </TableCell>
                   <TableCell align="right">
                     <IconButton size="small" onClick={() => handleServiceSelect(service)}>
                       <AssessmentIcon />
@@ -525,6 +641,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                     <TableCell>Due Date</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Weight</TableCell>
+                    <TableCell>Billed</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -542,6 +659,13 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                         />
                       </TableCell>
                       <TableCell>{review.weight_factor}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={review.is_billed ? 'Yes' : 'No'}
+                          color={review.is_billed ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
                       <TableCell align="right">
                         <IconButton size="small" onClick={() => handleOpenReviewDialog(review)}>
                           <EditIcon />
@@ -583,6 +707,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                     <TableCell>Due Date</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Priority</TableCell>
+                    <TableCell>Billed</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -610,6 +735,13 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                         <Chip
                           label={item.priority}
                           color={item.priority === 'critical' ? 'error' : item.priority === 'high' ? 'warning' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={item.is_billed ? 'Yes' : 'No'}
+                          color={item.is_billed ? 'success' : 'default'}
                           size="small"
                         />
                       </TableCell>
@@ -749,7 +881,16 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
               select
               label="Status"
               value={reviewFormData.status}
-              onChange={(e) => setReviewFormData(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) => {
+                const nextStatus = e.target.value;
+                setReviewFormData(prev => ({
+                  ...prev,
+                  status: nextStatus,
+                  is_billed: nextStatus === 'completed'
+                    ? true
+                    : (prev.status === 'completed' ? false : prev.is_billed),
+                }));
+              }}
               margin="normal"
             >
               {REVIEW_STATUSES.map((status) => (
@@ -758,6 +899,21 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                 </MenuItem>
               ))}
             </TextField>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={reviewFormData.is_billed}
+                  onChange={(e) =>
+                    setReviewFormData(prev => ({
+                      ...prev,
+                      is_billed: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Count this review as billed"
+              sx={{ mt: 1 }}
+            />
             <TextField
               fullWidth
               type="number"
@@ -851,7 +1007,16 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
               select
               label="Status"
               value={itemFormData.status}
-              onChange={(e) => setItemFormData(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) => {
+                const nextStatus = e.target.value;
+                setItemFormData(prev => ({
+                  ...prev,
+                  status: nextStatus,
+                  is_billed: nextStatus === 'completed'
+                    ? true
+                    : (prev.status === 'completed' ? false : prev.is_billed),
+                }));
+              }}
               margin="normal"
             >
               {ITEM_STATUSES.map((status) => (
@@ -860,6 +1025,21 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                 </MenuItem>
               ))}
             </TextField>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={itemFormData.is_billed}
+                  onChange={(e) =>
+                    setItemFormData(prev => ({
+                      ...prev,
+                      is_billed: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Count this item as billed"
+              sx={{ mt: 1 }}
+            />
             <TextField
               fullWidth
               select

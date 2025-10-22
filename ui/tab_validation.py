@@ -1,12 +1,14 @@
 # ui/tab_validation.py
 
 import os
+import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from tools.naming_validator import validate_files
-
-
-
 from ui.ui_helpers import (
     create_labeled_entry,
     create_labeled_combobox,

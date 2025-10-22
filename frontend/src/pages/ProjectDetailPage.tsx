@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -24,8 +24,9 @@ import {
   Folder as FolderIcon,
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
-import { projectsApi } from '../api/projects';
-import type { Project } from '../types/api';
+import { projectsApi } from '@/api/projects';
+import { usersApi } from '@/api/users';
+import type { Project, User } from '@/types/api';
 import { ProjectServicesTab } from '@/components/ProjectServicesTab';
 
 interface TabPanelProps {
@@ -43,6 +44,48 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical' };
+
+const resolvePriorityLabel = (
+  priority: Project['priority'],
+  fallbackLabel?: string | null
+): string => {
+  if (fallbackLabel && fallbackLabel.trim() !== '') {
+    return fallbackLabel;
+  }
+
+  if (typeof priority === 'number') {
+    return REVERSE_PRIORITY_MAP[priority] || 'Medium';
+  }
+
+  if (typeof priority === 'string' && priority.trim() !== '') {
+    const trimmed = priority.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const numericPriority = parseInt(trimmed, 10);
+      return REVERSE_PRIORITY_MAP[numericPriority] || 'Medium';
+    }
+    return trimmed;
+  }
+
+  return 'Medium';
+};
+
+const formatNumericDisplay = (value: number | string | null | undefined): string => {
+  if (value === undefined || value === null || value === '') {
+    return 'N/A';
+  }
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return numericValue.toLocaleString();
+  }
+
+  return String(value);
+};
+
+const getUserLabel = (user: User): string =>
+  user.name || user.full_name || user.username || `User ${user.user_id}`;
+
 const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -53,6 +96,39 @@ const ProjectDetailPage: React.FC = () => {
     queryFn: () => projectsApi.getById(Number(id)),
     enabled: !!id,
   });
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
+  });
+
+  const projectLeadName = useMemo(() => {
+    if (!project || project.internal_lead === undefined || project.internal_lead === null) {
+      return null;
+    }
+    const leadUser = (users ?? []).find((user) => user.user_id === project.internal_lead);
+    if (leadUser) {
+      return getUserLabel(leadUser);
+    }
+    return `User ${project.internal_lead}`;
+  }, [project, users]);
+
+  const priorityLabel = useMemo(() => {
+    if (!project) {
+      return 'Medium';
+    }
+    return resolvePriorityLabel(project.priority, project.priority_label);
+  }, [project]);
+
+  const areaDisplay = useMemo(
+    () => formatNumericDisplay(project?.area_hectares),
+    [project?.area_hectares]
+  );
+
+  const capacityDisplay = useMemo(
+    () => formatNumericDisplay(project?.mw_capacity),
+    [project?.mw_capacity]
+  );
 
   const handleEdit = () => {
     // TODO: Open edit dialog
@@ -115,7 +191,7 @@ const ProjectDetailPage: React.FC = () => {
               {project.project_name}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Project #{project.project_number}
+              Project #{project.project_number ?? project.contract_number ?? 'N/A'}
             </Typography>
           </Box>
           <Chip label={project.status} color={getStatusColor(project.status ?? '')} />
@@ -183,21 +259,39 @@ const ProjectDetailPage: React.FC = () => {
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Priority
                   </Typography>
-                  <Typography variant="body1">{project.priority || 'N/A'}</Typography>
+                  <Typography variant="body1">{priorityLabel || 'N/A'}</Typography>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Area (Hectares)
+                    Area (ha)
                   </Typography>
-                  <Typography variant="body1">{project.area_m2 || 'N/A'}</Typography>
+                  <Typography variant="body1">
+                    {areaDisplay === 'N/A' ? 'N/A' : `${areaDisplay} ha`}
+                  </Typography>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     MW Capacity
                   </Typography>
-                  <Typography variant="body1">{project.mw_capacity || 'N/A'}</Typography>
+                  <Typography variant="body1">
+                    {capacityDisplay === 'N/A' ? 'N/A' : `${capacityDisplay} MW`}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Naming Convention
+                  </Typography>
+                  <Typography variant="body1">{project.naming_convention || 'N/A'}</Typography>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Project Lead
+                  </Typography>
+                  <Typography variant="body1">{projectLeadName || 'Unassigned'}</Typography>
                 </Grid>
 
                 <Grid item xs={12}>
