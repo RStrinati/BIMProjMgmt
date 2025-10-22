@@ -337,10 +337,18 @@ class ProjectSetupTab:
                 existing_data = {
                     'name': project_details.get('project_name', ''),
                     'client_name': project_details.get('client_name', ''),
+                    'contract_number': project_details.get('contract_number', ''),
+                    'project_type': project_details.get('project_type', ''),
+                    'area': project_details.get('area', ''),
+                    'mw_capacity': project_details.get('mw_capacity', ''),
                     'status': project_details.get('status', ''),
                     'priority': project_details.get('priority', ''),
                     'start_date': project_details.get('start_date', ''),
                     'end_date': project_details.get('end_date', ''),
+                    'address': project_details.get('address', ''),
+                    'city': project_details.get('city', ''),
+                    'state': project_details.get('state', ''),
+                    'postcode': project_details.get('postcode', ''),
                     'folder_path': folder_path or '',
                     'ifc_folder_path': ifc_folder_path or ''
                 }
@@ -352,10 +360,14 @@ class ProjectSetupTab:
         project_name_var = tk.StringVar(value=existing_data.get('name', ''))
         project_name_entry = ttk.Entry(basic_frame, textvariable=project_name_var, width=50)
         project_name_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=5)
-        ttk.Label(basic_frame, text="Client*:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        ttk.Label(basic_frame, text="Project Number:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
+        contract_number_var = tk.StringVar(value=existing_data.get('contract_number', ''))
+        contract_number_entry = ttk.Entry(basic_frame, textvariable=contract_number_var, width=30)
+        contract_number_entry.grid(row=1, column=1, sticky="ew", pady=5)
+        ttk.Label(basic_frame, text="Client*:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
         client_var = tk.StringVar()
         client_combo = ttk.Combobox(basic_frame, textvariable=client_var, width=30, state="readonly")
-        client_combo.grid(row=1, column=1, sticky="ew", pady=5)
+        client_combo.grid(row=2, column=1, sticky="ew", pady=5)
         try:
             clients = get_available_clients()
             client_names = [f"{client[0]} - {client[1]}" for client in clients]
@@ -367,20 +379,20 @@ class ProjectSetupTab:
                         break
         except Exception as e:
             print(f"Error loading clients: {e}")
-        ttk.Button(basic_frame, text="+ New Client", command=lambda: self.show_new_client_dialog(client_combo)).grid(row=1, column=2, padx=(10, 0), pady=5)
-        ttk.Label(basic_frame, text="Project Type:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
-        project_type_var = tk.StringVar()
+        ttk.Button(basic_frame, text="+ New Client", command=lambda: self.show_new_client_dialog(client_combo)).grid(row=2, column=2, padx=(10, 0), pady=5)
+        ttk.Label(basic_frame, text="Project Type:").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=5)
+        project_type_var = tk.StringVar(value=existing_data.get('project_type', ''))
         project_type_combo = ttk.Combobox(basic_frame, textvariable=project_type_var, width=30)
-        project_type_combo.grid(row=2, column=1, sticky="ew", pady=5)
+        project_type_combo.grid(row=3, column=1, sticky="ew", pady=5)
         project_type_combo['values'] = ["Solar PV", "Wind Farm", "Battery Storage", "Hybrid Project", "Transmission", "Other"]
-        ttk.Label(basic_frame, text="Area (hectares):").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=5)
-        area_var = tk.StringVar()
+        ttk.Label(basic_frame, text="Area (hectares):").grid(row=4, column=0, sticky="w", padx=(0, 10), pady=5)
+        area_var = tk.StringVar(value=existing_data.get('area', ''))
         area_entry = ttk.Entry(basic_frame, textvariable=area_var, width=20)
-        area_entry.grid(row=3, column=1, sticky="w", pady=5)
-        ttk.Label(basic_frame, text="MW Capacity:").grid(row=3, column=2, sticky="w", padx=(20, 10), pady=5)
-        mw_var = tk.StringVar()
+        area_entry.grid(row=4, column=1, sticky="w", pady=5)
+        ttk.Label(basic_frame, text="MW Capacity:").grid(row=4, column=2, sticky="w", padx=(20, 10), pady=5)
+        mw_var = tk.StringVar(value=existing_data.get('mw_capacity', ''))
         mw_entry = ttk.Entry(basic_frame, textvariable=mw_var, width=20)
-        mw_entry.grid(row=3, column=3, sticky="w", pady=5)
+        mw_entry.grid(row=4, column=3, sticky="w", pady=5)
         basic_frame.columnconfigure(1, weight=1)
         status_frame = ttk.LabelFrame(content_frame, text="?? Project Status & Timeline", padding=15)
         status_frame.pack(fill="x", pady=(0, 10))
@@ -390,34 +402,46 @@ class ProjectSetupTab:
         status_combo.grid(row=0, column=1, sticky="w", pady=5)
         status_combo['values'] = ["Planning", "Design", "Construction", "Commissioning", "Operational", "Completed", "On Hold", "Cancelled"]
         ttk.Label(status_frame, text="Priority:").grid(row=0, column=2, sticky="w", padx=(20, 10), pady=5)
-        priority_var = tk.StringVar(value=existing_data.get('priority', 'Medium'))
-        priority_combo = ttk.Combobox(status_frame, textvariable=priority_var, width=15)
+        priority_combo = ttk.Combobox(status_frame, width=15)
         priority_combo.grid(row=0, column=3, sticky="w", pady=5)
         priority_combo['values'] = ["Low", "Medium", "High", "Critical"]
+        priority_combo.set(existing_data.get('priority', 'Medium'))
         ttk.Label(status_frame, text="Start Date:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
-        start_date_var = tk.StringVar(value=existing_data.get('start_date', ''))
-        start_date_entry = DateEntry(status_frame, textvariable=start_date_var, width=15, date_pattern='yyyy-mm-dd')
+        start_date_entry = DateEntry(status_frame, width=15, date_pattern='yyyy-mm-dd')
         start_date_entry.grid(row=1, column=1, sticky="w", pady=5)
+        if existing_data.get('start_date'):
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(existing_data['start_date'], '%Y-%m-%d').date()
+                start_date_entry.set_date(date_obj)
+            except Exception as e:
+                print(f"Error setting start date: {e}")
         ttk.Label(status_frame, text="End Date:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
-        end_date_var = tk.StringVar(value=existing_data.get('end_date', ''))
-        end_date_entry = DateEntry(status_frame, textvariable=end_date_var, width=15, date_pattern='yyyy-mm-dd')
+        end_date_entry = DateEntry(status_frame, width=15, date_pattern='yyyy-mm-dd')
         end_date_entry.grid(row=1, column=3, sticky="w", pady=5)
+        if existing_data.get('end_date'):
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(existing_data['end_date'], '%Y-%m-%d').date()
+                end_date_entry.set_date(date_obj)
+            except Exception as e:
+                print(f"Error setting end date: {e}")
         location_frame = ttk.LabelFrame(content_frame, text="?? Location Information", padding=15)
         location_frame.pack(fill="x", pady=(0, 10))
         ttk.Label(location_frame, text="Address:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=5)
-        address_var = tk.StringVar()
+        address_var = tk.StringVar(value=existing_data.get('address', ''))
         address_entry = ttk.Entry(location_frame, textvariable=address_var, width=50)
         address_entry.grid(row=0, column=1, columnspan=3, sticky="ew", pady=5)
         ttk.Label(location_frame, text="City:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
-        city_var = tk.StringVar()
+        city_var = tk.StringVar(value=existing_data.get('city', ''))
         city_entry = ttk.Entry(location_frame, textvariable=city_var, width=20)
         city_entry.grid(row=1, column=1, sticky="w", pady=5)
         ttk.Label(location_frame, text="State:").grid(row=1, column=2, sticky="w", padx=(20, 10), pady=5)
-        state_var = tk.StringVar()
+        state_var = tk.StringVar(value=existing_data.get('state', ''))
         state_entry = ttk.Entry(location_frame, textvariable=state_var, width=10)
         state_entry.grid(row=1, column=3, sticky="w", pady=5)
         ttk.Label(location_frame, text="Postcode:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=5)
-        postcode_var = tk.StringVar()
+        postcode_var = tk.StringVar(value=existing_data.get('postcode', ''))
         postcode_entry = ttk.Entry(location_frame, textvariable=postcode_var, width=15)
         postcode_entry.grid(row=2, column=1, sticky="w", pady=5)
         location_frame.columnconfigure(1, weight=1)
@@ -448,13 +472,14 @@ class ProjectSetupTab:
                 project_data = {
                     'name': project_name_var.get().strip(),
                     'client_id': client_id,
+                    'project_number': contract_number_var.get(),
                     'project_type': project_type_var.get(),
                     'area': area_var.get(),
                     'mw_capacity': mw_var.get(),
                     'status': status_var.get(),
-                    'priority': priority_var.get(),
-                    'start_date': start_date_var.get(),
-                    'end_date': end_date_var.get(),
+                    'priority': priority_combo.get(),
+                    'start_date': start_date_entry.get_date().strftime('%Y-%m-%d') if start_date_entry.get_date() else '',
+                    'end_date': end_date_entry.get_date().strftime('%Y-%m-%d') if end_date_entry.get_date() else '',
                     'address': address_var.get(),
                     'city': city_var.get(),
                     'state': state_var.get(),
@@ -727,11 +752,11 @@ class ProjectSetupTab:
         left_status.pack(side="left", fill="both", expand=True)
 
         self.status_labels = {}
-        basic_fields = ["Client", "Status", "Priority", "Start Date", "End Date"]
+        basic_fields = ["Client", "Project Type", "Project Number", "Status", "Priority", "Start Date", "End Date"]
         for i, field in enumerate(basic_fields):
             row_frame = ttk.Frame(left_status)
             row_frame.pack(fill="x", pady=2)
-            ttk.Label(row_frame, text=f"{field}:", width=12, anchor="w").pack(side="left")
+            ttk.Label(row_frame, text=f"{field}:", width=16, anchor="w").pack(side="left")
             self.status_labels[field] = ttk.Label(row_frame, text="Not Selected", foreground="gray")
             self.status_labels[field].pack(side="left", padx=(5, 0))
 
@@ -954,6 +979,8 @@ class ProjectSetupTab:
                     if project_details:
                         # Update status labels with real data
                         self.status_labels["Client"].config(text=project_details.get('client_name', 'Unknown'), foreground="black")
+                        self.status_labels["Project Type"].config(text=project_details.get('project_type', 'Unknown'), foreground="black")
+                        self.status_labels["Project Number"].config(text=project_details.get('contract_number') or 'Not set', foreground="black")
                         self.status_labels["Status"].config(text=project_details.get('status', 'Unknown'), foreground="black")
                         self.status_labels["Priority"].config(text=project_details.get('priority', 'Normal'), foreground="black")
                         self.status_labels["Start Date"].config(text=str(project_details.get('start_date', 'Not set')), foreground="black")
@@ -981,6 +1008,8 @@ class ProjectSetupTab:
                     else:
                         # No project details found - show basic info
                         self.status_labels["Client"].config(text="Data unavailable", foreground="gray")
+                        self.status_labels["Project Type"].config(text="Data unavailable", foreground="gray")
+                        self.status_labels["Project Number"].config(text="Data unavailable", foreground="gray")
                         self.status_labels["Status"].config(text="Active", foreground="black")
                         self.status_labels["Priority"].config(text="Normal", foreground="black")
                         self.status_labels["Start Date"].config(text="Not set", foreground="gray")
@@ -991,6 +1020,8 @@ class ProjectSetupTab:
                     print(f"Error getting project details: {e}")
                     # Show basic info on error
                     self.status_labels["Client"].config(text="Data unavailable", foreground="gray")
+                    self.status_labels["Project Type"].config(text="Data unavailable", foreground="gray")
+                    self.status_labels["Project Number"].config(text="Data unavailable", foreground="gray")
                     self.status_labels["Status"].config(text="Active", foreground="black")
                     self.status_labels["Priority"].config(text="Normal", foreground="black")
                     self.status_labels["Start Date"].config(text="Not set", foreground="gray")
@@ -999,7 +1030,7 @@ class ProjectSetupTab:
                     self.status_labels["IFC Path"].config(text="Not configured", foreground="gray")
             else:
                 # Clear all status labels
-                for field in ["Client", "Status", "Priority", "Start Date", "End Date", "Model Path", "IFC Path"]:
+                for field in ["Client", "Project Type", "Project Number", "Status", "Priority", "Start Date", "End Date", "Model Path", "IFC Path"]:
                     self.status_labels[field].config(text="Not selected", foreground="gray")
                     
         except Exception as e:

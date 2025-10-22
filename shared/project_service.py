@@ -25,6 +25,8 @@ from database import (
     get_projects_full,
     insert_project_full,
     update_project_record,
+    get_db_connection,
+    table_has_column,
 )
 
 PRIORITY_MAP = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
@@ -63,7 +65,9 @@ class ProjectPayload:
     postcode: Optional[str] = None
     project_number: Optional[str] = None
     description: Optional[str] = None
-    project_type: Optional[str] = None
+    type_id: Optional[int] = None
+    internal_lead: Optional[int] = None
+    naming_convention: Optional[str] = None
 
     def to_db_payload(self) -> Dict[str, Any]:
         """Convert to a payload suitable for database helpers."""
@@ -106,21 +110,15 @@ class ProjectPayload:
             payload[S.Projects.CONTRACT_NUMBER] = self.project_number
         
         # Convert project_type name to type_id
-        if self.project_type not in (None, ""):
-            try:
-                conn = get_db_connection()
-                if conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        f"SELECT {S.ProjectTypes.TYPE_ID} FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_NAME} = ?",
-                        (self.project_type,)
-                    )
-                    row = cursor.fetchone()
-                    if row:
-                        payload[S.Projects.TYPE_ID] = row[0]
-                    conn.close()
-            except Exception:
-                pass  # If lookup fails, just don't set the type_id
+        if self.type_id is not None:
+            payload[S.Projects.TYPE_ID] = self.type_id
+        if self.internal_lead is not None:
+            payload[S.Projects.INTERNAL_LEAD] = self.internal_lead
+        if (
+            self.naming_convention not in (None, "")
+            and table_has_column(S.Projects.TABLE, S.Projects.NAMING_CONVENTION)
+        ):
+            payload[S.Projects.NAMING_CONVENTION] = self.naming_convention
 
         return payload
 
@@ -151,24 +149,60 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
     start_date_str = start_date.strip() if start_date and isinstance(start_date, str) else ""
     end_date_str = end_date.strip() if end_date and isinstance(end_date, str) else ""
 
+    type_id = raw_payload.get("type_id")
+    project_type = raw_payload.get("project_type")
+    
+    # If type_id is not provided but project_type is, look up the type_id
+    if not type_id and project_type:
+        try:
+            with get_db_connection("ProjectManagement") as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT {S.ProjectTypes.TYPE_ID} FROM {S.ProjectTypes.TABLE} WHERE {S.ProjectTypes.TYPE_NAME} = ?", (project_type,))
+                row = cursor.fetchone()
+                if row:
+                    type_id = row[0]
+        except Exception as e:
+            # If lookup fails, ignore and continue
+            pass
+    
+    try:
+        type_id_int = int(type_id) if type_id not in (None, "") else None
+    except (TypeError, ValueError) as exc:
+        raise ProjectValidationError("type_id must be numeric if provided") from exc
+
+    # Map all possible frontend keys to backend fields
+    def safe_strip(val):
+        if val is None:
+            return ""
+        if isinstance(val, str):
+            return val.strip()
+        return str(val).strip()
+
     return ProjectPayload(
-        name=raw_payload.get("name", "").strip(),
-        folder_path=(raw_payload.get("folder_path") or "").strip(),
-        ifc_folder_path=(raw_payload.get("ifc_folder_path") or "").strip(),
+        name=safe_strip(raw_payload.get("project_name") or raw_payload.get("name") or ""),
+        folder_path=safe_strip(raw_payload.get("folder_path") or ""),
+        ifc_folder_path=safe_strip(raw_payload.get("ifc_folder_path") or ""),
         start_date=start_date_str,
         end_date=end_date_str,
         client_id=client_id_int,
         status=raw_payload.get("status") or None,
         priority=priority,
-        area=(raw_payload.get("area") or "").strip() or None,
-        mw_capacity=(raw_payload.get("mw_capacity") or "").strip() or None,
-        address=(raw_payload.get("address") or "").strip() or None,
-        city=(raw_payload.get("city") or "").strip() or None,
-        state=(raw_payload.get("state") or "").strip() or None,
-        postcode=(raw_payload.get("postcode") or "").strip() or None,
-        project_number=(raw_payload.get("project_number") or "").strip() or None,
-        description=(raw_payload.get("description") or "").strip() or None,
-        project_type=(raw_payload.get("project_type") or "").strip() or None,
+        area=safe_strip(
+            raw_payload.get("area")
+            or raw_payload.get("area_m2")
+            or raw_payload.get("area_hectares")
+            or ""
+        ) or None,
+        mw_capacity=safe_strip(raw_payload.get("mw_capacity") or raw_payload.get("mw_capacity_mw") or "") or None,
+        address=safe_strip(raw_payload.get("address") or raw_payload.get("project_address") or "") or None,
+        city=safe_strip(raw_payload.get("city") or raw_payload.get("project_city") or "") or None,
+        state=safe_strip(raw_payload.get("state") or raw_payload.get("project_state") or "") or None,
+        postcode=safe_strip(raw_payload.get("postcode") or raw_payload.get("project_postcode") or "") or None,
+        project_number=safe_strip(raw_payload.get("project_number") or raw_payload.get("contract_number") or "") or None,
+        description=safe_strip(raw_payload.get("description") or raw_payload.get("project_description") or "") or None,
+        type_id=type_id_int,
+        internal_lead=raw_payload.get("internal_lead"),
+        naming_convention=raw_payload.get("naming_convention"),
     )
 
 
@@ -186,6 +220,10 @@ def list_projects_full() -> List[Dict[str, Any]]:
 
     projects = get_projects_full() or []
     for project in projects:
+        # Ensure project number is always exposed with the new key even if the view still uses contract_number.
+        if not project.get("project_number") and project.get(S.Projects.CONTRACT_NUMBER):
+            project["project_number"] = project.get(S.Projects.CONTRACT_NUMBER)
+
         priority_value = project.get(S.Projects.PRIORITY)
         if priority_value in REVERSE_PRIORITY_MAP:
             project["priority_label"] = REVERSE_PRIORITY_MAP[priority_value]
@@ -211,6 +249,10 @@ def get_project(project_id: int) -> Dict[str, Any]:
         "ifc_folder_path": ifc_folder_path,
         "priority_label": REVERSE_PRIORITY_MAP.get(details.get("priority"), details.get("priority")),
     })
+
+    if not details.get("project_number") and details.get("contract_number"):
+        details["project_number"] = details.get("contract_number")
+
     return details
 
 

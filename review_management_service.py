@@ -136,6 +136,26 @@ class ReviewManagementService:
 
 
 
+            # Check if ServiceItems table exists
+
+            self.cursor.execute("""
+
+                SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+
+                WHERE TABLE_NAME = 'ServiceItems' AND TABLE_SCHEMA = 'dbo'
+
+            """)
+
+
+
+            if self.cursor.fetchone()[0] == 0:
+
+                print("Creating ServiceItems table...")
+
+                self.create_service_items_table()
+
+
+
         except Exception as e:
 
             print(f"Error checking/creating tables: {e}")
@@ -388,6 +408,67 @@ class ReviewManagementService:
 
             self.db.rollback()
 
+
+    def create_service_items_table(self):
+        """Create the ServiceItems table for comprehensive service item tracking."""
+        try:
+            create_sql = """
+
+            CREATE TABLE dbo.ServiceItems (
+
+                item_id       INT IDENTITY(1,1) PRIMARY KEY,
+
+                service_id    INT NOT NULL REFERENCES dbo.ProjectServices(service_id) ON DELETE CASCADE,
+
+                item_type     NVARCHAR(50) NOT NULL,  -- 'review', 'audit', 'deliverable', 'milestone', etc.
+
+                title         NVARCHAR(200) NOT NULL,
+
+                description   NVARCHAR(MAX) NULL,
+
+                planned_date  DATE NULL,
+
+                due_date      DATE NULL,
+
+                actual_date   DATE NULL,
+
+                status        NVARCHAR(20) NOT NULL DEFAULT 'planned',  -- 'planned', 'in_progress', 'completed', 'overdue', 'cancelled'
+
+                priority      NVARCHAR(20) NOT NULL DEFAULT 'medium',   -- 'low', 'medium', 'high', 'critical'
+
+                assigned_to   NVARCHAR(100) NULL,
+
+                evidence_links NVARCHAR(MAX) NULL,  -- JSON array of links
+
+                notes         NVARCHAR(MAX) NULL,
+
+                created_at    DATETIME2 DEFAULT SYSDATETIME(),
+
+                updated_at    DATETIME2 DEFAULT SYSDATETIME()
+
+            );
+
+            CREATE INDEX idx_service_items_service_id ON dbo.ServiceItems(service_id);
+
+            CREATE INDEX idx_service_items_type ON dbo.ServiceItems(item_type);
+
+            CREATE INDEX idx_service_items_status ON dbo.ServiceItems(status);
+
+            CREATE INDEX idx_service_items_planned_date ON dbo.ServiceItems(planned_date);
+
+            """
+
+            self.cursor.execute(create_sql)
+
+            self.db.commit()
+
+            print("? ServiceItems table created successfully")
+
+        except Exception as e:
+
+            print(f"Error creating ServiceItems table: {e}")
+
+            self.db.rollback()
 
 
     def load_template(self, template_name: str) -> Optional[Dict]:
@@ -2803,6 +2884,7 @@ class ReviewManagementService:
                 FROM ReviewSchedule rs
                 LEFT JOIN users u ON rs.assigned_to = u.user_id
                 LEFT JOIN project_review_cycles c ON rs.cycle_id = c.cycle_id
+
                 WHERE rs.project_id = ?
                 ORDER BY rs.review_date
             """, (project_id,))
@@ -3720,8 +3802,7 @@ class ReviewManagementService:
             query = """
                 SELECT 
                     COUNT(*) as total_reviews,
-                    SUM(CASE WHEN status IN ('completed', 'report_issued', 'closed') THEN weight_factor ELSE 0 END) as completed_weight,
-                    SUM(weight_factor) as total_weight
+                    SUM(CASE WHEN status IN ('completed', 'report_issued', 'closed') THEN 1 ELSE 0 END) as completed_count
                 FROM ServiceReviews 
                 WHERE service_id = ?
             """
@@ -3729,10 +3810,10 @@ class ReviewManagementService:
             result = self.cursor.fetchone()
             
             if result:
-                total_reviews, completed_weight, total_weight = result
+                total_reviews, completed_count = result
                 
-                if total_weight and total_weight > 0:
-                    progress_pct = (completed_weight / total_weight) * 100
+                if total_reviews > 0:
+                    progress_pct = (completed_count / total_reviews) * 100
                 else:
                     progress_pct = 0
                 

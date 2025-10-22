@@ -17,6 +17,7 @@ class Config:
     DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
 
     PROJECT_MGMT_DB = os.getenv("PROJECT_MGMT_DB", "ProjectManagement")
+    WAREHOUSE_DB = os.getenv("WAREHOUSE_DB", "ProjectManagement")
     ACC_DB = os.getenv("ACC_DB", "acc_data_schema")
     REVIT_HEALTH_DB = os.getenv("REVIT_HEALTH_DB", "RevitHealthCheckDB")
     REVIZTO_DB = os.getenv("REVIZTO_DB", "ReviztoData")
@@ -35,6 +36,8 @@ class Config:
 
 # Provide module-level aliases for backwards compatibility with code that
 # imports configuration values directly from this module.
+PROJECT_MGMT_DB = Config.PROJECT_MGMT_DB
+WAREHOUSE_DB = Config.WAREHOUSE_DB
 ACC_DB = Config.ACC_DB
 REVIT_HEALTH_DB = Config.REVIT_HEALTH_DB
 REVIZTO_DB = Config.REVIZTO_DB

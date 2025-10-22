@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -11,14 +11,14 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  Chip,
 } from '@mui/material';
 import { projectsApi } from '../api/projects';
-import type { Project } from '../types/api';
-
-interface ReferenceOption {
-  id: number;
-  name: string;
-}
+import { clientsApi } from '../api/clients';
+import { usersApi } from '../api/users';
+import { useNamingConventionOptions } from '../hooks/useNamingConventions';
+import type { Project, User } from '../types/api';
+import type { Client } from '../api/clients';
 
 interface ProjectType {
   type_id: number;
@@ -32,55 +32,137 @@ interface ProjectFormDialogProps {
   mode: 'create' | 'edit';
 }
 
+type FormState = {
+  project_name: string;
+  project_number: string;
+  client_id: string;
+  project_type_id: string;
+  status: string;
+  priority: string;
+  start_date: string;
+  end_date: string;
+  area_hectares: string;
+  mw_capacity: string;
+  address: string;
+  city: string;
+  state: string;
+  postcode: string;
+  folder_path: string;
+  ifc_folder_path: string;
+  description: string;
+  internal_lead: string;
+  naming_convention: string;
+};
+
+const emptyFormState: FormState = {
+  project_name: '',
+  project_number: '',
+  client_id: '',
+  project_type_id: '',
+  status: 'Active',
+  priority: 'Medium',
+  start_date: '',
+  end_date: '',
+  area_hectares: '',
+  mw_capacity: '',
+  address: '',
+  city: '',
+  state: '',
+  postcode: '',
+  folder_path: '',
+  ifc_folder_path: '',
+  description: '',
+  internal_lead: '',
+  naming_convention: '',
+};
+
+const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
+
 const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, project, mode }) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
-    project_name: '',
-    project_number: '',
-    client_id: '',
-    project_type: '',
-    status: 'Active',
-    priority: 'Medium',
-    start_date: '',
-    end_date: '',
-    area_hectares: '',
-    mw_capacity: '',
-    address: '',
-    city: '',
-    state: '',
-    postcode: '',
-    folder_path: '',
-    ifc_folder_path: '',
-    description: '',
+  const [formData, setFormData] = useState<FormState>({ ...emptyFormState });
+  // Load reference data
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ['clients'],
+    queryFn: clientsApi.getAll,
   });
 
-  // Load reference data
-  const { data: clients = [] } = useQuery<ReferenceOption[]>({
-    queryKey: ['reference', 'clients'],
-    queryFn: () => fetch('/api/reference/clients').then((r) => r.json()),
-  });
+  const { options: namingConventionOptions, isLoading: namingConventionsLoading } = useNamingConventionOptions();
 
   const { data: projectTypes = [] } = useQuery<ProjectType[]>({
     queryKey: ['reference', 'project_types'],
     queryFn: () => fetch('/api/reference/project_types').then((r) => r.json()),
   });
 
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: usersApi.getAll,
+  });
+
+  const clientById = useMemo(() => {
+    const map = new Map<number, Client>();
+    clients.forEach((client) => {
+      const key = client.id ?? client.client_id;
+      if (key !== undefined) {
+        map.set(key, client);
+      }
+    });
+    return map;
+  }, [clients]);
+
+  const userOptions = useMemo(() => {
+    const options = users.map((user) => ({
+      value: user.user_id.toString(),
+      label: user.name || user.full_name || user.username || `User ${user.user_id}`,
+    }));
+
+    if (
+      formData.internal_lead &&
+      !options.some((option) => option.value === formData.internal_lead)
+    ) {
+      options.unshift({
+        value: formData.internal_lead,
+        label: `User ${formData.internal_lead}`,
+      });
+    }
+
+    return options;
+  }, [users, formData.internal_lead]);
+
   // Populate form when editing
   useEffect(() => {
     if (mode === 'edit' && project) {
+      const projectClient =
+        project.client_id !== undefined && project.client_id !== null
+          ? clientById.get(project.client_id)
+          : undefined;
+      
       setFormData({
         project_name: project.project_name || '',
-        project_number: project.project_number || '',
+        project_number: project.project_number || project.contract_number || '',
         client_id: project.client_id?.toString() || '',
-        project_type: project.project_type || '',
+        project_type_id: project.type_id?.toString() || '',
         status: project.status || 'Active',
-        priority: project.priority || 'Medium',
-        start_date: project.start_date ? project.start_date.split('T')[0] : '',
-        end_date: project.end_date ? project.end_date.split('T')[0] : '',
-        area_hectares: project.area_hectares?.toString() || '',
+        priority: (() => {
+          let p = project.priority;
+          if (typeof p === 'number') {
+            return REVERSE_PRIORITY_MAP[p] || 'Medium';
+          } else if (typeof p === 'string' && /^\d+$/.test(p)) {
+            const num = parseInt(p);
+            return REVERSE_PRIORITY_MAP[num] || 'Medium';
+          } else {
+            return p || 'Medium';
+          }
+        })(),
+        start_date: project.start_date ? new Date(project.start_date).toISOString().slice(0, 10) : '',
+        end_date: project.end_date ? new Date(project.end_date).toISOString().slice(0, 10) : '',
+        area_hectares:
+          project.area_hectares !== undefined && project.area_hectares !== null
+            ? project.area_hectares.toString()
+            : '',
         mw_capacity: project.mw_capacity?.toString() || '',
         address: project.address || '',
         city: project.city || '',
@@ -89,37 +171,23 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
         folder_path: project.folder_path || '',
         ifc_folder_path: project.ifc_folder_path || '',
         description: project.description || '',
+        internal_lead: project.internal_lead?.toString() || '',
+        // Use project's saved naming convention if it exists, otherwise fall back to client's default
+        naming_convention: project.naming_convention || projectClient?.naming_convention || '',
       });
     } else if (mode === 'create') {
       // Reset form for create mode
-      setFormData({
-        project_name: '',
-        project_number: '',
-        client_id: '',
-        project_type: '',
-        status: 'Active',
-        priority: 'Medium',
-        start_date: '',
-        end_date: '',
-        area_hectares: '',
-        mw_capacity: '',
-        address: '',
-        city: '',
-        state: '',
-        postcode: '',
-        folder_path: '',
-        ifc_folder_path: '',
-        description: '',
-      });
+      setFormData({ ...emptyFormState });
     }
-  }, [mode, project, open]);
+  }, [mode, project, clientById]);
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: any) => projectsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
       onClose();
     },
     onError: (err: any) => {
@@ -132,6 +200,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
     mutationFn: (data: any) => projectsApi.update(project!.project_id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
       queryClient.invalidateQueries({ queryKey: ['project', project?.project_id.toString()] });
       onClose();
     },
@@ -142,6 +212,20 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
 
   const handleChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    setError(null);
+  };
+
+  // Special handler for client changes - auto-populate naming convention
+  const handleClientChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const clientId = event.target.value;
+    const selectedClient =
+      clientId !== '' ? clientById.get(Number(clientId)) : undefined;
+    
+    setFormData((prev) => ({ 
+      ...prev, 
+      client_id: clientId,
+      naming_convention: selectedClient?.naming_convention || ''
+    }));
     setError(null);
   };
 
@@ -158,15 +242,15 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
 
     // Prepare payload
     const payload = {
-      name: formData.project_name,
+      project_name: formData.project_name,
       project_number: formData.project_number,
       client_id: formData.client_id ? Number(formData.client_id) : null,
-      project_type: formData.project_type || null,
-      status: formData.status,
+      type_id: formData.project_type_id ? Number(formData.project_type_id) : null,
+      status: formData.status || null,
       priority: formData.priority,
       start_date: formData.start_date || null,
       end_date: formData.end_date || null,
-      area: formData.area_hectares ? Number(formData.area_hectares) : null,
+      area_hectares: formData.area_hectares ? Number(formData.area_hectares) : null,
       mw_capacity: formData.mw_capacity ? Number(formData.mw_capacity) : null,
       address: formData.address || null,
       city: formData.city || null,
@@ -175,6 +259,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       folder_path: formData.folder_path || null,
       ifc_folder_path: formData.ifc_folder_path || null,
       description: formData.description || null,
+      internal_lead: formData.internal_lead ? Number(formData.internal_lead) : null,
+      naming_convention: formData.naming_convention || null,
     };
 
     if (mode === 'create') {
@@ -224,7 +310,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
             <TextField
               label="Client"
               value={formData.client_id}
-              onChange={handleChange('client_id')}
+              onChange={handleClientChange}
               fullWidth
               select
               disabled={isLoading}
@@ -235,16 +321,36 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
               {clients.map((client) => (
                 <MenuItem key={client.id} value={client.id}>
                   {client.name}
+                  {client.naming_convention && (
+                    <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#666' }}>
+                      [{client.naming_convention}]
+                    </span>
+                  )}
                 </MenuItem>
               ))}
             </TextField>
           </Grid>
 
+          {/* Show naming convention if client has one */}
+          {formData.client_id && (() => {
+            const selectedClient = clientById.get(Number(formData.client_id));
+            return selectedClient?.naming_convention ? (
+              <Grid item xs={12}>
+                <Chip 
+                  label={`File Naming Convention: ${selectedClient.naming_convention}`}
+                  color="info"
+                  size="small"
+                  sx={{ mt: -1 }}
+                />
+              </Grid>
+            ) : null;
+          })()}
+
           <Grid item xs={12} sm={6}>
             <TextField
               label="Project Type"
-              value={formData.project_type}
-              onChange={handleChange('project_type')}
+              value={formData.project_type_id}
+              onChange={handleChange('project_type_id')}
               fullWidth
               select
               disabled={isLoading}
@@ -253,8 +359,30 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
                 <em>None</em>
               </MenuItem>
               {projectTypes.map((type) => (
-                <MenuItem key={type.type_id} value={type.type_name}>
+                <MenuItem key={type.type_id} value={type.type_id.toString()}>
                   {type.type_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          {/* Optional Naming Convention Override */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Naming Convention (Override)"
+              value={formData.naming_convention}
+              onChange={handleChange('naming_convention')}
+              fullWidth
+              select
+              disabled={isLoading || namingConventionsLoading}
+              helperText="Optional: Override client's default naming convention"
+            >
+              <MenuItem value="">
+                <em>Use Client Default</em>
+              </MenuItem>
+              {namingConventionOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
                 </MenuItem>
               ))}
             </TextField>
@@ -320,7 +448,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
           {/* Project Specs */}
           <Grid item xs={12} sm={6}>
             <TextField
-              label="Area (Hectares)"
+              label="Area (ha)"
               type="number"
               value={formData.area_hectares}
               onChange={handleChange('area_hectares')}
@@ -413,6 +541,27 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
               rows={3}
               disabled={isLoading}
             />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Project Lead"
+              value={formData.internal_lead}
+              onChange={handleChange('internal_lead')}
+              fullWidth
+              select
+              disabled={isLoading || usersLoading}
+              helperText="Assign a primary lead for this project"
+            >
+              <MenuItem value="">
+                <em>Unassigned</em>
+              </MenuItem>
+              {userOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
           </Grid>
         </Grid>
       </DialogContent>

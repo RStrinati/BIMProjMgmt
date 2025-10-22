@@ -84,6 +84,7 @@ class Clients:
     STATE = "state"
     POSTCODE = "postcode"
     COUNTRY = "country"
+    NAMING_CONVENTION = "naming_convention"
 
 
 class ConstructionStages:
@@ -191,6 +192,7 @@ class Projects:
     CITY = "city"
     STATE = "state"
     POSTCODE = "postcode"
+    NAMING_CONVENTION = "naming_convention"
 
 
 class ReviewCycles:
@@ -724,6 +726,7 @@ class ServiceReviews:
     WEIGHT_FACTOR = "weight_factor"
     EVIDENCE_LINKS = "evidence_links"
     ACTUAL_ISSUED_AT = "actual_issued_at"
+    IS_BILLED = "is_billed"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"
@@ -755,6 +758,26 @@ class ServiceTemplates:
     CREATEDBY = "CreatedBy"
     CREATEDAT = "CreatedAt"
     ISACTIVE = "IsActive"
+class ServiceItems:
+    TABLE = "ServiceItems"
+    ITEM_ID = "item_id"
+    SERVICE_ID = "service_id"
+    ITEM_TYPE = "item_type"  # 'review', 'audit', 'deliverable', 'milestone', etc.
+    TITLE = "title"
+    DESCRIPTION = "description"
+    PLANNED_DATE = "planned_date"
+    DUE_DATE = "due_date"
+    ACTUAL_DATE = "actual_date"
+    STATUS = "status"  # 'planned', 'in_progress', 'completed', 'overdue', 'cancelled'
+    PRIORITY = "priority"  # 'low', 'medium', 'high', 'critical'
+    ASSIGNED_TO = "assigned_to"
+    EVIDENCE_LINKS = "evidence_links"
+    NOTES = "notes"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    IS_BILLED = "is_billed"
+
+
 class ProjectBookmarks:
     TABLE = "ProjectBookmarks"
     ID = "bookmark_id"

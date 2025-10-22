@@ -12,7 +12,6 @@ import type {
   ACCConnectorFilesResponse,
   ExtractACCFilesRequest,
   ExtractACCFilesResponse,
-  ACCIssue,
   ACCIssuesResponse,
   ACCIssuesStats,
   ACCIssuesFilters,
@@ -20,7 +19,6 @@ import type {
   ReviztoExtractionRunsResponse,
   StartReviztoExtractionRequest,
   StartReviztoExtractionResponse,
-  RevitHealthFile,
   RevitHealthFilesResponse,
   RevitHealthSummary
 } from '../types/dataImports';
@@ -31,29 +29,66 @@ import type {
 export const revitHealthApi = {
   /**
    * Get Revit health files for a project (paginated)
-   * GET /api/projects/:project_id/revit-health-files
+   * GET /api/projects/:project_id/health-files (backend)
    */
   getHealthFiles: async (
     projectId: number,
     page: number = 1,
     pageSize: number = 25
   ): Promise<RevitHealthFilesResponse> => {
-    const response = await apiClient.get<RevitHealthFilesResponse>(
-      `/projects/${projectId}/revit-health-files`,
+    // Backend currently returns `{ files: string[] }` from vw_LatestRvtFiles.
+    // Adapt to UI's richer shape with safe defaults.
+    const response = await apiClient.get<{ files: string[] | any }>(
+      `/projects/${projectId}/health-files`,
       { params: { page, limit: pageSize } }
     );
-    return response.data;
+    const raw = response.data;
+    // Only show combined files (e.g., combined_*.json)
+    const fileNames: string[] = Array.isArray(raw?.files)
+      ? (raw.files as string[])
+      : [];
+    const combinedFiles = fileNames.filter((name) => name.startsWith('combined_'));
+    const startIndex = (page - 1) * pageSize;
+    const paged = combinedFiles.slice(startIndex, startIndex + pageSize);
+    const files = paged.map((name, idx) => ({
+      id: startIndex + idx + 1,
+      project_id: projectId,
+      file_name: name,
+      file_path: name,
+      check_date: '',
+      health_score: null,
+      total_warnings: null,
+      total_errors: null,
+      file_size_mb: null,
+      uploaded_by: null,
+    }));
+    return {
+      files,
+      total_count: combinedFiles.length,
+      page,
+      page_size: pageSize,
+    };
   },
 
   /**
    * Get Revit health summary for a project
-   * GET /api/projects/:project_id/revit-health-summary
+   * GET /api/projects/:project_id/health-summary (backend)
    */
   getSummary: async (projectId: number): Promise<RevitHealthSummary> => {
-    const response = await apiClient.get<RevitHealthSummary>(
-      `/projects/${projectId}/revit-health-summary`
+    // Backend returns counters like { total_checks, passed, failed, warnings }
+    // Normalize into UI summary shape.
+    const response = await apiClient.get<any>(
+      `/projects/${projectId}/health-summary`
     );
-    return response.data;
+    const data = response.data || {};
+    return {
+      total_files: data.total_checks ?? 0,
+      avg_health_score: data.avg_health_score ?? 0,
+      total_warnings: data.warnings ?? data.total_warnings ?? 0,
+      total_errors: data.failed ?? data.total_errors ?? 0,
+      latest_check_date: data.latest_check_date ?? null,
+      files_by_score: data.files_by_score ?? {},
+    };
   },
 };
 // ============================================================================

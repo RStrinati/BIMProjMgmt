@@ -29,15 +29,13 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import ClientsTab from '../components/settings/ClientsTab';
+import ServiceTemplatesTab from '../components/settings/ServiceTemplatesTab';
+import ProjectAliasesTab from '../components/settings/ProjectAliasesTab';
 
 interface ProjectType {
   type_id: number;
   type_name: string;
-}
-
-interface Client {
-  client_id: number;
-  client_name: string;
 }
 
 interface TabPanelProps {
@@ -83,6 +81,8 @@ export default function SettingsPage() {
         >
           <Tab label="Project Types" />
           <Tab label="Clients" />
+          <Tab label="Service Templates" />
+          <Tab label="Project Aliases" />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -91,6 +91,14 @@ export default function SettingsPage() {
 
         <TabPanel value={tabValue} index={1}>
           <ClientsTab />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={2}>
+          <ServiceTemplatesTab />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={3}>
+          <ProjectAliasesTab />
         </TabPanel>
       </Paper>
     </Container>
@@ -300,55 +308,3 @@ function ProjectTypesTab() {
   );
 }
 
-// Clients Tab Component (Placeholder)
-function ClientsTab() {
-  const { data: clients, isLoading } = useQuery<Client[]>({
-    queryKey: ['reference', 'clients'],
-    queryFn: async () => {
-      const response = await apiClient.get<Client[]>('/reference/clients');
-      return response.data;
-    },
-  });
-
-  if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" p={3}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  return (
-    <Box sx={{ px: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h6">Clients</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled
-        >
-          Add Client (Coming Soon)
-        </Button>
-      </Box>
-
-      <TableContainer>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Name</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {clients?.map((client) => (
-              <TableRow key={client.client_id}>
-                <TableCell>{client.client_id}</TableCell>
-                <TableCell>{client.client_name}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
-}

@@ -40,6 +40,18 @@ Project Setup → Review Cycles → Task Assignment → Progress Tracking → Bi
 External Data: ACC ZIP files, Revit health checks, IFC models → Analytics Dashboard
 ```
 
+## ⚠️ Important: Codebase Cleanup Required
+
+**This codebase requires organization cleanup before active development.** See:
+- 📋 **[CLEANUP_SUMMARY.md](./CLEANUP_SUMMARY.md)** - Executive summary of cleanup needed
+- 🚀 **[CLEANUP_QUICKSTART.md](./CLEANUP_QUICKSTART.md)** - Start cleanup immediately (10 min)
+- 📊 **[CLEANUP_REPORT.md](./CLEANUP_REPORT.md)** - Complete analysis and action plan
+- 📁 **[FILE_ORGANIZATION_GUIDE.md](./FILE_ORGANIZATION_GUIDE.md)** - Organization rules for developers
+
+**Quick cleanup:** Run `.\scripts\cleanup_phase1.ps1 -DryRun` to see what will be fixed.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

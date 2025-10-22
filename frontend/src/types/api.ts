@@ -4,17 +4,19 @@ export interface Project {
   project_id: number;
   project_name: string;
   project_number?: string;
-  client_id?: number;
+  contract_number?: string;
+  client_id?: number | null;
   client_name?: string;
   type_id?: number;
   type_name?: string;
   project_type?: string; // Alternative field name used by backend
   status?: string;
-  priority?: string;
+  priority?: string | number;
+  priority_label?: string;
   start_date?: string;
   end_date?: string;
-  area_hectares?: number;
-  mw_capacity?: number;
+  area_hectares?: number | null;
+  mw_capacity?: number | null;
   address?: string;
   city?: string;
   state?: string;
@@ -22,8 +24,13 @@ export interface Project {
   folder_path?: string;
   ifc_folder_path?: string;
   description?: string;
+  internal_lead?: number | null;
+  naming_convention?: string | null;
   created_at?: string;
   updated_at?: string;
+  total_service_agreed_fee?: number;
+  total_service_billed_amount?: number;
+  service_billed_pct?: number;
 }
 
 export interface ReviewCycle {
@@ -70,12 +77,19 @@ export interface Task {
 }
 
 export interface Client {
+  id?: number;
   client_id: number;
   client_name: string;
+  name?: string;
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+  naming_convention?: string | null;
   created_at?: string;
 }
 
@@ -87,7 +101,8 @@ export interface ProjectType {
 
 export interface User {
   user_id: number;
-  username: string;
+  name?: string;
+  username?: string;
   full_name?: string;
   email?: string;
   role?: string;
@@ -134,4 +149,153 @@ export interface TaskFilters {
   priority?: string;
   due_date_from?: string;
   due_date_to?: string;
+}
+
+export interface ServiceTemplate {
+  id: number;
+  template_name: string;
+  description: string;
+  service_type: string;
+  parameters: any;
+  created_by: number;
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface ProjectService {
+  service_id: number;
+  project_id: number;
+  phase?: string;
+  service_code: string;
+  service_name: string;
+  unit_type?: string;
+  unit_qty?: number;
+  unit_rate?: number;
+  lump_sum_fee?: number;
+  agreed_fee?: number;
+  bill_rule?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  progress_pct?: number;
+  claimed_to_date?: number;
+  billing_progress_pct?: number;
+  billed_amount?: number;
+  agreed_fee_remaining?: number;
+}
+
+export interface ServiceReview {
+  review_id: number;
+  service_id: number;
+  cycle_no: number;
+  planned_date: string;
+  due_date?: string;
+  disciplines?: string;
+  deliverables?: string;
+  status: string;
+  weight_factor: number;
+  evidence_links?: string;
+  actual_issued_at?: string;
+  is_billed?: boolean;
+}
+
+export interface ServiceItem {
+  item_id: number;
+  service_id: number;
+  item_type: 'review' | 'audit' | 'deliverable' | 'milestone' | 'inspection' | 'meeting' | string;
+  title: string;
+  description?: string;
+  planned_date?: string;
+  due_date?: string;
+  actual_date?: string;
+  status: 'planned' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  assigned_to?: string;
+  evidence_links?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  is_billed?: boolean;
+}
+
+export interface FileServiceTemplateSummary {
+  total_items: number;
+  lump_sum_items: number;
+  review_items: number;
+  total_reviews: number;
+  estimated_value: number;
+}
+
+export interface FileServiceTemplate {
+  key: string;
+  index: number;
+  name: string;
+  sector?: string;
+  notes?: string;
+  description?: string;
+  items: Record<string, any>[];
+  summary: FileServiceTemplateSummary;
+  is_valid: boolean;
+  validation_errors: string[];
+  source: 'file';
+}
+
+export interface FileServiceTemplatePayload {
+  name: string;
+  sector?: string;
+  notes?: string;
+  items: Record<string, any>[];
+}
+
+export interface ProjectAliasIssueSummary {
+  total_issues: number;
+  open_issues: number;
+  alias_count?: number;
+  aliases?: string;
+  has_issues?: boolean;
+}
+
+export interface ProjectAlias {
+  alias_name: string;
+  project_id: number;
+  project_name?: string;
+  project_status?: string;
+  project_manager?: string;
+  project_created_at?: string | null;
+  issue_summary: ProjectAliasIssueSummary;
+}
+
+export interface ProjectAliasStats {
+  project_id: number;
+  project_name: string;
+  alias_count: number;
+  aliases: string;
+  total_issues: number;
+  open_issues: number;
+  has_issues: boolean;
+}
+
+export interface UnmappedProjectAlias {
+  project_name: string;
+  total_issues: number;
+  open_issues: number;
+  closed_issues: number;
+  sources: number;
+  first_issue_date?: string | null;
+  last_issue_date?: string | null;
+  suggested_match?: {
+    project_name: string;
+    match_type: string;
+    confidence: number;
+  } | null;
+}
+
+export interface ProjectAliasValidationResult {
+  orphaned_aliases: Array<{ alias_name: string; invalid_project_id: number }>;
+  duplicate_aliases: Array<{ alias_name: string; count: number }>;
+  unused_projects: Array<{ project_id: number; project_name: string }>;
+  mapping_conflicts: Array<Record<string, any>>;
+  total_aliases: number;
+  total_projects_with_aliases: number;
 }

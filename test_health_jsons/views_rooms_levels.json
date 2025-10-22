@@ -1,0 +1,22 @@
+{
+  "project_name": "NFPS-DPE-ZZ-ZZ-M3-E-0001",
+  "exported_on": "2025-10-12T23:03:08.116032Z",
+  "data_type": "views_rooms_levels",
+  "data": {
+    "views": [
+      {
+        "Name": "Floor Plan",
+        "ViewType": "7"
+      }
+    ],
+    "levels": [],
+    "rooms": [],
+    "title_blocks": [],
+    "schedules": [],
+    "design_options": [],
+    "worksets": [],
+    "phases": [],
+    "grids": [],
+    "warnings": []
+  }
+}

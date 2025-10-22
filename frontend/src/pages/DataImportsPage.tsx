@@ -29,7 +29,6 @@ import {
   ArrowBack as ArrowBackIcon,
   CloudDownload as CloudDownloadIcon,
   Upload as UploadIcon,
-  BugReport as IssueIcon,
   AccountTree as ReviztoIcon,
   HealthAndSafety as HealthIcon,
   FolderOpen as ProjectIcon,
@@ -37,7 +36,6 @@ import {
 import { projectsApi } from '@/api/projects';
 import { ACCConnectorPanel } from '@/components/dataImports/ACCConnectorPanel';
 import { ACCDataImportPanel } from '@/components/dataImports/ACCDataImportPanel';
-import { ACCIssuesPanel } from '@/components/dataImports/ACCIssuesPanel';
 import { ReviztoImportPanel } from '@/components/dataImports/ReviztoImportPanel';
 import { RevitHealthPanel } from '@/components/dataImports/RevitHealthPanel';
 import type { Project } from '@/types/api';
@@ -267,12 +265,6 @@ const DataImportsPage: React.FC = () => {
             sx={{ textTransform: 'none' }}
           />
           <Tab
-            icon={<IssueIcon />}
-            iconPosition="start"
-            label="ACC Issues"
-            sx={{ textTransform: 'none' }}
-          />
-          <Tab
             icon={<ReviztoIcon />}
             iconPosition="start"
             label="Revizto Extraction"
@@ -296,12 +288,9 @@ const DataImportsPage: React.FC = () => {
               <ACCDataImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
             <TabPanel value={tabValue} index={2}>
-              <ACCIssuesPanel projectId={effectiveProjectId} projectName={project?.project_name} />
-            </TabPanel>
-            <TabPanel value={tabValue} index={3}>
               <ReviztoImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
-            <TabPanel value={tabValue} index={4}>
+            <TabPanel value={tabValue} index={3}>
               <RevitHealthPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
           </>
