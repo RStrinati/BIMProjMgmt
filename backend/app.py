@@ -1808,9 +1808,14 @@ def import_acc_data_endpoint(project_id):
         if not os.path.exists(folder_path):
             return jsonify({'error': f'ACC data folder does not exist: {folder_path}'}), 400
         
+        # Compute absolute path to sql directory (relative to project root)
+        # backend/app.py is one level down from project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        merge_dir = os.path.join(project_root, "sql")
+        
         # Run the import (this imports to acc_data_schema database)
         # Import returns True/False or raises exception
-        result = import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=False)
+        result = import_acc_data(folder_path, db=None, merge_dir=merge_dir, show_skip_summary=False)
         
         execution_time = time.time() - start_time
         

@@ -266,6 +266,13 @@ def import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=Tru
     with open(LOG_FILE, "w"):
         pass
 
+    # Resolve merge_dir to absolute path if it's relative
+    # This ensures the path works regardless of current working directory
+    if not os.path.isabs(merge_dir):
+        # handlers/acc_handler.py is one level down from project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        merge_dir = os.path.join(project_root, merge_dir)
+
     temp_dir = None
 
     # Handle zipped exports
