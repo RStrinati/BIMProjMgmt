@@ -87,11 +87,20 @@ def test_template_loading():
             if template_name:
                 try:
                     print(f"\n🔧 Testing template application: '{template_name}' to project {project_id}")
-                    services = review_service.apply_template(project_id, template_name)
-                    if services:
-                        print(f"✅ Template applied successfully - {len(services)} services created")
-                        for service in services:
+                    result = review_service.apply_template(
+                        project_id,
+                        template_name,
+                        replace_existing=False,
+                        skip_existing_duplicates=True,
+                    )
+                    created = result.get('created', [])
+                    skipped = result.get('skipped', [])
+                    if created:
+                        print(f"✅ Template applied successfully - {len(created)} services created")
+                        for service in created:
                             print(f"  - {service.get('service_name', 'Unknown Service')}")
+                        if skipped:
+                            print(f"  ⚠️  {len(skipped)} service(s) skipped due to duplicates")
                     else:
                         print("❌ Template application returned no services")
                 except Exception as e:

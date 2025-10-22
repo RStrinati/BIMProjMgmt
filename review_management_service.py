@@ -10,15 +10,18 @@ Comprehensive scope - schedule - progress - billing workflow
 
 import json
 
+import math
 import sqlite3
 
 from datetime import datetime, timedelta
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 import os
+
+from constants import schema as S
 
 # Import fuzzy matching for enhanced template search
 try:
@@ -952,134 +955,461 @@ class ReviewManagementService:
 
 
 
-    def apply_template(self, project_id: int, template_name: str, overrides: Dict = None) -> List[Dict]:
+    def apply_template(
+        self,
+        project_id: int,
+        template_name: str,
+        overrides: Dict = None,
+        replace_existing: bool = False,
+        skip_existing_duplicates: bool = False,
+    ) -> Dict[str, Any]:
+        """Apply service template to a project with duplicate handling and transactional safety."""
+        overrides = overrides or {}
 
-        """Apply service template to project, creating ProjectServices"""
+        template = self.load_template(template_name)
+        if not template:
+            raise ValueError(f"Template '{template_name}' not found")
+
+        items = template.get('items') or []
+        if not isinstance(items, list):
+            raise ValueError(f"Template '{template_name}' is missing service items")
+
+        result: Dict[str, Any] = {
+            'template_name': template_name,
+            'created': [],
+            'skipped': [],
+            'duplicates': [],
+            'existing_services': 0,
+            'replaced_services': 0,
+        }
+
+        existing_services = self.get_project_services(project_id)
+        result['existing_services'] = len(existing_services)
+        existing_lookup = {}
+        for svc in existing_services:
+            code = (svc.get('service_code') or '').strip().upper()
+            phase = (svc.get('phase') or '').strip().lower()
+            if code:
+                existing_lookup[(code, phase)] = svc
+
+        duplicate_keys = set()
+
+        if existing_services and replace_existing:
+            try:
+                self.delete_all_project_reviews(project_id)
+            except Exception:
+                pass
+            removed = self.clear_all_project_services(project_id)
+            result['replaced_services'] = removed
+            existing_lookup = {}
+        else:
+            for item in items:
+                key = (
+                    (item.get('service_code') or '').strip().upper(),
+                    (item.get('phase') or '').strip().lower(),
+                )
+                if key[0] and key in existing_lookup and key not in duplicate_keys:
+                    duplicate_info = {
+                        'service_code': item.get('service_code'),
+                        'service_name': item.get('service_name'),
+                        'phase': item.get('phase'),
+                    }
+                    result['duplicates'].append(duplicate_info)
+                    duplicate_keys.add(key)
+
+            if result['duplicates'] and not skip_existing_duplicates:
+                duplicate_labels = [
+                    f"{dup.get('service_code')} ({dup.get('phase') or 'no phase'})"
+                    for dup in result['duplicates']
+                ]
+                raise ValueError(
+                    "Template contains services that already exist on this project: "
+                    + ", ".join(duplicate_labels)
+                    + ". Select 'replace existing services' or enable duplicate skipping to continue."
+                )
+
+        created_services: List[Dict] = []
+        skipped_items: List[Dict] = []
+        existing_keys = set(existing_lookup.keys())
+        now = datetime.now()
+
+        def _as_decimal(raw_value, fallback, label: str) -> Decimal:
+            candidate = raw_value if raw_value is not None else fallback
+            try:
+                return Decimal(str(candidate))
+            except (InvalidOperation, TypeError):
+                raise ValueError(
+                    f"Invalid {label} value '{candidate}' for service {item.get('service_code') or ''}"
+                )
 
         try:
+            for item in items:
+                service_code = (item.get('service_code') or '').strip()
+                phase = (item.get('phase') or '').strip()
 
-            # Load template
+                if not service_code:
+                    skipped_items.append({
+                        'service_code': service_code,
+                        'service_name': item.get('service_name'),
+                        'phase': phase,
+                        'reason': 'missing_service_code',
+                    })
+                    continue
 
-            template = self.load_template(template_name)
+                key = (service_code.upper(), phase.lower())
 
-            if not template:
+                if key in existing_keys:
+                    duplicate_detail = {
+                        'service_code': service_code,
+                        'service_name': item.get('service_name'),
+                        'phase': phase,
+                    }
+                    if key not in duplicate_keys:
+                        result['duplicates'].append(duplicate_detail)
+                        duplicate_keys.add(key)
 
-                raise ValueError(f"Template '{template_name}' not found")
+                    skipped_items.append({**duplicate_detail, 'reason': 'duplicate'})
+                    if not skip_existing_duplicates:
+                        raise ValueError(
+                            f"Service '{service_code}' in phase '{phase or 'unspecified'}' already exists on project {project_id}"
+                        )
+                    continue
 
-            
+                unit_qty_dec = _as_decimal(
+                    overrides.get(f"{service_code}_units"), item.get('default_units', 1), 'unit quantity'
+                )
+                unit_rate_dec = _as_decimal(
+                    overrides.get(f"{service_code}_rate"), item.get('unit_rate', 0), 'unit rate'
+                )
+                lump_sum_dec = _as_decimal(
+                    overrides.get(f"{service_code}_lump"), item.get('lump_sum_fee', 0), 'lump sum fee'
+                )
 
-            services_created = []
-
-            overrides = overrides or {}
-
-            
-
-            for item in template['items']:
-
-                # Apply overrides if provided
-
-                unit_qty = overrides.get(f"{item['service_code']}_units", item.get('default_units', 1))
-
-                unit_rate = overrides.get(f"{item['service_code']}_rate", item.get('unit_rate', 0))
-
-                lump_sum = overrides.get(f"{item['service_code']}_lump", item.get('lump_sum_fee', 0))
-
-                
-
-                # Calculate agreed fee
-
-                if item['unit_type'] == 'lump_sum':
-
-                    agreed_fee = lump_sum
-
+                if (item.get('unit_type') or '').lower() == 'lump_sum':
+                    agreed_fee_dec = lump_sum_dec
                 else:
-
-                    agreed_fee = unit_qty * unit_rate
-
-                
-
-                # Create service record
+                    agreed_fee_dec = unit_qty_dec * unit_rate_dec
 
                 service_data = {
-
                     'project_id': project_id,
-
-                    'phase': item['phase'],
-
-                    'service_code': item['service_code'],
-
-                    'service_name': item['service_name'],
-
-                    'unit_type': item['unit_type'],
-
-                    'unit_qty': unit_qty,
-
-                    'unit_rate': unit_rate,
-
-                    'lump_sum_fee': lump_sum,
-
-                    'agreed_fee': agreed_fee,
-
-                    'bill_rule': item['bill_rule'],
-
-                    'notes': item.get('notes', '')
-
+                    'phase': phase,
+                    'service_code': service_code,
+                    'service_name': item.get('service_name'),
+                    'unit_type': item.get('unit_type'),
+                    'unit_qty': float(unit_qty_dec),
+                    'unit_rate': float(unit_rate_dec),
+                    'lump_sum_fee': float(lump_sum_dec),
+                    'agreed_fee': float(agreed_fee_dec),
+                    'bill_rule': item.get('bill_rule'),
+                    'notes': item.get('notes', ''),
                 }
 
-                
-
-                # Validate service data before creation
-
                 validation_errors = validate_service_data(service_data)
-
                 if validation_errors:
+                    skipped_items.append({
+                        'service_code': service_code,
+                        'service_name': item.get('service_name'),
+                        'phase': phase,
+                        'reason': 'validation_error',
+                        'details': [str(err) for err in validation_errors],
+                    })
+                    continue
 
-                    print(f"Service validation errors for {item['service_code']}: {validation_errors}")
+                service_id = self.create_project_service(service_data, commit=False)
+                if not service_id:
+                    raise ValueError(
+                        f"Failed to create service '{service_code}' for project {project_id}"
+                    )
 
-                    continue  # Skip invalid services
+                service_data['service_id'] = service_id
 
-                
+                schedule_start = now.strftime('%Y-%m-%d')
+                qty_for_schedule = float(unit_qty_dec) if unit_qty_dec > 0 else 1.0
+                duration_multiplier = max(1, math.ceil(qty_for_schedule))
 
-                service_id = self.create_project_service(service_data)
+                schedule_end = (now + timedelta(days=30 * duration_multiplier)).strftime('%Y-%m-%d')
+
+                self.upsert_service_schedule(
+                    service_id,
+                    schedule_start,
+                    schedule_end,
+                    item.get('frequency', 'weekly'),
+                    commit=False,
+                )
+
+                if (item.get('unit_type') or '').lower() == 'review':
+                    self.rebuild_service_reviews(service_id, commit=False)
+
+                blueprint_items = item.get('service_items') or []
+                if blueprint_items:
+                    self._create_service_items_from_blueprint(
+                        service_id,
+                        blueprint_items,
+                        schedule_start,
+                        commit=False,
+                    )
+
+                created_services.append(service_data)
+                existing_keys.add(key)
+
+            self.db.commit()
+        except Exception:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            raise
+
+        result['created'] = created_services
+        result['skipped'] = skipped_items
+        return result
 
 
-                if service_id:
+    def build_template_from_project(
+        self,
+        project_id: int,
+        include_reviews: bool = True,
+        include_items: bool = True,
+    ) -> List[Dict]:
+        """Build template items from an existing project configuration."""
+        services = self.get_project_services(project_id)
+        return self._build_template_items(services, include_reviews, include_items)
 
+    def _build_template_items(
+        self,
+        services: List[Dict],
+        include_reviews: bool = True,
+        include_items: bool = True,
+    ) -> List[Dict]:
+        template_items: List[Dict] = []
 
-                    service_data['service_id'] = service_id
+        for service in services:
+            service_id = service.get('service_id')
+            if not service_id:
+                continue
 
+            unit_type = (service.get('unit_type') or 'lump_sum').lower()
+            unit_qty = service.get('unit_qty') if service.get('unit_qty') is not None else 0
+            default_units = float(unit_qty or 0)
+            if unit_type == 'lump_sum' and default_units <= 0:
+                default_units = 1.0
 
-                    schedule_start = datetime.now().strftime('%Y-%m-%d')
+            template_item: Dict[str, Any] = {
+                'phase': service.get('phase') or '',
+                'service_code': service.get('service_code') or '',
+                'service_name': service.get('service_name') or '',
+                'unit_type': unit_type,
+                'default_units': default_units,
+                'unit_rate': float(service.get('unit_rate') or 0),
+                'lump_sum_fee': float(service.get('lump_sum_fee') or 0),
+                'bill_rule': service.get('bill_rule') or 'on_completion',
+                'notes': service.get('notes') or '',
+            }
 
+            schedule_info = self.get_service_by_id(service_id) or {}
+            schedule_start_raw = schedule_info.get('schedule_start')
+            schedule_freq = schedule_info.get('schedule_frequency')
 
-                    schedule_end = (datetime.now() + timedelta(days=30 * max(1, int(unit_qty or 1)))).strftime('%Y-%m-%d')
+            if schedule_freq:
+                template_item['frequency'] = schedule_freq
 
+            schedule_start_dt: Optional[datetime] = None
+            if schedule_start_raw:
+                if isinstance(schedule_start_raw, datetime):
+                    schedule_start_dt = schedule_start_raw
+                elif isinstance(schedule_start_raw, str):
+                    try:
+                        schedule_start_dt = datetime.fromisoformat(schedule_start_raw)
+                    except ValueError:
+                        schedule_start_dt = None
 
-                    self.upsert_service_schedule(service_id, schedule_start, schedule_end, item.get('frequency', 'weekly'))
+            if include_reviews:
+                review_blueprint = self._build_review_blueprint(service_id)
+                if review_blueprint:
+                    template_item['review_blueprint'] = review_blueprint
 
+            if include_items:
+                service_items = self._build_service_item_blueprint(service_id, schedule_start_dt)
+                if service_items:
+                    template_item['service_items'] = service_items
 
-                    if item['unit_type'] == 'review':
+            template_items.append(template_item)
 
+        return template_items
 
-                        self.rebuild_service_reviews(service_id)
+    def _build_review_blueprint(self, service_id: int) -> Optional[Dict]:
+        """Capture representative review blueprint data for a service."""
+        try:
+            query = f"""
+                SELECT {S.ServiceReviews.CYCLE_NO},
+                       {S.ServiceReviews.DISCIPLINES},
+                       {S.ServiceReviews.DELIVERABLES},
+                       {S.ServiceReviews.WEIGHT_FACTOR}
+                FROM {S.ServiceReviews.TABLE}
+                WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                ORDER BY {S.ServiceReviews.CYCLE_NO}
+            """
+            self.cursor.execute(query, (service_id,))
+            rows = self.cursor.fetchall()
+            if not rows:
+                return None
 
+            first_cycle = rows[0]
+            total_cycles = len(rows)
+            weight_factor = first_cycle[3] if len(first_cycle) > 3 else 1.0
 
-                    services_created.append(service_data)
-            
+            return {
+                'total_cycles': total_cycles,
+                'disciplines': first_cycle[1] or '',
+                'deliverables': first_cycle[2] or '',
+                'weight_factor': float(weight_factor or 1.0),
+            }
+        except Exception as exc:
+            print(f"⚠️  Unable to capture review blueprint for service {service_id}: {exc}")
+            return None
 
-            return services_created
+    def _build_service_item_blueprint(
+        self,
+        service_id: int,
+        schedule_start: Optional[datetime],
+    ) -> List[Dict]:
+        """Capture service item blueprint data for reuse."""
+        blueprint: List[Dict] = []
+        try:
+            query = f"""
+                SELECT {S.ServiceItems.ITEM_TYPE},
+                       {S.ServiceItems.TITLE},
+                       {S.ServiceItems.DESCRIPTION},
+                       {S.ServiceItems.PRIORITY},
+                       {S.ServiceItems.STATUS},
+                       {S.ServiceItems.PLANNED_DATE},
+                       {S.ServiceItems.DUE_DATE},
+                       {S.ServiceItems.NOTES}
+                FROM {S.ServiceItems.TABLE}
+                WHERE {S.ServiceItems.SERVICE_ID} = ?
+                ORDER BY {S.ServiceItems.PLANNED_DATE}
+            """
+            self.cursor.execute(query, (service_id,))
+            rows = self.cursor.fetchall()
 
-            
+            for row in rows:
+                planned_dt = row[5]
+                due_dt = row[6]
 
-        except Exception as e:
+                planned_offset = None
+                due_offset = None
 
-            print(f"Error applying template: {e}")
+                if isinstance(planned_dt, str):
+                    try:
+                        planned_dt = datetime.fromisoformat(planned_dt)
+                    except ValueError:
+                        planned_dt = None
+                if isinstance(due_dt, str):
+                    try:
+                        due_dt = datetime.fromisoformat(due_dt)
+                    except ValueError:
+                        due_dt = None
 
-            return []
+                if schedule_start and isinstance(planned_dt, datetime):
+                    planned_offset = (planned_dt.date() - schedule_start.date()).days
+                if schedule_start and isinstance(due_dt, datetime):
+                    due_offset = (due_dt.date() - schedule_start.date()).days
 
-    
+                blueprint.append({
+                    'item_type': row[0] or 'other',
+                    'title': row[1] or 'Untitled Item',
+                    'description': row[2] or '',
+                    'priority': row[3] or 'medium',
+                    'status': row[4] or 'planned',
+                    'planned_offset_days': planned_offset,
+                    'due_offset_days': due_offset,
+                    'notes': row[7] or '',
+                })
 
-    def create_project_service(self, service_data: Dict) -> int:
+        except Exception as exc:
+            print(f"⚠️  Unable to capture service item blueprint for service {service_id}: {exc}")
+
+        return blueprint
+
+    def _create_service_items_from_blueprint(
+        self,
+        service_id: int,
+        blueprint_items: List[Dict],
+        schedule_start: Optional[str],
+        commit: bool = False,
+    ) -> None:
+        """Create service items based on a saved blueprint."""
+        if not blueprint_items:
+            return
+
+        try:
+            base_dt: Optional[datetime] = None
+            if schedule_start:
+                try:
+                    base_dt = datetime.fromisoformat(schedule_start)
+                except ValueError:
+                    base_dt = None
+            if base_dt is None:
+                base_dt = datetime.now()
+
+            for item in blueprint_items:
+                planned_offset = item.get('planned_offset_days')
+                due_offset = item.get('due_offset_days')
+
+                planned_dt = base_dt + timedelta(days=int(planned_offset)) if planned_offset is not None else base_dt
+                due_dt = (
+                    base_dt + timedelta(days=int(due_offset))
+                    if due_offset is not None
+                    else None
+                )
+
+                columns = [
+                    S.ServiceItems.SERVICE_ID,
+                    S.ServiceItems.ITEM_TYPE,
+                    S.ServiceItems.TITLE,
+                    S.ServiceItems.PLANNED_DATE,
+                    S.ServiceItems.STATUS,
+                    S.ServiceItems.PRIORITY,
+                    S.ServiceItems.CREATED_AT,
+                    S.ServiceItems.UPDATED_AT,
+                ]
+                values = [
+                    service_id,
+                    item.get('item_type') or 'other',
+                    item.get('title') or 'Untitled Item',
+                    planned_dt.strftime('%Y-%m-%d'),
+                    (item.get('status') or 'planned'),
+                    (item.get('priority') or 'medium'),
+                    datetime.now(),
+                    datetime.now(),
+                ]
+                placeholders = ['?'] * len(values)
+
+                optional_pairs = [
+                    (S.ServiceItems.DESCRIPTION, item.get('description')),
+                    (S.ServiceItems.NOTES, item.get('notes')),
+                    (S.ServiceItems.DUE_DATE, due_dt.strftime('%Y-%m-%d') if due_dt else None),
+                ]
+
+                for column, value in optional_pairs:
+                    if value:
+                        columns.append(column)
+                        values.append(value)
+                        placeholders.append('?')
+
+                query = f"""
+                    INSERT INTO {S.ServiceItems.TABLE} ({', '.join(columns)})
+                    VALUES ({', '.join(placeholders)})
+                """
+                self.cursor.execute(query, values)
+
+            if commit:
+                self.db.commit()
+
+        except Exception as exc:
+            print(f"⚠️  Unable to create service items for service {service_id}: {exc}")
+
+    def create_project_service(self, service_data: Dict, commit: bool = True) -> int:
 
         """Create a new project service"""
 
@@ -1151,21 +1481,26 @@ class ReviewManagementService:
 
         # Get the last inserted ID for SQL Server
 
-        self.cursor.execute("SELECT @@IDENTITY")
+        self.cursor.execute("SELECT SCOPE_IDENTITY()")
 
-        service_id = self.cursor.fetchone()[0]
+        row = self.cursor.fetchone()
+
+        service_id = int(row[0]) if row and row[0] is not None else 0
 
         
 
-        self.db.commit()
+        if commit:
 
-        return int(service_id)
+            self.db.commit()
+
+        return service_id
 
     
 
     def generate_review_cycles(self, service_id: int, unit_qty: int,
                              start_date: datetime, end_date: datetime,
-                             cadence: str = 'weekly', disciplines: str = 'All') -> List[Dict]:
+                             cadence: str = 'weekly', disciplines: str = 'All',
+                             commit: bool = True) -> List[Dict]:
         """Fixed review cycle generation with consistent date handling"""
         try:
             if unit_qty <= 0:
@@ -1239,7 +1574,7 @@ class ReviewManagementService:
                     'weight_factor': 1.0
                 }
 
-                review_id = self.create_service_review(cycle_data)
+                review_id = self.create_service_review(cycle_data, commit=commit)
                 cycle_data['review_id'] = review_id
                 cycles_created.append(cycle_data)
                 print(f"   ✅ Cycle {i+1}: {planned_date}")
@@ -1253,7 +1588,7 @@ class ReviewManagementService:
 
     
 
-    def create_service_review(self, review_data: Dict) -> int:
+    def create_service_review(self, review_data: Dict, commit: bool = True) -> int:
 
         """Create a service review cycle"""
 
@@ -1308,13 +1643,15 @@ class ReviewManagementService:
 
             self.cursor.execute("SELECT SCOPE_IDENTITY()")
 
-            review_id = self.cursor.fetchone()[0]
+            review_row = self.cursor.fetchone()
 
-            
+            review_id = int(review_row[0]) if review_row and review_row[0] is not None else 0
 
-            self.db.commit()
+            if commit:
 
-            return int(review_id) if review_id else 0
+                self.db.commit()
+
+            return review_id
 
             
 
@@ -1905,6 +2242,8 @@ class ReviewManagementService:
 
         auto_complete: Optional[bool] = None,
 
+        commit: bool = True,
+
     ):
 
         """Insert or update schedule metadata for a service."""
@@ -1967,11 +2306,13 @@ class ReviewManagementService:
 
         self.cursor.execute(query, params)
 
-        self.db.commit()
+        if commit:
+
+            self.db.commit()
 
 
 
-    def delete_service_reviews(self, service_id: int, preserve_data: bool = True):
+    def delete_service_reviews(self, service_id: int, preserve_data: bool = True, commit: bool = True):
         """Remove all existing review cycles for a service."""
         try:
             if preserve_data:
@@ -2002,7 +2343,8 @@ class ReviewManagementService:
             # Proceed with deletion
             self.cursor.execute("DELETE FROM ServiceReviews WHERE service_id = ?", (service_id,))
             deleted_count = self.cursor.rowcount
-            self.db.commit()
+            if commit:
+                self.db.commit()
             print(f"🗑️  Deleted {deleted_count} review cycles for service {service_id}")
             
         except Exception as e:
@@ -2133,7 +2475,7 @@ class ReviewManagementService:
                 'error': str(e)
             }
 
-    def rebuild_service_reviews(self, service_id: int) -> bool:
+    def rebuild_service_reviews(self, service_id: int, commit: bool = True) -> bool:
 
         """Recreate review cycles according to stored schedule settings."""
 
@@ -2189,7 +2531,7 @@ class ReviewManagementService:
 
 
 
-        self.delete_service_reviews(service_id)
+        self.delete_service_reviews(service_id, commit=commit)
 
         cycles = self.generate_review_cycles(
 
@@ -2204,6 +2546,8 @@ class ReviewManagementService:
             cadence=frequency,
 
             disciplines=service.get('phase', 'All') or 'All',
+
+            commit=commit,
 
         )
 

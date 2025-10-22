@@ -3788,41 +3788,85 @@ class ReviewManagementTab:
             if not self.current_project_id:
                 messagebox.showwarning("Warning", "Please select a project first")
                 return
-            
+
             if not self.template_var.get():
                 messagebox.showwarning("Warning", "Please select a template first")
                 return
-            
-            # Confirm action
-            result = messagebox.askyesno("Confirm", "This will add services from the template to the current project. Continue?")
-            if not result:
-                return
-            
-            template_name = self.template_var.get().split(" (")[0]
-            
-            if self.review_service:
-                services = self.review_service.apply_template(self.current_project_id, template_name)
-                if services:
-                    messagebox.showinfo("Success", f"Applied template successfully. {len(services)} services created.")
-                    self.load_project_services()
-                    
-                    # Automatically update stages and cycles after applying template
-                    print("🔄 Auto-updating stages and cycles after applying template...")
-                    self.auto_update_stages_and_cycles(force_update=True)
-                    
-                    # Ask if user wants to auto-populate stages from the new services
-                    auto_stages = messagebox.askyesno("Auto-populate Stages", 
-                        "Would you like to automatically create review stages from the service phases?")
-                    if auto_stages:
-                        # Switch to the Review Planning tab
-                        self.sub_notebook.select(1)  # Index 1 is the Review Planning tab
-                        # Load stages from services
-                        self.load_stages_from_services()
-                else:
-                    messagebox.showerror("Error", "Failed to apply template")
-            else:
+
+            if not self.review_service:
                 messagebox.showerror("Error", "Review service not initialized")
-                
+                return
+
+            template_name = self.template_var.get().split(" (")[0]
+
+            confirm = messagebox.askyesno(
+                "Apply Template",
+                "This will add services from the template to the current project. Continue?",
+            )
+            if not confirm:
+                return
+
+            existing_services = self.review_service.get_project_services(self.current_project_id)
+            replace_existing = False
+            skip_duplicates = False
+
+            if existing_services:
+                choice = messagebox.askyesnocancel(
+                    "Existing Services Detected",
+                    (
+                        f"The project already contains {len(existing_services)} service(s).\n\n"
+                        "Choose 'Yes' to replace existing services with the template.\n"
+                        "Choose 'No' to keep current services and add only new ones\n"
+                        "(duplicate entries will be skipped).\n"
+                        "Choose 'Cancel' to abort."
+                    ),
+                )
+                if choice is None:
+                    return
+                replace_existing = bool(choice)
+                skip_duplicates = not replace_existing
+
+            apply_result = self.review_service.apply_template(
+                self.current_project_id,
+                template_name,
+                replace_existing=replace_existing,
+                skip_existing_duplicates=skip_duplicates,
+            )
+
+            created = apply_result.get('created', [])
+            skipped = apply_result.get('skipped', [])
+            replaced_count = apply_result.get('replaced_services', 0)
+
+            if created:
+                summary_lines = [
+                    f"Applied template '{template_name}'.",
+                    f"Created {len(created)} new service(s).",
+                ]
+                if replaced_count:
+                    summary_lines.append(f"Removed {replaced_count} existing service(s).")
+                if skipped:
+                    summary_lines.append(f"Skipped {len(skipped)} duplicate service(s).")
+
+                messagebox.showinfo("Template Applied", "\n".join(summary_lines))
+                self.load_project_services()
+
+                # Automatically update stages and cycles after applying template
+                print("🔄 Auto-updating stages and cycles after applying template...")
+                self.auto_update_stages_and_cycles(force_update=True)
+
+                auto_stages = messagebox.askyesno(
+                    "Auto-populate Stages",
+                    "Would you like to automatically create review stages from the service phases?",
+                )
+                if auto_stages:
+                    self.sub_notebook.select(1)  # Switch to Review Planning tab
+                    self.load_stages_from_services()
+            else:
+                message = "No services were added from the template."
+                if skipped:
+                    message += f"\n{len(skipped)} service(s) were skipped because they already exist."
+                messagebox.showwarning("No Services Added", message)
+
         except Exception as e:
             messagebox.showerror("Error", f"Error applying template: {e}")
     
@@ -3925,21 +3969,15 @@ class ReviewManagementTab:
                             return
                         template_name = existing_name
                     
-                    # Convert services to template format
-                    template_items = []
-                    for service in services:
-                        item = {
-                            "phase": service.get('phase', ''),
-                            "service_code": service.get('service_code', ''),
-                            "service_name": service.get('service_name', ''),
-                            "unit_type": service.get('unit_type', 'lump_sum'),
-                            "default_units": service.get('unit_qty', 1),
-                            "unit_rate": service.get('unit_rate', 0),
-                            "lump_sum_fee": service.get('lump_sum_fee', 0),
-                            "bill_rule": service.get('bill_rule', 'on_completion'),
-                            "notes": service.get('notes', '')
-                        }
-                        template_items.append(item)
+                    # Build template blueprint from current project services
+                    template_items = self.review_service.build_template_from_project(
+                        self.current_project_id,
+                        include_reviews=True,
+                        include_items=True,
+                    )
+                    if not template_items:
+                        messagebox.showerror("Error", "Could not build template from current project services")
+                        return
                     
                     # Save template
                     success = self.review_service.save_template(template_name, sector, notes, template_items, save_option_var.get() == "overwrite")
