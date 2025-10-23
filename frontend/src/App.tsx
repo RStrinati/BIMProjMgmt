@@ -10,6 +10,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import DataImportsPage from './pages/DataImportsPage';
 import SettingsPage from './pages/SettingsPage';
+import TasksNotesPage from './pages/TasksNotesPage';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -36,7 +37,7 @@ function App() {
               <Route path="/projects/:id/data-imports" element={<DataImportsPage />} />
               <Route path="/data-imports" element={<DataImportsPage />} />
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
-              <Route path="/tasks" element={<Navigate to="/projects" replace />} />
+              <Route path="/tasks" element={<TasksNotesPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

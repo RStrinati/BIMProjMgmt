@@ -12,6 +12,7 @@ import json
 
 import math
 import sqlite3
+import pyodbc
 
 from datetime import datetime, timedelta
 
@@ -1475,24 +1476,47 @@ class ReviewManagementService:
 
         
 
-        self.cursor.execute(query, params)
-
-        
-
-        # Get the last inserted ID for SQL Server
+        try:
+            self.cursor.execute(query, params)
+        except pyodbc.Error as exc:
+            print(f"⚠️  Database error creating service '{service_data.get('service_code')}' for project {service_data.get('project_id')}: {exc}")
+            raise
 
         self.cursor.execute("SELECT SCOPE_IDENTITY()")
-
         row = self.cursor.fetchone()
 
-        service_id = int(row[0]) if row and row[0] is not None else 0
+        service_id = 0
+        if row and row[0] is not None:
+            try:
+                service_id = int(Decimal(str(row[0])))
+            except (InvalidOperation, ValueError, TypeError):
+                try:
+                    service_id = int(row[0])
+                except (ValueError, TypeError):
+                    service_id = 0
 
-        
+        if not service_id:
+            self.cursor.execute(
+                """
+                SELECT TOP 1 service_id
+                FROM ProjectServices
+                WHERE project_id = ? AND service_code = ?
+                ORDER BY service_id DESC
+                """,
+                (service_data['project_id'], service_data['service_code']),
+            )
+            fallback_row = self.cursor.fetchone()
+            if fallback_row and fallback_row[0] is not None:
+                try:
+                    service_id = int(fallback_row[0])
+                except (ValueError, TypeError):
+                    service_id = 0
+
+        if not service_id:
+            raise ValueError(f"Failed to retrieve service ID for project {service_data.get('project_id')} and service {service_data.get('service_code')}")
 
         if commit:
-
             self.db.commit()
-
         return service_id
 
     

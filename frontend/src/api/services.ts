@@ -5,6 +5,7 @@ import type {
   ServiceItem,
   FileServiceTemplate,
   FileServiceTemplatePayload,
+  ApplyTemplateResult,
 } from '@/types/api';
 
 export interface ServiceTemplate {
@@ -93,6 +94,16 @@ export const fileServiceTemplatesApi = {
 export const projectServicesApi = {
   getAll: (projectId: number) =>
     apiClient.get<ProjectService[]>(`/projects/${projectId}/services`),
+
+  applyTemplate: (
+    projectId: number,
+    data: {
+      template_name: string;
+      replace_existing?: boolean;
+      skip_duplicates?: boolean;
+      overrides?: Record<string, unknown>;
+    },
+  ) => apiClient.post<ApplyTemplateResult>(`/projects/${projectId}/services/apply-template`, data),
 
   create: (projectId: number, data: {
     service_code: string;

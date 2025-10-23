@@ -31,6 +31,7 @@ export interface Project {
   total_service_agreed_fee?: number;
   total_service_billed_amount?: number;
   service_billed_pct?: number;
+  agreed_fee?: number;
 }
 
 export interface ReviewCycle {
@@ -62,18 +63,49 @@ export interface Review {
   updated_at?: string;
 }
 
+export interface TaskItem {
+  label?: string;
+  title?: string;
+  completed?: boolean;
+  notes?: string;
+  [key: string]: unknown;
+}
+
 export interface Task {
   task_id: number;
   project_id: number;
+  project_name?: string;
   task_name: string;
-  description?: string;
-  assigned_to?: string;
-  status?: string;
-  priority?: string;
-  due_date?: string;
-  completed_date?: string;
+  cycle_id?: number | null;
+  task_date?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  time_spent_minutes?: number | null;
+  status?: string | null;
+  assigned_to?: number | null;
+  assigned_to_name?: string | null;
+  task_items?: TaskItem[];
+  notes?: string | null;
+  description?: string | null;
+  priority?: string | null;
+  due_date?: string | null;
+  completed_date?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface TaskPayload {
+  task_name: string;
+  project_id: number;
+  cycle_id?: number | null;
+  task_date?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  time_spent_minutes?: number | null;
+  assigned_to?: number | null;
+  status?: string | null;
+  task_items?: TaskItem[];
+  notes?: string | null;
 }
 
 export interface Client {
@@ -144,11 +176,11 @@ export interface ReviewFilters {
 
 export interface TaskFilters {
   project_id?: number;
-  assigned_to?: string;
-  status?: string;
-  priority?: string;
-  due_date_from?: string;
-  due_date_to?: string;
+  user_id?: number;
+  assigned_to?: number;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
 }
 
 export interface ServiceTemplate {
@@ -246,6 +278,26 @@ export interface FileServiceTemplatePayload {
   sector?: string;
   notes?: string;
   items: Record<string, any>[];
+}
+
+export interface ApplyTemplateDuplicate {
+  service_code?: string;
+  service_name?: string;
+  phase?: string;
+}
+
+export interface ApplyTemplateSkipped extends ApplyTemplateDuplicate {
+  reason?: string;
+  details?: string[];
+}
+
+export interface ApplyTemplateResult {
+  template_name: string;
+  created: Array<Record<string, any>>;
+  skipped: ApplyTemplateSkipped[];
+  duplicates: ApplyTemplateDuplicate[];
+  existing_services: number;
+  replaced_services: number;
 }
 
 export interface ProjectAliasIssueSummary {

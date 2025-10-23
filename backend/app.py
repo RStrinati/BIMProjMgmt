@@ -56,6 +56,12 @@ from database import (  # noqa: E402
     get_service_reviews,
     get_service_templates,
     get_users_list,
+    fetch_tasks_notes_view,
+    insert_task_notes_record,
+    update_task_notes_record,
+    archive_task_record,
+    delete_task_record,
+    toggle_task_item_completion,
     insert_files_into_tblACCDocs,
     log_acc_import,
     save_acc_folder_path,
@@ -82,6 +88,7 @@ from shared.project_service import (  # noqa: E402
 )
 from constants import schema as S  # noqa: E402
 from review_validation import validate_template  # noqa: E402
+from review_management_service import ReviewManagementService  # noqa: E402
 from services.project_alias_service import ProjectAliasManager  # noqa: E402
 
 def _extract_project_payload(body):
@@ -145,6 +152,101 @@ def _extract_project_payload(body):
         'internal_lead': body.get('internal_lead'),
         'naming_convention': body.get('naming_convention'),
     }
+
+
+def _parse_int(value):
+    try:
+        if value in (None, '', 'null'):
+            return None
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'y'}
+
+
+def _clean_string(value, allow_empty=False):
+    if not isinstance(value, str):
+        return value
+    cleaned = value.strip()
+    if allow_empty:
+        return cleaned
+    return cleaned or None
+
+
+def _extract_task_payload(body):
+    """Normalise task payloads for create/update handlers."""
+    payload = {}
+    if not isinstance(body, dict):
+        return payload
+
+    if 'task_name' in body or 'taskName' in body or 'name' in body:
+        name = body.get('task_name')
+        if name is None and 'taskName' in body:
+            name = body.get('taskName')
+        if name is None and 'name' in body:
+            name = body.get('name')
+        payload[S.Tasks.TASK_NAME] = _clean_string(name)
+
+    if 'project_id' in body or 'projectId' in body:
+        project_id = body.get('project_id')
+        if project_id is None and 'projectId' in body:
+            project_id = body.get('projectId')
+        payload[S.Tasks.PROJECT_ID] = _parse_int(project_id)
+
+    if 'cycle_id' in body or 'cycleId' in body:
+        cycle_id = body.get('cycle_id')
+        if cycle_id is None and 'cycleId' in body:
+            cycle_id = body.get('cycleId')
+        payload[S.Tasks.CYCLE_ID] = _parse_int(cycle_id)
+
+    if 'task_date' in body or 'taskDate' in body:
+        task_date = body.get('task_date')
+        if task_date is None and 'taskDate' in body:
+            task_date = body.get('taskDate')
+        payload[S.Tasks.TASK_DATE] = _clean_string(task_date)
+
+    if 'time_start' in body or 'timeStart' in body:
+        time_start = body.get('time_start')
+        if time_start is None and 'timeStart' in body:
+            time_start = body.get('timeStart')
+        payload[S.Tasks.TIME_START] = _clean_string(time_start)
+
+    if 'time_end' in body or 'timeEnd' in body:
+        time_end = body.get('time_end')
+        if time_end is None and 'timeEnd' in body:
+            time_end = body.get('timeEnd')
+        payload[S.Tasks.TIME_END] = _clean_string(time_end)
+
+    for key in ('time_spent_minutes', 'timeSpentMinutes', 'duration_minutes', 'durationMinutes'):
+        if key in body:
+            payload[S.Tasks.TIME_SPENT_MINUTES] = _parse_int(body.get(key))
+            break
+
+    if 'assigned_to' in body or 'assignedTo' in body:
+        assigned_to = body.get('assigned_to')
+        if assigned_to is None and 'assignedTo' in body:
+            assigned_to = body.get('assignedTo')
+        payload[S.Tasks.ASSIGNED_TO] = _parse_int(assigned_to)
+
+    if 'status' in body:
+        payload[S.Tasks.STATUS] = _clean_string(body.get('status'))
+
+    if 'task_items' in body:
+        payload[S.Tasks.TASK_ITEMS] = body.get('task_items')
+    elif 'taskItems' in body:
+        payload[S.Tasks.TASK_ITEMS] = body.get('taskItems')
+
+    if 'notes' in body:
+        payload[S.Tasks.NOTES] = _clean_string(body.get('notes'), allow_empty=True)
+
+    return payload
 
 
 def _serialize_client_response(client):
@@ -544,6 +646,38 @@ def api_delete_file_service_template():
 def api_get_project_services(project_id):
     services = get_project_services(project_id)
     return jsonify(services)
+
+@app.route('/api/projects/<int:project_id>/services/apply-template', methods=['POST'])
+def api_apply_project_service_template(project_id):
+    """Apply a file-based service template to a project."""
+    body = request.get_json() or {}
+    template_name = (body.get('template_name') or '').strip()
+    if not template_name:
+        return jsonify({'error': 'Template name is required'}), 400
+
+    replace_existing = bool(body.get('replace_existing'))
+    skip_duplicates = bool(body.get('skip_duplicates'))
+    overrides = body.get('overrides') or {}
+
+    try:
+        with get_db_connection() as conn:
+            service = ReviewManagementService(conn)
+            result = service.apply_template(
+                project_id=project_id,
+                template_name=template_name,
+                overrides=overrides if overrides else None,
+                replace_existing=replace_existing,
+                skip_existing_duplicates=skip_duplicates,
+            )
+            return jsonify(result)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to apply service template")
+        return jsonify({
+            'error': 'Failed to apply service template',
+            'details': str(exc),
+        }), 500
 
 @app.route('/api/projects/<int:project_id>/services', methods=['POST'])
 def api_create_project_service(project_id):
@@ -1479,79 +1613,114 @@ def api_bookmark_operations(bookmark_id):
 
 # Task Management API Endpoints
 
+@app.route('/api/tasks/notes-view', methods=['GET'])
+def api_tasks_notes_view():
+    """Return tasks with the additional fields required by the Tasks & Notes view."""
+    try:
+        date_from = _clean_string(request.args.get('date_from')) or _clean_string(request.args.get('dateFrom'))
+        date_to = _clean_string(request.args.get('date_to')) or _clean_string(request.args.get('dateTo'))
+        project_id = _parse_int(request.args.get('project_id') or request.args.get('projectId'))
+        user_id = _parse_int(request.args.get('user_id') or request.args.get('userId'))
+        limit = request.args.get('limit', type=int)
+
+        tasks = fetch_tasks_notes_view(
+            date_from=date_from,
+            date_to=date_to,
+            project_id=project_id,
+            user_id=user_id,
+            limit=limit,
+        )
+        return jsonify({'tasks': tasks})
+    except Exception as exc:
+        logging.exception("Error fetching tasks & notes view data")
+        return jsonify({'error': str(exc)}), 500
+
+
 @app.route('/api/tasks', methods=['GET'])
 def api_get_tasks():
-    """Get tasks for a project"""
-    project_id = request.args.get('project_id')
-    if not project_id:
-        return jsonify({'error': 'project_id required'}), 400
-    
-    # For now, return mock data until we implement the full task system
-    mock_tasks = [
-        {
-            'task_id': 1,
-            'task_name': 'Design Review Phase 1',
-            'project_id': project_id,
-            'priority': 'High',
-            'status': 'In Progress',
-            'progress_percentage': 75,
-            'assigned_to': 'John Doe',
-            'start_date': '2024-01-15',
-            'end_date': '2024-01-30',
-            'estimated_hours': 40,
-            'description': 'Complete architectural design review'
-        },
-        {
-            'task_id': 2,
-            'task_name': 'Structural Analysis',
-            'project_id': project_id,
-            'priority': 'Medium',
-            'status': 'Not Started',
-            'progress_percentage': 0,
-            'assigned_to': 'Jane Smith',
-            'start_date': '2024-02-01',
-            'end_date': '2024-02-15',
-            'estimated_hours': 60,
-            'description': 'Perform structural calculations and analysis'
-        }
-    ]
-    
-    return jsonify(mock_tasks)
+    """Return task records, optionally filtered by project or user."""
+    try:
+        project_id = _parse_int(request.args.get('project_id') or request.args.get('projectId'))
+        user_id = _parse_int(request.args.get('user_id') or request.args.get('userId') or request.args.get('assigned_to') or request.args.get('assignedTo'))
+        tasks = fetch_tasks_notes_view(project_id=project_id, user_id=user_id)
+        return jsonify(tasks)
+    except Exception as exc:
+        logging.exception("Error fetching tasks list")
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/tasks', methods=['POST'])
 def api_create_task():
-    """Create a new task"""
-    body = request.get_json() or {}
-    
-    required_fields = ['task_name', 'project_id']
-    if not all(field in body for field in required_fields):
-        return jsonify({'error': 'task_name and project_id are required'}), 400
-    
-    # For now, return success - would integrate with EnhancedTaskManager
-    task_data = {
-        'task_id': 999,  # Mock ID
-        'success': True,
-        **body
-    }
-    
-    return jsonify(task_data), 201
+    """Create a new task entry."""
+    try:
+        body = request.get_json(silent=True) or {}
+        payload = _extract_task_payload(body)
+
+        task_name = payload.get(S.Tasks.TASK_NAME)
+        project_id = payload.get(S.Tasks.PROJECT_ID)
+        if not task_name:
+            return jsonify({'error': 'task_name is required'}), 400
+        if project_id is None:
+            return jsonify({'error': 'project_id is required'}), 400
+
+        created = insert_task_notes_record(payload)
+        if not created:
+            return jsonify({'error': 'Failed to create task'}), 500
+        return jsonify(created), 201
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Error creating task")
+        return jsonify({'error': str(exc)}), 500
 
 
-@app.route('/api/tasks/<int:task_id>', methods=['PATCH'])
+@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
 def api_update_task(task_id):
-    """Update a task"""
-    body = request.get_json() or {}
-    
-    # For now, return success - would integrate with task update logic
-    return jsonify({'success': True, 'task_id': task_id})
+    """Update an existing task entry."""
+    try:
+        body = request.get_json(silent=True) or {}
+        updates = _extract_task_payload(body)
+        if not updates:
+            return jsonify({'error': 'No updatable fields provided'}), 400
+
+        updated = update_task_notes_record(task_id, updates)
+        if not updated:
+            return jsonify({'error': 'Task not found'}), 404
+        return jsonify(updated)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Error updating task")
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 def api_delete_task(task_id):
-    """Delete a task"""
-    # For now, return success - would integrate with task deletion logic
-    return jsonify({'success': True})
+    """Delete a task by archiving or hard-deleting based on request."""
+    try:
+        hard_delete = _parse_bool(request.args.get('hard'))
+        success = delete_task_record(task_id) if hard_delete else archive_task_record(task_id)
+        if not success:
+            return jsonify({'error': 'Task not found'}), 404
+        return jsonify({'success': True, 'hard_deleted': hard_delete})
+    except Exception as exc:
+        logging.exception("Error deleting task")
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/tasks/<int:task_id>/items/<int:item_index>/toggle', methods=['PUT'])
+def api_toggle_task_item(task_id, item_index):
+    """Toggle the completion state of a specific task checklist item."""
+    try:
+        updated = toggle_task_item_completion(task_id, item_index)
+        if not updated:
+            return jsonify({'error': 'Task not found'}), 404
+        return jsonify(updated)
+    except IndexError:
+        return jsonify({'error': 'Task item index out of range'}), 400
+    except Exception as exc:
+        logging.exception("Error toggling task item")
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/task_dependencies/<int:task_id>', methods=['GET'])

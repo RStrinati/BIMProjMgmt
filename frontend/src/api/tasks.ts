@@ -1,39 +1,34 @@
 import apiClient from './client';
-import type { Task, TaskFilters } from '@/types/api';
+import type { Task, TaskFilters, TaskPayload } from '@/types/api';
 
 export const tasksApi = {
-  // Get all tasks
   getAll: async (filters?: TaskFilters): Promise<Task[]> => {
     const response = await apiClient.get<Task[]>('/tasks', { params: filters });
     return response.data;
   },
 
-  // Get tasks for a project
-  getByProject: async (projectId: number): Promise<Task[]> => {
-    const response = await apiClient.get<Task[]>(`/projects/${projectId}/tasks`);
-    return response.data;
+  getNotesView: async (filters?: TaskFilters): Promise<Task[]> => {
+    const response = await apiClient.get<{ tasks: Task[] }>('/tasks/notes-view', { params: filters });
+    return response.data.tasks;
   },
 
-  // Create new task
-  create: async (task: Partial<Task>): Promise<Task> => {
+  create: async (task: TaskPayload): Promise<Task> => {
     const response = await apiClient.post<Task>('/tasks', task);
     return response.data;
   },
 
-  // Update task
-  update: async (id: number, task: Partial<Task>): Promise<Task> => {
+  update: async (id: number, task: Partial<TaskPayload>): Promise<Task> => {
     const response = await apiClient.put<Task>(`/tasks/${id}`, task);
     return response.data;
   },
 
-  // Delete task
-  delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/tasks/${id}`);
+  delete: async (id: number, options?: { hardDelete?: boolean }): Promise<void> => {
+    const params = options?.hardDelete ? { hard: 'true' } : undefined;
+    await apiClient.delete(`/tasks/${id}`, { params });
   },
 
-  // Complete task
-  complete: async (id: number): Promise<Task> => {
-    const response = await apiClient.patch<Task>(`/tasks/${id}/complete`);
+  toggleItem: async (taskId: number, itemIndex: number): Promise<Task> => {
+    const response = await apiClient.put<Task>(`/tasks/${taskId}/items/${itemIndex}/toggle`);
     return response.data;
   },
 };

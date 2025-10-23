@@ -788,11 +788,12 @@ def get_service_items_statistics(service_id=None):
         return {}
 
 
+import json
 import pyodbc
 import os
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
+from datetime import datetime, timedelta, date, time
+from typing import Any, Dict, List, Optional, Tuple
 
 from config import Config
 import logging
@@ -3672,4 +3673,367 @@ def get_project_review_statistics():
 
 
 
+def _parse_time_input(value: Any) -> Optional[time]:
+    """Convert supported time formats into a time object."""
+    if value in (None, "", "null"):
+        return None
+    if isinstance(value, time):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    if isinstance(value, str):
+        cleaned = value.strip().lower()
+        if not cleaned or cleaned == "null":
+            return None
+        normalised = cleaned.replace(".", ":")
+        if ":" not in normalised:
+            normalised = f"{normalised}:00"
+        for fmt in ("%H:%M", "%H:%M:%S"):
+            try:
+                return datetime.strptime(normalised, fmt).time()
+            except ValueError:
+                continue
+    return None
+
+
+def _calculate_duration_minutes(start_value: Any, end_value: Any) -> Optional[int]:
+    """Derive a duration in minutes when both start and end times are available."""
+    start_time = _parse_time_input(start_value)
+    end_time = _parse_time_input(end_value)
+    if not start_time or not end_time:
+        return None
+
+    start_dt = datetime.combine(date.today(), start_time)
+    end_dt = datetime.combine(date.today(), end_time)
+    if end_dt < start_dt:
+        end_dt += timedelta(days=1)
+    return int((end_dt - start_dt).total_seconds() // 60)
+
+
+def _format_task_notes_row(row: tuple) -> Dict[str, Any]:
+    """Transform a raw SQL row into a serialisable task record."""
+    if not row:
+        return {}
+
+    raw_items = row[12]
+    task_items: List[Dict[str, Any]] = []
+    if raw_items:
+        try:
+            parsed_items = json.loads(raw_items)
+            if isinstance(parsed_items, list):
+                task_items = parsed_items
+        except (ValueError, TypeError):
+            logger.warning("Unable to parse task_items JSON for task_id=%s", row[0])
+
+    return {
+        'task_id': row[0],
+        'task_name': row[1],
+        'project_id': row[2],
+        'project_name': row[3],
+        'cycle_id': row[4],
+        'task_date': row[5].isoformat() if row[5] else None,
+        'time_start': row[6].strftime("%H:%M") if row[6] else None,
+        'time_end': row[7].strftime("%H:%M") if row[7] else None,
+        'time_spent_minutes': row[8],
+        'status': row[9],
+        'assigned_to': row[10],
+        'assigned_to_name': row[11],
+        'task_items': task_items,
+        'notes': row[13],
+        'created_at': row[14].isoformat() if row[14] else None,
+        'updated_at': row[15].isoformat() if row[15] else None,
+    }
+
+
+_TASK_NOTES_BASE_QUERY = f"""
+    SELECT
+        t.{S.Tasks.TASK_ID},
+        t.{S.Tasks.TASK_NAME},
+        t.{S.Tasks.PROJECT_ID},
+        p.project_name,
+        t.{S.Tasks.CYCLE_ID},
+        t.{S.Tasks.TASK_DATE},
+        t.{S.Tasks.TIME_START},
+        t.{S.Tasks.TIME_END},
+        t.{S.Tasks.TIME_SPENT_MINUTES},
+        t.{S.Tasks.STATUS},
+        t.{S.Tasks.ASSIGNED_TO},
+        u.{S.Users.NAME} AS assigned_to_name,
+        t.{S.Tasks.TASK_ITEMS},
+        t.{S.Tasks.NOTES},
+        t.{S.Tasks.CREATED_AT},
+        t.{S.Tasks.UPDATED_AT}
+    FROM {S.Tasks.TABLE} t
+    LEFT JOIN Projects p ON t.{S.Tasks.PROJECT_ID} = p.project_id
+    LEFT JOIN {S.Users.TABLE} u ON t.{S.Tasks.ASSIGNED_TO} = u.{S.Users.ID}
+"""
+
+
+def fetch_tasks_notes_view(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    project_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Retrieve tasks tailored for the Tasks & Notes view with optional filters."""
+    default_start = (datetime.utcnow() - timedelta(days=90)).date()
+    where_clauses = ["ISNULL(t.status, 'active') <> 'archived'"]
+    params: List[Any] = []
+
+    if date_from:
+        where_clauses.append(f"t.{S.Tasks.TASK_DATE} >= ?")
+        params.append(date_from)
+    if date_to:
+        where_clauses.append(f"t.{S.Tasks.TASK_DATE} <= ?")
+        params.append(date_to)
+    if not date_from and not date_to:
+        where_clauses.append(f"(t.{S.Tasks.TASK_DATE} IS NULL OR t.{S.Tasks.TASK_DATE} >= ?)")
+        params.append(default_start)
+    if project_id:
+        where_clauses.append(f"t.{S.Tasks.PROJECT_ID} = ?")
+        params.append(project_id)
+    if user_id:
+        where_clauses.append(f"t.{S.Tasks.ASSIGNED_TO} = ?")
+        params.append(user_id)
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    select_prefix = "SELECT"
+    if limit:
+        select_prefix = f"SELECT TOP {int(limit)}"
+
+    query = f"""
+        {select_prefix}
+            t.{S.Tasks.TASK_ID},
+            t.{S.Tasks.TASK_NAME},
+            t.{S.Tasks.PROJECT_ID},
+            p.project_name,
+            t.{S.Tasks.CYCLE_ID},
+            t.{S.Tasks.TASK_DATE},
+            t.{S.Tasks.TIME_START},
+            t.{S.Tasks.TIME_END},
+            t.{S.Tasks.TIME_SPENT_MINUTES},
+            t.{S.Tasks.STATUS},
+            t.{S.Tasks.ASSIGNED_TO},
+            u.{S.Users.NAME} AS assigned_to_name,
+            t.{S.Tasks.TASK_ITEMS},
+            t.{S.Tasks.NOTES},
+            t.{S.Tasks.CREATED_AT},
+            t.{S.Tasks.UPDATED_AT}
+        FROM {S.Tasks.TABLE} t
+        LEFT JOIN Projects p ON t.{S.Tasks.PROJECT_ID} = p.project_id
+        LEFT JOIN {S.Users.TABLE} u ON t.{S.Tasks.ASSIGNED_TO} = u.{S.Users.ID}
+        {where_sql}
+        ORDER BY
+            t.{S.Tasks.TASK_DATE} DESC,
+            t.{S.Tasks.TIME_START} DESC,
+            t.{S.Tasks.TASK_ID} DESC;
+    """
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+    return [_format_task_notes_row(row) for row in rows]
+
+
+def get_task_notes_record(task_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch a single task with notes view fields."""
+    query = f"""
+        {_TASK_NOTES_BASE_QUERY}
+        WHERE t.{S.Tasks.TASK_ID} = ?;
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, (task_id,))
+        row = cursor.fetchone()
+    return _format_task_notes_row(row) if row else None
+
+
+def insert_task_notes_record(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Insert a new task record supporting notes view fields."""
+    required_fields = [S.Tasks.TASK_NAME, S.Tasks.PROJECT_ID]
+    for field in required_fields:
+        if field not in payload or payload[field] in (None, ""):
+            raise ValueError(f"{field} is required")
+
+    status = payload.get(S.Tasks.STATUS) or "active"
+
+    time_start = payload.get(S.Tasks.TIME_START)
+    time_end = payload.get(S.Tasks.TIME_END)
+    time_spent = payload.get(S.Tasks.TIME_SPENT_MINUTES)
+    if time_spent is None:
+        time_spent = _calculate_duration_minutes(time_start, time_end)
+
+    task_items_value = payload.get(S.Tasks.TASK_ITEMS)
+    if isinstance(task_items_value, list):
+        task_items_value = json.dumps(task_items_value)
+    elif task_items_value in (None, "", "null"):
+        task_items_value = None
+    else:
+        task_items_value = str(task_items_value)
+
+    columns = [
+        S.Tasks.TASK_NAME,
+        S.Tasks.PROJECT_ID,
+        S.Tasks.CYCLE_ID,
+        S.Tasks.TASK_DATE,
+        S.Tasks.TIME_START,
+        S.Tasks.TIME_END,
+        S.Tasks.TIME_SPENT_MINUTES,
+        S.Tasks.ASSIGNED_TO,
+        S.Tasks.STATUS,
+        S.Tasks.TASK_ITEMS,
+        S.Tasks.NOTES,
+    ]
+    values = [
+        payload.get(S.Tasks.TASK_NAME),
+        payload.get(S.Tasks.PROJECT_ID),
+        payload.get(S.Tasks.CYCLE_ID),
+        payload.get(S.Tasks.TASK_DATE),
+        _parse_time_input(time_start),
+        _parse_time_input(time_end),
+        time_spent,
+        payload.get(S.Tasks.ASSIGNED_TO),
+        status,
+        task_items_value,
+        payload.get(S.Tasks.NOTES),
+    ]
+
+    placeholders = ", ".join(["?"] * len(columns))
+    column_sql = ", ".join(columns)
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            INSERT INTO {S.Tasks.TABLE} ({column_sql})
+            OUTPUT INSERTED.{S.Tasks.TASK_ID}
+            VALUES ({placeholders});
+            """,
+            values,
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+
+    return get_task_notes_record(int(new_id))
+
+
+def update_task_notes_record(task_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Update an existing task record and return the refreshed task."""
+    if not updates:
+        return get_task_notes_record(task_id)
+
+    time_start = updates.get(S.Tasks.TIME_START)
+    time_end = updates.get(S.Tasks.TIME_END)
+    if S.Tasks.TIME_SPENT_MINUTES not in updates and (time_start or time_end):
+        updates[S.Tasks.TIME_SPENT_MINUTES] = _calculate_duration_minutes(time_start, time_end)
+
+    if S.Tasks.TASK_ITEMS in updates:
+        items_value = updates[S.Tasks.TASK_ITEMS]
+        if isinstance(items_value, list):
+            updates[S.Tasks.TASK_ITEMS] = json.dumps(items_value)
+        elif items_value in (None, "", "null"):
+            updates[S.Tasks.TASK_ITEMS] = None
+        else:
+            updates[S.Tasks.TASK_ITEMS] = str(items_value)
+
+    set_clauses = []
+    params: List[Any] = []
+    for column, value in updates.items():
+        if column == S.Tasks.TIME_START or column == S.Tasks.TIME_END:
+            value = _parse_time_input(value)
+        set_clauses.append(f"{column} = ?")
+        params.append(value)
+
+    set_clauses.append(f"{S.Tasks.UPDATED_AT} = ?")
+    params.append(datetime.utcnow())
+    params.append(task_id)
+
+    sql = f"""
+        UPDATE {S.Tasks.TABLE}
+        SET {', '.join(set_clauses)}
+        WHERE {S.Tasks.TASK_ID} = ?;
+    """
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        conn.commit()
+
+    return get_task_notes_record(task_id)
+
+
+def archive_task_record(task_id: int) -> bool:
+    """Soft-delete a task by marking it archived."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            UPDATE {S.Tasks.TABLE}
+            SET {S.Tasks.STATUS} = 'archived',
+                {S.Tasks.UPDATED_AT} = ?
+            WHERE {S.Tasks.TASK_ID} = ?;
+            """,
+            (datetime.utcnow(), task_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_task_record(task_id: int) -> bool:
+    """Hard delete a task record."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"DELETE FROM {S.Tasks.TABLE} WHERE {S.Tasks.TASK_ID} = ?;",
+            (task_id,),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def toggle_task_item_completion(task_id: int, item_index: int) -> Optional[Dict[str, Any]]:
+    """Flip the completion flag on a specific task item."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT {S.Tasks.TASK_ITEMS} FROM {S.Tasks.TABLE} WHERE {S.Tasks.TASK_ID} = ?;",
+            (task_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        task_items_raw = row[0]
+        items: List[Any] = []
+        if task_items_raw:
+            try:
+                parsed = json.loads(task_items_raw)
+                if isinstance(parsed, list):
+                    items = parsed
+            except (ValueError, TypeError):
+                logger.warning("Unable to parse task_items JSON for task_id=%s", task_id)
+
+        if item_index < 0 or item_index >= len(items):
+            raise IndexError("Task item index out of range")
+
+        current_item = items[item_index]
+        if isinstance(current_item, dict):
+            current_item['completed'] = not bool(current_item.get('completed'))
+        else:
+            items[item_index] = {'label': current_item, 'completed': True}
+
+        cursor.execute(
+            f"""
+            UPDATE {S.Tasks.TABLE}
+            SET {S.Tasks.TASK_ITEMS} = ?, {S.Tasks.UPDATED_AT} = ?
+            WHERE {S.Tasks.TASK_ID} = ?;
+            """,
+            (json.dumps(items), datetime.utcnow(), task_id),
+        )
+        conn.commit()
+
+    return get_task_notes_record(task_id)
 
