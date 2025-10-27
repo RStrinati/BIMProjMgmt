@@ -13,6 +13,7 @@ responses or UI feedback however they need.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
@@ -31,6 +32,37 @@ from database import (
 
 PRIORITY_MAP = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
 REVERSE_PRIORITY_MAP = {v: k for k, v in PRIORITY_MAP.items()}
+
+_PROJECTS_CACHE_TTL_SECONDS = 60
+_PROJECTS_CACHE: Dict[str, Any] = {
+    "data": None,
+    "timestamp": 0.0,
+}
+
+
+def _store_projects_cache(projects: List[Dict[str, Any]]) -> None:
+    _PROJECTS_CACHE["data"] = tuple(project.copy() for project in projects)
+    _PROJECTS_CACHE["timestamp"] = time.time()
+
+
+def _get_cached_projects() -> Optional[List[Dict[str, Any]]]:
+    cached = _PROJECTS_CACHE.get("data")
+    if not cached:
+        return None
+    age = time.time() - float(_PROJECTS_CACHE.get("timestamp", 0.0))
+    if age > _PROJECTS_CACHE_TTL_SECONDS:
+        return None
+    return [dict(project) for project in cached]
+
+
+def _invalidate_projects_cache() -> None:
+    _PROJECTS_CACHE["data"] = None
+    _PROJECTS_CACHE["timestamp"] = 0.0
+
+
+def invalidate_projects_cache() -> None:
+    """Public cache invalidator for external callers."""
+    _invalidate_projects_cache()
 
 
 class ProjectServiceError(Exception):
@@ -218,8 +250,15 @@ def list_projects_basic() -> List[Dict[str, Any]]:
 def list_projects_full() -> List[Dict[str, Any]]:
     """Return detailed project dictionaries with priority labels normalised."""
 
-    projects = get_projects_full() or []
-    for project in projects:
+    cached = _get_cached_projects()
+    if cached is not None:
+        return cached
+
+    raw_projects = get_projects_full() or []
+    normalised_projects: List[Dict[str, Any]] = []
+
+    for item in raw_projects:
+        project = dict(item)
         # Ensure project number is always exposed with the new key even if the view still uses contract_number.
         if not project.get("project_number") and project.get(S.Projects.CONTRACT_NUMBER):
             project["project_number"] = project.get(S.Projects.CONTRACT_NUMBER)
@@ -232,7 +271,11 @@ def list_projects_full() -> List[Dict[str, Any]]:
             project["priority_label"] = priority_value
         else:
             project["priority_label"] = "Medium"
-    return projects
+
+        normalised_projects.append(project)
+
+    _store_projects_cache(normalised_projects)
+    return [dict(project) for project in normalised_projects]
 
 
 def get_project(project_id: int) -> Dict[str, Any]:
@@ -263,6 +306,7 @@ def create_project(payload: Dict[str, Any]) -> Dict[str, Any]:
     success = insert_project_full(normalised.to_db_payload())
     if not success:
         raise ProjectServiceError("Database rejected project insert")
+    _invalidate_projects_cache()
     return {"success": True}
 
 
@@ -274,5 +318,6 @@ def update_project(project_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
     success = update_project_record(project_id, db_payload)
     if not success:
         raise ProjectServiceError("Database rejected project update")
+    _invalidate_projects_cache()
     return {"success": True}
 

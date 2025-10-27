@@ -38,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { revitHealthApi } from '@/api/dataImports';
+import { ControlModelConfigurator } from '@/components/dataImports/ControlModelConfigurator';
 import { fileBrowserApi, scriptApi } from '@/api/fileBrowser';
 import { formatDate } from '@/utils/dateUtils';
 
@@ -168,6 +169,8 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         View and analyze Revit model health check data for {projectName || `Project #${projectId}`}.
       </Typography>
+
+      <ControlModelConfigurator projectId={projectId} projectName={projectName} />
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>

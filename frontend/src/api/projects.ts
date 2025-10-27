@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Project, ProjectFilters } from '@/types/api';
+import type { Project, ProjectFilters, DashboardTimelineResponse } from '@/types/api';
 
 export const projectsApi = {
   // Get all projects
@@ -54,6 +54,14 @@ export const projectsApi = {
     upcoming_reviews_30_days: number;
   }>> => {
     const response = await apiClient.get('/project_review_statistics');
+    return response.data;
+  },
+
+  // Get timeline data for dashboard
+  getTimeline: async (options?: { months?: number }): Promise<DashboardTimelineResponse> => {
+    const response = await apiClient.get<DashboardTimelineResponse>('/dashboard/timeline', {
+      params: options,
+    });
     return response.data;
   },
 };

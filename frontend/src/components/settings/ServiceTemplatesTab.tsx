@@ -44,6 +44,16 @@ const SERVICE_TYPES = [
   'Other',
 ];
 
+const SECTOR_OPTIONS = [
+  'Education',
+  'Data Centre',
+  'Healthcare',
+  'Commercial',
+  'Residential',
+  'Infrastructure',
+  'Other',
+];
+
 const ServiceTemplatesTab: React.FC = () => {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,7 +71,7 @@ const ServiceTemplatesTab: React.FC = () => {
   const [fileOriginalName, setFileOriginalName] = useState<string | undefined>();
   const [fileFormData, setFileFormData] = useState({
     name: '',
-    sector: '',
+    sector: 'Other',
     notes: '',
     itemsJson: '[]',
   });
@@ -219,24 +229,24 @@ const ServiceTemplatesTab: React.FC = () => {
     setFileDialogMode(mode);
     setFileError('');
 
-    if (template) {
-      const nextName = mode === 'duplicate' ? `${template.name} Copy` : template.name;
-      setFileFormData({
-        name: nextName,
-        sector: template.sector ?? '',
-        notes: template.notes ?? '',
-        itemsJson: JSON.stringify(template.items ?? [], null, 2),
-      });
-      setFileOriginalName(mode === 'edit' ? template.name : undefined);
-    } else {
-      setFileOriginalName(undefined);
-      setFileFormData({
-        name: '',
-        sector: '',
-        notes: '',
-        itemsJson: '[]',
-      });
-    }
+      if (template) {
+        const nextName = mode === 'duplicate' ? `${template.name} Copy` : template.name;
+        setFileFormData({
+          name: nextName,
+          sector: template.sector && SECTOR_OPTIONS.includes(template.sector) ? template.sector : 'Other',
+          notes: template.notes ?? '',
+          itemsJson: JSON.stringify(template.items ?? [], null, 2),
+        });
+        setFileOriginalName(mode === 'edit' ? template.name : undefined);
+      } else {
+        setFileOriginalName(undefined);
+        setFileFormData({
+          name: '',
+          sector: 'Other',
+          notes: '',
+          itemsJson: '[]',
+        });
+      }
 
     setFileDialogOpen(true);
   };
@@ -254,28 +264,72 @@ const ServiceTemplatesTab: React.FC = () => {
   };
 
   const handleFileSubmit = () => {
-    if (!fileFormData.name.trim()) {
-      setFileError('Template name is required');
+    let derivedName = fileFormData.name.trim();
+    let derivedSector = fileFormData.sector || 'Other';
+    let derivedNotes = fileFormData.notes || '';
+    let items: Record<string, any>[] = [];
+
+    try {
+      const raw = (fileFormData.itemsJson ?? '').trim();
+      if (!raw) {
+        items = [];
+      } else {
+        let parsed: unknown = JSON.parse(raw);
+
+        // Allow payloads that include a top-level template or nested template object
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const maybeTemplate =
+            'template' in (parsed as Record<string, any>) && typeof (parsed as Record<string, any>).template === 'object'
+              ? (parsed as Record<string, any>).template
+              : parsed;
+
+          if (
+            maybeTemplate &&
+            typeof maybeTemplate === 'object' &&
+            Array.isArray((maybeTemplate as Record<string, any>).items)
+          ) {
+            parsed = (maybeTemplate as Record<string, any>).items;
+            derivedName = derivedName || (maybeTemplate as Record<string, any>).name || '';
+            derivedSector = derivedSector || (maybeTemplate as Record<string, any>).sector || 'Other';
+            derivedNotes =
+              derivedNotes || (maybeTemplate as Record<string, any>).notes || (maybeTemplate as Record<string, any>).description || '';
+          }
+        }
+
+        if (!Array.isArray(parsed)) {
+          throw new Error('Items must be an array or an object containing an "items" array');
+        }
+        items = parsed as Record<string, any>[];
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? `Items JSON parse error: ${err.message}` : 'Items must be a valid JSON array';
+      setFileError(message);
       return;
     }
 
-    let items: Record<string, any>[];
-    try {
-      const parsed = JSON.parse(fileFormData.itemsJson || '[]');
-      if (!Array.isArray(parsed)) {
-        throw new Error('Items must be an array');
-      }
-      items = parsed;
-    } catch (err) {
-      setFileError('Items must be a valid JSON array');
+    if (!fileFormData.name.trim() && derivedName) {
+      setFileFormData((prev) => ({ ...prev, name: derivedName }));
+    }
+
+    if (!fileFormData.sector && derivedSector) {
+      setFileFormData((prev) => ({ ...prev, sector: derivedSector }));
+    }
+
+    if (!fileFormData.notes && derivedNotes) {
+      setFileFormData((prev) => ({ ...prev, notes: derivedNotes }));
+    }
+
+    if (!derivedName.trim()) {
+      setFileError('Template name is required');
       return;
     }
 
     fileSaveMutation.mutate({
       template: {
-        name: fileFormData.name.trim(),
-        sector: fileFormData.sector || undefined,
-        notes: fileFormData.notes || '',
+        name: derivedName,
+        sector: derivedSector || undefined,
+        notes: derivedNotes,
         items,
       },
       overwrite: fileDialogMode === 'edit',
@@ -538,12 +592,20 @@ const ServiceTemplatesTab: React.FC = () => {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 label="Sector"
+                select
                 value={fileFormData.sector}
                 onChange={(e) => setFileFormData((prev) => ({ ...prev, sector: e.target.value }))}
                 fullWidth
-              />
-              <TextField
-                label="Notes / Description"
+                required
+              >
+                {SECTOR_OPTIONS.map((sector) => (
+                  <MenuItem key={sector} value={sector}>
+                    {sector}
+                  </MenuItem>
+                ))}
+              </TextField>
+            <TextField
+              label="Notes / Description"
                 value={fileFormData.notes}
                 onChange={(e) => setFileFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 fullWidth

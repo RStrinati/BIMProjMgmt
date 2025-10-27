@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Profiler, Suspense, lazy, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -25,7 +25,9 @@ import {
 } from '@mui/icons-material';
 import { projectsApi, usersApi } from '@/api';
 import type { Project, User } from '@/types/api';
-import ProjectFormDialog from '@/components/ProjectFormDialog';
+import { profilerLog } from '@/utils/perfLogger';
+
+const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
 const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
 
@@ -170,7 +172,8 @@ export function ProjectsPage() {
   };
 
   return (
-    <Box>
+    <Profiler id="ProjectsPage" onRender={profilerLog}>
+      <Box>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
@@ -518,13 +521,34 @@ export function ProjectsPage() {
       )}
 
       {/* Project Form Dialog */}
-      <ProjectFormDialog
-        key={selectedProject?.project_id || 'new'}
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        project={selectedProject}
-        mode={dialogMode}
-      />
-    </Box>
+      {dialogOpen && (
+        <Suspense
+          fallback={(
+            <Box
+              position="fixed"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              sx={{ bgcolor: 'rgba(0,0,0,0.25)', zIndex: (theme) => theme.zIndex.modal - 1 }}
+            >
+              <CircularProgress />
+            </Box>
+          )}
+        >
+          <ProjectFormDialog
+            key={selectedProject?.project_id || 'new'}
+            open={dialogOpen}
+            onClose={handleCloseDialog}
+            project={selectedProject}
+            mode={dialogMode}
+          />
+        </Suspense>
+      )}
+      </Box>
+    </Profiler>
   );
 }

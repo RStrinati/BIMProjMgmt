@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { logNetworkTiming } from '@/utils/perfLogger';
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
@@ -12,6 +13,11 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
+    const requestConfig = config as typeof config & { metadata?: { startTime: number } };
+    requestConfig.metadata = {
+      startTime: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+    };
+
     // Add any auth tokens here if needed in the future
     // const token = localStorage.getItem('token');
     // if (token) {
@@ -27,9 +33,40 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
+    const responseConfig = response.config as typeof response.config & {
+      metadata?: { startTime?: number };
+    };
+
+    const startTime = responseConfig.metadata?.startTime;
+    if (typeof startTime === 'number' && typeof performance !== 'undefined') {
+      const duration = performance.now() - startTime;
+      logNetworkTiming({
+        phase: 'success',
+        method: response.config.method,
+        url: response.config.url,
+        status: response.status,
+        durationMs: duration,
+      });
+    }
+
     return response;
   },
   (error: AxiosError) => {
+    const errorConfig = error.config as typeof error.config & {
+      metadata?: { startTime?: number };
+    };
+    const startTime = errorConfig?.metadata?.startTime;
+    if (typeof startTime === 'number' && typeof performance !== 'undefined') {
+      const duration = performance.now() - startTime;
+      logNetworkTiming({
+        phase: 'error',
+        method: errorConfig?.method,
+        url: errorConfig?.url,
+        status: error.response?.status,
+        durationMs: duration,
+      });
+    }
+
     // Handle common errors
     if (error.response) {
       // Server responded with error status

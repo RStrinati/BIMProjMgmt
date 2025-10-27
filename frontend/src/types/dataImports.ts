@@ -217,6 +217,59 @@ export interface RevitHealthServiceTemplate {
 }
 
 // ============================================================================
+// Control Model Configuration
+// ============================================================================
+
+export type ValidationTarget = 'naming' | 'coordinates' | 'levels';
+
+export interface ControlModelMetadata {
+  validation_targets: ValidationTarget[];
+  is_primary?: boolean;
+  volume_label?: string | null;
+  notes?: string | null;
+}
+
+export interface ControlModel {
+  id: number | null;
+  file_name: string;
+  is_active: boolean;
+  metadata: ControlModelMetadata;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ControlModelConfiguration {
+  project_id: number;
+  available_models: string[];
+  control_models: ControlModel[];
+  primary_control_model: string | null;
+  validation_summary: {
+    naming_ready: boolean;
+    coordinates_ready: boolean;
+    levels_ready: boolean;
+    multi_volume_ready: boolean;
+    active_control_count: number;
+    issues: string[];
+  };
+  mode: 'none' | 'single' | 'multi';
+  validation_targets: ValidationTarget[];
+  message?: string;
+}
+
+export interface ControlModelInput {
+  file_name: string;
+  validation_targets?: ValidationTarget[];
+  volume_label?: string | null;
+  notes?: string | null;
+  is_primary?: boolean;
+}
+
+export interface ControlModelUpdateRequest {
+  control_models: ControlModelInput[];
+  primary_control_model?: string | null;
+}
+
+// ============================================================================
 // Common Response Types
 // ============================================================================
 

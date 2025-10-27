@@ -20,7 +20,9 @@ import type {
   StartReviztoExtractionRequest,
   StartReviztoExtractionResponse,
   RevitHealthFilesResponse,
-  RevitHealthSummary
+  RevitHealthSummary,
+  ControlModelConfiguration,
+  ControlModelUpdateRequest
 } from '../types/dataImports';
 // ============================================================================
 // Revit Health API
@@ -89,6 +91,31 @@ export const revitHealthApi = {
       latest_check_date: data.latest_check_date ?? null,
       files_by_score: data.files_by_score ?? {},
     };
+  },
+};
+// ============================================================================
+// Control Model API
+// ============================================================================
+
+export const controlModelsApi = {
+  /** Retrieve control model configuration for project */
+  getConfiguration: async (projectId: number): Promise<ControlModelConfiguration> => {
+    const response = await apiClient.get<ControlModelConfiguration>(
+      `/projects/${projectId}/control-models`
+    );
+    return response.data;
+  },
+
+  /** Persist control model configuration */
+  saveConfiguration: async (
+    projectId: number,
+    request: ControlModelUpdateRequest
+  ): Promise<ControlModelConfiguration> => {
+    const response = await apiClient.post<ControlModelConfiguration>(
+      `/projects/${projectId}/control-models`,
+      request
+    );
+    return response.data;
   },
 };
 // ============================================================================
@@ -166,11 +193,11 @@ export const accIssuesApi = {
 
   /**
    * Get ACC issues statistics for a project
-   * GET /api/projects/:project_id/acc-issues-stats
+   * GET /api/projects/:project_id/acc-issues/stats
    */
   getStats: async (projectId: number): Promise<ACCIssuesStats> => {
     const response = await apiClient.get<ACCIssuesStats>(
-      `/projects/${projectId}/acc-issues-stats`
+      `/projects/${projectId}/acc-issues/stats`
     );
     return response.data;
   },
@@ -264,5 +291,6 @@ export const dataImportsApi = {
   connector: accConnectorApi,
   issues: accIssuesApi,
   revizto: reviztoApi,
+  controlModels: controlModelsApi,
   revitHealth: revitHealthApi,
 };

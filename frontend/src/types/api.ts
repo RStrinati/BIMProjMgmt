@@ -63,6 +63,35 @@ export interface Review {
   updated_at?: string;
 }
 
+export interface DashboardTimelineReviewItem {
+  review_id: number;
+  planned_date?: string | null;
+  due_date?: string | null;
+  status?: string | null;
+  service_name?: string | null;
+}
+
+export interface DashboardTimelineProject {
+  project_id: number;
+  project_name: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  project_manager?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  type_id?: number | null;
+  project_type?: string | null;
+  review_items: DashboardTimelineReviewItem[];
+}
+
+export interface DashboardTimelineResponse {
+  projects: DashboardTimelineProject[];
+  date_range?: {
+    min: string;
+    max: string;
+  } | null;
+}
+
 export interface TaskItem {
   label?: string;
   title?: string;
@@ -181,6 +210,15 @@ export interface TaskFilters {
   date_from?: string;
   date_to?: string;
   limit?: number;
+  page?: number;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  meta?: Record<string, unknown>;
 }
 
 export interface ServiceTemplate {

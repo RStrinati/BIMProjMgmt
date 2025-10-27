@@ -1,0 +1,52 @@
+[
+  {
+    "bill_rule": "on_setup",
+    "default_units": 1,
+    "lump_sum_fee": 15000,
+    "notes": "Includes DEXP, project kickoff, ACC/Revizto platform setup",
+    "phase": "Phase 4/5 – Digital Initiation",
+    "service_code": "INIT",
+    "service_name": "Digital Initiation (DEXP, Kickoff, ACC/Revizto setup)",
+    "unit_type": "lump_sum"
+  },
+  {
+    "bill_rule": "per_unit_complete",
+    "default_units": 4,
+    "notes": "DD/CD combined; 4 cycles total",
+    "phase": "Phase 4/5 – Digital Production",
+    "service_code": "PROD",
+    "service_name": "BIM Coordination Review Cycles",
+    "unit_rate": 5500,
+    "unit_type": "review"
+  },
+  {
+    "bill_rule": "per_unit_complete",
+    "default_units": 12,
+    "notes": "Construction phase weekly reviews",
+    "phase": "Phase 7 – Digital Production",
+    "service_code": "PROD",
+    "service_name": "BIM Coordination Review Cycles",
+    "unit_rate": 5500,
+    "unit_type": "review"
+  },
+  {
+    "bill_rule": "on_report_issue",
+    "default_units": 1,
+    "lump_sum_fee": 7000,
+    "notes": "Practical Completion review and report",
+    "phase": "Phase 8 – Digital Handover",
+    "service_code": "HANDOVER",
+    "service_name": "PC Report",
+    "unit_type": "lump_sum"
+  },
+  {
+    "bill_rule": "per_unit_complete",
+    "default_units": 3,
+    "notes": "3 image-based field validation reviews",
+    "phase": "Phase 8 – Digital Handover",
+    "service_code": "HANDOVER",
+    "service_name": "Cupix Reviews",
+    "unit_rate": 3333.33,
+    "unit_type": "audit"
+  }
+]

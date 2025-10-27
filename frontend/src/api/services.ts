@@ -57,6 +57,23 @@ export interface ServiceReview {
   is_billed?: boolean;
 }
 
+export type ProjectServicesListResponse =
+  | ProjectService[]
+  | {
+      items?: ProjectService[];
+      services?: ProjectService[];
+      results?: ProjectService[];
+      total?: number;
+      total_count?: number;
+      count?: number;
+      page?: number;
+      page_size?: number;
+      limit?: number;
+      aggregate?: Record<string, unknown>;
+      summary?: Record<string, unknown>;
+      meta?: Record<string, unknown>;
+    };
+
 // Service Templates API
 export const serviceTemplatesApi = {
   getAll: () => apiClient.get<ServiceTemplate[]>('/service_templates'),
@@ -92,8 +109,10 @@ export const fileServiceTemplatesApi = {
 
 // Project Services API
 export const projectServicesApi = {
-  getAll: (projectId: number) =>
-    apiClient.get<ProjectService[]>(`/projects/${projectId}/services`),
+  getAll: (projectId: number, params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<ProjectServicesListResponse>(`/projects/${projectId}/services`, { params })
+      .then((response) => response.data),
 
   applyTemplate: (
     projectId: number,

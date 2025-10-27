@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Profiler, useCallback, type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -27,6 +27,7 @@ import {
   Tabs,
   Tab,
   Stack,
+  TablePagination,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,7 +36,9 @@ import {
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { projectServicesApi, serviceReviewsApi, serviceItemsApi, fileServiceTemplatesApi } from '@/api';
+import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService, ServiceReview, ServiceItem, FileServiceTemplate, ApplyTemplateResult } from '@/types/api';
+import { profilerLog } from '@/utils/perfLogger';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -97,6 +100,140 @@ const ITEM_PRIORITIES = [
   'critical'
 ];
 
+type BillingSummary = {
+  totalAgreed: number;
+  totalBilled: number;
+  totalRemaining: number;
+  progress: number;
+};
+
+const pickNumber = (...candidates: Array<unknown>): number | undefined => {
+  for (const candidate of candidates) {
+    const numeric = typeof candidate === 'number' ? candidate : Number(candidate);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return undefined;
+};
+
+const unwrapServicesPayload = (input: unknown): unknown => {
+  let current = input;
+  let depth = 0;
+  while (
+    current &&
+    typeof current === 'object' &&
+    'data' in (current as Record<string, unknown>) &&
+    depth < 3
+  ) {
+    const next = (current as Record<string, unknown>).data;
+    if (next === current) {
+      break;
+    }
+    current = next;
+    depth += 1;
+  }
+  return current;
+};
+
+const normaliseServicesPayload = (
+  payload: ProjectServicesListResponse | undefined,
+  defaults: { page: number; pageSize: number },
+) => {
+  const base = unwrapServicesPayload(payload);
+
+  const candidateArrays: Array<ProjectService[] | null> = [
+    Array.isArray(base) ? (base as ProjectService[]) : null,
+    Array.isArray((base as any)?.services) ? ((base as any)?.services as ProjectService[]) : null,
+    Array.isArray((base as any)?.items) ? ((base as any)?.items as ProjectService[]) : null,
+    Array.isArray((base as any)?.results) ? ((base as any)?.results as ProjectService[]) : null,
+  ];
+
+  const items = candidateArrays.find((value): value is ProjectService[] => Array.isArray(value)) ?? [];
+
+  const total =
+    pickNumber(
+      (base as any)?.total,
+      (base as any)?.total_count,
+      (base as any)?.count,
+      (base as any)?.meta?.total,
+      items.length,
+    ) ?? items.length;
+
+  const page =
+    pickNumber((base as any)?.page, (base as any)?.current_page, (base as any)?.meta?.page) ??
+    defaults.page;
+
+  const pageSize =
+    pickNumber(
+      (base as any)?.page_size,
+      (base as any)?.limit,
+      (base as any)?.meta?.page_size,
+      defaults.pageSize,
+      items.length || defaults.pageSize,
+    ) ?? defaults.pageSize;
+
+  const aggregate = ((base as any)?.aggregate ?? (base as any)?.summary ?? (base as any)?.totals ?? (base as any)?.meta?.aggregate) as Record<string, unknown> | undefined;
+
+  return {
+    items,
+    total: total < 0 ? items.length : total,
+    aggregate,
+    isServerPaginated: total > items.length,
+    page: page > 0 ? page : defaults.page,
+    pageSize: pageSize > 0 ? pageSize : defaults.pageSize,
+  };
+};
+
+const mapAggregateToSummary = (aggregate?: Record<string, unknown>): BillingSummary | undefined => {
+  if (!aggregate) {
+    return undefined;
+  }
+
+  const totalAgreed =
+    pickNumber(
+      (aggregate as any).total_agreed_fee,
+      (aggregate as any).totalAgreed,
+      (aggregate as any).total_agreed,
+      (aggregate as any).contract_sum,
+    ) ?? 0;
+
+  const totalBilled =
+    pickNumber(
+      (aggregate as any).total_billed,
+      (aggregate as any).billed_amount,
+      (aggregate as any).total_billed_amount,
+      (aggregate as any).billed_sum,
+    ) ?? 0;
+
+  const totalRemainingCandidate =
+    pickNumber(
+      (aggregate as any).total_remaining,
+      (aggregate as any).remaining_fee,
+      (aggregate as any).total_remaining_fee,
+    ) ?? totalAgreed - totalBilled;
+
+  let progress =
+    pickNumber(
+      (aggregate as any).billing_progress_pct,
+      (aggregate as any).progress_pct,
+      typeof (aggregate as any).billed_ratio === 'number'
+        ? (aggregate as any).billed_ratio * 100
+        : Number((aggregate as any).billed_ratio) * 100,
+    ) ?? 0;
+
+  if (!Number.isFinite(progress) && totalAgreed > 0) {
+    progress = (totalBilled / totalAgreed) * 100;
+  }
+
+  return {
+    totalAgreed,
+    totalBilled,
+    totalRemaining: Math.max(Number.isFinite(totalRemainingCandidate) ? totalRemainingCandidate : totalAgreed - totalBilled, 0),
+    progress: Math.min(Math.max(Number.isFinite(progress) ? progress : 0, 0), 100),
+  };
+};
+
 export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const queryClient = useQueryClient();
   const [serviceTabValue, setServiceTabValue] = useState(0);
@@ -106,6 +243,8 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [servicesPage, setServicesPage] = useState(0);
+  const [servicesRowsPerPage, setServicesRowsPerPage] = useState(10);
   const [serviceFormData, setServiceFormData] = useState({
     service_code: '',
     service_name: '',
@@ -153,12 +292,17 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
   // Fetch project services
   const {
-    data: services,
+    data: servicesPayload,
     isLoading: servicesLoading,
     error: servicesError,
   } = useQuery({
-    queryKey: ['projectServices', projectId],
-    queryFn: () => projectServicesApi.getAll(projectId),
+    queryKey: ['projectServices', projectId, servicesPage, servicesRowsPerPage],
+    queryFn: () =>
+      projectServicesApi.getAll(projectId, {
+        page: servicesPage + 1,
+        limit: servicesRowsPerPage,
+      }),
+    keepPreviousData: true,
   });
 
   // Fetch service reviews when a service is selected
@@ -198,8 +342,67 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     },
   });
 
-  const servicesData: ProjectService[] = services?.data ?? [];
+  const normalizedServices = useMemo(
+    () =>
+      normaliseServicesPayload(servicesPayload as ProjectServicesListResponse | undefined, {
+        page: servicesPage + 1,
+        pageSize: servicesRowsPerPage,
+      }),
+    [servicesPayload, servicesPage, servicesRowsPerPage],
+  );
+
+  const {
+    items: servicesData,
+    total: totalServices,
+    aggregate: servicesAggregate,
+    isServerPaginated,
+    page: serverPage,
+    pageSize: serverPageSize,
+  } = normalizedServices;
+  const serverPageIndex = Math.max(0, serverPage - 1);
+
   const fileTemplateOptions: FileServiceTemplate[] = fileTemplates ?? [];
+
+  useEffect(() => {
+    setServicesPage(0);
+  }, [projectId]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(totalServices / servicesRowsPerPage) - 1);
+    if (servicesPage > maxPage) {
+      setServicesPage(maxPage);
+    }
+  }, [totalServices, servicesPage, servicesRowsPerPage]);
+
+  useEffect(() => {
+    if (isServerPaginated && serverPageIndex !== servicesPage) {
+      setServicesPage(serverPageIndex);
+    }
+  }, [isServerPaginated, serverPageIndex, servicesPage]);
+
+  useEffect(() => {
+    if (isServerPaginated && serverPageSize > 0 && serverPageSize !== servicesRowsPerPage) {
+      setServicesRowsPerPage(serverPageSize);
+    }
+  }, [isServerPaginated, serverPageSize, servicesRowsPerPage]);
+
+  const paginatedServices = useMemo(() => {
+    if (isServerPaginated) {
+      return servicesData;
+    }
+    const start = servicesPage * servicesRowsPerPage;
+    return servicesData.slice(start, start + servicesRowsPerPage);
+  }, [isServerPaginated, servicesData, servicesPage, servicesRowsPerPage]);
+
+  const handleChangeServicesPage = (_event: unknown, newPage: number) => {
+    setServicesPage(newPage);
+  };
+
+  const handleChangeServicesRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = Number(event.target.value) || 10;
+    setServicesRowsPerPage(nextValue);
+    setServicesPage(0);
+  };
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
@@ -214,28 +417,62 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     return `${numeric.toFixed(1)}%`;
   };
 
-  const billingSummary = useMemo(() => {
+  const rowsPerPageOptions = useMemo(() => {
+    const base = [5, 10, 25, 50];
+    if (isServerPaginated && serverPageSize > 0 && !base.includes(serverPageSize)) {
+      return [...base, serverPageSize].sort((a, b) => a - b);
+    }
+    return base;
+  }, [isServerPaginated, serverPageSize]);
+
+  const aggregatedSummary = useMemo(
+    () => mapAggregateToSummary(servicesAggregate),
+    [servicesAggregate],
+  );
+
+  const billingSummary = useMemo<BillingSummary>(() => {
+    if (aggregatedSummary) {
+      return aggregatedSummary;
+    }
+
     const totals = servicesData.reduce(
       (acc, service) => {
         const agreed = service.agreed_fee ?? 0;
-        const billed =
-          service.billed_amount ?? service.claimed_to_date ?? 0;
-        acc.totalAgreed += agreed;
-        acc.totalBilled += billed;
-        return acc;
+        const billed = service.billed_amount ?? service.claimed_to_date ?? 0;
+        return {
+          totalAgreed: acc.totalAgreed + agreed,
+          totalBilled: acc.totalBilled + billed,
+        };
       },
-      { totalAgreed: 0, totalBilled: 0 }
+      { totalAgreed: 0, totalBilled: 0 },
     );
+
     const totalRemaining = Math.max(totals.totalAgreed - totals.totalBilled, 0);
     const progress =
       totals.totalAgreed > 0 ? (totals.totalBilled / totals.totalAgreed) * 100 : 0;
+
     return {
       totalAgreed: totals.totalAgreed,
       totalBilled: totals.totalBilled,
       totalRemaining,
       progress: Math.min(Math.max(progress, 0), 100),
     };
-  }, [servicesData]);
+  }, [aggregatedSummary, servicesData]);
+
+  const isPartialSummary = isServerPaginated && !aggregatedSummary;
+
+  const effectivePageSize = isServerPaginated ? serverPageSize : servicesRowsPerPage;
+  const safePageSize = effectivePageSize > 0 ? effectivePageSize : servicesRowsPerPage;
+  const displayPageIndex = isServerPaginated ? serverPageIndex : servicesPage;
+  const displayStart = totalServices === 0 ? 0 : displayPageIndex * safePageSize + 1;
+  const displayEnd =
+    totalServices === 0
+      ? 0
+      : Math.min(displayStart + paginatedServices.length - 1, totalServices);
+  const displayRangeText =
+    totalServices === 0
+      ? 'No services loaded'
+      : `Showing ${displayStart}-${displayEnd} of ${totalServices} services`;
 
   const getStatusColor = (
     status: string
@@ -566,29 +803,43 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     }
   };
 
-  const handleServiceSelect = (service: ProjectService) => {
-    setSelectedService(service);
-    setServiceTabValue(1); // Switch to reviews tab
-  };
+  const handleServiceSelect = useCallback(
+    (service: ProjectService) => {
+      if (!isServerPaginated) {
+        const targetIndex = servicesData.findIndex((item) => item.service_id === service.service_id);
+        if (targetIndex >= 0) {
+          setServicesPage(Math.floor(targetIndex / servicesRowsPerPage));
+        }
+      }
+      setSelectedService(service);
+      setServiceTabValue(1); // Switch to reviews tab
+    },
+    [isServerPaginated, servicesData, servicesRowsPerPage],
+  );
 
   if (servicesLoading) {
     return (
-      <Box display="flex" justifyContent="center" p={4}>
-        <CircularProgress />
-      </Box>
+      <Profiler id="ProjectServicesTab:loading" onRender={profilerLog}>
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      </Profiler>
     );
   }
 
   if (servicesError) {
     return (
-      <Alert severity="error" sx={{ m: 2 }}>
-        Failed to load services: {servicesError.message}
-      </Alert>
+      <Profiler id="ProjectServicesTab:error" onRender={profilerLog}>
+        <Alert severity="error" sx={{ m: 2 }}>
+          Failed to load services: {servicesError.message}
+        </Alert>
+      </Profiler>
     );
   }
 
   return (
-    <Box>
+    <Profiler id="ProjectServicesTab" onRender={profilerLog}>
+      <Box>
       <Box
         display="flex"
         justifyContent="space-between"
@@ -643,24 +894,34 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             {formatCurrency(billingSummary.totalBilled)}
           </Typography>
         </Paper>
-        <Paper sx={{ p: 2, flex: '1 1 240px', minWidth: 220 }} elevation={1}>
-          <Typography variant="subtitle2" color="text.secondary">
-            Agreed Fee Remaining
+      <Paper sx={{ p: 2, flex: '1 1 240px', minWidth: 220 }} elevation={1}>
+        <Typography variant="subtitle2" color="text.secondary">
+          Agreed Fee Remaining
+        </Typography>
+        <Typography variant="h6">
+          {formatCurrency(billingSummary.totalRemaining)}
+        </Typography>
+        <Box mt={1}>
+          <LinearProgress
+            variant="determinate"
+            value={billingSummary.progress}
+            sx={{ height: 8, borderRadius: 4 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {formatPercent(billingSummary.progress)} billed
           </Typography>
-          <Typography variant="h6">
-            {formatCurrency(billingSummary.totalRemaining)}
+        </Box>
+      </Paper>
+    </Box>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          {displayRangeText}
+        </Typography>
+        {isPartialSummary && (
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+            Totals reflect the current page until the API provides aggregated rollups.
           </Typography>
-          <Box mt={1}>
-            <LinearProgress
-              variant="determinate"
-              value={billingSummary.progress}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-            <Typography variant="caption" color="text.secondary">
-              {formatPercent(billingSummary.progress)} billed
-            </Typography>
-          </Box>
-        </Paper>
+        )}
       </Box>
 
       <Tabs value={serviceTabValue} onChange={(_, newValue) => {
@@ -690,7 +951,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {servicesData.map((service) => (
+              {paginatedServices.map((service) => (
                 <TableRow key={service.service_id}>
                   <TableCell>{service.service_code}</TableCell>
                   <TableCell>{service.service_name}</TableCell>
@@ -733,6 +994,15 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={totalServices}
+          page={servicesPage}
+          onPageChange={handleChangeServicesPage}
+          rowsPerPage={servicesRowsPerPage}
+          onRowsPerPageChange={handleChangeServicesRowsPerPage}
+          rowsPerPageOptions={rowsPerPageOptions}
+        />
       </TabPanel>
 
       <TabPanel value={serviceTabValue} index={1}>
@@ -1262,6 +1532,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+      </Box>
+    </Profiler>
   );
 }

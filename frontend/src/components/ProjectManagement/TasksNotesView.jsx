@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, Profiler, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
   Chip,
   Checkbox,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   Grid,
   IconButton,
@@ -24,17 +20,19 @@ import {
   TextField,
   Typography,
   Paper,
+  TablePagination,
 } from '@mui/material';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { format } from 'date-fns';
 import { tasksApi } from '@/api/tasks';
 import { projectsApi } from '@/api/projects';
 import { usersApi } from '@/api/users';
+import { profilerLog } from '@/utils/perfLogger';
 
 const defaultFilters = {
   dateFrom: null,
@@ -56,7 +54,7 @@ const defaultFormState = {
 
 const asDisplayDate = (value) => {
   if (!value) {
-    return '—';
+    return '--';
   }
   try {
     return format(new Date(value), 'EEE, MMM d');
@@ -88,7 +86,7 @@ const buildTimeRange = (start, end) => {
   if (cleanEnd) {
     return cleanEnd;
   }
-  return '—';
+  return '--';
 };
 
 const normaliseItems = (items = []) =>
@@ -100,6 +98,31 @@ const normaliseItems = (items = []) =>
       notes: item.notes ?? '',
     }));
 
+const mapItemsForForm = (items = []) =>
+  items.map((item) => ({
+    label: item?.label ?? item?.title ?? '',
+    completed: Boolean(item?.completed),
+    notes: item?.notes ?? '',
+  }));
+
+const toTimeInputValue = (value) => {
+  if (!value) {
+    return '';
+  }
+  return typeof value === 'string' && value.length > 5 ? value.slice(0, 5) : value;
+};
+
+const toApiDate = (value) => {
+  if (!value) {
+    return undefined;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return format(date, 'yyyy-MM-dd');
+};
+
 export function TasksNotesView() {
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
@@ -108,11 +131,23 @@ export function TasksNotesView() {
   const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState(defaultFilters);
   const [showFilters, setShowFilters] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeTask, setActiveTask] = useState(null);
   const [formState, setFormState] = useState(defaultFormState);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [pendingToggleKey, setPendingToggleKey] = useState(null);
+  const [inlineMode, setInlineMode] = useState(false);
+  const [inlineAnchor, setInlineAnchor] = useState(null);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [totalTasks, setTotalTasks] = useState(0);
+
+  const updateFilters = useCallback((updater) => {
+    setFilters((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next;
+    });
+    setPage(0);
+  }, []);
 
   const loadLookups = useCallback(async () => {
     try {
@@ -131,16 +166,42 @@ export function TasksNotesView() {
     try {
       setLoadingTasks(true);
       setLoadError('');
-      const data = await tasksApi.getNotesView();
-      setTasks(Array.isArray(data) ? data : []);
+
+      const requestFilters = {
+        project_id: filters.projectId ? Number(filters.projectId) : undefined,
+        user_id: filters.userId ? Number(filters.userId) : undefined,
+        date_from: toApiDate(filters.dateFrom),
+        date_to: toApiDate(filters.dateTo),
+        page: page + 1,
+        limit: rowsPerPage,
+      };
+
+      const result = await tasksApi.getNotesView(requestFilters);
+      const fetchedTasks = Array.isArray(result.tasks) ? result.tasks : [];
+
+      setTasks(fetchedTasks);
+      setTotalTasks(
+        typeof result.total === 'number' && Number.isFinite(result.total)
+          ? result.total
+          : fetchedTasks.length,
+      );
+
+      if (typeof result.page === 'number' && result.page > 0 && result.page - 1 !== page) {
+        setPage(result.page - 1);
+      }
+
+      if (typeof result.pageSize === 'number' && result.pageSize > 0 && result.pageSize !== rowsPerPage) {
+        setRowsPerPage(result.pageSize);
+      }
     } catch (error) {
       console.error('Failed to load tasks', error);
       setLoadError('Unable to load tasks. Please try again.');
       setTasks([]);
+      setTotalTasks(0);
     } finally {
       setLoadingTasks(false);
     }
-  }, []);
+  }, [filters, page, rowsPerPage]);
 
   useEffect(() => {
     loadLookups();
@@ -180,37 +241,95 @@ export function TasksNotesView() {
     });
   }, [filters, tasks]);
 
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(totalTasks / rowsPerPage) - 1);
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [page, rowsPerPage, totalTasks]);
+
+  const isServerPaginated = totalTasks > tasks.length;
+
+  const paginatedTasks = useMemo(() => {
+    if (isServerPaginated) {
+      return filteredTasks;
+    }
+    const start = page * rowsPerPage;
+    return filteredTasks.slice(start, start + rowsPerPage);
+  }, [filteredTasks, isServerPaginated, page, rowsPerPage]);
+
+  useEffect(() => {
+    if (!isServerPaginated) {
+      setTotalTasks(filteredTasks.length);
+    }
+  }, [filteredTasks.length, isServerPaginated]);
+
+  const taskRowsPerPageOptions = useMemo(() => {
+    const base = [10, 25, 50, 100];
+    if (rowsPerPage > 0 && !base.includes(rowsPerPage)) {
+      return [...base, rowsPerPage].sort((a, b) => a - b);
+    }
+    return base;
+  }, [rowsPerPage]);
+
+  const tasksDisplayStart = totalTasks === 0 ? 0 : page * rowsPerPage + 1;
+  const tasksDisplayEnd =
+    totalTasks === 0 ? 0 : Math.min(tasksDisplayStart + paginatedTasks.length - 1, totalTasks);
+  const tasksDisplayRangeText =
+    totalTasks === 0
+      ? 'No tasks loaded'
+      : `Showing ${tasksDisplayStart}-${tasksDisplayEnd} of ${totalTasks} tasks`;
+
   const resetForm = () => {
     setFormState(defaultFormState);
-    setActiveTask(null);
+    setInlineMode(false);
+    setInlineAnchor(null);
+    setEditingTaskId(null);
   };
 
-  const handleOpenCreate = () => {
-    resetForm();
-    setDialogOpen(true);
+  const handleStartInlineCreate = (anchor = 'top') => {
+    const defaultDate =
+      filters.dateFrom instanceof Date ? new Date(filters.dateFrom) : new Date();
+    const defaultProject = filters.projectId ? String(filters.projectId) : '';
+    setFormState({
+      ...defaultFormState,
+      task_date: defaultDate,
+      project_id: defaultProject,
+    });
+    if (anchor === 'top') {
+      setPage(0);
+    } else {
+      const targetIndex = filteredTasks.findIndex((task) => task.task_id === anchor);
+      if (targetIndex >= 0) {
+        setPage(Math.floor(targetIndex / rowsPerPage));
+      }
+    }
+    setInlineAnchor(anchor);
+    setInlineMode(true);
+    setEditingTaskId(null);
   };
 
-  const handleOpenEdit = (task) => {
-    setActiveTask(task);
+  const handleStartEdit = (task) => {
+    const dateValue = task.task_date ? new Date(task.task_date) : null;
+    const safeDate =
+      dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue : new Date();
     setFormState({
       task_name: task.task_name ?? '',
       project_id: task.project_id ? String(task.project_id) : '',
-      task_date: task.task_date ? new Date(task.task_date) : null,
-      time_start: task.time_start ?? '',
-      time_end: task.time_end ?? '',
+      task_date: safeDate,
+      time_start: toTimeInputValue(task.time_start),
+      time_end: toTimeInputValue(task.time_end),
       assigned_to: task.assigned_to ? String(task.assigned_to) : '',
       notes: task.notes ?? '',
-      task_items: normaliseItems(task.task_items),
+      task_items: mapItemsForForm(task.task_items ?? []),
     });
-    setDialogOpen(true);
-  };
-
-  const handleDialogClose = () => {
-    if (formSubmitting) {
-      return;
+    const targetIndex = filteredTasks.findIndex((item) => item.task_id === task.task_id);
+    if (targetIndex >= 0) {
+      setPage(Math.floor(targetIndex / rowsPerPage));
     }
-    setDialogOpen(false);
-    resetForm();
+    setInlineAnchor(task.task_id);
+    setInlineMode(true);
+    setEditingTaskId(task.task_id);
   };
 
   const handleFormFieldChange = (field, value) => {
@@ -281,10 +400,15 @@ export function TasksNotesView() {
 
     setFormSubmitting(true);
     try {
+      const taskDateIso = formState.task_date
+        ? format(formState.task_date, 'yyyy-MM-dd')
+        : format(new Date(), 'yyyy-MM-dd');
       const payload = {
         task_name: formState.task_name.trim(),
         project_id: Number(formState.project_id),
-        task_date: formState.task_date ? format(formState.task_date, 'yyyy-MM-dd') : null,
+        task_date: taskDateIso,
+        start_date: taskDateIso,
+        end_date: taskDateIso,
         time_start: formState.time_start || null,
         time_end: formState.time_end || null,
         assigned_to: formState.assigned_to ? Number(formState.assigned_to) : null,
@@ -292,14 +416,12 @@ export function TasksNotesView() {
         task_items: normaliseItems(formState.task_items),
       };
 
-      if (activeTask) {
-        await tasksApi.update(activeTask.task_id, payload);
+      if (editingTaskId) {
+        await tasksApi.update(editingTaskId, payload);
       } else {
         await tasksApi.create(payload);
       }
-
       await loadTasks();
-      setDialogOpen(false);
       resetForm();
     } catch (error) {
       console.error('Failed to save task', error);
@@ -337,9 +459,176 @@ export function TasksNotesView() {
     }
   };
 
+  const handleInlineKeyDown = (event) => {
+    if (!inlineMode) {
+      return;
+    }
+    if (event.ctrlKey && event.key === '1') {
+      event.preventDefault();
+      handleAddItem();
+    } else if (event.shiftKey && event.key === 'Enter') {
+      event.preventDefault();
+      handleAddItem();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      resetForm();
+    }
+  };
+
+  const renderInlineCreateRow = (anchorKey) => {
+    const isEditing = Boolean(editingTaskId);
+    return (
+    <TableRow
+      key={`inline-${anchorKey}`}
+      sx={{ backgroundColor: 'background.paper' }}
+      onKeyDown={handleInlineKeyDown}
+      tabIndex={-1}
+    >
+      <TableCell>
+        <DatePicker
+          value={formState.task_date}
+          onChange={(value) => handleFormFieldChange('task_date', value)}
+          slotProps={{ textField: { size: 'small', fullWidth: true } }}
+        />
+      </TableCell>
+      <TableCell>
+        <Box display="flex" gap={1}>
+          <TextField
+            label="Start"
+            type="time"
+            size="small"
+            value={formState.time_start}
+            onChange={(event) => handleFormFieldChange('time_start', event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="End"
+            type="time"
+            size="small"
+            value={formState.time_end}
+            onChange={(event) => handleFormFieldChange('time_end', event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+        </Box>
+      </TableCell>
+      <TableCell>
+        <FormControl fullWidth size="small">
+          <InputLabel id="inline-project">Project</InputLabel>
+          <Select
+            labelId="inline-project"
+            label="Project"
+            value={formState.project_id}
+            onChange={(event) => handleFormFieldChange('project_id', event.target.value)}
+          >
+            {projects.map((project) => (
+              <MenuItem key={project.project_id} value={project.project_id}>
+                {project.project_name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </TableCell>
+      <TableCell sx={{ minWidth: 220 }}>
+        <TextField
+          label="Task name"
+          value={formState.task_name}
+          size="small"
+          fullWidth
+          autoFocus
+          onChange={(event) => handleFormFieldChange('task_name', event.target.value)}
+        />
+        <FormControl fullWidth size="small" sx={{ mt: 1 }}>
+          <InputLabel id="inline-assignee">Assigned to</InputLabel>
+          <Select
+            labelId="inline-assignee"
+            label="Assigned to"
+            value={formState.assigned_to}
+            onChange={(event) => handleFormFieldChange('assigned_to', event.target.value)}
+          >
+            <MenuItem value="">Unassigned</MenuItem>
+            {users.map((user) => (
+              <MenuItem key={user.user_id} value={user.user_id}>
+                {user.full_name ?? user.name ?? user.username ?? `User ${user.user_id}`}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </TableCell>
+      <TableCell>
+        <Box display="flex" flexDirection="column" gap={0.5}>
+          {(formState.task_items ?? []).map((item, index) => (
+            <Box key={index} display="flex" alignItems="center" gap={1}>
+              <Checkbox
+                size="small"
+                checked={Boolean(item.completed)}
+                onChange={(event) => handleItemChange(index, 'completed', event.target.checked)}
+              />
+              <TextField
+                size="small"
+                value={item.label}
+                placeholder={`Item ${index + 1}`}
+                onChange={(event) => handleItemChange(index, 'label', event.target.value)}
+              />
+              <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleAddItem}
+            variant="text"
+          >
+            Add Item
+          </Button>
+        </Box>
+      </TableCell>
+      <TableCell>
+        <Chip
+          label={`${(formState.task_items ?? []).filter((item) => item.completed).length}/${
+            formState.task_items?.length ?? 0
+          }`}
+        />
+      </TableCell>
+      <TableCell>
+        <TextField
+          value={formState.notes}
+          onChange={(event) => handleFormFieldChange('notes', event.target.value)}
+          placeholder="Notes"
+          multiline
+          minRows={2}
+          size="small"
+          fullWidth
+        />
+      </TableCell>
+      <TableCell align="right">
+        <Box display="flex" gap={1} justifyContent="flex-end">
+          <Button variant="outlined" size="small" onClick={resetForm} disabled={formSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleSubmitForm}
+            disabled={formSubmitting || !formState.task_name?.trim() || !formState.project_id}
+          >
+            {formSubmitting ? (
+              <CircularProgress size={18} />
+            ) : (
+              isEditing ? 'Update Task' : 'Create Task'
+            )}
+          </Button>
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+  };
+
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box display="flex" flexDirection="column" gap={3}>
+    <Profiler id="TasksNotesView" onRender={profilerLog}>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <Box display="flex" flexDirection="column" gap={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h5" fontWeight={600}>
             Tasks &amp; Notes
@@ -352,8 +641,13 @@ export function TasksNotesView() {
             >
               {showFilters ? 'Hide Filters' : 'Show Filters'}
             </Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
-              New Task
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleStartInlineCreate('top')}
+              disabled={inlineMode}
+            >
+              Add Task Row
             </Button>
           </Box>
         </Box>
@@ -365,7 +659,12 @@ export function TasksNotesView() {
                 <DatePicker
                   label="Date from"
                   value={filters.dateFrom}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, dateFrom: value }))}
+                  onChange={(value) =>
+                    updateFilters((prev) => ({
+                      ...prev,
+                      dateFrom: value,
+                    }))
+                  }
                   slotProps={{ textField: { fullWidth: true, size: 'small' } }}
                 />
               </Grid>
@@ -373,7 +672,12 @@ export function TasksNotesView() {
                 <DatePicker
                   label="Date to"
                   value={filters.dateTo}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, dateTo: value }))}
+                  onChange={(value) =>
+                    updateFilters((prev) => ({
+                      ...prev,
+                      dateTo: value,
+                    }))
+                  }
                   slotProps={{ textField: { fullWidth: true, size: 'small' } }}
                 />
               </Grid>
@@ -385,7 +689,10 @@ export function TasksNotesView() {
                     label="Project"
                     value={filters.projectId}
                     onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, projectId: event.target.value }))
+                      updateFilters((prev) => ({
+                        ...prev,
+                        projectId: event.target.value,
+                      }))
                     }
                   >
                     <MenuItem value="">All projects</MenuItem>
@@ -405,7 +712,10 @@ export function TasksNotesView() {
                     label="Assigned"
                     value={filters.userId}
                     onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, userId: event.target.value }))
+                      updateFilters((prev) => ({
+                        ...prev,
+                        userId: event.target.value,
+                      }))
                     }
                   >
                     <MenuItem value="">All users</MenuItem>
@@ -418,7 +728,9 @@ export function TasksNotesView() {
                 </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <Button onClick={() => setFilters(defaultFilters)}>Reset Filters</Button>
+                <Button onClick={() => updateFilters(() => ({ ...defaultFilters }))}>
+                  Reset Filters
+                </Button>
               </Grid>
             </Grid>
           </Paper>
@@ -445,233 +757,137 @@ export function TasksNotesView() {
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
-              ) : filteredTasks.length ? (
-                filteredTasks.map((task) => {
-                  const progress = calculateProgress(task);
-                  return (
-                    <TableRow key={task.task_id} hover>
-                      <TableCell>{asDisplayDate(task.task_date)}</TableCell>
-                      <TableCell>{buildTimeRange(task.time_start, task.time_end)}</TableCell>
-                      <TableCell>{resolveProjectName(task)}</TableCell>
-                      <TableCell>
-                        <Typography variant="subtitle2">{task.task_name}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {resolveUserName(task)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" flexDirection="column" gap={0.5}>
-                          {(task.task_items ?? []).map((item, index) => {
-                            const toggleKey = `${task.task_id}-${index}`;
-                            const disabled = pendingToggleKey === toggleKey;
-                            return (
-                              <Box
-                                key={toggleKey}
-                                display="flex"
-                                alignItems="center"
-                                gap={1}
-                              >
-                                <Checkbox
-                                  size="small"
-                                  checked={Boolean(item?.completed)}
-                                  disabled={disabled}
-                                  onChange={() => handleToggleItem(task.task_id, index)}
-                                />
-                                <Typography variant="body2">
-                                  {item?.label ?? item?.title ?? `Item ${index + 1}`}
+              ) : (
+                <>
+                  {inlineMode && inlineAnchor === 'top' && page === 0 && renderInlineCreateRow('top')}
+                  {paginatedTasks.length ? (
+                    paginatedTasks.map((task) => {
+                      const progress = calculateProgress(task);
+                      const isEditingRow =
+                        inlineMode && inlineAnchor === task.task_id && editingTaskId === task.task_id;
+                      return (
+                        <Fragment key={task.task_id}>
+                          {!isEditingRow && (
+                            <TableRow hover>
+                              <TableCell>{asDisplayDate(task.task_date)}</TableCell>
+                              <TableCell>{buildTimeRange(task.time_start, task.time_end)}</TableCell>
+                              <TableCell>{resolveProjectName(task)}</TableCell>
+                              <TableCell>
+                                <Typography variant="subtitle2">{task.task_name}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {resolveUserName(task)}
                                 </Typography>
-                              </Box>
-                            );
-                          })}
-                          {!(task.task_items ?? []).length && (
-                            <Typography variant="body2" color="text.secondary">
-                              No checklist items
-                            </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Box display="flex" flexDirection="column" gap={0.5}>
+                                  {(task.task_items ?? []).map((item, index) => {
+                                    const toggleKey = `${task.task_id}-${index}`;
+                                    const disabled = pendingToggleKey === toggleKey;
+                                    return (
+                                      <Box
+                                        key={toggleKey}
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={1}
+                                      >
+                                        <Checkbox
+                                          size="small"
+                                          checked={Boolean(item?.completed)}
+                                          disabled={disabled}
+                                          onChange={() => handleToggleItem(task.task_id, index)}
+                                        />
+                                        <Typography variant="body2">
+                                          {item?.label ?? item?.title ?? `Item ${index + 1}`}
+                                        </Typography>
+                                      </Box>
+                                    );
+                                  })}
+                                  {!(task.task_items ?? []).length && (
+                                    <Typography variant="body2" color="text.secondary">
+                                      No checklist items
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={`${progress.completed}/${progress.total}`} color="primary" />
+                              </TableCell>
+                              <TableCell sx={{ minWidth: 180 }}>
+                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                                  {task.notes || '--'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleStartInlineCreate(task.task_id)}
+                                  color={inlineMode && inlineAnchor === task.task_id && !editingTaskId ? 'primary' : 'default'}
+                                  aria-label="Add task below"
+                                >
+                                  <AddIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleStartEdit(task)}
+                                  color={editingTaskId === task.task_id ? 'primary' : 'default'}
+                                  aria-label="Edit task"
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteTask(task)}
+                                  aria-label="Delete task"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={`${progress.completed}/${progress.total}`} color="primary" />
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 180 }}>
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                          {task.notes || '—'}
+                          {inlineMode && inlineAnchor === task.task_id && renderInlineCreateRow(task.task_id)}
+                        </Fragment>
+                      );
+                    })
+                  ) : inlineMode && inlineAnchor === 'top' ? null : (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        <Typography variant="body2" color="text.secondary">
+                          {loadError || 'No tasks match the selected filters.'}
                         </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => handleOpenEdit(task)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteTask(task)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    <Typography variant="body2" color="text.secondary">
-                      {loadError || 'No tasks match the selected filters.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-
-        <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-          <DialogTitle>{activeTask ? 'Edit Task' : 'New Task'}</DialogTitle>
-          <DialogContent dividers>
-            <Box display="flex" flexDirection="column" gap={2} mt={1}>
-              <TextField
-                label="Task name"
-                value={formState.task_name}
-                onChange={(event) => handleFormFieldChange('task_name', event.target.value)}
-                fullWidth
-              />
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel id="task-dialog-project">Project</InputLabel>
-                    <Select
-                      labelId="task-dialog-project"
-                      label="Project"
-                      value={formState.project_id}
-                      onChange={(event) => handleFormFieldChange('project_id', event.target.value)}
-                    >
-                      {projects.map((project) => (
-                        <MenuItem key={project.project_id} value={project.project_id}>
-                          {project.project_name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <DatePicker
-                    label="Task date"
-                    value={formState.task_date}
-                    onChange={(value) => handleFormFieldChange('task_date', value)}
-                    slotProps={{ textField: { fullWidth: true } }}
-                  />
-                </Grid>
-              </Grid>
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Start time"
-                    type="time"
-                    value={formState.time_start}
-                    onChange={(event) => handleFormFieldChange('time_start', event.target.value)}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="End time"
-                    type="time"
-                    value={formState.time_end}
-                    onChange={(event) => handleFormFieldChange('time_end', event.target.value)}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-
-              <FormControl fullWidth>
-                <InputLabel id="task-dialog-user">Assigned to</InputLabel>
-                <Select
-                  labelId="task-dialog-user"
-                  label="Assigned to"
-                  value={formState.assigned_to}
-                  onChange={(event) => handleFormFieldChange('assigned_to', event.target.value)}
-                >
-                  <MenuItem value="">Unassigned</MenuItem>
-                  {users.map((user) => (
-                    <MenuItem key={user.user_id} value={user.user_id}>
-                      {user.full_name ?? user.name ?? user.username ?? `User ${user.user_id}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Box display="flex" flexDirection="column" gap={1}>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography variant="subtitle2">Checklist Items</Typography>
-                  <Button startIcon={<AddIcon />} size="small" onClick={handleAddItem}>
-                    Add Item
-                  </Button>
-                </Box>
-                {(formState.task_items ?? []).map((item, index) => (
-                  <Box
-                    key={index}
-                    display="flex"
-                    alignItems="center"
-                    gap={1}
-                    sx={{ backgroundColor: 'background.paper', p: 1, borderRadius: 1 }}
-                  >
-                    <Checkbox
-                      checked={Boolean(item.completed)}
-                      onChange={(event) =>
-                        handleItemChange(index, 'completed', event.target.checked)
-                      }
-                    />
-                    <TextField
-                      label="Item"
-                      value={item.label}
-                      onChange={(event) => handleItemChange(index, 'label', event.target.value)}
-                      fullWidth
-                    />
-                    <IconButton
-                      color="error"
-                      onClick={() => handleRemoveItem(index)}
-                      aria-label="Remove item"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
-                {!(formState.task_items ?? []).length && (
-                  <Typography variant="body2" color="text.secondary">
-                    No checklist items yet. Add one to build a task checklist.
-                  </Typography>
-                )}
-              </Box>
-
-              <TextField
-                label="Notes"
-                value={formState.notes}
-                onChange={(event) => handleFormFieldChange('notes', event.target.value)}
-                fullWidth
-                multiline
-                minRows={3}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleDialogClose} disabled={formSubmitting}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleSubmitForm}
-              disabled={formSubmitting}
-            >
-              {formSubmitting ? <CircularProgress size={20} /> : 'Save Task'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    </LocalizationProvider>
+        <Box sx={{ px: 2, pb: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block">
+            {tasksDisplayRangeText}
+          </Typography>
+          {isServerPaginated && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              Totals reflect the full dataset reported by the API; adjust pagination to review additional pages.
+            </Typography>
+          )}
+        </Box>
+        <TablePagination
+          component="div"
+          count={totalTasks}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_event, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(event) => {
+            const nextValue = Number(event.target.value) || 10;
+            setRowsPerPage(nextValue);
+            setPage(0);
+          }}
+          rowsPerPageOptions={taskRowsPerPageOptions}
+        />
+        </Box>
+      </LocalizationProvider>
+    </Profiler>
   );
 }

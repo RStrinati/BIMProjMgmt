@@ -1,6 +1,8 @@
 def create_service_template(template_name, description, service_type, parameters, created_by):
     """Insert a new service template."""
     try:
+        if parameters is not None and not isinstance(parameters, str):
+            parameters = json.dumps(parameters)
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -55,6 +57,8 @@ def update_service_template(template_id, template_name=None, description=None, s
             if service_type is not None:
                 update_fields[S.ServiceTemplates.SERVICE_TYPE] = service_type
             if parameters is not None:
+                if not isinstance(parameters, str):
+                    parameters = json.dumps(parameters)
                 update_fields[S.ServiceTemplates.PARAMETERS] = parameters
             if is_active is not None:
                 update_fields[S.ServiceTemplates.IS_ACTIVE] = is_active
@@ -803,6 +807,54 @@ from database_pool import get_db_connection, connect_to_db  # Import both for gr
 logger = logging.getLogger(__name__)
 
 _table_column_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
+_control_model_metadata_supported: Optional[bool] = None
+
+
+def _ensure_control_model_metadata_column(conn) -> bool:
+    """Ensure tblControlModels has metadata_json column for storing structured data."""
+    global _control_model_metadata_supported
+    if _control_model_metadata_supported:
+        return True
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            IF COL_LENGTH('ProjectManagement.dbo.tblControlModels', 'metadata_json') IS NULL
+            BEGIN
+                ALTER TABLE ProjectManagement.dbo.tblControlModels
+                ADD metadata_json NVARCHAR(MAX) NULL;
+            END
+            """
+        )
+        _control_model_metadata_supported = True
+        return True
+    except Exception as exc:
+        logger.warning("Control model metadata column unavailable: %s", exc)
+        _control_model_metadata_supported = False
+        return False
+
+
+def _control_model_metadata_column_exists(conn) -> bool:
+    """Check whether the metadata_json column exists on tblControlModels."""
+    global _control_model_metadata_supported
+    if _control_model_metadata_supported is not None:
+        return _control_model_metadata_supported
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME = 'tblControlModels'
+              AND COLUMN_NAME = 'metadata_json'
+            """
+        )
+        _control_model_metadata_supported = cursor.fetchone() is not None
+    except Exception as exc:
+        logger.warning("Failed to inspect tblControlModels metadata column: %s", exc)
+        _control_model_metadata_supported = False
+    return bool(_control_model_metadata_supported)
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""
@@ -1509,46 +1561,224 @@ def get_project_health_files(project_id):
         return []
 
 
-def get_control_file(project_id):
-    """Retrieve the saved control file for the given project."""
+def get_control_models(project_id) -> List[Dict[str, Any]]:
+    """Fetch control model records for a project, including metadata when available."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT p.project_name, cm.control_file_name
-                FROM ProjectManagement.dbo.tblControlModels cm
-                JOIN ProjectManagement.dbo.projects p ON cm.project_id = p.project_id
-                WHERE cm.project_id = ?
-            """, (project_id,))
+            metadata_supported = _control_model_metadata_column_exists(conn)
+            if metadata_supported:
+                cursor.execute(
+                    """
+                    SELECT id, control_file_name, is_active, created_at, updated_at, metadata_json
+                    FROM ProjectManagement.dbo.tblControlModels
+                    WHERE project_id = ?
+                    ORDER BY is_active DESC, updated_at DESC, id ASC
+                    """,
+                    (project_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT id, control_file_name, is_active, created_at, updated_at
+                    FROM ProjectManagement.dbo.tblControlModels
+                    WHERE project_id = ?
+                    ORDER BY is_active DESC, updated_at DESC, id ASC
+                    """,
+                    (project_id,),
+                )
 
-            row = cursor.fetchone()
-            return row[1] if row else None
+            models: List[Dict[str, Any]] = []
+            rows = cursor.fetchall()
+            for row in rows:
+                model = {
+                    'id': row[0],
+                    'control_file_name': row[1],
+                    'is_active': bool(row[2]) if row[2] is not None else False,
+                    'created_at': row[3],
+                    'updated_at': row[4],
+                }
+                if metadata_supported:
+                    metadata_raw = row[5]
+                    if metadata_raw:
+                        try:
+                            model['metadata'] = json.loads(metadata_raw)
+                        except json.JSONDecodeError:
+                            logger.warning("Invalid control model metadata for project %s (record %s)", project_id, row[0])
+                            model['metadata'] = {}
+                    else:
+                        model['metadata'] = {}
+                models.append(model)
+            return models
     except Exception as e:
-        logger.error(f"❌ Error fetching control file: {e}")
-        return None
+        logger.error(f"Error fetching control models: {e}")
+        return []
 
 
-def set_control_file(project_id, file_name):
-    """Save or update the selected control file for the project."""
+def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
+    """Persist the control models (and metadata) assigned to a project."""
+    normalized: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for entry in models:
+        file_name = entry.get('file_name') or entry.get('control_file_name')
+        if not file_name:
+            continue
+        file_name = str(file_name).strip()
+        if not file_name or file_name.lower() == "no files":
+            continue
+        if file_name in seen:
+            continue
+
+        metadata = entry.get('metadata') or {}
+
+        targets = entry.get('validation_targets') or metadata.get('validation_targets')
+        if targets:
+            normalised_targets = sorted(
+                {
+                    str(target).lower()
+                    for target in targets
+                    if str(target).strip().lower() in CONTROL_VALIDATION_TARGETS
+                }
+            )
+            if not normalised_targets:
+                normalised_targets = sorted(CONTROL_VALIDATION_TARGETS)
+            metadata['validation_targets'] = normalised_targets
+        else:
+            metadata.setdefault('validation_targets', sorted(CONTROL_VALIDATION_TARGETS))
+
+        volume_label = entry.get('volume_label') or metadata.get('volume_label')
+        metadata['volume_label'] = str(volume_label).strip() if volume_label else None
+        notes = entry.get('notes') or metadata.get('notes')
+        metadata['notes'] = str(notes).strip() if notes else None
+        metadata['is_primary'] = bool(entry.get('is_primary') or metadata.get('is_primary'))
+
+        normalized.append({'file_name': file_name, 'metadata': metadata})
+        seen.add(file_name)
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                MERGE dbo.tblControlModels AS target
-                USING (SELECT ? AS project_id, ? AS control_file_name) AS src
-                ON target.project_id = src.project_id
-                WHEN MATCHED THEN 
-                    UPDATE SET control_file_name = src.control_file_name, updated_at = GETDATE()
-                WHEN NOT MATCHED THEN 
-                    INSERT (project_id, control_file_name)
-                    VALUES (src.project_id, src.control_file_name);
-            """, (project_id, file_name))
+            metadata_supported = _ensure_control_model_metadata_column(conn)
+
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.tblControlModels
+                SET is_active = 0
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            )
+
+            if not normalized:
+                conn.commit()
+                return True
+
+            primary_candidates = [model for model in normalized if model['metadata'].get('is_primary')]
+            if not primary_candidates:
+                normalized[0]['metadata']['is_primary'] = True
+                primary_candidates = [normalized[0]]
+
+            ordered_models = [
+                model for model in normalized if not model['metadata'].get('is_primary')
+            ] + primary_candidates
+
+            cursor.execute(
+                """
+                SELECT control_file_name
+                FROM ProjectManagement.dbo.tblControlModels
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            )
+            existing_names = {row[0] for row in cursor.fetchall()}
+
+            for entry in ordered_models:
+                file_name = entry['file_name']
+                metadata = entry['metadata']
+                cleaned_metadata = {
+                    key: value
+                    for key, value in metadata.items()
+                    if value not in (None, '', [])
+                }
+                metadata_json = json.dumps(cleaned_metadata) if cleaned_metadata and metadata_supported else None
+
+                if file_name in existing_names:
+                    if metadata_supported:
+                        cursor.execute(
+                            """
+                            UPDATE ProjectManagement.dbo.tblControlModels
+                            SET is_active = 1,
+                                metadata_json = ?,
+                                updated_at = GETDATE()
+                            WHERE project_id = ? AND control_file_name = ?
+                            """,
+                            (metadata_json, project_id, file_name),
+                        )
+                    else:
+                        cursor.execute(
+                            """
+                            UPDATE ProjectManagement.dbo.tblControlModels
+                            SET is_active = 1,
+                                updated_at = GETDATE()
+                            WHERE project_id = ? AND control_file_name = ?
+                            """,
+                            (project_id, file_name),
+                        )
+                else:
+                    if metadata_supported:
+                        cursor.execute(
+                            """
+                            INSERT INTO ProjectManagement.dbo.tblControlModels
+                                (project_id, control_file_name, is_active, metadata_json, created_at, updated_at)
+                            VALUES (?, ?, 1, ?, GETDATE(), GETDATE())
+                            """,
+                            (project_id, file_name, metadata_json),
+                        )
+                    else:
+                        cursor.execute(
+                            """
+                            INSERT INTO ProjectManagement.dbo.tblControlModels
+                                (project_id, control_file_name, is_active, created_at, updated_at)
+                            VALUES (?, ?, 1, GETDATE(), GETDATE())
+                            """,
+                            (project_id, file_name),
+                        )
+
             conn.commit()
             return True
     except Exception as e:
-        logger.error(f"❌ Error saving control file: {e}")
+        logger.error(f"Error saving control models: {e}")
         return False
-        conn.close()
+
+
+def get_control_file(project_id):
+    """Retrieve the primary control file for the given project."""
+    models = get_control_models(project_id)
+    for model in models:
+        if model.get('is_active') and (model.get('metadata') or {}).get('is_primary'):
+            return model['control_file_name']
+    for model in models:
+        if model.get('is_active'):
+            return model['control_file_name']
+    return None
+
+
+def set_control_file(project_id, file_name):
+    """Save a single control file for the project (legacy helper)."""
+    if not file_name:
+        return set_control_models(project_id, [])
+    return set_control_models(
+        project_id,
+        [{
+            'file_name': file_name,
+            'metadata': {
+                'validation_targets': sorted(CONTROL_VALIDATION_TARGETS),
+                'is_primary': True,
+            },
+        }],
+    )
+
 
 def update_file_validation_status(file_name, status, reason, regex_used,
                                   failed_field=None, failed_value=None, failed_reason=None, discipline=None, discipline_full=None):
@@ -3671,6 +3901,178 @@ def get_project_review_statistics():
         return {}
 
 
+def get_dashboard_timeline(months: Optional[int] = None):
+    """Aggregate project timelines and review schedule data for dashboard visualisations."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            months_filter = months if months and months > 0 else None
+            params: List[Any] = []
+            date_filter_sql = ""
+
+            if months_filter:
+                date_filter_sql = f"""
+                WHERE 
+                    (
+                        (p.{S.Projects.START_DATE} IS NOT NULL AND p.{S.Projects.START_DATE} >= DATEADD(month, ?, CAST(GETDATE() AS date)))
+                        OR
+                        (p.{S.Projects.END_DATE} IS NOT NULL AND p.{S.Projects.END_DATE} >= DATEADD(month, ?, CAST(GETDATE() AS date)))
+                        OR
+                        (UPPER(ISNULL(p.{S.Projects.STATUS}, '')) IN ('ACTIVE', 'IN PROGRESS'))
+                        OR
+                        (p.{S.Projects.START_DATE} IS NULL AND p.{S.Projects.END_DATE} IS NULL)
+                    )
+                """
+                # negative months to look back
+                params.extend([-months_filter, -months_filter])
+
+            cursor.execute(
+                f"""
+                SELECT 
+                    p.{S.Projects.ID},
+                    p.{S.Projects.NAME},
+                    p.{S.Projects.START_DATE},
+                    p.{S.Projects.END_DATE},
+                    p.{S.Projects.PROJECT_MANAGER},
+                    p.{S.Projects.CLIENT_ID},
+                    c.{S.Clients.CLIENT_NAME},
+                    p.{S.Projects.TYPE_ID},
+                    pt.{S.ProjectTypes.TYPE_NAME}
+                FROM {S.Projects.TABLE} p
+                LEFT JOIN {S.Clients.TABLE} c
+                    ON p.{S.Projects.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
+                LEFT JOIN {S.ProjectTypes.TABLE} pt
+                    ON p.{S.Projects.TYPE_ID} = pt.{S.ProjectTypes.TYPE_ID}
+                {date_filter_sql}
+                ORDER BY p.{S.Projects.NAME}
+                """
+            , tuple(params))
+
+            project_rows = cursor.fetchall()
+            project_map: Dict[int, Dict[str, Any]] = {}
+            timeline_dates: List[date] = []
+
+            def _as_iso(value: Any) -> Optional[str]:
+                if isinstance(value, (datetime, date)):
+                    return value.isoformat()
+                if value is None:
+                    return None
+                try:
+                    return value.isoformat()  # type: ignore[attr-defined]
+                except AttributeError:
+                    return str(value)
+
+            def _as_date(value: Any) -> Optional[date]:
+                if isinstance(value, datetime):
+                    return value.date()
+                if isinstance(value, date):
+                    return value
+                return None
+
+            def _as_int(value: Any) -> Optional[int]:
+                if value is None:
+                    return None
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+
+            for row in project_rows:
+                project_id = row[0]
+                start_value = row[2]
+                end_value = row[3]
+
+                start_date = _as_date(start_value)
+                end_date = _as_date(end_value)
+                if start_date:
+                    timeline_dates.append(start_date)
+                if end_date:
+                    timeline_dates.append(end_date)
+
+                project_map[project_id] = {
+                    "project_id": project_id,
+                    "project_name": row[1],
+                    "start_date": _as_iso(start_value),
+                    "end_date": _as_iso(end_value),
+                    "project_manager": row[4],
+                    "client_id": _as_int(row[5]),
+                    "client_name": row[6],
+                    "type_id": _as_int(row[7]),
+                    "project_type": row[8],
+                    "review_items": [],
+                }
+
+            if not project_map:
+                return {"projects": [], "date_range": None}
+
+            placeholders = ", ".join(["?"] * len(project_map))
+            cursor.execute(
+                f"""
+                SELECT 
+                    ps.{S.ProjectServices.PROJECT_ID},
+                    sr.{S.ServiceReviews.REVIEW_ID},
+                    sr.{S.ServiceReviews.PLANNED_DATE},
+                    sr.{S.ServiceReviews.DUE_DATE},
+                    sr.{S.ServiceReviews.STATUS},
+                    ps.{S.ProjectServices.SERVICE_NAME}
+                FROM {S.ServiceReviews.TABLE} sr
+                INNER JOIN {S.ProjectServices.TABLE} ps
+                    ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} IN ({placeholders})
+                ORDER BY 
+                    ps.{S.ProjectServices.PROJECT_ID},
+                    sr.{S.ServiceReviews.PLANNED_DATE},
+                    sr.{S.ServiceReviews.REVIEW_ID}
+                """,
+                tuple(project_map.keys()),
+            )
+
+            review_rows = cursor.fetchall()
+            for row in review_rows:
+                project_id = row[0]
+                if project_id not in project_map:
+                    continue
+
+                planned_value = row[2]
+                due_value = row[3]
+
+                planned_date = _as_date(planned_value)
+                due_date = _as_date(due_value)
+                if planned_date:
+                    timeline_dates.append(planned_date)
+                if due_date:
+                    timeline_dates.append(due_date)
+
+                project_map[project_id]["review_items"].append(
+                    {
+                        "review_id": row[1],
+                        "planned_date": _as_iso(planned_value),
+                        "due_date": _as_iso(due_value),
+                        "status": row[4],
+                        "service_name": row[5],
+                    }
+                )
+
+            date_range: Optional[Dict[str, str]] = None
+            if timeline_dates:
+                min_date = min(timeline_dates)
+                max_date = max(timeline_dates)
+                date_range = {
+                    "min": min_date.isoformat(),
+                    "max": max_date.isoformat(),
+                }
+
+            return {
+                "projects": list(project_map.values()),
+                "date_range": date_range,
+            }
+
+    except Exception as e:
+        logger.error(f"Error fetching dashboard timeline data: {e}")
+        return {"projects": [], "date_range": None}
+
+
 
 
 def _parse_time_input(value: Any) -> Optional[time]:
@@ -3693,6 +4095,29 @@ def _parse_time_input(value: Any) -> Optional[time]:
                 return datetime.strptime(normalised, fmt).time()
             except ValueError:
                 continue
+    return None
+
+
+def _coerce_date_input(value: Any) -> Optional[date]:
+    """Convert supported date formats into a date object."""
+    if value in (None, "", "null"):
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        try:
+            return datetime.fromisoformat(cleaned).date()
+        except ValueError:
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(cleaned, fmt).date()
+                except ValueError:
+                    continue
     return None
 
 
@@ -3874,10 +4299,20 @@ def insert_task_notes_record(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
     else:
         task_items_value = str(task_items_value)
 
+    task_date_value = _coerce_date_input(payload.get(S.Tasks.TASK_DATE))
+    start_date_value = (
+        _coerce_date_input(payload.get(S.Tasks.START_DATE))
+        or task_date_value
+        or datetime.utcnow().date()
+    )
+    end_date_value = _coerce_date_input(payload.get(S.Tasks.END_DATE)) or task_date_value
+
     columns = [
         S.Tasks.TASK_NAME,
         S.Tasks.PROJECT_ID,
         S.Tasks.CYCLE_ID,
+        S.Tasks.START_DATE,
+        S.Tasks.END_DATE,
         S.Tasks.TASK_DATE,
         S.Tasks.TIME_START,
         S.Tasks.TIME_END,
@@ -3891,7 +4326,9 @@ def insert_task_notes_record(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
         payload.get(S.Tasks.TASK_NAME),
         payload.get(S.Tasks.PROJECT_ID),
         payload.get(S.Tasks.CYCLE_ID),
-        payload.get(S.Tasks.TASK_DATE),
+        start_date_value,
+        end_date_value,
+        task_date_value,
         _parse_time_input(time_start),
         _parse_time_input(time_end),
         time_spent,
@@ -3942,8 +4379,12 @@ def update_task_notes_record(task_id: int, updates: Dict[str, Any]) -> Optional[
     set_clauses = []
     params: List[Any] = []
     for column, value in updates.items():
-        if column == S.Tasks.TIME_START or column == S.Tasks.TIME_END:
+        if column in (S.Tasks.TIME_START, S.Tasks.TIME_END):
             value = _parse_time_input(value)
+        elif column in (S.Tasks.START_DATE, S.Tasks.END_DATE, S.Tasks.TASK_DATE):
+            value = _coerce_date_input(value)
+            if column == S.Tasks.START_DATE and value is None:
+                value = datetime.utcnow().date()
         set_clauses.append(f"{column} = ?")
         params.append(value)
 

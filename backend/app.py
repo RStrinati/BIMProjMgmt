@@ -26,6 +26,7 @@ from database import (  # noqa: E402
     create_service_template,
     delete_bookmark,
     delete_client,
+    delete_project,
     delete_project_service,
     delete_review_cycle,
     delete_service_review,
@@ -35,6 +36,7 @@ from database import (  # noqa: E402
     get_all_projects_issues_overview,
     get_bep_matrix,
     get_contractual_links,
+    get_control_models,
     get_cycle_ids,
     get_db_connection,
     get_last_revizto_extraction_run,
@@ -73,6 +75,7 @@ from database import (  # noqa: E402
     update_review_task_assignee,
     update_service_review,
     update_service_template,
+    set_control_models,
     upsert_bep_section,
     update_bep_status,
     update_project_details,
@@ -84,10 +87,11 @@ from shared.project_service import (  # noqa: E402
     ProjectValidationError,
     create_project,
     list_projects_full,
+    invalidate_projects_cache,
     update_project,
 )
 from constants import schema as S  # noqa: E402
-from review_validation import validate_template  # noqa: E402
+from review_validation import ValidationError, validate_template  # noqa: E402
 from review_management_service import ReviewManagementService  # noqa: E402
 from services.project_alias_service import ProjectAliasManager  # noqa: E402
 
@@ -100,6 +104,12 @@ class CustomJSONProvider(DefaultJSONProvider):
     """Custom JSON provider to handle date, datetime, and Decimal objects."""
     
     def default(self, obj):
+        if isinstance(obj, ValidationError):
+            return {
+                'field': obj.field,
+                'message': obj.message,
+                'value': obj.value,
+            }
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         if isinstance(obj, Decimal):
@@ -111,6 +121,112 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "service_templates.json"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.json = CustomJSONProvider(app)
+
+CONTROL_MODEL_TARGETS = ('naming', 'coordinates', 'levels')
+
+
+def _serialize_datetime(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time()).isoformat()
+    return str(value)
+
+
+def _normalise_validation_targets(targets):
+    if not targets:
+        return list(CONTROL_MODEL_TARGETS)
+    seen = []
+    for target in targets:
+        value = str(target).strip().lower()
+        if value in CONTROL_MODEL_TARGETS and value not in seen:
+            seen.append(value)
+    return seen or list(CONTROL_MODEL_TARGETS)
+
+
+def _build_control_model_configuration(project_id: int) -> dict:
+    """Assemble control model configuration payload for API responses."""
+    raw_models = get_control_models(project_id)
+    available_models = get_project_health_files(project_id)
+
+    control_models = []
+    active_models = []
+    primary_name = None
+
+    for raw in raw_models:
+        metadata_source = dict(raw.get('metadata') or {})
+        validation_targets = _normalise_validation_targets(metadata_source.get('validation_targets'))
+        volume_label = metadata_source.get('volume_label') or None
+        notes = metadata_source.get('notes') or None
+        is_primary = bool(metadata_source.get('is_primary'))
+
+        metadata = {
+            'validation_targets': validation_targets,
+            'is_primary': bool(is_primary),
+        }
+        if volume_label:
+            metadata['volume_label'] = volume_label
+        if notes:
+            metadata['notes'] = notes
+
+        control_entry = {
+            'id': raw.get('id'),
+            'file_name': raw.get('control_file_name'),
+            'is_active': bool(raw.get('is_active')),
+            'metadata': metadata,
+            'created_at': _serialize_datetime(raw.get('created_at')),
+            'updated_at': _serialize_datetime(raw.get('updated_at')),
+        }
+        control_models.append(control_entry)
+
+        if control_entry['is_active']:
+            active_models.append(control_entry)
+            if metadata.get('is_primary') and not primary_name:
+                primary_name = control_entry['file_name']
+
+    if active_models and primary_name is None:
+        primary_name = active_models[0]['file_name']
+        active_models[0]['metadata']['is_primary'] = True
+
+    readiness = {
+        target: any(target in (entry['metadata'].get('validation_targets') or []) for entry in active_models)
+        for target in CONTROL_MODEL_TARGETS
+    }
+
+    issues = []
+    if not active_models:
+        issues.append("No control models have been configured for this project.")
+    else:
+        for target, ready in readiness.items():
+            if not ready:
+                issues.append(f"{target.capitalize()} validation does not have an assigned control model.")
+
+    validation_summary = {
+        'naming_ready': readiness['naming'],
+        'coordinates_ready': readiness['coordinates'],
+        'levels_ready': readiness['levels'],
+        'multi_volume_ready': len(active_models) > 1,
+        'active_control_count': len(active_models),
+        'issues': issues,
+    }
+
+    mode = 'none'
+    if len(active_models) == 1:
+        mode = 'single'
+    elif len(active_models) > 1:
+        mode = 'multi'
+
+    return {
+        'project_id': project_id,
+        'available_models': available_models,
+        'control_models': control_models,
+        'primary_control_model': primary_name,
+        'validation_summary': validation_summary,
+        'mode': mode,
+        'validation_targets': list(CONTROL_MODEL_TARGETS),
+    }
 CORS(app)
 
 
@@ -212,6 +328,18 @@ def _extract_task_payload(body):
             task_date = body.get('taskDate')
         payload[S.Tasks.TASK_DATE] = _clean_string(task_date)
 
+    if 'start_date' in body or 'startDate' in body:
+        start_date = body.get('start_date')
+        if start_date is None and 'startDate' in body:
+            start_date = body.get('startDate')
+        payload[S.Tasks.START_DATE] = _clean_string(start_date)
+
+    if 'end_date' in body or 'endDate' in body:
+        end_date = body.get('end_date')
+        if end_date is None and 'endDate' in body:
+            end_date = body.get('endDate')
+        payload[S.Tasks.END_DATE] = _clean_string(end_date)
+
     if 'time_start' in body or 'timeStart' in body:
         time_start = body.get('time_start')
         if time_start is None and 'timeStart' in body:
@@ -245,6 +373,12 @@ def _extract_task_payload(body):
 
     if 'notes' in body:
         payload[S.Tasks.NOTES] = _clean_string(body.get('notes'), allow_empty=True)
+
+    task_date_value = payload.get(S.Tasks.TASK_DATE)
+    if not payload.get(S.Tasks.START_DATE) and task_date_value:
+        payload[S.Tasks.START_DATE] = task_date_value
+    if not payload.get(S.Tasks.END_DATE) and task_date_value:
+        payload[S.Tasks.END_DATE] = task_date_value
 
     return payload
 
@@ -321,7 +455,20 @@ def _normalise_file_template_payload(template_payload):
     if notes is None:
         notes = template_payload.get('description') or ''
 
-    items = template_payload.get('items') or []
+    items = template_payload.get('items')
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Template items must be a valid JSON array") from exc
+
+    # Handle PowerShell ConvertTo-Json quirk where arrays come through as { "value": [...], "Count": n }
+    if isinstance(items, dict) and 'value' in items and isinstance(items['value'], list):
+        items = items['value']
+
+    if items is None:
+        items = []
+
     if not isinstance(items, list):
         raise ValueError("Template items must be a list")
 
@@ -528,15 +675,27 @@ def api_get_service_templates():
 @app.route('/api/service_templates', methods=['POST'])
 def api_create_service_template():
     body = request.get_json() or {}
-    required = ['template_name', 'service_type', 'parameters', 'created_by']
-    if not all(body.get(k) for k in required):
-        return jsonify({'error': 'Missing required fields'}), 400
+    template_name = (body.get('template_name') or body.get('name') or '').strip()
+    service_type = (body.get('service_type') or body.get('type') or '').strip()
+    parameters = body.get('parameters')
+    if parameters is None and 'items' in body:
+        parameters = body['items']
+    created_by = body.get('created_by') or body.get('createdBy') or body.get('created_by_id')
+
+    if not template_name:
+        return jsonify({'error': 'Template name is required'}), 400
+    if not service_type:
+        service_type = 'custom'
+    if parameters is None:
+        return jsonify({'error': 'Template parameters are required'}), 400
+    if not created_by:
+        created_by = 'system'
     success = create_service_template(
-        body['template_name'],
+        template_name,
         body.get('description', ''),
-        body['service_type'],
-        body['parameters'],
-        body['created_by']
+        service_type,
+        parameters,
+        created_by
     )
     if success:
         return jsonify({'success': True}), 201
@@ -798,6 +957,19 @@ def api_projects():
     return jsonify(result), 201
 
 
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def api_delete_project_route(project_id):
+    """Delete a project and all related data."""
+    if not get_project_details(project_id):
+        return jsonify({'error': 'Project not found'}), 404
+
+    success = delete_project(project_id)
+    if success:
+        invalidate_projects_cache()
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to delete project'}), 500
+
+
 @app.route('/api/projects_full', methods=['GET'])
 def api_get_projects_full():
     """Return enriched project data from the SQL view."""
@@ -809,15 +981,25 @@ def api_get_projects_full():
 def api_projects_stats():
     """Get project statistics for dashboard"""
     try:
-        projects = get_projects_full()
-        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.Projects.STATUS}, COUNT(*)
+                FROM {S.Projects.TABLE}
+                GROUP BY {S.Projects.STATUS}
+                """
+            )
+            rows = cursor.fetchall()
+
+        totals = { (row[0] or '').strip().lower(): int(row[1] or 0) for row in rows }
         stats = {
-            'total': len(projects),
-            'active': len([p for p in projects if p.get('status') == 'Active']),
-            'completed': len([p for p in projects if p.get('status') == 'Completed']),
-            'on_hold': len([p for p in projects if p.get('status') == 'On Hold']),
+            'total': sum(totals.values()),
+            'active': totals.get('active', 0),
+            'completed': totals.get('completed', 0),
+            'on_hold': totals.get('on hold', 0) + totals.get('on_hold', 0),
         }
-        
+
         return jsonify(stats)
     except Exception as e:
         logging.exception("Failed to get project stats")
@@ -1253,6 +1435,8 @@ def api_update_project_details_endpoint(project_id):
         body.get('status'),
         body.get('priority'),
     )
+    if success:
+        invalidate_projects_cache()
     return jsonify({'success': bool(success)})
 
 
@@ -1271,6 +1455,8 @@ def api_project_folders(project_id):
         body.get('data_path'),
         body.get('ifc_path'),
     )
+    if success:
+        invalidate_projects_cache()
     return jsonify({'success': bool(success)})
 
 
@@ -1513,6 +1699,7 @@ def api_update_project(project_id):
         )
     
     if success:
+        invalidate_projects_cache()
         return jsonify({'success': True})
     return jsonify({'success': False}), 500
 
@@ -1789,6 +1976,7 @@ def save_project_acc_connector_folder(project_id):
         success = update_project_folders(project_id, models_path=folder_path)
         
         if success:
+            invalidate_projects_cache()
             return jsonify({
                 'success': True,
                 'project_id': project_id,
@@ -2023,75 +2211,126 @@ def get_acc_issues(project_id):
     """Get ACC issues from acc_data_schema database"""
     try:
         from config import Config
-        
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        status = request.args.get('status', None)
-        priority = request.args.get('priority', None)
-        assigned_to = request.args.get('assigned_to', None)
-        
+
+        limit = max(1, request.args.get('limit', 25, type=int) or 25)
+        limit = min(limit, 200)
+        page = max(1, request.args.get('page', 1, type=int) or 1)
+        status = request.args.get('status')
+        priority = request.args.get('priority')
+        assigned_to = request.args.get('assigned_to')
+        search = request.args.get('search')
+        offset = (page - 1) * limit
+
         # Connect to acc_data_schema database
         with get_db_connection(Config.ACC_DB) as conn:
             cursor = conn.cursor()
-            
+
             # Build where clause
-            where_clauses = []
-            params = []
-            
+            where_clauses = ["project_id = ?"]
+            params = [project_id]
+
             if status:
                 where_clauses.append("status = ?")
                 params.append(status)
-            
+
             if priority:
                 where_clauses.append("priority = ?")
                 params.append(priority)
-            
+
             if assigned_to:
                 where_clauses.append("assigned_to = ?")
                 params.append(assigned_to)
-            
+
+            if search:
+                like_value = f"%{search}%"
+                where_clauses.append("(title LIKE ? OR description LIKE ?)")
+                params.extend([like_value, like_value])
+
             where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-            
+
             # Get total count
             count_query = f"SELECT COUNT(*) FROM acc_data_schema.dbo.vw_issues_expanded_pm {where_sql}"
             cursor.execute(count_query, params)
             total_count = cursor.fetchone()[0]
-            
+
             # Get paginated issues
             issues_query = f"""
-                SELECT issue_id, title, description, status, priority, 
-                       assigned_to, created_at, due_date, owner, project_name
+                SELECT issue_id,
+                       title,
+                       description,
+                       status,
+                       priority,
+                       assigned_to,
+                       created_at,
+                       due_date,
+                       owner,
+                       project_name
                 FROM acc_data_schema.dbo.vw_issues_expanded_pm
                 {where_sql}
                 ORDER BY created_at DESC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
             """
-            
+
             cursor.execute(issues_query, params + [offset, limit])
             rows = cursor.fetchall()
-            
+
+            column_names = [col[0].lower() for col in cursor.description] if cursor.description else []
+
+            def _serialise_date(value):
+                if value is None:
+                    return None
+                if isinstance(value, (datetime, date)):
+                    return value.isoformat()
+                return str(value)
+
+            def _to_string(value):
+                if value is None:
+                    return None
+                return str(value)
+
             issues = []
             for row in rows:
+                row_map = {column_names[index]: row[index] for index in range(len(column_names))}
+                created_raw = row_map.get('created_at') or row_map.get('created_date')
+                due_raw = row_map.get('due_date')
+                issue_id = row_map.get('issue_id')
+                custom_raw = row_map.get('custom_attributes')
+
+                custom_attributes = None
+                if isinstance(custom_raw, str):
+                    try:
+                        custom_attributes = json.loads(custom_raw)
+                    except json.JSONDecodeError:
+                        custom_attributes = None
+                elif isinstance(custom_raw, dict):
+                    custom_attributes = custom_raw
+
                 issues.append({
-                    'issue_id': row[0],
-                    'title': row[1],
-                    'description': row[2],
-                    'status': row[3],
-                    'priority': row[4],
-                    'assigned_to': row[5],
-                    'created_at': row[6].isoformat() if row[6] else None,
-                    'due_date': row[7].isoformat() if row[7] else None,
-                    'owner': row[8],
-                    'project_name': row[9]
+                    'id': str(issue_id) if issue_id is not None else None,
+                    'issue_id': str(issue_id) if issue_id is not None else None,
+                    'title': _to_string(row_map.get('title')),
+                    'description': _to_string(row_map.get('description')),
+                    'status': _to_string(row_map.get('status')),
+                    'priority': _to_string(row_map.get('priority')),
+                    'type': _to_string(row_map.get('type') or row_map.get('priority')),
+                    'assigned_to': _to_string(row_map.get('assigned_to')),
+                    'created_date': _serialise_date(created_raw),
+                    'created_at': _serialise_date(created_raw),
+                    'due_date': _serialise_date(due_raw),
+                    'closed_date': _serialise_date(row_map.get('closed_date')),
+                    'location': _to_string(row_map.get('location')),
+                    'owner': _to_string(row_map.get('owner')),
+                    'project_name': _to_string(row_map.get('project_name')),
+                    'custom_attributes': custom_attributes,
                 })
-        
+
         return jsonify({
             'issues': issues,
             'total_count': total_count,
-            'page': (offset // limit) + 1,
+            'page': page,
             'page_size': limit
         })
-        
+
     except Exception as e:
         logging.exception(f"Error getting ACC issues for project {project_id}")
         return jsonify({'error': str(e)}), 500
@@ -2102,42 +2341,47 @@ def get_acc_issues_stats(project_id):
     """Get ACC issues statistics"""
     try:
         from config import Config
-        
+
         with get_db_connection(Config.ACC_DB) as conn:
             cursor = conn.cursor()
-            
+
             # Get issue counts by status
             cursor.execute("""
                 SELECT status, COUNT(*) as count
                 FROM acc_data_schema.dbo.vw_issues_expanded_pm
+                WHERE project_id = ?
                 GROUP BY status
-            """)
-            
+            """, (project_id,))
+
             status_counts = {}
             for row in cursor.fetchall():
                 status_counts[row[0] or 'Unknown'] = row[1]
-            
+
             # Get issue counts by priority
             cursor.execute("""
                 SELECT priority, COUNT(*) as count
                 FROM acc_data_schema.dbo.vw_issues_expanded_pm
+                WHERE project_id = ?
                 GROUP BY priority
-            """)
-            
+            """, (project_id,))
+
             priority_counts = {}
             for row in cursor.fetchall():
                 priority_counts[row[0] or 'Unknown'] = row[1]
-            
+
             # Get total count
-            cursor.execute("SELECT COUNT(*) FROM acc_data_schema.dbo.vw_issues_expanded_pm")
+            cursor.execute(
+                "SELECT COUNT(*) FROM acc_data_schema.dbo.vw_issues_expanded_pm WHERE project_id = ?",
+                (project_id,)
+            )
             total_count = cursor.fetchone()[0]
-        
+
         return jsonify({
             'total_issues': total_count,
             'by_status': status_counts,
             'by_priority': priority_counts
         })
-        
+
     except Exception as e:
         logging.exception(f"Error getting ACC issues stats for project {project_id}")
         return jsonify({'error': str(e)}), 500
@@ -2263,6 +2507,60 @@ def import_revit_health_data(project_id):
     except Exception as e:
         logging.exception(f"Error importing Revit health data for project {project_id}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/control-models', methods=['GET'])
+def get_project_control_models_endpoint(project_id):
+    """Return control model configuration for a project."""
+    try:
+        config = _build_control_model_configuration(project_id)
+        return jsonify(config)
+    except Exception as exc:
+        logging.exception(f"Error fetching control models for project {project_id}")
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/control-models', methods=['POST'])
+def save_project_control_models(project_id):
+    """Persist control model configuration for a project."""
+    payload = request.get_json(silent=True) or {}
+    raw_models = payload.get('control_models', [])
+
+    if raw_models is None:
+        raw_models = []
+    if not isinstance(raw_models, list):
+        return jsonify({'error': 'control_models must be an array'}), 400
+
+    processed = []
+    seen = set()
+
+    for entry in raw_models:
+        if not isinstance(entry, dict):
+            continue
+        file_name = (entry.get('file_name') or entry.get('control_file_name') or '').strip()
+        if not file_name or file_name in seen:
+            continue
+        seen.add(file_name)
+        processed.append({
+            'file_name': file_name,
+            'validation_targets': _normalise_validation_targets(entry.get('validation_targets')),
+            'volume_label': (entry.get('volume_label') or '').strip() or None,
+            'notes': (entry.get('notes') or '').strip() or None,
+            'is_primary': bool(entry.get('is_primary')),
+        })
+
+    primary_override = payload.get('primary_control_model')
+    if primary_override:
+        for model in processed:
+            model['is_primary'] = model['file_name'] == primary_override
+
+    if not set_control_models(project_id, processed):
+        logging.error("Failed to persist control models for project %s", project_id)
+        return jsonify({'error': 'Failed to save control model configuration'}), 500
+
+    config = _build_control_model_configuration(project_id)
+    config['message'] = 'Control model configuration updated successfully.'
+    return jsonify(config)
 
 
 @app.route('/api/projects/<int:project_id>/health-files', methods=['GET'])
@@ -2707,6 +3005,19 @@ def api_get_project_review_statistics():
         return jsonify(stats)
     except Exception as e:
         logging.exception("Error fetching project review statistics")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dashboard/timeline', methods=['GET'])
+def api_get_dashboard_timeline():
+    """Get aggregated project timeline data for the dashboard."""
+    try:
+        from database import get_dashboard_timeline
+        months = request.args.get('months', type=int)
+        timeline_data = get_dashboard_timeline(months=months)
+        return jsonify(timeline_data)
+    except Exception as e:
+        logging.exception("Error fetching dashboard timeline data")
         return jsonify({'error': str(e)}), 500
 
 

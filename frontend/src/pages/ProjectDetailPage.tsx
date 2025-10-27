@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { Profiler, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Paper,
@@ -28,6 +28,7 @@ import { projectsApi } from '@/api/projects';
 import { usersApi } from '@/api/users';
 import type { Project, User } from '@/types/api';
 import { ProjectServicesTab } from '@/components/ProjectServicesTab';
+import { profilerLog } from '@/utils/perfLogger';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -89,6 +90,7 @@ const getUserLabel = (user: User): string =>
 const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(0);
 
   const { data: project, isLoading, error } = useQuery<Project>({
@@ -130,14 +132,41 @@ const ProjectDetailPage: React.FC = () => {
     [project?.mw_capacity]
   );
 
+  const deleteMutation = useMutation<void, Error, number>({
+    mutationFn: (projectId: number) => projectsApi.delete(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
+      if (id !== undefined) {
+        queryClient.removeQueries({ queryKey: ['project', id], exact: true });
+      }
+      navigate('/projects');
+    },
+  });
+
   const handleEdit = () => {
     // TODO: Open edit dialog
     console.log('Edit project:', id);
   };
 
   const handleDelete = () => {
-    // TODO: Confirm and delete
-    console.log('Delete project:', id);
+    if (!id) {
+      return;
+    }
+
+    const projectId = Number(id);
+    if (Number.isNaN(projectId)) {
+      return;
+    }
+
+    const confirmationMessage = project?.project_name
+      ? `Delete project "${project.project_name}" and all related data? This action cannot be undone.`
+      : 'Delete this project and all related data? This action cannot be undone.';
+
+    if (window.confirm(confirmationMessage)) {
+      deleteMutation.mutate(projectId);
+    }
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -179,7 +208,14 @@ const ProjectDetailPage: React.FC = () => {
   };
 
   return (
-    <Box>
+    <Profiler id="ProjectDetailPage" onRender={profilerLog}>
+      <Box>
+      {deleteMutation.isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {deleteMutation.error.message || 'Failed to delete project'}
+        </Alert>
+      )}
+
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box display="flex" alignItems="center" gap={2}>
@@ -200,8 +236,14 @@ const ProjectDetailPage: React.FC = () => {
           <Button variant="outlined" startIcon={<EditIcon />} onClick={handleEdit}>
             Edit
           </Button>
-          <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
-            Delete
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
         </Box>
       </Box>
@@ -414,7 +456,8 @@ const ProjectDetailPage: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
-    </Box>
+      </Box>
+    </Profiler>
   );
 };
 
