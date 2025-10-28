@@ -61,7 +61,7 @@ def build_validation_tab(tab, status_var):
         if not fname or fname == "No files":
             messagebox.showerror("Error", "Select a valid control file")
             return
-        if set_control_file(pid, fname):
+        if set_control_file(int(pid), fname):
             update_status(status_var, f"Control file saved: {fname}")
         else:
             messagebox.showerror("Error", "Failed to save control file")

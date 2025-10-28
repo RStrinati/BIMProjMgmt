@@ -2531,6 +2531,7 @@ def save_project_control_models(project_id):
     if not isinstance(raw_models, list):
         return jsonify({'error': 'control_models must be an array'}), 400
 
+    logging.info("Saving control models for project %s. Incoming payload: %s", project_id, raw_models)
     processed = []
     seen = set()
 
@@ -2553,6 +2554,14 @@ def save_project_control_models(project_id):
     if primary_override:
         for model in processed:
             model['is_primary'] = model['file_name'] == primary_override
+
+    logging.info(
+        "Prepared %s control model(s) for project %s. Primary: %s. Payload: %s",
+        len(processed),
+        project_id,
+        primary_override,
+        processed,
+    )
 
     if not set_control_models(project_id, processed):
         logging.error("Failed to persist control models for project %s", project_id)

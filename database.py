@@ -819,16 +819,43 @@ def _ensure_control_model_metadata_column(conn) -> bool:
         cursor = conn.cursor()
         cursor.execute(
             """
-            IF COL_LENGTH('ProjectManagement.dbo.tblControlModels', 'metadata_json') IS NULL
-            BEGIN
-                ALTER TABLE ProjectManagement.dbo.tblControlModels
-                ADD metadata_json NVARCHAR(MAX) NULL;
-            END
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME = 'tblControlModels'
+              AND COLUMN_NAME = 'metadata_json'
             """
         )
-        _control_model_metadata_supported = True
-        return True
+        exists = cursor.fetchone() is not None
+        if not exists:
+            cursor.execute(
+                """
+                ALTER TABLE ProjectManagement.dbo.tblControlModels
+                ADD metadata_json NVARCHAR(MAX) NULL;
+                """
+            )
+            try:
+                conn.commit()
+            except Exception:
+                # Connection context managers typically commit on exit, but force it so the new column is persisted.
+                pass
+            cursor.execute(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = 'dbo'
+                  AND TABLE_NAME = 'tblControlModels'
+                  AND COLUMN_NAME = 'metadata_json'
+                """
+            )
+            exists = cursor.fetchone() is not None
+        _control_model_metadata_supported = exists
+        return exists
     except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         logger.warning("Control model metadata column unavailable: %s", exc)
         _control_model_metadata_supported = False
         return False
@@ -1541,8 +1568,10 @@ def log_acc_import(project_id, folder_name, summary):
     except Exception as e:
         logger.error(f"Error logging ACC import: {e}")
 
- 
+
 # Control file management ===========================================
+
+CONTROL_VALIDATION_TARGETS: Tuple[str, ...] = ('naming', 'coordinates', 'levels')
 
 def get_project_health_files(project_id):
     """Return distinct Revit file names from vw_LatestRvtFiles for a project."""
@@ -1552,7 +1581,7 @@ def get_project_health_files(project_id):
             cursor.execute("""
                 SELECT DISTINCT strRvtFileName
                 FROM dbo.vw_LatestRvtFiles
-                WHERE project_id = ?
+                WHERE pm_project_id = ?
                 ORDER BY strRvtFileName;
             """, (project_id,))
             return [row[0] for row in cursor.fetchall()]
@@ -1660,6 +1689,12 @@ def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             metadata_supported = _ensure_control_model_metadata_column(conn)
+            logger.info(
+                "Persisting control models for project %s (metadata_supported=%s): %s",
+                project_id,
+                metadata_supported,
+                normalized,
+            )
 
             cursor.execute(
                 """
@@ -1746,6 +1781,11 @@ def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
                         )
 
             conn.commit()
+            logger.info(
+                "Control models persisted for project %s. Active count: %s",
+                project_id,
+                len(ordered_models),
+            )
             return True
     except Exception as e:
         logger.error(f"Error saving control models: {e}")

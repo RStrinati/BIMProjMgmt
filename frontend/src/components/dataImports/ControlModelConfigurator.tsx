@@ -75,17 +75,6 @@ const toEditableModels = (config: ControlModelConfiguration): EditableControlMod
   }));
 };
 
-const serialiseModels = (models: EditableControlModel[]): string =>
-  JSON.stringify(
-    models.map((model) => ({
-      fileName: model.fileName,
-      validationTargets: [...model.validationTargets].sort(),
-      volumeLabel: model.volumeLabel.trim(),
-      notes: model.notes.trim(),
-      isPrimary: model.isPrimary,
-    })),
-  );
-
 export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> = ({
   projectId,
   projectName,
@@ -105,13 +94,6 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
     queryFn: () => controlModelsApi.getConfiguration(projectId),
     enabled: projectId > 0,
   });
-
-  const initialSerialised = useMemo(() => {
-    if (!configuration) {
-      return '';
-    }
-    return serialiseModels(toEditableModels(configuration));
-  }, [configuration]);
 
   useEffect(() => {
     if (configuration) {
@@ -135,9 +117,6 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
   }, [models]);
 
   const isBusy = isFetching;
-  const currentSerialised = useMemo(() => serialiseModels(models), [models]);
-  const isDirty = initialSerialised !== currentSerialised;
-
   const availableOptions = useMemo(() => {
     const options = new Set<string>();
     configuration?.available_models.forEach((item) => options.add(item));
@@ -334,7 +313,7 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
             <Button
               variant="contained"
               startIcon={<SaveIcon />}
-              disabled={!isDirty || mutationPending}
+              disabled={mutationPending}
               onClick={handleSave}
               color="primary"
             >
@@ -463,9 +442,18 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
                           color={model.validationTargets.includes(target) ? 'primary' : 'default'}
                           variant={model.validationTargets.includes(target) ? 'filled' : 'outlined'}
                           clickable
-                          disabled={mutationPending}
-                          onClick={() => handleTargetToggle(model.fileName, target)}
-                          sx={{ mr: 1, mb: 1 }}
+                          onClick={() => {
+                            if (mutationPending) {
+                              return;
+                            }
+                            handleTargetToggle(model.fileName, target);
+                          }}
+                          sx={{
+                            mr: 1,
+                            mb: 1,
+                            pointerEvents: mutationPending ? 'none' : 'auto',
+                            opacity: mutationPending ? 0.75 : 1,
+                          }}
                         />
                       }
                     />
