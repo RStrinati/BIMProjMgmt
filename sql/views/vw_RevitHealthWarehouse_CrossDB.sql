@@ -43,7 +43,7 @@ SELECT
     lf.NormalizedFileName as normalized_file_name,
     h.strProjectName as revit_project_name,
     h.strProjectNumber as revit_project_number,
-    lf.model_functional_code,
+    COALESCE(ctrl.zone_code, lf.model_functional_code) as model_functional_code,
     
     -- === PROJECT MANAGEMENT LINKAGE ===
     lf.pm_project_id,
@@ -134,6 +134,11 @@ SELECT
     h.nSheetsCount as sheet_count,
     h.nDesignOptionSetCount as design_option_sets,
     h.nDesignOptionCount as design_options,
+
+    -- === CONTROL MODEL METADATA (when available) ===
+    ctrl.zone_code,
+    ctrl.volume_label as control_volume_label,
+    ctrl.is_primary as control_is_primary,
     
     -- === VALIDATION & FLAGS ===
     h.validation_status,
@@ -165,6 +170,17 @@ SELECT
 
 FROM dbo.tblRvtProjHealth h
 INNER JOIN LatestFiles lf ON h.nId = lf.nId
+OUTER APPLY (
+    SELECT TOP 1
+        UPPER(NULLIF(LTRIM(RTRIM(JSON_VALUE(cm.metadata_json, '$.zone_code'))), '')) AS zone_code,
+        NULLIF(LTRIM(RTRIM(JSON_VALUE(cm.metadata_json, '$.volume_label'))), '') AS volume_label,
+        TRY_CAST(JSON_VALUE(cm.metadata_json, '$.is_primary') AS BIT) AS is_primary
+    FROM ProjectManagement.dbo.tblControlModels cm
+    WHERE cm.project_id = lf.pm_project_id
+      AND cm.control_file_name = lf.strRvtFileName
+      AND cm.is_active = 1
+    ORDER BY cm.updated_at DESC, cm.id DESC
+) ctrl
 LEFT JOIN dbo.tblRvtUser u ON h.nRvtUserId = u.nId
 LEFT JOIN dbo.tblSysName s ON h.nSysNameId = s.nId
 WHERE h.nDeletedOn IS NULL;

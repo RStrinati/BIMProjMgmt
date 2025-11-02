@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Card,
@@ -36,6 +36,7 @@ const MARKER_SIZE_PX = 14;
 const ROW_HEIGHT_PX = 76;
 const VIRTUALIZATION_THRESHOLD = 40;
 const VIRTUALIZATION_OVERSCAN = 6;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface DashboardTimelineChartProps {
   projects?: DashboardTimelineProject[];
@@ -64,7 +65,7 @@ const parseDate = (value?: string | null) => {
     return null;
   }
   const parsed = parseISO(value);
-  return isValid(parsed) ? parsed : null;
+  return isValid(parsed) ? startOfDay(parsed) : null;
 };
 
 type ParsedReview = {
@@ -110,6 +111,26 @@ type ReviewCacheEntry = {
   parsed: ParsedReview;
 };
 
+type ReviewMarker = {
+  reviewId: number;
+  left: number;
+  colorKey: string;
+  serviceName: string | null | undefined;
+  plannedLabel: string | null;
+  dueLabel: string | null;
+  status: string | null | undefined;
+  statusLabel: string;
+  key: string;
+};
+
+type ProjectLayout = {
+  project: ParsedProject;
+  bar: { left: number; width: number };
+  rangeLabel: string;
+  metaCompact: string;
+  reviewMarkers: ReviewMarker[];
+};
+
 const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
   const projectCacheRef = useRef<Map<number, ProjectCacheEntry>>(new Map());
   const reviewCacheRef = useRef<Map<number, ReviewCacheEntry>>(new Map());
@@ -118,6 +139,21 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
     if (!projects || projects.length === 0) {
       return null;
     }
+
+    let minTimestamp: number | null = null;
+    let maxTimestamp: number | null = null;
+    const updateBounds = (date: Date | null) => {
+      if (!date) {
+        return;
+      }
+      const value = date.getTime();
+      if (minTimestamp === null || value < minTimestamp) {
+        minTimestamp = value;
+      }
+      if (maxTimestamp === null || value > maxTimestamp) {
+        maxTimestamp = value;
+      }
+    };
 
     const parsedProjects: ParsedProject[] = projects.map((project) => {
       const cachedProject = projectCacheRef.current.get(project.project_id);
@@ -138,6 +174,8 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
           status: review.status,
           serviceName: review.service_name,
         };
+        updateBounds(parsed.plannedDate);
+        updateBounds(parsed.dueDate);
         reviewCacheRef.current.set(review.review_id, { source: review, parsed });
         return parsed;
       });
@@ -157,6 +195,9 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
         rawEnd: project.end_date ?? null,
       };
 
+      updateBounds(parsedProject.startDate);
+      updateBounds(parsedProject.endDate);
+
       projectCacheRef.current.set(project.project_id, {
         source: project,
         parsed: parsedProject,
@@ -165,25 +206,7 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
       return parsedProject;
     });
 
-    const dateBuckets: Date[] = [];
-    parsedProjects.forEach((project) => {
-      if (project.startDate) {
-        dateBuckets.push(project.startDate);
-      }
-      if (project.endDate) {
-        dateBuckets.push(project.endDate);
-      }
-      project.reviews.forEach((review) => {
-        if (review.plannedDate) {
-          dateBuckets.push(review.plannedDate);
-        }
-        if (review.dueDate) {
-          dateBuckets.push(review.dueDate);
-        }
-      });
-    });
-
-    if (dateBuckets.length === 0) {
+    if (minTimestamp === null || maxTimestamp === null) {
       return {
         projects: parsedProjects,
         minDate: null,
@@ -195,10 +218,9 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
       };
     }
 
-    const sortedDates = dateBuckets.sort((a, b) => a.getTime() - b.getTime());
-    const minDate = sortedDates[0];
-    const maxDate = sortedDates[sortedDates.length - 1];
-    const rawSpan = Math.max(0, differenceInCalendarDays(maxDate, minDate));
+    const minDate = new Date(minTimestamp);
+    const maxDate = new Date(maxTimestamp);
+    const rawSpan = Math.max(0, Math.round((maxTimestamp - minTimestamp) / MS_PER_DAY));
     const totalDays = Math.max(1, rawSpan + 1);
 
     const baseTrackWidth = totalDays * BASE_DAY_WIDTH_PX;
@@ -243,6 +265,27 @@ const getStatusColor = (status: string | null | undefined, fallback: string) => 
   return STATUS_COLOR_MAP[normalised] ?? fallback;
 };
 
+const formatDisplayDate = (date?: Date | null) => {
+  if (!date) {
+    return null;
+  }
+  return format(date, 'd MMM yyyy');
+};
+
+const formatRangeLabel = (start?: Date | null, end?: Date | null) => {
+  if (!start && !end) {
+    return 'No dates';
+  }
+  if (start && end) {
+    const startLabel = formatDisplayDate(start);
+    const endLabel = formatDisplayDate(end);
+    return startLabel && endLabel ? `${startLabel} \u2013 ${endLabel}` : 'No dates';
+  }
+  const target = start ?? end;
+  const label = formatDisplayDate(target);
+  return label ?? 'No dates';
+};
+
 function DashboardTimelineChart({
   projects,
   isLoading,
@@ -263,6 +306,7 @@ function DashboardTimelineChart({
   const today = startOfDay(new Date());
   const startBoundary = minDate ? startOfDay(minDate) : null;
   const endBoundary = maxDate ? startOfDay(maxDate) : null;
+  const startBoundaryTime = startBoundary?.getTime() ?? null;
   const isTimelineEmpty = !timelineData || parsedProjects.length === 0;
   const isTodayInRange =
     !!startBoundary && !!endBoundary && !isBefore(today, startBoundary) && !isAfter(today, endBoundary);
@@ -283,6 +327,27 @@ function DashboardTimelineChart({
   const timelineContainerWidth = mdUp
     ? LEFT_COLUMN_WIDTH_PX + roundedTrackWidth
     : Math.max(roundedTrackWidth, MIN_TRACK_WIDTH_PX);
+  const getTimelineOffset = useMemo(() => {
+    if (startBoundaryTime === null) {
+      return () => 0;
+    }
+    const base = startBoundaryTime;
+    const cache = new Map<number, number>();
+    return (date: Date) => {
+      const timestamp = startOfDay(date).getTime();
+      const cached = cache.get(timestamp);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const offset = ((timestamp - base) / MS_PER_DAY) * pixelsPerDay;
+      cache.set(timestamp, offset);
+      return offset;
+    };
+  }, [startBoundaryTime, pixelsPerDay]);
+  const todayMarkerLeft = Math.max(
+    0,
+    Math.min(getTimelineOffset(today), roundedTrackWidth),
+  );
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
@@ -364,60 +429,6 @@ function DashboardTimelineChart({
     </Box>
   );
 
-  const computeDayOffset = (date: Date) => {
-    if (!startBoundary) {
-      return 0;
-    }
-    const days = differenceInCalendarDays(startOfDay(date), startBoundary);
-    return Math.max(0, days * pixelsPerDay);
-  };
-
-  const getProjectBarMetrics = (start: Date | null, end: Date | null) => {
-    if (!startBoundary) {
-      return { left: 0, width: 0 };
-    }
-    const clamp = (value: number) => Math.max(0, Math.min(value, roundedTrackWidth));
-
-    if (start && end) {
-      const startOffset = computeDayOffset(start);
-      const endOffset = computeDayOffset(end);
-      const left = clamp(Math.min(startOffset, endOffset));
-      const inclusiveEnd = clamp(Math.max(startOffset, endOffset) + pixelsPerDay);
-      let width = Math.max(MIN_BAR_WIDTH_PX, inclusiveEnd - left);
-      if (left + width > roundedTrackWidth) {
-        width = Math.max(MIN_BAR_WIDTH_PX, roundedTrackWidth - left);
-      }
-      return { left, width };
-    }
-
-    const anchor = start ?? end;
-    if (!anchor) {
-      return { left: 0, width: 0 };
-    }
-    const anchorOffset = computeDayOffset(anchor);
-    const centredLeft = clamp(anchorOffset - MIN_BAR_WIDTH_PX / 2);
-    const adjustedLeft =
-      centredLeft + MIN_BAR_WIDTH_PX > roundedTrackWidth
-        ? Math.max(0, roundedTrackWidth - MIN_BAR_WIDTH_PX)
-        : centredLeft;
-    return { left: adjustedLeft, width: MIN_BAR_WIDTH_PX };
-  };
-
-  const computeMarkerLeft = (date: Date | null) => {
-    if (!date || !startBoundary) {
-      return 0;
-    }
-    const offset = computeDayOffset(date) + pixelsPerDay / 2;
-    return Math.max(0, Math.min(offset, roundedTrackWidth));
-  };
-
-  const computeTickLeft = (date: Date) => {
-    if (!startBoundary) {
-      return 0;
-    }
-    return Math.max(0, Math.min(computeDayOffset(date), roundedTrackWidth));
-  };
-
   const virtualizationMetrics = useMemo(() => {
     if (!virtualizationEnabled) {
       return {
@@ -458,10 +469,128 @@ function DashboardTimelineChart({
     parsedProjects.length,
   ]);
 
-  const visibleProjects = useMemo(
+  const projectLayouts = useMemo<ProjectLayout[]>(() => {
+    if (!parsedProjects.length) {
+      return [];
+    }
+
+    const buildMeta = (project: ParsedProject) =>
+      [project.projectManager, project.clientName, project.projectType]
+        .filter(Boolean)
+        .join(' \u2022 ');
+
+    if (startBoundaryTime === null) {
+      return parsedProjects.map((project) => {
+        const reviewMarkers: ReviewMarker[] = [];
+        project.reviews.forEach((review) => {
+          const reviewDate = review.plannedDate ?? review.dueDate;
+          if (!reviewDate) {
+            return;
+          }
+          const normalizedStatus = review.status?.toLowerCase() ?? 'planned';
+          reviewMarkers.push({
+            reviewId: review.reviewId,
+            left: 0,
+            colorKey: getStatusColor(normalizedStatus, 'primary.main'),
+            serviceName: review.serviceName,
+            plannedLabel: formatDisplayDate(review.plannedDate),
+            dueLabel: formatDisplayDate(review.dueDate),
+            status: review.status,
+            statusLabel: STATUS_LABEL_MAP[normalizedStatus] ?? review.status ?? '',
+            key: `${review.reviewId}-${reviewDate.toISOString()}`,
+          });
+        });
+
+        return {
+          project,
+          bar: { left: 0, width: 0 },
+          rangeLabel: formatRangeLabel(project.startDate, project.endDate),
+          metaCompact: buildMeta(project),
+          reviewMarkers,
+        };
+      });
+    }
+
+    return parsedProjects.map((project) => {
+      const start = project.startDate;
+      const end = project.endDate;
+      let left = 0;
+      let width = 0;
+
+      if (start && end) {
+        const startOffset = getTimelineOffset(start);
+        const endOffset = getTimelineOffset(end);
+        left = Math.max(0, Math.min(Math.min(startOffset, endOffset), roundedTrackWidth));
+        const rawInclusiveEnd = Math.max(startOffset, endOffset) + pixelsPerDay;
+        const inclusiveEnd = Math.max(left, Math.min(rawInclusiveEnd, roundedTrackWidth));
+        width = Math.max(MIN_BAR_WIDTH_PX, inclusiveEnd - left);
+        if (left + width > roundedTrackWidth) {
+          width = Math.max(MIN_BAR_WIDTH_PX, roundedTrackWidth - left);
+        }
+      } else {
+        const anchor = start ?? end;
+        if (anchor) {
+          const anchorOffset = getTimelineOffset(anchor);
+          const centredLeft = anchorOffset - MIN_BAR_WIDTH_PX / 2;
+          const maxLeft = Math.max(0, roundedTrackWidth - MIN_BAR_WIDTH_PX);
+          left = Math.max(0, Math.min(centredLeft, maxLeft));
+          width = MIN_BAR_WIDTH_PX;
+        }
+      }
+
+      const reviewMarkers: ReviewMarker[] = [];
+      project.reviews.forEach((review) => {
+        const reviewDate = review.plannedDate ?? review.dueDate;
+        if (!reviewDate) {
+          return;
+        }
+        const normalizedStatus = review.status?.toLowerCase() ?? 'planned';
+        const markerBase = getTimelineOffset(reviewDate) + pixelsPerDay / 2;
+        const markerLeft = Math.max(0, Math.min(markerBase, roundedTrackWidth));
+        reviewMarkers.push({
+          reviewId: review.reviewId,
+          left: markerLeft,
+          colorKey: getStatusColor(normalizedStatus, 'primary.main'),
+          serviceName: review.serviceName,
+          plannedLabel: formatDisplayDate(review.plannedDate),
+          dueLabel: formatDisplayDate(review.dueDate),
+          status: review.status,
+          statusLabel: STATUS_LABEL_MAP[normalizedStatus] ?? review.status ?? '',
+          key: `${review.reviewId}-${reviewDate.toISOString()}`,
+        });
+      });
+
+      return {
+        project,
+        bar: { left, width },
+        rangeLabel: formatRangeLabel(start, end),
+        metaCompact: buildMeta(project),
+        reviewMarkers,
+      };
+    });
+  }, [parsedProjects, startBoundaryTime, pixelsPerDay, roundedTrackWidth, getTimelineOffset]);
+
+  const visibleProjectLayouts = useMemo(
     () =>
-      parsedProjects.slice(virtualizationMetrics.startIndex, virtualizationMetrics.endIndex),
-    [parsedProjects, virtualizationMetrics],
+      projectLayouts.slice(
+        virtualizationMetrics.startIndex,
+        virtualizationMetrics.endIndex,
+      ),
+    [projectLayouts, virtualizationMetrics],
+  );
+
+  const tickPositions = useMemo(
+    () =>
+      ticks.map((tick) => {
+        const offset = getTimelineOffset(tick);
+        const left = Math.max(0, Math.min(offset, roundedTrackWidth));
+        return {
+          date: tick,
+          left,
+          iso: tick.toISOString(),
+        };
+      }),
+    [ticks, getTimelineOffset, roundedTrackWidth],
   );
 
   const daySequence = useMemo(() => {
@@ -479,35 +608,40 @@ function DashboardTimelineChart({
   };
 
   const weekendSegments = useMemo(() => {
-    if (!startBoundary || totalDays <= 0) {
+    if (!daySequence.length) {
       return [] as { left: number; width: number }[];
     }
 
     const segments: { left: number; width: number }[] = [];
-    let index = 0;
-    while (index < totalDays) {
-      const currentDay = addDays(startBoundary, index);
-      if (!isWeekend(currentDay)) {
-        index += 1;
-        continue;
-      }
+    let startIndex = -1;
 
-      let span = 0;
-      while (index + span < totalDays && isWeekend(addDays(startBoundary, index + span))) {
-        span += 1;
+    daySequence.forEach((day, index) => {
+      if (isWeekend(day)) {
+        if (startIndex === -1) {
+          startIndex = index;
+        }
+      } else if (startIndex !== -1) {
+        const span = index - startIndex;
+        if (span > 0) {
+          segments.push({
+            left: startIndex * pixelsPerDay,
+            width: Math.max(span * pixelsPerDay, 1),
+          });
+        }
+        startIndex = -1;
       }
+    });
 
-      if (span > 0) {
-        const left = index * pixelsPerDay;
-        const width = Math.max(span * pixelsPerDay, 1);
-        segments.push({ left, width });
-      }
-
-      index += span || 1;
+    if (startIndex !== -1) {
+      const span = daySequence.length - startIndex;
+      segments.push({
+        left: startIndex * pixelsPerDay,
+        width: Math.max(span * pixelsPerDay, 1),
+      });
     }
 
     return segments;
-  }, [startBoundary, totalDays, pixelsPerDay]);
+  }, [daySequence, pixelsPerDay]);
 
   useEffect(() => {
     if (!timelineData || !startBoundary || !isTodayInRange) {
@@ -567,17 +701,6 @@ function DashboardTimelineChart({
     );
   }
 
-  const formatRangeLabel = (start?: Date | null, end?: Date | null) => {
-    if (!start && !end) {
-      return 'No dates';
-    }
-    if (start && end) {
-      return `${format(start, 'd MMM yyyy')} \u2013 ${format(end, 'd MMM yyyy')}`;
-    }
-    const target = start ?? end;
-    return target ? format(target, 'd MMM yyyy') : 'No dates';
-  };
-
   const axisLeftColumnSx = {
     flex: `0 0 ${LEFT_COLUMN_WIDTH_PX}px`,
     pr: 2,
@@ -627,33 +750,30 @@ function DashboardTimelineChart({
           overflow: 'hidden',
         }}
       >
-        {ticks.map((tick) => {
-          const left = computeTickLeft(tick);
-          return (
+        {tickPositions.map(({ date, left, iso }) => (
+          <Box
+            key={iso}
+            sx={{
+              position: 'absolute',
+              left,
+              bottom: 4,
+              transform: 'translateX(-50%)',
+              textAlign: 'center',
+            }}
+          >
+            <Typography variant='caption' color='text.secondary'>
+              {format(date, 'd MMM')}
+            </Typography>
             <Box
-              key={tick.toISOString()}
               sx={{
-                position: 'absolute',
-                left,
-                bottom: 4,
-                transform: 'translateX(-50%)',
-                textAlign: 'center',
+                width: 1,
+                height: 14,
+                bgcolor: 'divider',
+                mx: 'auto',
               }}
-            >
-              <Typography variant='caption' color='text.secondary'>
-                {format(tick, 'd MMM')}
-              </Typography>
-              <Box
-                sx={{
-                  width: 1,
-                  height: 14,
-                  bgcolor: 'divider',
-                  mx: 'auto',
-                }}
-              />
-            </Box>
-          );
-        })}
+            />
+          </Box>
+        ))}
       </Box>
     </Box>
   );
@@ -738,31 +858,29 @@ function DashboardTimelineChart({
               {virtualizationEnabled && virtualizationMetrics.paddingTop > 0 && (
                 <Box sx={{ height: virtualizationMetrics.paddingTop }} />
               )}
-              {visibleProjects.map((project) => {
-                const barMetrics = getProjectBarMetrics(project.startDate, project.endDate);
-                return (
-                  <Box
-                    key={project.projectId}
-                    sx={{
-                      display: 'flex',
-                      alignItems: mdUp ? 'stretch' : 'flex-start',
-                      gap: mdUp ? 0 : 2,
-                      minHeight: ROW_HEIGHT_PX,
-                      py: mdUp ? 1.5 : 1.25,
-                      borderBottom: '1px solid',
-                      borderColor: alpha(theme.palette.divider, 0.15),
-                      '&:last-of-type': {
-                        borderBottom: 'none',
-                      },
-                    }}
-                  >
+              {visibleProjectLayouts.map(({ project, bar, rangeLabel, metaCompact, reviewMarkers }) => (
+                <Box
+                  key={project.projectId}
+                  sx={{
+                    display: 'flex',
+                    alignItems: mdUp ? 'stretch' : 'flex-start',
+                    gap: mdUp ? 0 : 2,
+                    minHeight: ROW_HEIGHT_PX,
+                    py: mdUp ? 1.5 : 1.25,
+                    borderBottom: '1px solid',
+                    borderColor: alpha(theme.palette.divider, 0.15),
+                    '&:last-of-type': {
+                      borderBottom: 'none',
+                    },
+                  }}
+                >
                   {mdUp && (
                     <Box sx={rowLeftColumnSx}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                         {project.name}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {formatRangeLabel(project.startDate, project.endDate)}
+                        {rangeLabel}
                       </Typography>
                       {project.projectManager && (
                         <Typography variant="caption" color="text.secondary" display="block">
@@ -809,13 +927,11 @@ function DashboardTimelineChart({
                           {project.name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" display="block">
-                          {formatRangeLabel(project.startDate, project.endDate)}
+                          {rangeLabel}
                         </Typography>
-                        {(project.projectManager || project.clientName || project.projectType) && (
+                        {metaCompact && (
                           <Typography variant="caption" color="text.secondary" display="block">
-                            {[project.projectManager, project.clientName, project.projectType]
-                              .filter(Boolean)
-                              .join(' \u2022 ')}
+                            {metaCompact}
                           </Typography>
                         )}
                       </Box>
@@ -838,13 +954,13 @@ function DashboardTimelineChart({
                       />
                     ))}
 
-                    {(project.startDate || project.endDate) && barMetrics.width > 0 && (
+                    {bar.width > 0 && (
                       <Box
                         sx={{
                           position: 'absolute',
                           top: mdUp ? '50%' : '60%',
-                          left: barMetrics.left,
-                          width: barMetrics.width,
+                          left: bar.left,
+                          width: bar.width,
                           transform: 'translateY(-50%)',
                           height: BAR_HEIGHT_PX,
                           bgcolor: 'primary.main',
@@ -861,10 +977,13 @@ function DashboardTimelineChart({
                           position: 'absolute',
                           top: 0,
                           bottom: 0,
-                          left: computeTickLeft(today),
+                          left: todayMarkerLeft,
                           width: Math.max(pixelsPerDay, 3),
                           transform: 'translateX(-50%)',
-                          bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.15 : 0.28),
+                          bgcolor: alpha(
+                            theme.palette.primary.main,
+                            theme.palette.mode === 'light' ? 0.15 : 0.28,
+                          ),
                           borderRadius: 2,
                           pointerEvents: 'none',
                           zIndex: 2,
@@ -872,72 +991,60 @@ function DashboardTimelineChart({
                       />
                     )}
 
-                    {ticks.map((tick) => {
-                      const left = computeTickLeft(tick);
-                      return (
+                    {tickPositions.map(({ left, iso }) => (
+                      <Box
+                        key={`${project.projectId}-${iso}-grid`}
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left,
+                          width: 1,
+                          bgcolor: 'divider',
+                          opacity: 0.3,
+                          pointerEvents: 'none',
+                          zIndex: 2,
+                        }}
+                      />
+                    ))}
+
+                    {reviewMarkers.map((marker) => (
+                      <Tooltip
+                        key={marker.key}
+                        title={
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {marker.serviceName ?? 'Service review'}
+                            </Typography>
+                            {marker.plannedLabel && (
+                              <Typography variant="body2">
+                                Planned: {marker.plannedLabel}
+                              </Typography>
+                            )}
+                            {marker.dueLabel && (
+                              <Typography variant="body2">
+                                Due: {marker.dueLabel}
+                              </Typography>
+                            )}
+                            {marker.status && (
+                              <Typography variant="body2">
+                                Status: {marker.statusLabel}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        placement="top"
+                      >
                         <Box
-                          key={`${project.projectId}-${tick.toISOString()}-grid`}
                           sx={{
                             position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            left,
-                            width: 1,
-                            bgcolor: 'divider',
-                            opacity: 0.3,
-                            pointerEvents: 'none',
-                            zIndex: 2,
-                          }}
-                        />
-                      );
-                    })}
-
-                    {project.reviews.map((review) => {
-                      const reviewDate = review.plannedDate ?? review.dueDate;
-                      if (!reviewDate) {
-                        return null;
-                      }
-                      const left = computeMarkerLeft(reviewDate);
-                      const normalizedStatus = review.status?.toLowerCase() ?? 'planned';
-                      const colorKey = getStatusColor(normalizedStatus, 'primary.main');
-
-                      return (
-                        <Tooltip
-                          key={`${review.reviewId}-${reviewDate.toISOString()}`}
-                          title={
-                            <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {review.serviceName ?? 'Service review'}
-                              </Typography>
-                              {review.plannedDate && (
-                                <Typography variant="body2">
-                                  Planned: {format(review.plannedDate, 'd MMM yyyy')}
-                                </Typography>
-                              )}
-                              {review.dueDate && (
-                                <Typography variant="body2">
-                                  Due: {format(review.dueDate, 'd MMM yyyy')}
-                                </Typography>
-                              )}
-                              {review.status && (
-                                <Typography variant="body2">
-                                  Status: {STATUS_LABEL_MAP[normalizedStatus] ?? review.status}
-                                </Typography>
-                              )}
-                            </Box>
-                          }
-                          placement="top"
-                        >
-                          <Box
-                            sx={{
-                              position: 'absolute',
                             top: mdUp ? '50%' : '70%',
-                            left,
+                            left: marker.left,
                             transform: 'translate(-50%, -50%)',
                             width: MARKER_SIZE_PX,
                             height: MARKER_SIZE_PX,
                             borderRadius: '50%',
-                            bgcolor: colorKey,
+                            bgcolor: marker.colorKey,
                             border: '2px solid',
                             borderColor: theme.palette.background.paper,
                             boxShadow: 1,
@@ -945,12 +1052,10 @@ function DashboardTimelineChart({
                           }}
                         />
                       </Tooltip>
-                    );
-                  })}
+                    ))}
                   </Box>
                 </Box>
-              );
-            })}
+              ))}
               {virtualizationEnabled && virtualizationMetrics.paddingBottom > 0 && (
                 <Box sx={{ height: virtualizationMetrics.paddingBottom }} />
               )}

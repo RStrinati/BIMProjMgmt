@@ -3,9 +3,11 @@ import json
 import shutil
 from datetime import datetime
 from collections import defaultdict
+from typing import Dict, List, Optional
 
 from config import Config
-from constants.schema import TblRvtProjHealth, TblRvtUser, TblSysName
+from constants.schema import TblRvtProjHealth, TblRvtUser, TblSysName, TblRvtFamilySummary
+from services.revit_naming_validator_service import RevitNamingValidator
 
 REVIT_HEALTH_DB = Config.REVIT_HEALTH_DB
 LOG_FILE = "rvt_import_summary.txt"
@@ -15,6 +17,133 @@ def log(msg):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{ts}] {msg}\n")
     print(f"[{ts}] {msg}")
+
+
+def _coerce_size_mb(raw_value: Optional[str]) -> Optional[float]:
+    """Convert a size string to float MB when possible."""
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, (int, float)):
+        try:
+            return float(raw_value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(raw_value, str):
+        value = raw_value.strip().lower()
+        if not value or "unavailable" in value or value in {"na", "n/a"}:
+            return None
+        # Remove non-numeric characters except dot
+        filtered = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+        if not filtered:
+            return None
+        try:
+            return float(filtered)
+        except ValueError:
+            return None
+    return None
+
+
+def _persist_family_details(cursor, health_check_id: int,
+                            family_sizes: List[Dict], placed_families: List[Dict]) -> None:
+    """Persist summarised family metadata to dedicated table."""
+    if not family_sizes and not placed_families:
+        return
+
+    try:
+        cursor.execute(
+            f"DELETE FROM {TblRvtFamilySummary.TABLE} WHERE {TblRvtFamilySummary.HEALTH_CHECK_ID} = ?",
+            health_check_id
+        )
+    except Exception as exc:
+        log(f"[WARNING] Skipping family summary storage for health check {health_check_id}: {exc}")
+        return
+
+    merged: Dict[str, Dict[str, Optional[object]]] = {}
+
+    for entry in family_sizes or []:
+        name = entry.get("FamilyName") or entry.get("family_name")
+        if not name:
+            continue
+        name = str(name).strip()
+        if not name:
+            continue
+
+        record = merged.setdefault(name, {
+            "category": None,
+            "instance_count": None,
+            "size_mb": None,
+            "file_path": None,
+            "shared_parameters_json": None,
+        })
+        size_mb = _coerce_size_mb(entry.get("SizeMB"))
+        if size_mb is not None:
+            record["size_mb"] = size_mb
+        file_path = entry.get("FilePath")
+        if file_path:
+            record["file_path"] = str(file_path)
+        shared_params = entry.get("SharedParameters")
+        if shared_params:
+            try:
+                record["shared_parameters_json"] = json.dumps(shared_params)
+            except (TypeError, ValueError):
+                record["shared_parameters_json"] = None
+
+    for entry in placed_families or []:
+        name = entry.get("FamilyName") or entry.get("family_name")
+        if not name:
+            continue
+        name = str(name).strip()
+        if not name:
+            continue
+        record = merged.setdefault(name, {
+            "category": None,
+            "instance_count": None,
+            "size_mb": None,
+            "file_path": None,
+            "shared_parameters_json": None,
+        })
+        category = entry.get("Category") or entry.get("category")
+        if category:
+            record["category"] = str(category)
+        count = entry.get("Count") or entry.get("count") or entry.get("Instances") or entry.get("instances")
+        if count is not None:
+            try:
+                record["instance_count"] = int(count)
+            except (TypeError, ValueError):
+                pass
+
+    if not merged:
+        return
+
+    payload = [
+        (
+            health_check_id,
+            family_name,
+            details.get("category"),
+            details.get("instance_count"),
+            details.get("size_mb"),
+            details.get("file_path"),
+            details.get("shared_parameters_json"),
+        )
+        for family_name, details in merged.items()
+    ]
+
+    try:
+        cursor.executemany(f"""
+            INSERT INTO {TblRvtFamilySummary.TABLE} (
+                {TblRvtFamilySummary.HEALTH_CHECK_ID},
+                {TblRvtFamilySummary.FAMILY_NAME},
+                {TblRvtFamilySummary.CATEGORY},
+                {TblRvtFamilySummary.INSTANCE_COUNT},
+                {TblRvtFamilySummary.SIZE_MB},
+                {TblRvtFamilySummary.FILE_PATH},
+                {TblRvtFamilySummary.SHARED_PARAMETERS_JSON}
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, payload)
+        log(f"[FAMILY] Stored {len(payload)} family summary rows for health check {health_check_id}")
+    except Exception as exc:
+        log(f"[WARNING] Failed to insert family summary rows for health check {health_check_id}: {exc}")
 
 def safe_float(v):
     """Return ``float(v)`` or ``None`` if conversion fails."""
@@ -37,9 +166,15 @@ def import_health_data(json_folder, project_id=None, db_name=None):
 
     processed = os.path.join(json_folder, "processed")
     os.makedirs(processed, exist_ok=True)
+    naming_validator = RevitNamingValidator()
 
     # Group JSON files by project_name
-    project_data = defaultdict(lambda: {"data": {}, "files": []})
+    project_data: Dict[str, Dict] = defaultdict(lambda: {
+        "data": {},
+        "files": [],
+        "family_sizes": [],
+        "placed_families": [],
+    })
     json_files = [fn for fn in os.listdir(json_folder)
                  if fn.lower().endswith('.json') and fn != os.path.basename(LOG_FILE)]
     if not json_files:
@@ -64,11 +199,12 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 # Extract metadata fields to top level
                 combined_data.update(data["data"])
             elif data_type == "family_sizes":
-                # Store family sizes as JSON string
-                combined_data["jsonFamily_sizes"] = json.dumps(data["data"])
+                family_entries = data.get("data") or []
+                project_data[project_name]["family_sizes"] = family_entries
+                combined_data["nFamilyCount"] = data.get("family_count", len(family_entries))
             elif data_type == "placed_families":
-                # Store placed families as JSON string
-                combined_data["jsonFamilies"] = json.dumps(data["data"])
+                placed_entries = data.get("data") or []
+                project_data[project_name]["placed_families"] = placed_entries
             elif data_type == "views_rooms_levels":
                 # Extract individual arrays from the data dict
                 d = data["data"]
@@ -96,6 +232,8 @@ def import_health_data(json_folder, project_id=None, db_name=None):
     # Process each project
     for project_file_name, project_info in project_data.items():
         combined_data = project_info["data"]
+        family_sizes = project_info.get("family_sizes", [])
+        placed_families = project_info.get("placed_families", [])
         project_files = project_info["files"]
         # Save combined file
         file_identifier = project_file_name.replace(" ", "_").replace("/", "-")
@@ -200,6 +338,14 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 if project_id is not None:
                     log(f"Associating data with project ID: {project_id}")
 
+                # Normalise coordinate payload keys coming from newer exporters
+                if "surveyPoint" in combined_data and "jsonSurveyPoint" not in combined_data:
+                    combined_data["jsonSurveyPoint"] = combined_data["surveyPoint"]
+                if "projectBasePoint" in combined_data and "jsonProjectBasePoint" not in combined_data:
+                    combined_data["jsonProjectBasePoint"] = combined_data["projectBasePoint"]
+                if "internalOrigin" in combined_data and "jsonInternalOrigin" not in combined_data:
+                    combined_data["jsonInternalOrigin"] = combined_data["internalOrigin"]
+
                 # build columns + values
                 cols = ["nRvtUserId", "nSysNameId"] + [db_col for _,db_col in MAPPING]
                 vals = [user_id, sys_id]
@@ -216,11 +362,26 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 sql = f"""
                     INSERT INTO {TblRvtProjHealth.TABLE} (
                       {','.join(cols)}
-                    ) VALUES ({ph})
+                    )
+                    VALUES ({ph})
                 """
                 cursor.execute(sql, vals)
+                # SCOPE_IDENTITY() avoids trigger conflicts with OUTPUT clauses.
+                cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+                inserted_row = cursor.fetchone()
+                health_check_id = inserted_row[0] if inserted_row else None
+
+                if health_check_id:
+                    _persist_family_details(cursor, health_check_id, family_sizes, placed_families)
+
                 conn.commit()
                 log(f"[OK] inserted {combined_fn} for project {project_file_name}")
+                if health_check_id:
+                    try:
+                        naming_validator.validate_new_health_check(health_check_id)
+                        log(f"[NAMING] Validated naming for health check ID {health_check_id}")
+                    except Exception as validation_error:
+                        log(f"[WARNING] Naming validation failed for health check {health_check_id}: {validation_error}")
                 shutil.move(combined_path, os.path.join(processed, combined_fn))
                 log(f"[MOVED] {combined_fn}")
                 

@@ -227,6 +227,7 @@ export interface ControlModelMetadata {
   is_primary?: boolean;
   volume_label?: string | null;
   notes?: string | null;
+  zone_code?: string | null;
 }
 
 export interface ControlModel {
@@ -262,6 +263,7 @@ export interface ControlModelInput {
   volume_label?: string | null;
   notes?: string | null;
   is_primary?: boolean;
+  zone_code?: string | null;
 }
 
 export interface ControlModelUpdateRequest {

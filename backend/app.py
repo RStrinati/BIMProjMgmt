@@ -2,6 +2,7 @@ import copy
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from datetime import date, datetime
@@ -146,6 +147,18 @@ def _normalise_validation_targets(targets):
     return seen or list(CONTROL_MODEL_TARGETS)
 
 
+def _derive_zone_code(file_name):
+    if not file_name:
+        return None
+    cleaned = str(file_name).strip()
+    cleaned = re.sub(r'\[.*?\]$', '', cleaned)
+    cleaned = re.sub(r'\.rvt$', '', cleaned, flags=re.IGNORECASE)
+    parts = [part for part in re.split(r'[-_]', cleaned) if part]
+    if len(parts) >= 3:
+        return parts[2].upper()
+    return None
+
+
 def _build_control_model_configuration(project_id: int) -> dict:
     """Assemble control model configuration payload for API responses."""
     raw_models = get_control_models(project_id)
@@ -160,6 +173,7 @@ def _build_control_model_configuration(project_id: int) -> dict:
         validation_targets = _normalise_validation_targets(metadata_source.get('validation_targets'))
         volume_label = metadata_source.get('volume_label') or None
         notes = metadata_source.get('notes') or None
+        zone_code = metadata_source.get('zone_code') or _derive_zone_code(raw.get('control_file_name'))
         is_primary = bool(metadata_source.get('is_primary'))
 
         metadata = {
@@ -170,6 +184,8 @@ def _build_control_model_configuration(project_id: int) -> dict:
             metadata['volume_label'] = volume_label
         if notes:
             metadata['notes'] = notes
+        if zone_code:
+            metadata['zone_code'] = str(zone_code).upper()
 
         control_entry = {
             'id': raw.get('id'),
@@ -1123,6 +1139,45 @@ def api_delete_client_route(client_id):
 
 
 # --- Project Aliases API ---
+
+@app.route('/api/project_aliases/summary', methods=['GET'])
+def api_get_project_aliases_summary():
+    """Get ultra-fast summary of aliases - just counts, no heavy processing"""
+    try:
+        from services.optimized_alias_service import OptimizedProjectAliasManager
+        manager = OptimizedProjectAliasManager()
+        try:
+            summary = manager.get_summary_quick()
+            return jsonify(summary)
+        finally:
+            manager.close_connection()
+    except Exception as exc:
+        logging.error("Error fetching alias summary: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/project_aliases/analyze', methods=['POST'])
+def api_analyze_project_aliases():
+    """
+    Run enhanced matching analysis on unmapped projects.
+    This executes the test script logic as a service.
+    
+    Returns:
+    {
+        "summary": { confidence breakdown },
+        "recommendations": [ top high-confidence matches ],
+        "unmapped_details": [ all unmapped with suggestions ]
+    }
+    """
+    try:
+        from services.optimized_alias_service import run_matching_analysis
+        results = run_matching_analysis()
+        return jsonify(results)
+    except Exception as exc:
+        logging.error("Error analyzing project aliases: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+
+
 @app.route('/api/project_aliases', methods=['GET'])
 def api_get_project_aliases():
     """List all project aliases with linked issue statistics."""
@@ -1241,17 +1296,27 @@ def api_get_project_alias_stats():
 
 @app.route('/api/project_aliases/unmapped', methods=['GET'])
 def api_get_unmapped_alias_projects():
-    """Return list of unmapped external project names."""
-    manager = ProjectAliasManager()
+    """Return list of unmapped external project names (optimized version)."""
     try:
-        unmapped = manager.discover_unmapped_projects()
-        return jsonify(unmapped)
+        from services.optimized_alias_service import OptimizedProjectAliasManager
+        manager = OptimizedProjectAliasManager()
+        try:
+            unmapped = manager.discover_unmapped_optimized()
+            return jsonify(unmapped)
+        finally:
+            manager.close_connection()
     except Exception as exc:
         logging.error("Error discovering unmapped projects: %s", exc)
-        return jsonify({'error': str(exc)}), 500
-    finally:
-        manager.close_connection()
-
+        # Fallback to original method if optimized fails
+        try:
+            manager = ProjectAliasManager()
+            try:
+                unmapped = manager.discover_unmapped_projects()
+                return jsonify(unmapped)
+            finally:
+                manager.close_connection()
+        except:
+            return jsonify({'error': str(exc)}), 500
 
 @app.route('/api/project_aliases/validation', methods=['GET'])
 def api_validate_project_aliases():
@@ -1262,6 +1327,150 @@ def api_validate_project_aliases():
         return jsonify(validation)
     except Exception as exc:
         logging.error("Error validating project aliases: %s", exc)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        manager.close_connection()
+
+
+@app.route('/api/project_aliases/auto-map', methods=['POST'])
+def api_auto_map_aliases():
+    """
+    Automatically create aliases for high-confidence matches.
+    
+    Request body:
+    {
+        "min_confidence": 0.85,  // Minimum confidence threshold (0.0-1.0)
+        "dry_run": true          // If true, preview without creating
+    }
+    
+    Response:
+    {
+        "created": [...],         // Successfully created aliases
+        "skipped": [...],         // Skipped (low confidence or errors)
+        "errors": [...],          // Errors during processing
+        "summary": {...}          // Overall statistics
+    }
+    """
+    body = request.get_json() or {}
+    min_confidence = body.get('min_confidence', 0.85)
+    dry_run = body.get('dry_run', True)
+    
+    # Validate confidence threshold
+    try:
+        min_confidence = float(min_confidence)
+        if not 0.0 <= min_confidence <= 1.0:
+            return jsonify({'error': 'min_confidence must be between 0.0 and 1.0'}), 400
+    except (TypeError, ValueError):
+        return jsonify({'error': 'min_confidence must be a number'}), 400
+    
+    manager = ProjectAliasManager()
+    try:
+        unmapped = manager.discover_unmapped_projects()
+        results = {
+            'created': [],
+            'skipped': [],
+            'errors': [],
+            'summary': {
+                'total_unmapped': len(unmapped),
+                'eligible_for_mapping': 0,
+                'successfully_mapped': 0,
+                'failed': 0,
+                'dry_run': dry_run
+            }
+        }
+        
+        conn = manager._get_connection()
+        if not conn:
+            return jsonify({'error': 'Database connection failed'}), 500
+        
+        cursor = conn.cursor()
+        
+        for item in unmapped:
+            suggestion = item.get('suggested_match')
+            
+            # Skip if no suggestion or confidence too low
+            if not suggestion:
+                results['skipped'].append({
+                    'alias_name': item['project_name'],
+                    'reason': 'No suggested match found',
+                    'total_issues': item.get('total_issues', 0)
+                })
+                continue
+            
+            if suggestion['confidence'] < min_confidence:
+                results['skipped'].append({
+                    'alias_name': item['project_name'],
+                    'reason': f'Confidence {suggestion["confidence"]:.1%} below threshold {min_confidence:.1%}',
+                    'suggested_project': suggestion['project_name'],
+                    'confidence': suggestion['confidence'],
+                    'match_type': suggestion['match_type']
+                })
+                continue
+            
+            results['summary']['eligible_for_mapping'] += 1
+            
+            # Get project_id for the suggested match
+            try:
+                cursor.execute(
+                    f"SELECT {S.Projects.ID} FROM {S.Projects.TABLE} WHERE {S.Projects.NAME} = ?",
+                    (suggestion['project_name'],)
+                )
+                row = cursor.fetchone()
+                
+                if not row:
+                    results['errors'].append({
+                        'alias_name': item['project_name'],
+                        'error': f"Project '{suggestion['project_name']}' not found in database"
+                    })
+                    results['summary']['failed'] += 1
+                    continue
+                
+                project_id = row[0]
+                
+                if dry_run:
+                    # Preview mode - don't actually create
+                    results['created'].append({
+                        'alias_name': item['project_name'],
+                        'project_id': project_id,
+                        'project_name': suggestion['project_name'],
+                        'confidence': suggestion['confidence'],
+                        'match_type': suggestion['match_type'],
+                        'total_issues': item.get('total_issues', 0),
+                        'dry_run': True
+                    })
+                    results['summary']['successfully_mapped'] += 1
+                else:
+                    # Actually create the alias
+                    success = manager.add_alias(project_id, item['project_name'])
+                    
+                    if success:
+                        results['created'].append({
+                            'alias_name': item['project_name'],
+                            'project_id': project_id,
+                            'project_name': suggestion['project_name'],
+                            'confidence': suggestion['confidence'],
+                            'match_type': suggestion['match_type'],
+                            'total_issues': item.get('total_issues', 0)
+                        })
+                        results['summary']['successfully_mapped'] += 1
+                    else:
+                        results['errors'].append({
+                            'alias_name': item['project_name'],
+                            'error': 'Failed to create alias (may already exist)'
+                        })
+                        results['summary']['failed'] += 1
+            
+            except Exception as e:
+                results['errors'].append({
+                    'alias_name': item['project_name'],
+                    'error': str(e)
+                })
+                results['summary']['failed'] += 1
+        
+        return jsonify(results)
+    
+    except Exception as exc:
+        logging.error("Error in auto-mapping aliases: %s", exc)
         return jsonify({'error': str(exc)}), 500
     finally:
         manager.close_connection()
@@ -2534,6 +2743,7 @@ def save_project_control_models(project_id):
     logging.info("Saving control models for project %s. Incoming payload: %s", project_id, raw_models)
     processed = []
     seen = set()
+    zone_checks = []
 
     for entry in raw_models:
         if not isinstance(entry, dict):
@@ -2542,13 +2752,32 @@ def save_project_control_models(project_id):
         if not file_name or file_name in seen:
             continue
         seen.add(file_name)
+        expected_zone = _derive_zone_code(file_name)
+        provided_zone = (entry.get('zone_code') or '').strip()
+        if provided_zone:
+            zone_value = provided_zone.upper()
+        elif expected_zone:
+            zone_value = expected_zone
+        else:
+            zone_value = None
         processed.append({
             'file_name': file_name,
             'validation_targets': _normalise_validation_targets(entry.get('validation_targets')),
             'volume_label': (entry.get('volume_label') or '').strip() or None,
             'notes': (entry.get('notes') or '').strip() or None,
+            'zone_code': zone_value,
             'is_primary': bool(entry.get('is_primary')),
         })
+        zone_checks.append((file_name, zone_value, expected_zone))
+
+    if len(processed) > 1:
+        for file_name, zone_value, expected_zone in zone_checks:
+            if expected_zone and not zone_value:
+                return jsonify({'error': f'Zone code required for control model {file_name}.'}), 400
+            if expected_zone and zone_value and zone_value.upper() != expected_zone.upper():
+                return jsonify({
+                    'error': f'Zone code for {file_name} must match the control file zone {expected_zone}.'
+                }), 400
 
     primary_override = payload.get('primary_control_model')
     if primary_override:

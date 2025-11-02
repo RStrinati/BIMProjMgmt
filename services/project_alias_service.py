@@ -244,39 +244,184 @@ class ProjectAliasManager:
             return []
     
     def _suggest_project_match(self, unmapped_name: str, main_projects: List[str]) -> Optional[Dict]:
-        """Suggest potential matches for unmapped project names"""
-        unmapped_lower = unmapped_name.lower()
+        """
+        Enhanced project matching with multiple strategies:
+        1. Project code extraction (P220702, MEL071)
+        2. Abbreviation matching (CWPS ↔ Calderwood Primary School)
+        3. Fuzzy string similarity
+        4. File pattern recognition
+        5. Substring matching (legacy)
+        6. Word overlap analysis
+        """
+        import re
+        from difflib import SequenceMatcher
         
+        unmapped_lower = unmapped_name.lower()
         suggestions = []
+        
+        # Preprocess: Extract project codes from unmapped name
+        unmapped_codes = self._extract_project_codes(unmapped_name)
+        unmapped_abbrev = self._extract_abbreviations(unmapped_name)
         
         for main_project in main_projects:
             main_lower = main_project.lower()
             
-            # Exact substring match
+            # Strategy 1: Project Code Matching (Highest Priority)
+            # Match patterns like P220702, MEL071, CWPS001
+            main_codes = self._extract_project_codes(main_project)
+            if unmapped_codes and main_codes:
+                if unmapped_codes & main_codes:  # Set intersection
+                    suggestions.append({
+                        'project_name': main_project,
+                        'match_type': 'project_code',
+                        'confidence': 0.95,
+                        'matched_codes': list(unmapped_codes & main_codes)
+                    })
+                    continue
+            
+            # Strategy 2: Abbreviation Matching
+            # Match CWPS → Calderwood Primary School, NFPS → North Fremantle PS
+            if self._match_abbreviation(unmapped_name, main_project):
+                suggestions.append({
+                    'project_name': main_project,
+                    'match_type': 'abbreviation',
+                    'confidence': 0.88
+                })
+                continue
+            
+            # Strategy 3: Fuzzy String Similarity (Levenshtein-based)
+            # Handles typos and variations
+            # Also check against project name without prefix codes
+            main_clean = re.sub(r'^(P\d{6}|[A-Z]{3,4}\d{3,4})\s+', '', main_project)
+            similarity_full = SequenceMatcher(None, unmapped_lower, main_lower).ratio()
+            similarity_clean = SequenceMatcher(None, unmapped_lower, main_clean.lower()).ratio()
+            similarity = max(similarity_full, similarity_clean)
+            
+            if similarity > 0.70:
+                suggestions.append({
+                    'project_name': main_project,
+                    'match_type': 'fuzzy_match',
+                    'confidence': min(similarity, 0.92)  # Cap at 92% for fuzzy
+                })
+            
+            # Strategy 4: Exact substring match (legacy behavior)
             if main_lower in unmapped_lower or unmapped_lower in main_lower:
                 suggestions.append({
                     'project_name': main_project,
                     'match_type': 'substring',
-                    'confidence': 0.9
+                    'confidence': 0.85
                 })
             
-            # Word matching
-            unmapped_words = set(unmapped_lower.replace('[', ' ').replace(']', ' ').split())
-            main_words = set(main_lower.split())
+            # Strategy 5: Word overlap analysis (with stop-word filtering)
+            unmapped_words = set(unmapped_lower.replace('[', ' ').replace(']', ' ').replace('-', ' ').split())
+            main_words = set(main_lower.replace('-', ' ').split())
+            
+            # Remove common stop words to improve matching
+            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+            unmapped_words = {w for w in unmapped_words if w not in stop_words and len(w) > 2}
+            main_words = {w for w in main_words if w not in stop_words and len(w) > 2}
+            
             common_words = unmapped_words.intersection(main_words)
             
-            if common_words and len(common_words) >= len(main_words) * 0.5:
-                confidence = len(common_words) / max(len(unmapped_words), len(main_words))
+            if common_words and len(common_words) >= 2:  # Require at least 2 matching words
+                # Weight by word importance (longer words = higher weight)
+                word_score = sum(len(w) for w in common_words) / sum(len(w) for w in main_words | unmapped_words)
+                confidence = min(word_score * 1.2, 0.82)  # Cap at 82% for word matching
+                
                 suggestions.append({
                     'project_name': main_project,
                     'match_type': 'word_match',
-                    'confidence': confidence
+                    'confidence': confidence,
+                    'matched_words': list(common_words)
                 })
         
-        # Return best suggestion
+        # Return best suggestion (highest confidence)
         if suggestions:
-            return max(suggestions, key=lambda x: x['confidence'])
+            best_match = max(suggestions, key=lambda x: x['confidence'])
+            return best_match
         return None
+    
+    def _extract_project_codes(self, text: str) -> set:
+        """
+        Extract project codes from text:
+        - P + 6 digits (e.g., P220702)
+        - 3-4 letters + 3-4 digits (e.g., MEL071, CWPS001)
+        - Standalone numbers with 4+ digits (e.g., 220702)
+        """
+        import re
+        codes = set()
+        
+        # Pattern 1: P + 6 digits
+        codes.update(re.findall(r'P\d{6}', text.upper()))
+        
+        # Pattern 2: 3-4 letters + 3-4 digits
+        codes.update(re.findall(r'[A-Z]{3,4}\d{3,4}', text.upper()))
+        
+        # Pattern 3: Standalone 4-6 digit numbers (project IDs)
+        codes.update(re.findall(r'\b\d{4,6}\b', text))
+        
+        return codes
+    
+    def _extract_abbreviations(self, text: str) -> str:
+        """Extract uppercase abbreviations from text (e.g., CWPS, NFPS)"""
+        import re
+        # Find sequences of 3+ consecutive uppercase letters
+        abbrevs = re.findall(r'\b[A-Z]{3,}\b', text)
+        return ''.join(abbrevs)
+    
+    def _match_abbreviation(self, file_name: str, project_name: str) -> bool:
+        """
+        Match abbreviations like:
+        - CWPS → Calderwood Primary School
+        - NFPS → North Fremantle Primary School  
+        - MCC → Melbourne Convention Centre (even if project is "P220702 Melbourne Convention Centre")
+        Uses initials of capitalized words
+        """
+        import re
+        
+        # Remove project code prefix from project name to get clean name
+        project_clean = re.sub(r'^(P\d{6}|[A-Z]{3,4}\d{3,4})\s+', '', project_name)
+        
+        # Extract capital letters from project name (initials)
+        # Match words that start with capitals (including after spaces)
+        project_words = re.findall(r'\b[A-Z][a-z]*', project_clean)
+        if not project_words:
+            return False
+        
+        # Create abbreviation from first letters
+        project_abbrev = ''.join([w[0] for w in project_words])
+        
+        # Extract standalone abbreviations from file name (2+ consecutive uppercase)
+        file_abbrevs = re.findall(r'\b[A-Z]{2,}\b', file_name)
+        
+        # Check if any file abbreviation matches project initials
+        for file_abbrev in file_abbrevs:
+            # Exact match
+            if file_abbrev == project_abbrev:
+                return True
+            
+            # File abbrev is prefix of project abbrev (at least 2 chars)
+            if len(file_abbrev) >= 2 and len(project_abbrev) >= len(file_abbrev):
+                if project_abbrev.startswith(file_abbrev):
+                    return True
+            
+            # Project abbrev is prefix of file abbrev (at least 2 chars)
+            if len(project_abbrev) >= 2 and len(file_abbrev) >= len(project_abbrev):
+                if file_abbrev.startswith(project_abbrev):
+                    return True
+            
+            # Handle common suffixes - match core part
+            # NFPS vs NFPS (North Fremantle Primary School)
+            if file_abbrev.endswith('PS') and project_abbrev.endswith('PS'):
+                # Match if cores are similar
+                file_core = file_abbrev[:-2]
+                proj_core = project_abbrev[:-2]
+                if len(file_core) >= 1 and len(proj_core) >= 1:
+                    # Check if cores match or one contains the other
+                    if file_core == proj_core or file_core in proj_core or proj_core in file_core:
+                        return True
+        
+        return False
     
     # ==================== Validation & Monitoring ====================
     

@@ -25,6 +25,9 @@ SELECT
     wh.health_check_id,
     wh.revit_file_name,
     wh.export_date,
+    wh.zone_code,
+    wh.control_volume_label,
+    wh.control_is_primary,
     g.*
 FROM dbo.vw_RevitHealthWarehouse_CrossDB wh
 INNER JOIN dbo.vw_RvtGrids g 
@@ -53,6 +56,9 @@ SELECT
     wh.health_check_id,
     wh.revit_file_name,
     wh.export_date,
+    wh.zone_code,
+    wh.control_volume_label,
+    wh.control_is_primary,
     l.*
 FROM dbo.vw_RevitHealthWarehouse_CrossDB wh
 INNER JOIN dbo.vw_RvtLevels l 
@@ -81,6 +87,9 @@ SELECT
     wh.health_check_id,
     wh.revit_file_name,
     wh.export_date,
+    wh.zone_code,
+    wh.control_volume_label,
+    wh.control_is_primary,
     c.*
 FROM dbo.vw_RevitHealthWarehouse_CrossDB wh
 INNER JOIN dbo.vw_RvtCoordinates c 

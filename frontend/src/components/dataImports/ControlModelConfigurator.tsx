@@ -4,11 +4,9 @@ import {
   Autocomplete,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
   FormControlLabel,
-  FormGroup,
   LinearProgress,
   Paper,
   Radio,
@@ -45,6 +43,7 @@ interface EditableControlModel {
   volumeLabel: string;
   notes: string;
   isPrimary: boolean;
+  zoneCode: string;
 }
 
 const sanitiseTargets = (targets?: ValidationTarget[]): ValidationTarget[] => {
@@ -61,6 +60,18 @@ const sanitiseTargets = (targets?: ValidationTarget[]): ValidationTarget[] => {
   return unique.length ? unique : [...DEFAULT_TARGETS];
 };
 
+const deriveZoneCode = (fileName: string): string => {
+  if (!fileName) {
+    return '';
+  }
+  const normalised = fileName.replace(/\[.*?\]$/, '').replace(/\.rvt$/i, '');
+  const parts = normalised.split(/[-_]/).filter(Boolean);
+  if (parts.length >= 3) {
+    return parts[2].toUpperCase();
+  }
+  return '';
+};
+
 const toEditableModels = (config: ControlModelConfiguration): EditableControlModel[] => {
   const active = config.control_models.filter((model) => model.is_active);
   if (!active.length) {
@@ -72,6 +83,7 @@ const toEditableModels = (config: ControlModelConfiguration): EditableControlMod
     volumeLabel: model.metadata?.volume_label ?? '',
     notes: model.metadata?.notes ?? '',
     isPrimary: Boolean(model.metadata?.is_primary),
+    zoneCode: (model.metadata?.zone_code as string | undefined) ?? deriveZoneCode(model.file_name),
   }));
 };
 
@@ -164,6 +176,7 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
           volumeLabel: '',
           notes: '',
           isPrimary: false,
+          zoneCode: deriveZoneCode(fileName),
         };
       }),
     );
@@ -205,7 +218,7 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
 
   const handleFieldChange = (
     fileName: string,
-    field: 'volumeLabel' | 'notes',
+    field: 'volumeLabel' | 'notes' | 'zoneCode',
     value: string,
   ) => {
     setStatusMessage(null);
@@ -227,6 +240,20 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
       setErrorMessage('Add at least one control model before saving.');
       return;
     }
+    const isMultiVolume = models.length > 1;
+    for (const model of models) {
+      const expectedZone = deriveZoneCode(model.fileName);
+      const providedZoneRaw = model.zoneCode.trim();
+      const providedZone = providedZoneRaw ? providedZoneRaw.toUpperCase() : '';
+      if (expectedZone && providedZone && providedZone !== expectedZone) {
+        setErrorMessage(`Zone code for ${model.fileName} must match ${expectedZone}.`);
+        return;
+      }
+      if (isMultiVolume && !providedZone) {
+        setErrorMessage(`Enter a zone code for ${model.fileName}.`);
+        return;
+      }
+    }
     setStatusMessage(null);
     setErrorMessage(null);
     const primaryModel = models.find((model) => model.isPrimary)?.fileName ?? models[0].fileName;
@@ -236,6 +263,7 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
       volume_label: model.volumeLabel.trim() || undefined,
       notes: model.notes.trim() || undefined,
       is_primary: model.isPrimary,
+      zone_code: model.zoneCode.trim() ? model.zoneCode.trim().toUpperCase() : undefined,
     }));
     mutation.mutate({ controlModels: payload, primary: primaryModel });
   };
@@ -419,49 +447,37 @@ export const ControlModelConfigurator: React.FC<ControlModelConfiguratorProps> =
                 alignItems={{ xs: 'flex-start', md: 'center' }}
                 sx={{ mb: 2 }}
               >
-                <FormGroup row>
-                  {VALIDATION_TARGETS.map((target) => (
-                    <FormControlLabel
-                      key={target}
-                      control={
-                        <Checkbox
-                          checked={model.validationTargets.includes(target)}
-                          onChange={() => handleTargetToggle(model.fileName, target)}
-                          disabled={mutationPending}
-                          sx={{
-                            position: 'absolute',
-                            opacity: 0,
-                            width: 1,
-                            height: 1,
-                          }}
-                        />
-                      }
-                      label={
-                        <Chip
-                          label={target.charAt(0).toUpperCase() + target.slice(1)}
-                          color={model.validationTargets.includes(target) ? 'primary' : 'default'}
-                          variant={model.validationTargets.includes(target) ? 'filled' : 'outlined'}
-                          clickable
-                          onClick={() => {
-                            if (mutationPending) {
-                              return;
-                            }
-                            handleTargetToggle(model.fileName, target);
-                          }}
-                          sx={{
-                            mr: 1,
-                            mb: 1,
-                            pointerEvents: mutationPending ? 'none' : 'auto',
-                            opacity: mutationPending ? 0.75 : 1,
-                          }}
-                        />
-                      }
-                    />
-                  ))}
-                </FormGroup>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {VALIDATION_TARGETS.map((target) => {
+                    const selected = model.validationTargets.includes(target);
+                    return (
+                      <Chip
+                        key={target}
+                        label={target.charAt(0).toUpperCase() + target.slice(1)}
+                        color={selected ? 'primary' : 'default'}
+                        variant={selected ? 'filled' : 'outlined'}
+                        clickable
+                        disabled={mutationPending}
+                        onClick={() => handleTargetToggle(model.fileName, target)}
+                        sx={{ opacity: mutationPending ? 0.75 : 1 }}
+                      />
+                    );
+                  })}
+                </Box>
               </Stack>
 
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                <TextField
+                  label="Zone Code"
+                  value={model.zoneCode}
+                  onChange={(event) =>
+                    handleFieldChange(model.fileName, 'zoneCode', event.target.value.toUpperCase())
+                  }
+                  disabled={mutationPending}
+                  fullWidth
+                  placeholder="Auto-detected from file name"
+                  helperText={`Expected: ${deriveZoneCode(model.fileName) || 'N/A'}`}
+                />
                 <TextField
                   label="Volume / Area"
                   value={model.volumeLabel}

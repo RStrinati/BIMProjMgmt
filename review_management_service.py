@@ -14,7 +14,8 @@ import math
 import sqlite3
 import pyodbc
 
-from datetime import datetime, timedelta
+from collections import Counter
+from datetime import datetime, timedelta, date
 
 from decimal import Decimal, InvalidOperation
 
@@ -41,6 +42,9 @@ from review_validation import (
 class ReviewManagementService:
 
     """Core service for review management operations"""
+
+    # Statuses that remain flexible enough to be rescheduled automatically
+    ADJUSTABLE_STATUSES = {'planned', 'in_progress', 'overdue'}
 
     
 
@@ -1764,6 +1768,287 @@ class ReviewManagementService:
             print(f"Error marking review issued: {e}")
 
             return False
+
+    def reschedule_adjacent_reviews(
+        self,
+        review_id: int,
+        anchor_date: Optional[date] = None,
+        include_previous: bool = True,
+        include_following: bool = True,
+        auto_commit: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Realign neighbouring reviews to maintain cadence when one review date changes.
+
+        Args:
+            review_id: The review that was manually adjusted.
+            anchor_date: New planned date to anchor the series (defaults to stored value).
+            include_previous: Whether to adjust earlier pending reviews.
+            include_following: Whether to adjust later reviews.
+            auto_commit: Commit changes automatically if True.
+
+        Returns:
+            Dict with counts of updated records and the cadence that was applied.
+        """
+        results = {
+            'updated_forward': 0,
+            'updated_previous': 0,
+            'interval_days': None,
+        }
+
+        if not include_previous and not include_following:
+            return results
+
+        try:
+            # Fetch anchor review details
+            self.cursor.execute(
+                f"""
+                SELECT
+                    {S.ServiceReviews.SERVICE_ID},
+                    {S.ServiceReviews.CYCLE_NO},
+                    {S.ServiceReviews.PLANNED_DATE},
+                    {S.ServiceReviews.STATUS}
+                FROM {S.ServiceReviews.TABLE}
+                WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                """,
+                (review_id,),
+            )
+            row = self.cursor.fetchone()
+            if not row:
+                print(f"[reviews] Review {review_id} not found for rescheduling")
+                return results
+
+            service_id, cycle_no, stored_planned, _ = row
+            base_date = self._coerce_to_date(anchor_date or stored_planned)
+            if not base_date:
+                print(f"[reviews] Unable to determine anchor date for review {review_id}")
+                return results
+
+            # Resolve cadence
+            self.cursor.execute(
+                f"""
+                SELECT {S.ServiceScheduleSettings.FREQUENCY}
+                FROM {S.ServiceScheduleSettings.TABLE}
+                WHERE {S.ServiceScheduleSettings.SERVICE_ID} = ?
+                """,
+                (service_id,),
+            )
+            freq_row = self.cursor.fetchone()
+            interval_days = self._map_frequency_to_days(freq_row[0] if freq_row else None)
+            if not interval_days:
+                interval_days = self._infer_interval_days_from_reviews(service_id, exclude_review_id=review_id)
+            if not interval_days:
+                # Default to weekly if cadence cannot be determined
+                interval_days = 7
+
+            results['interval_days'] = interval_days
+            cadence_delta = timedelta(days=interval_days)
+
+            # Adjust later reviews
+            if include_following:
+                self.cursor.execute(
+                    f"""
+                    SELECT
+                        {S.ServiceReviews.REVIEW_ID},
+                        {S.ServiceReviews.CYCLE_NO},
+                        {S.ServiceReviews.PLANNED_DATE},
+                        {S.ServiceReviews.STATUS}
+                    FROM {S.ServiceReviews.TABLE}
+                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                      AND {S.ServiceReviews.CYCLE_NO} > ?
+                    ORDER BY {S.ServiceReviews.CYCLE_NO}
+                    """,
+                    (service_id, cycle_no),
+                )
+                reference_date = base_date
+                for next_review_id, _, planned_value, status_value in self.cursor.fetchall():
+                    planned_date = self._coerce_to_date(planned_value)
+                    status_key = (status_value or 'planned').lower()
+                    if status_key not in self.ADJUSTABLE_STATUSES:
+                        reference_date = planned_date or reference_date
+                        continue
+
+                    expected_date = reference_date + cadence_delta
+                    if planned_date == expected_date:
+                        reference_date = planned_date
+                        continue
+
+                    date_str = expected_date.strftime('%Y-%m-%d')
+                    self.cursor.execute(
+                        f"""
+                        UPDATE {S.ServiceReviews.TABLE}
+                        SET {S.ServiceReviews.PLANNED_DATE} = ?,
+                            {S.ServiceReviews.DUE_DATE} = ?
+                        WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                        """,
+                        (date_str, date_str, next_review_id),
+                    )
+                    if self.cursor.rowcount:
+                        results['updated_forward'] += 1
+                    reference_date = expected_date
+
+            # Adjust earlier reviews
+            if include_previous:
+                self.cursor.execute(
+                    f"""
+                    SELECT
+                        {S.ServiceReviews.REVIEW_ID},
+                        {S.ServiceReviews.CYCLE_NO},
+                        {S.ServiceReviews.PLANNED_DATE},
+                        {S.ServiceReviews.STATUS}
+                    FROM {S.ServiceReviews.TABLE}
+                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                      AND {S.ServiceReviews.CYCLE_NO} < ?
+                    ORDER BY {S.ServiceReviews.CYCLE_NO} DESC
+                    """,
+                    (service_id, cycle_no),
+                )
+                reference_date = base_date
+                for prev_review_id, _, planned_value, status_value in self.cursor.fetchall():
+                    planned_date = self._coerce_to_date(planned_value)
+                    status_key = (status_value or 'planned').lower()
+                    if status_key not in self.ADJUSTABLE_STATUSES:
+                        reference_date = planned_date or reference_date
+                        continue
+
+                    expected_date = reference_date - cadence_delta
+                    if planned_date == expected_date:
+                        reference_date = planned_date
+                        continue
+
+                    date_str = expected_date.strftime('%Y-%m-%d')
+                    self.cursor.execute(
+                        f"""
+                        UPDATE {S.ServiceReviews.TABLE}
+                        SET {S.ServiceReviews.PLANNED_DATE} = ?,
+                            {S.ServiceReviews.DUE_DATE} = ?
+                        WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                        """,
+                        (date_str, date_str, prev_review_id),
+                    )
+                    if self.cursor.rowcount:
+                        results['updated_previous'] += 1
+                    reference_date = expected_date
+
+            if auto_commit:
+                self.db.commit()
+
+            print(
+                f"[reviews] Rescheduled service {service_id}: "
+                f"{results['updated_previous']} previous, {results['updated_forward']} upcoming "
+                f"(interval {interval_days} days)"
+            )
+            return results
+
+        except Exception as exc:
+            if auto_commit:
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
+            results['error'] = str(exc)
+            print(f"[reviews] Error rescheduling reviews for {review_id}: {exc}")
+            return results
+
+    def _coerce_to_date(self, value: Any) -> Optional[date]:
+        """Convert supported date representations to a date instance."""
+        if value is None:
+            return None
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return None
+            try:
+                return datetime.fromisoformat(text).date()
+            except ValueError:
+                try:
+                    return datetime.strptime(text[:10], '%Y-%m-%d').date()
+                except ValueError:
+                    return None
+        return None
+
+    def _map_frequency_to_days(self, frequency_value: Optional[Any]) -> Optional[int]:
+        """Map stored frequency values to a number of days."""
+        if frequency_value is None:
+            return None
+
+        if isinstance(frequency_value, (int, float)):
+            return int(frequency_value)
+
+        frequency_str = str(frequency_value).strip()
+        if not frequency_str:
+            return None
+
+        # Support direct numeric strings like "14"
+        try:
+            numeric = int(float(frequency_str))
+            if numeric > 0:
+                return numeric
+        except ValueError:
+            pass
+
+        normalized = frequency_str.lower().replace('_', '-')
+        lookup = {
+            'one-off': 0,
+            'weekly': 7,
+            'week': 7,
+            'bi-weekly': 14,
+            'biweekly': 14,
+            'fortnightly': 14,
+            'fortnight': 14,
+            'two-weekly': 14,
+            'monthly': 30,
+            'quarterly': 90,
+        }
+        return lookup.get(normalized)
+
+    def _infer_interval_days_from_reviews(
+        self,
+        service_id: int,
+        exclude_review_id: Optional[int] = None,
+    ) -> Optional[int]:
+        """Infer cadence from existing review spacing when frequency metadata is missing."""
+        try:
+            params: List[Any] = [service_id]
+            query = f"""
+                SELECT {S.ServiceReviews.PLANNED_DATE}
+                FROM {S.ServiceReviews.TABLE}
+                WHERE {S.ServiceReviews.SERVICE_ID} = ?
+            """
+            if exclude_review_id:
+                query += f" AND {S.ServiceReviews.REVIEW_ID} <> ?"
+                params.append(exclude_review_id)
+            query += f" ORDER BY {S.ServiceReviews.PLANNED_DATE}"
+
+            self.cursor.execute(query, tuple(params))
+            dates = [
+                self._coerce_to_date(row[0])
+                for row in self.cursor.fetchall()
+                if row and row[0]
+            ]
+
+            diffs = []
+            previous_date = None
+            for current_date in dates:
+                if not current_date:
+                    continue
+                if previous_date:
+                    gap = (current_date - previous_date).days
+                    if gap > 0:
+                        diffs.append(gap)
+                previous_date = current_date
+
+            if diffs:
+                return Counter(diffs).most_common(1)[0][0]
+
+        except Exception as exc:
+            print(f"[reviews] Unable to infer cadence for service {service_id}: {exc}")
+
+        return None
 
     
 

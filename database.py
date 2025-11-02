@@ -1680,6 +1680,8 @@ def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
         metadata['volume_label'] = str(volume_label).strip() if volume_label else None
         notes = entry.get('notes') or metadata.get('notes')
         metadata['notes'] = str(notes).strip() if notes else None
+        zone_code = entry.get('zone_code') or metadata.get('zone_code')
+        metadata['zone_code'] = str(zone_code).strip() if zone_code else None
         metadata['is_primary'] = bool(entry.get('is_primary') or metadata.get('is_primary'))
 
         normalized.append({'file_name': file_name, 'metadata': metadata})

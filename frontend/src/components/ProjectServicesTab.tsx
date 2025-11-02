@@ -302,7 +302,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         page: servicesPage + 1,
         limit: servicesRowsPerPage,
       }),
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 
   // Fetch service reviews when a service is selected

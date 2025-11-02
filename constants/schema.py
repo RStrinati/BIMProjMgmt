@@ -354,6 +354,19 @@ class TblRvtProjHealth:
     JSON_PHASES = "jsonPhases"
 
 
+class TblRvtFamilySummary:
+    TABLE = "tblRvtFamilySummary"
+    ID = "id"
+    HEALTH_CHECK_ID = "health_check_id"
+    FAMILY_NAME = "family_name"
+    CATEGORY = "category"
+    INSTANCE_COUNT = "instance_count"
+    SIZE_MB = "size_mb"
+    FILE_PATH = "file_path"
+    SHARED_PARAMETERS_JSON = "shared_parameters_json"
+    CREATED_AT = "created_at"
+
+
 class TblRvtUser:
     TABLE = "tblRvtUser"
     NID = "nId"
