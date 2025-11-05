@@ -1,4 +1,4 @@
-import { Profiler, useCallback, type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Profiler, type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -24,36 +24,22 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Tabs,
-  Tab,
   Stack,
   TablePagination,
+  Collapse,
+  Link,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Assessment as AssessmentIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
 } from '@mui/icons-material';
 import { projectServicesApi, serviceReviewsApi, serviceItemsApi, fileServiceTemplatesApi } from '@/api';
 import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService, ServiceReview, ServiceItem, FileServiceTemplate, ApplyTemplateResult } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div role="tabpanel" hidden={value !== index} {...other}>
-      {value === index && <Box sx={{ p: 1 }}>{children}</Box>}
-    </div>
-  );
-}
 
 interface ProjectServicesTabProps {
   projectId: number;
@@ -234,9 +220,352 @@ const mapAggregateToSummary = (aggregate?: Record<string, unknown>): BillingSumm
   };
 };
 
+interface ServiceRowProps {
+  projectId: number;
+  service: ProjectService;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onEditService: (service: ProjectService) => void;
+  onDeleteService: (serviceId: number) => void;
+  onAddReview: (service: ProjectService, existingReviewCount: number) => void;
+  onEditReview: (service: ProjectService, review: ServiceReview, existingReviewCount: number) => void;
+  onDeleteReview: (service: ProjectService, reviewId: number) => void;
+  onAddItem: (service: ProjectService) => void;
+  onEditItem: (service: ProjectService, item: ServiceItem) => void;
+  onDeleteItem: (service: ProjectService, itemId: number) => void;
+  formatCurrency: (value?: number | null) => string;
+  formatPercent: (value?: number | null) => string;
+  getStatusColor: (
+    status: string
+  ) => 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning';
+}
+
+function ServiceRow({
+  projectId,
+  service,
+  isExpanded,
+  onToggle,
+  onEditService,
+  onDeleteService,
+  onAddReview,
+  onEditReview,
+  onDeleteReview,
+  onAddItem,
+  onEditItem,
+  onDeleteItem,
+  formatCurrency,
+  formatPercent,
+  getStatusColor,
+}: ServiceRowProps) {
+  const {
+    data: reviewsData = [],
+    isLoading: reviewsLoading,
+    isError: reviewsIsError,
+    error: reviewsError,
+    isFetching: reviewsFetching,
+  } = useQuery({
+    queryKey: ['serviceReviews', projectId, service.service_id],
+    queryFn: async () => {
+      const response = await serviceReviewsApi.getAll(projectId, service.service_id);
+      return response.data;
+    },
+    enabled: isExpanded,
+    staleTime: 60 * 1000,
+  });
+
+  const {
+    data: itemsData = [],
+    isLoading: itemsLoading,
+    isError: itemsIsError,
+    error: itemsError,
+    isFetching: itemsFetching,
+  } = useQuery({
+    queryKey: ['serviceItems', projectId, service.service_id],
+    queryFn: async () => {
+      const response = await serviceItemsApi.getAll(projectId, service.service_id);
+      return response.data;
+    },
+    enabled: isExpanded,
+    staleTime: 60 * 1000,
+  });
+
+  const billedAmount = service.billed_amount ?? service.claimed_to_date ?? 0;
+  const collapseColSpan = 10;
+  const reviewsErrorMessage =
+    reviewsError instanceof Error ? reviewsError.message : 'Failed to load reviews';
+  const itemsErrorMessage =
+    itemsError instanceof Error ? itemsError.message : 'Failed to load items';
+  const renderInvoiceReference = (value?: string | null) => {
+    if (!value) {
+      return '-';
+    }
+    const trimmed = String(value).trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return (
+        <Link href={trimmed} target="_blank" rel="noopener noreferrer">
+          Open
+        </Link>
+      );
+    }
+    return trimmed;
+  };
+
+  return (
+    <>
+      <TableRow hover>
+        <TableCell padding="checkbox">
+          <IconButton
+            size="small"
+            onClick={onToggle}
+            aria-label={isExpanded ? 'Collapse service details' : 'Expand service details'}
+          >
+            {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+        <TableCell>{service.service_code}</TableCell>
+        <TableCell>{service.service_name}</TableCell>
+        <TableCell>{service.phase || '-'}</TableCell>
+        <TableCell>
+          <Chip label={service.status} color={getStatusColor(service.status)} size="small" />
+        </TableCell>
+        <TableCell>{formatCurrency(service.agreed_fee)}</TableCell>
+        <TableCell>{formatCurrency(billedAmount)}</TableCell>
+        <TableCell>{formatCurrency(service.agreed_fee_remaining)}</TableCell>
+        <TableCell sx={{ minWidth: 180 }}>
+          <Box>
+            <LinearProgress
+              variant="determinate"
+              value={service.billing_progress_pct ?? service.progress_pct ?? 0}
+              sx={{ height: 8, borderRadius: 4, mb: 0.5 }}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {formatPercent(service.billing_progress_pct ?? service.progress_pct)} billed
+            </Typography>
+          </Box>
+        </TableCell>
+        <TableCell align="right">
+          <IconButton size="small" onClick={() => onEditService(service)}>
+            <EditIcon />
+          </IconButton>
+          <IconButton size="small" color="error" onClick={() => onDeleteService(service.service_id)}>
+            <DeleteIcon />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={collapseColSpan}>
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <Box margin={2} display="flex" flexDirection="column" gap={3}>
+              <Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle1">Reviews</Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => onAddReview(service, reviewsData.length)}
+                  >
+                    Add Review
+                  </Button>
+                </Box>
+                {reviewsLoading || reviewsFetching ? (
+                  <Box display="flex" justifyContent="center" py={2}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : reviewsIsError ? (
+                  <Alert severity="error">{reviewsErrorMessage}</Alert>
+                ) : reviewsData.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No reviews yet.
+                  </Typography>
+                ) : (
+                  <Table size="small" sx={{ mt: 1 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Cycle</TableCell>
+                        <TableCell>Planned Date</TableCell>
+                        <TableCell>Due Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Weight</TableCell>
+                        <TableCell>Invoice / Folder</TableCell>
+                        <TableCell>Billed</TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {reviewsData.map((review) => (
+                        <TableRow key={review.review_id}>
+                          <TableCell>{review.cycle_no}</TableCell>
+                          <TableCell>
+                            {review.planned_date
+                              ? new Date(review.planned_date).toLocaleDateString()
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {review.due_date
+                              ? new Date(review.due_date).toLocaleDateString()
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={review.status}
+                              color={
+                                review.status === 'completed'
+                                  ? 'success'
+                                  : review.status === 'in_progress'
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>{review.weight_factor}</TableCell>
+                          <TableCell>{renderInvoiceReference(review.invoice_reference)}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={review.is_billed ? 'Yes' : 'No'}
+                              color={review.is_billed ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={() => onEditReview(service, review, reviewsData.length)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => onDeleteReview(service, review.review_id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Box>
+
+              <Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle1">Items</Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => onAddItem(service)}
+                  >
+                    Add Item
+                  </Button>
+                </Box>
+                {itemsLoading || itemsFetching ? (
+                  <Box display="flex" justifyContent="center" py={2}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : itemsIsError ? (
+                  <Alert severity="error">{itemsErrorMessage}</Alert>
+                ) : itemsData.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No items yet.
+                  </Typography>
+                ) : (
+                  <Table size="small" sx={{ mt: 1 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Title</TableCell>
+                        <TableCell>Planned Date</TableCell>
+                        <TableCell>Due Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Priority</TableCell>
+                        <TableCell>Billed</TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {itemsData.map((item) => (
+                        <TableRow key={item.item_id}>
+                          <TableCell>
+                            <Chip label={item.item_type} color="info" size="small" />
+                          </TableCell>
+                          <TableCell>{item.title}</TableCell>
+                          <TableCell>
+                            {item.planned_date
+                              ? new Date(item.planned_date).toLocaleDateString()
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {item.due_date ? new Date(item.due_date).toLocaleDateString() : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.status}
+                              color={
+                                item.status === 'completed'
+                                  ? 'success'
+                                  : item.status === 'in_progress'
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.priority}
+                              color={
+                                item.priority === 'critical'
+                                  ? 'error'
+                                  : item.priority === 'high'
+                                  ? 'warning'
+                                  : 'default'
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.is_billed ? 'Yes' : 'No'}
+                              color={item.is_billed ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={() => onEditItem(service, item)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => onDeleteItem(service, item.item_id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Box>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
+
 export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const queryClient = useQueryClient();
-  const [serviceTabValue, setServiceTabValue] = useState(0);
+  const [expandedServiceIds, setExpandedServiceIds] = useState<number[]>([]);
   const [selectedService, setSelectedService] = useState<ProjectService | null>(null);
   const [selectedReview, setSelectedReview] = useState<ServiceReview | null>(null);
   const [selectedItem, setSelectedItem] = useState<ServiceItem | null>(null);
@@ -265,6 +594,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     deliverables: '',
     status: 'planned',
     weight_factor: 1.0,
+    invoice_reference: '',
     evidence_links: '',
     is_billed: false,
   });
@@ -305,32 +635,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     placeholderData: (previousData) => previousData,
   });
 
-  // Fetch service reviews when a service is selected
-  const {
-    data: reviews,
-  } = useQuery({
-    queryKey: ['serviceReviews', projectId, selectedService?.service_id],
-    queryFn: async () => {
-      if (!selectedService) return [];
-      const response = await serviceReviewsApi.getAll(projectId, selectedService.service_id);
-      return response.data;
-    },
-    enabled: !!selectedService,
-  });
-
-  // Fetch service items when a service is selected
-  const {
-    data: serviceItems,
-  } = useQuery({
-    queryKey: ['serviceItems', projectId, selectedService?.service_id],
-    queryFn: async () => {
-      if (!selectedService) return [];
-      const response = await serviceItemsApi.getAll(projectId, selectedService.service_id);
-      return response.data;
-    },
-    enabled: !!selectedService,
-  });
- 
   const {
     data: fileTemplates,
     isLoading: fileTemplatesLoading,
@@ -368,6 +672,10 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   }, [projectId]);
 
   useEffect(() => {
+    setExpandedServiceIds([]);
+  }, [projectId]);
+
+  useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(totalServices / servicesRowsPerPage) - 1);
     if (servicesPage > maxPage) {
       setServicesPage(maxPage);
@@ -394,6 +702,15 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     return servicesData.slice(start, start + servicesRowsPerPage);
   }, [isServerPaginated, servicesData, servicesPage, servicesRowsPerPage]);
 
+  useEffect(() => {
+    setExpandedServiceIds((prev) => {
+      const filtered = prev.filter((id) =>
+        servicesData.some((service) => service.service_id === id),
+      );
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [servicesData]);
+
   const handleChangeServicesPage = (_event: unknown, newPage: number) => {
     setServicesPage(newPage);
   };
@@ -402,6 +719,12 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     const nextValue = Number(event.target.value) || 10;
     setServicesRowsPerPage(nextValue);
     setServicesPage(0);
+  };
+
+  const toggleServiceExpansion = (serviceId: number) => {
+    setExpandedServiceIds((prev) =>
+      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId],
+    );
   };
 
   const currencyFormatter = useMemo(
@@ -511,9 +834,10 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
   const deleteServiceMutation = useMutation({
     mutationFn: (serviceId: number) => projectServicesApi.delete(projectId, serviceId),
-    onSuccess: () => {
+    onSuccess: (_result, serviceId) => {
       queryClient.invalidateQueries({ queryKey: ['projectServices', projectId] });
       setSelectedService(null);
+      setExpandedServiceIds((prev) => prev.filter((id) => id !== serviceId));
     },
   });
 
@@ -556,55 +880,69 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
   // Review mutations
   const createReviewMutation = useMutation({
-    mutationFn: (data: typeof reviewFormData) =>
-      selectedService ? serviceReviewsApi.create(projectId, selectedService.service_id, data) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, selectedService?.service_id] });
+    mutationFn: ({ serviceId, data }: { serviceId: number; data: typeof reviewFormData }) =>
+      serviceReviewsApi.create(projectId, serviceId, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, variables.serviceId] });
       handleCloseReviewDialog();
     },
   });
 
   const updateReviewMutation = useMutation({
-    mutationFn: ({ reviewId, data }: { reviewId: number; data: Partial<typeof reviewFormData> }) =>
-      selectedService ? serviceReviewsApi.update(projectId, selectedService.service_id, reviewId, data) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, selectedService?.service_id] });
+    mutationFn: ({
+      serviceId,
+      reviewId,
+      data,
+    }: {
+      serviceId: number;
+      reviewId: number;
+      data: Partial<typeof reviewFormData>;
+    }) => serviceReviewsApi.update(projectId, serviceId, reviewId, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, variables.serviceId] });
       handleCloseReviewDialog();
     },
   });
 
   const deleteReviewMutation = useMutation({
-    mutationFn: (reviewId: number) => 
-      selectedService ? serviceReviewsApi.delete(projectId, selectedService.service_id, reviewId) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, selectedService?.service_id] });
+    mutationFn: ({ serviceId, reviewId }: { serviceId: number; reviewId: number }) =>
+      serviceReviewsApi.delete(projectId, serviceId, reviewId),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, variables.serviceId] });
     },
   });
 
   // Item mutations
   const createItemMutation = useMutation({
-    mutationFn: (data: typeof itemFormData) =>
-      selectedService ? serviceItemsApi.create(projectId, selectedService.service_id, data) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, selectedService?.service_id] });
+    mutationFn: ({ serviceId, data }: { serviceId: number; data: typeof itemFormData }) =>
+      serviceItemsApi.create(projectId, serviceId, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, variables.serviceId] });
       handleCloseItemDialog();
     },
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: ({ itemId, data }: { itemId: number; data: Partial<ServiceItem> }) =>
-      selectedService ? serviceItemsApi.update(projectId, selectedService.service_id, itemId, data) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, selectedService?.service_id] });
+    mutationFn: ({
+      serviceId,
+      itemId,
+      data,
+    }: {
+      serviceId: number;
+      itemId: number;
+      data: Partial<ServiceItem>;
+    }) => serviceItemsApi.update(projectId, serviceId, itemId, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, variables.serviceId] });
       handleCloseItemDialog();
     },
   });
 
   const deleteItemMutation = useMutation({
-    mutationFn: (itemId: number) => 
-      selectedService ? serviceItemsApi.delete(projectId, selectedService.service_id, itemId) : Promise.reject('No service selected'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, selectedService?.service_id] });
+    mutationFn: ({ serviceId, itemId }: { serviceId: number; itemId: number }) =>
+      serviceItemsApi.delete(projectId, serviceId, itemId),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, variables.serviceId] });
     },
   });
 
@@ -679,7 +1017,13 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     setSelectedService(null);
   };
 
-  const handleOpenReviewDialog = (review?: ServiceReview) => {
+  const handleOpenReviewDialog = (
+    service: ProjectService,
+    options?: { review?: ServiceReview; existingReviewCount?: number },
+  ) => {
+    const { review, existingReviewCount = 0 } = options ?? {};
+    setSelectedService(service);
+
     if (review) {
       setSelectedReview(review);
       setReviewFormData({
@@ -690,19 +1034,21 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         deliverables: review.deliverables || '',
         status: review.status,
         weight_factor: review.weight_factor,
+        invoice_reference: review.invoice_reference || '',
         evidence_links: review.evidence_links || '',
         is_billed: review.is_billed ?? (review.status === 'completed'),
       });
     } else {
       setSelectedReview(null);
       setReviewFormData({
-        cycle_no: (reviews?.length || 0) + 1,
+        cycle_no: existingReviewCount + 1,
         planned_date: '',
         due_date: '',
         disciplines: '',
         deliverables: '',
         status: 'planned',
         weight_factor: 1.0,
+        invoice_reference: '',
         evidence_links: '',
         is_billed: false,
       });
@@ -713,9 +1059,11 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const handleCloseReviewDialog = () => {
     setReviewDialogOpen(false);
     setSelectedReview(null);
+    setSelectedService(null);
   };
 
-  const handleOpenItemDialog = (item?: ServiceItem) => {
+  const handleOpenItemDialog = (service: ProjectService, item?: ServiceItem) => {
+    setSelectedService(service);
     if (item) {
       setSelectedItem(item);
       setItemFormData({
@@ -755,6 +1103,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const handleCloseItemDialog = () => {
     setItemDialogOpen(false);
     setSelectedItem(null);
+    setSelectedService(null);
   };
 
   const handleServiceSubmit = () => {
@@ -769,9 +1118,16 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     if (!selectedService) return;
 
     if (selectedReview) {
-      updateReviewMutation.mutate({ reviewId: selectedReview.review_id, data: reviewFormData });
+      updateReviewMutation.mutate({
+        serviceId: selectedService.service_id,
+        reviewId: selectedReview.review_id,
+        data: reviewFormData,
+      });
     } else {
-      createReviewMutation.mutate(reviewFormData);
+      createReviewMutation.mutate({
+        serviceId: selectedService.service_id,
+        data: reviewFormData,
+      });
     }
   };
 
@@ -779,9 +1135,16 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     if (!selectedService) return;
 
     if (selectedItem) {
-      updateItemMutation.mutate({ itemId: selectedItem.item_id, data: itemFormData as Partial<ServiceItem> });
+      updateItemMutation.mutate({
+        serviceId: selectedService.service_id,
+        itemId: selectedItem.item_id,
+        data: itemFormData as Partial<ServiceItem>,
+      });
     } else {
-      createItemMutation.mutate(itemFormData);
+      createItemMutation.mutate({
+        serviceId: selectedService.service_id,
+        data: itemFormData,
+      });
     }
   };
 
@@ -791,31 +1154,17 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     }
   };
 
-  const handleDeleteReview = (reviewId: number) => {
+  const handleDeleteReview = (service: ProjectService, reviewId: number) => {
     if (window.confirm('Are you sure you want to delete this review?')) {
-      deleteReviewMutation.mutate(reviewId);
+      deleteReviewMutation.mutate({ serviceId: service.service_id, reviewId });
     }
   };
 
-  const handleDeleteItem = (itemId: number) => {
+  const handleDeleteItem = (service: ProjectService, itemId: number) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
-      deleteItemMutation.mutate(itemId);
+      deleteItemMutation.mutate({ serviceId: service.service_id, itemId });
     }
   };
-
-  const handleServiceSelect = useCallback(
-    (service: ProjectService) => {
-      if (!isServerPaginated) {
-        const targetIndex = servicesData.findIndex((item) => item.service_id === service.service_id);
-        if (targetIndex >= 0) {
-          setServicesPage(Math.floor(targetIndex / servicesRowsPerPage));
-        }
-      }
-      setSelectedService(service);
-      setServiceTabValue(1); // Switch to reviews tab
-    },
-    [isServerPaginated, servicesData, servicesRowsPerPage],
-  );
 
   if (servicesLoading) {
     return (
@@ -924,230 +1273,67 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         )}
       </Box>
 
-      <Tabs value={serviceTabValue} onChange={(_, newValue) => {
-        // Prevent switching to reviews/items tabs if no service is selected
-        if ((newValue === 1 || newValue === 2) && !selectedService) return;
-        setServiceTabValue(newValue);
-      }}>
-        <Tab label="Services" />
-        <Tab label="Reviews" disabled={!selectedService} />
-        <Tab label="Items" disabled={!selectedService} />
-      </Tabs>
-
-      <TabPanel value={serviceTabValue} index={0}>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ width: 56 }} />
+              <TableCell>Code</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Phase</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Agreed Fee</TableCell>
+              <TableCell>Billed</TableCell>
+              <TableCell>Remaining</TableCell>
+              <TableCell>Progress</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {paginatedServices.length === 0 ? (
               <TableRow>
-                <TableCell>Code</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Phase</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Agreed Fee</TableCell>
-                <TableCell>Billed</TableCell>
-                <TableCell>Remaining</TableCell>
-                <TableCell>Progress</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell colSpan={10}>
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
+                    No services added yet. Use "Add Service" to create one.
+                  </Typography>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedServices.map((service) => (
-                <TableRow key={service.service_id}>
-                  <TableCell>{service.service_code}</TableCell>
-                  <TableCell>{service.service_name}</TableCell>
-                  <TableCell>{service.phase || '-'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={service.status}
-                      color={getStatusColor(service.status)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{formatCurrency(service.agreed_fee)}</TableCell>
-                  <TableCell>{formatCurrency(service.billed_amount ?? service.claimed_to_date)}</TableCell>
-                  <TableCell>{formatCurrency(service.agreed_fee_remaining)}</TableCell>
-                  <TableCell sx={{ minWidth: 180 }}>
-                    <Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={service.billing_progress_pct ?? service.progress_pct ?? 0}
-                        sx={{ height: 8, borderRadius: 4, mb: 0.5 }}
-                      />
-                      <Typography variant="caption" color="text.secondary">
-                        {formatPercent(service.billing_progress_pct ?? service.progress_pct)} billed
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => handleServiceSelect(service)}>
-                      <AssessmentIcon />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => handleOpenServiceDialog(service)}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDeleteService(service.service_id)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          component="div"
-          count={totalServices}
-          page={servicesPage}
-          onPageChange={handleChangeServicesPage}
-          rowsPerPage={servicesRowsPerPage}
-          onRowsPerPageChange={handleChangeServicesRowsPerPage}
-          rowsPerPageOptions={rowsPerPageOptions}
-        />
-      </TabPanel>
-
-      <TabPanel value={serviceTabValue} index={1}>
-        {selectedService && (
-          <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Reviews for {selectedService.service_name}</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenReviewDialog()}
-              >
-                Add Review
-              </Button>
-            </Box>
-
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Cycle</TableCell>
-                    <TableCell>Planned Date</TableCell>
-                    <TableCell>Due Date</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Weight</TableCell>
-                    <TableCell>Billed</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {reviews?.map((review: ServiceReview) => (
-                    <TableRow key={review.review_id}>
-                      <TableCell>{review.cycle_no}</TableCell>
-                      <TableCell>{new Date(review.planned_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{review.due_date ? new Date(review.due_date).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={review.status}
-                          color={review.status === 'completed' ? 'success' : review.status === 'in_progress' ? 'primary' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{review.weight_factor}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={review.is_billed ? 'Yes' : 'No'}
-                          color={review.is_billed ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => handleOpenReviewDialog(review)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteReview(review.review_id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
-      </TabPanel>
-
-      <TabPanel value={serviceTabValue} index={2}>
-        {selectedService && (
-          <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Items for {selectedService.service_name}</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenItemDialog()}
-              >
-                Add Item
-              </Button>
-            </Box>
-
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Title</TableCell>
-                    <TableCell>Planned Date</TableCell>
-                    <TableCell>Due Date</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Priority</TableCell>
-                    <TableCell>Billed</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {serviceItems?.map((item: ServiceItem) => (
-                    <TableRow key={item.item_id}>
-                      <TableCell>
-                        <Chip
-                          label={item.item_type}
-                          color="info"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{item.title}</TableCell>
-                      <TableCell>{item.planned_date ? new Date(item.planned_date).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>{item.due_date ? new Date(item.due_date).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={item.status}
-                          color={item.status === 'completed' ? 'success' : item.status === 'in_progress' ? 'primary' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={item.priority}
-                          color={item.priority === 'critical' ? 'error' : item.priority === 'high' ? 'warning' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={item.is_billed ? 'Yes' : 'No'}
-                          color={item.is_billed ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => handleOpenItemDialog(item)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteItem(item.item_id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
-      </TabPanel>
+            ) : (
+              paginatedServices.map((service) => (
+                <ServiceRow
+                  key={service.service_id}
+                  projectId={projectId}
+                  service={service}
+                  isExpanded={expandedServiceIds.includes(service.service_id)}
+                  onToggle={() => toggleServiceExpansion(service.service_id)}
+                  onEditService={handleOpenServiceDialog}
+                  onDeleteService={handleDeleteService}
+                  onAddReview={(svc, count) => handleOpenReviewDialog(svc, { existingReviewCount: count })}
+                  onEditReview={(svc, review, count) =>
+                    handleOpenReviewDialog(svc, { review, existingReviewCount: count })
+                  }
+                  onDeleteReview={handleDeleteReview}
+                  onAddItem={(svc) => handleOpenItemDialog(svc)}
+                  onEditItem={(svc, item) => handleOpenItemDialog(svc, item)}
+                  onDeleteItem={handleDeleteItem}
+                  formatCurrency={formatCurrency}
+                  formatPercent={formatPercent}
+                  getStatusColor={getStatusColor}
+                />
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <TablePagination
+        component="div"
+        count={totalServices}
+        page={servicesPage}
+        onPageChange={handleChangeServicesPage}
+        rowsPerPage={servicesRowsPerPage}
+        onRowsPerPageChange={handleChangeServicesRowsPerPage}
+        rowsPerPageOptions={rowsPerPageOptions}
+      />
 
       {/* Apply Template Dialog */}
       <Dialog open={templateDialogOpen} onClose={handleCloseTemplateDialog} maxWidth="sm" fullWidth>
@@ -1399,6 +1585,24 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
               value={reviewFormData.deliverables}
               onChange={(e) => setReviewFormData(prev => ({ ...prev, deliverables: e.target.value }))}
               margin="normal"
+            />
+            <TextField
+              fullWidth
+              label="Invoice Reference or Folder Link"
+              value={reviewFormData.invoice_reference}
+              onChange={(e) => setReviewFormData(prev => ({ ...prev, invoice_reference: e.target.value }))}
+              margin="normal"
+              helperText="Add an invoice number or a shared folder URL so the billing trail stays accessible."
+            />
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Evidence Links"
+              value={reviewFormData.evidence_links}
+              onChange={(e) => setReviewFormData(prev => ({ ...prev, evidence_links: e.target.value }))}
+              margin="normal"
+              placeholder="https://..."
             />
           </Box>
         </DialogContent>

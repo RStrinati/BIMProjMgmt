@@ -283,7 +283,7 @@ export function ProjectsPage() {
 
       {/* Projects Grid */}
       {!isLoading && !error && (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 2.5 }}>
           {filteredProjects?.map((project) => {
             const projectNumber =
               project.project_number ?? project.contract_number ?? null;
@@ -318,14 +318,14 @@ export function ProjectsPage() {
             return (
               <Grid item xs={12} sm={6} md={4} key={project.project_id}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
+                  <CardContent sx={{ flexGrow: 1, p: 2, pb: 1.5 }}>
                     <Box
                       sx={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'flex-start',
-                        gap: 2,
-                        mb: showBillingSummary ? 2 : 1.5,
+                        gap: 1.5,
+                        mb: showBillingSummary ? 1.5 : 1,
                       }}
                     >
                       <Box sx={{ flexGrow: 1 }}>
@@ -348,12 +348,12 @@ export function ProjectsPage() {
                             />
                           )}
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
                           Project #: {projectNumber || 'N/A'}
                         </Typography>
                       </Box>
                       {showBillingSummary && (
-                        <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Box sx={{ textAlign: 'center', minWidth: 96 }}>
                           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
                             <CircularProgress
                               variant="determinate"
@@ -391,7 +391,7 @@ export function ProjectsPage() {
                               </Typography>
                             </Box>
                           </Box>
-                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
                             {formatCurrency(totalServiceBilled)} / {formatCurrency(totalServiceAgreed)}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
@@ -402,37 +402,37 @@ export function ProjectsPage() {
                     </Box>
 
                     {project.client_name && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Client: {project.client_name}
                       </Typography>
                     )}
 
                     {project.project_type && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Type: {project.project_type}
                       </Typography>
                     )}
 
                     {areaDisplay && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Area: {areaDisplay} ha
                       </Typography>
                     )}
 
                     {capacityDisplay && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Capacity: {capacityDisplay} MW
                       </Typography>
                     )}
 
                     {project.naming_convention && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Naming: {project.naming_convention}
                       </Typography>
                     )}
 
                     {projectLeadName && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                         Lead: {projectLeadName}
                       </Typography>
                     )}
@@ -456,8 +456,8 @@ export function ProjectsPage() {
 
                     {/* Review Statistics */}
                     {reviewStats && reviewStats[project.project_id] && (
-                      <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                      <Box sx={{ mt: 1.5, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
                           Reviews
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -486,7 +486,7 @@ export function ProjectsPage() {
                     )}
                   </CardContent>
 
-                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pt: 0.5, pb: 1.5 }}>
                     <Button
                       size="small"
                       startIcon={<VisibilityIcon />}

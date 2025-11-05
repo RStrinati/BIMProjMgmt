@@ -82,6 +82,9 @@ class ReviewManagementService:
 
                 self.create_service_reviews_table()
 
+            # Ensure billing metadata columns exist for legacy deployments
+            self.ensure_service_review_billing_columns()
+
             
 
             # Check if ServiceDeliverables table exists
@@ -168,7 +171,142 @@ class ReviewManagementService:
 
             print(f"Error checking/creating tables: {e}")
 
-    
+        
+
+    def _column_exists(self, table_name: str, column_name: str) -> bool:
+        """Check if a column exists on a given table."""
+        try:
+            self.cursor.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = ? AND COLUMN_NAME = ?
+            """, (table_name, column_name))
+            row = self.cursor.fetchone()
+            return bool(row and row[0])
+        except Exception as exc:
+            print(f"Error checking column {table_name}.{column_name}: {exc}")
+            return False
+
+    def ensure_service_review_billing_columns(self):
+        """Ensure billing metadata columns exist on ServiceReviews."""
+        try:
+            columns = [
+                (S.ServiceReviews.SOURCE_PHASE, 'NVARCHAR(200) NULL'),
+                (S.ServiceReviews.BILLING_PHASE, 'NVARCHAR(200) NULL'),
+                (S.ServiceReviews.BILLING_RATE, 'DECIMAL(18,2) NULL'),
+                (S.ServiceReviews.BILLING_AMOUNT, 'DECIMAL(18,2) NULL'),
+            ]
+
+            altered = False
+            for column_name, definition in columns:
+                if not self._column_exists(S.ServiceReviews.TABLE, column_name):
+                    try:
+                        self.cursor.execute(f"ALTER TABLE dbo.{S.ServiceReviews.TABLE} ADD {column_name} {definition}")
+                        altered = True
+                    except Exception as exc:
+                        print(f"Error adding column {column_name} to {S.ServiceReviews.TABLE}: {exc}")
+                        self.db.rollback()
+                        return
+
+            if altered:
+                self.db.commit()
+
+            self.initialize_review_billing_defaults()
+        except Exception as exc:
+            print(f"Error ensuring ServiceReviews billing columns: {exc}")
+
+    def initialize_review_billing_defaults(self):
+        """Seed billing metadata for existing review rows based on their project service."""
+        try:
+            default_rate_sql = """
+                CASE
+                    WHEN LOWER(ISNULL(ps.unit_type, '')) = 'review' AND ps.unit_rate IS NOT NULL THEN ps.unit_rate
+                    WHEN LOWER(ISNULL(ps.unit_type, '')) = 'review' AND ps.unit_qty IS NOT NULL AND ps.unit_qty <> 0 AND ps.agreed_fee IS NOT NULL
+                        THEN CAST(ps.agreed_fee AS DECIMAL(18,4)) / NULLIF(CAST(ps.unit_qty AS DECIMAL(18,4)), 0)
+                    WHEN LOWER(ISNULL(ps.unit_type, '')) = 'lump_sum' AND ps.unit_qty IS NOT NULL AND ps.unit_qty <> 0 AND ps.lump_sum_fee IS NOT NULL
+                        THEN CAST(ps.lump_sum_fee AS DECIMAL(18,4)) / NULLIF(CAST(ps.unit_qty AS DECIMAL(18,4)), 0)
+                    WHEN ps.unit_rate IS NOT NULL THEN ps.unit_rate
+                    WHEN ps.unit_qty IS NOT NULL AND ps.unit_qty <> 0 AND ps.agreed_fee IS NOT NULL
+                        THEN CAST(ps.agreed_fee AS DECIMAL(18,4)) / NULLIF(CAST(ps.unit_qty AS DECIMAL(18,4)), 0)
+                    WHEN ps.lump_sum_fee IS NOT NULL THEN ps.lump_sum_fee
+                    WHEN ps.agreed_fee IS NOT NULL THEN ps.agreed_fee
+                    ELSE NULL
+                END
+            """.strip()
+
+            update_sql = f"""
+                UPDATE sr
+                SET 
+                    {S.ServiceReviews.SOURCE_PHASE} = COALESCE(sr.{S.ServiceReviews.SOURCE_PHASE}, ps.{S.ProjectServices.PHASE}),
+                    {S.ServiceReviews.BILLING_PHASE} = COALESCE(sr.{S.ServiceReviews.BILLING_PHASE}, ps.{S.ProjectServices.PHASE}),
+                    {S.ServiceReviews.BILLING_RATE} = COALESCE(sr.{S.ServiceReviews.BILLING_RATE}, ({default_rate_sql})),
+                    {S.ServiceReviews.BILLING_AMOUNT} = COALESCE(
+                        sr.{S.ServiceReviews.BILLING_AMOUNT},
+                        COALESCE(({default_rate_sql}), 0) * COALESCE(NULLIF(sr.{S.ServiceReviews.WEIGHT_FACTOR}, 0), 1)
+                    )
+                FROM dbo.{S.ServiceReviews.TABLE} sr
+                INNER JOIN dbo.{S.ProjectServices.TABLE} ps ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE 
+                    sr.{S.ServiceReviews.SOURCE_PHASE} IS NULL
+                    OR sr.{S.ServiceReviews.BILLING_PHASE} IS NULL
+                    OR sr.{S.ServiceReviews.BILLING_RATE} IS NULL
+                    OR sr.{S.ServiceReviews.BILLING_AMOUNT} IS NULL
+            """
+
+            self.cursor.execute(update_sql)
+            self.db.commit()
+        except Exception as exc:
+            print(f"Error initializing review billing defaults: {exc}")
+            self.db.rollback()
+
+    def _derive_default_billing_rate(self, service: Optional[Dict]) -> Optional[float]:
+        """Compute a sensible default per-review billing rate from the project service."""
+        if not service:
+            return None
+
+        def _to_decimal(value):
+            if value is None or value == '':
+                return None
+            try:
+                return Decimal(str(value))
+            except (InvalidOperation, ValueError, TypeError):
+                return None
+
+        unit_type = (service.get('unit_type') or '').lower()
+        unit_rate_dec = _to_decimal(service.get('unit_rate'))
+        unit_qty_dec = _to_decimal(service.get('unit_qty'))
+        lump_sum_dec = _to_decimal(service.get('lump_sum_fee'))
+        agreed_fee_dec = _to_decimal(service.get('agreed_fee'))
+
+        try:
+            if unit_type == 'review':
+                if unit_rate_dec is not None:
+                    return float(unit_rate_dec)
+                if unit_qty_dec and unit_qty_dec != 0 and agreed_fee_dec is not None:
+                    return float(agreed_fee_dec / unit_qty_dec)
+
+            if unit_type == 'lump_sum':
+                if unit_qty_dec and unit_qty_dec != 0 and lump_sum_dec is not None:
+                    return float(lump_sum_dec / unit_qty_dec)
+                if lump_sum_dec is not None:
+                    return float(lump_sum_dec)
+
+            if unit_rate_dec is not None:
+                return float(unit_rate_dec)
+
+            if unit_qty_dec and unit_qty_dec != 0 and agreed_fee_dec is not None:
+                return float(agreed_fee_dec / unit_qty_dec)
+
+            if lump_sum_dec is not None:
+                return float(lump_sum_dec)
+
+            if agreed_fee_dec is not None:
+                return float(agreed_fee_dec)
+        except (InvalidOperation, ZeroDivisionError):
+            return None
+
+        return None
+
 
     def create_service_reviews_table(self):
 
@@ -201,6 +339,14 @@ class ReviewManagementService:
                 evidence_links    NVARCHAR(MAX) NULL,
 
                 actual_issued_at  DATETIME2 NULL,
+
+                source_phase      NVARCHAR(200) NULL,
+
+                billing_phase     NVARCHAR(200) NULL,
+
+                billing_rate      DECIMAL(18,2) NULL,
+
+                billing_amount    DECIMAL(18,2) NULL,
 
                 regeneration_signature NVARCHAR(500) NULL
 
@@ -1618,12 +1764,35 @@ class ReviewManagementService:
 
     def create_service_review(self, review_data: Dict, commit: bool = True) -> int:
 
-        """Create a service review cycle"""
+        """Create a service review cycle with billing metadata defaults"""
 
         try:
 
+            service_id = review_data['service_id']
+            weight_factor = review_data.get('weight_factor', 1.0) or 1.0
+
+            service_defaults = self.get_service_by_id(service_id)
+            default_phase = service_defaults.get('phase') if service_defaults else None
+            default_rate = self._derive_default_billing_rate(service_defaults) if service_defaults else None
+
+            source_phase = review_data.get('source_phase') or default_phase
+            billing_phase = review_data.get('billing_phase') or source_phase or default_phase
+
+            billing_rate = review_data.get('billing_rate')
+            if billing_rate is None:
+                billing_rate = default_rate
+            if billing_rate is None:
+                billing_rate = 0.0
+
+            billing_amount = review_data.get('billing_amount')
+            if billing_amount is None:
+                try:
+                    billing_amount = float(Decimal(str(billing_rate or 0)) * Decimal(str(weight_factor or 1)))
+                except (InvalidOperation, ValueError, TypeError):
+                    billing_amount = float(billing_rate or 0) * float(weight_factor or 1)
+
             # Get the regeneration signature for this service
-            regeneration_signature = self.get_service_regeneration_signature(review_data['service_id'])
+            regeneration_signature = self.get_service_regeneration_signature(service_id)
 
             query = """
 
@@ -1631,64 +1800,69 @@ class ReviewManagementService:
 
                 service_id, cycle_no, planned_date, due_date, disciplines,
 
-                deliverables, status, weight_factor, regeneration_signature
+                deliverables, status, weight_factor, evidence_links,
 
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                invoice_reference, source_phase, billing_phase, billing_rate, billing_amount,
+
+                regeneration_signature
+
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
             """
 
-            
+            status = review_data.get('status') or 'planned'
 
             params = (
 
-                review_data['service_id'],
+                service_id,
 
                 review_data['cycle_no'],
 
                 review_data['planned_date'],
 
-                review_data['due_date'],
+                review_data.get('due_date'),
 
-                review_data['disciplines'],
+                review_data.get('disciplines'),
 
-                review_data['deliverables'],
+                review_data.get('deliverables'),
 
-                review_data['status'],
+                status,
 
-                review_data['weight_factor'],
+                weight_factor,
+
+                review_data.get('evidence_links'),
+
+                review_data.get('invoice_reference'),
+
+                source_phase,
+
+                billing_phase,
+
+                billing_rate,
+
+                billing_amount,
 
                 regeneration_signature
 
             )
 
-            
-
             self.cursor.execute(query, params)
 
-            
-
             # Get the last inserted ID
-
             self.cursor.execute("SELECT SCOPE_IDENTITY()")
 
             review_row = self.cursor.fetchone()
-
             review_id = int(review_row[0]) if review_row and review_row[0] is not None else 0
 
             if commit:
-
                 self.db.commit()
 
             return review_id
 
-            
-
         except Exception as e:
 
             print(f"Error creating service review: {e}")
-
             self.db.rollback()
-
             return 0
 
     
@@ -3664,7 +3838,8 @@ class ReviewManagementService:
                 self.cursor.execute("""
                     SELECT sr.review_id, sr.service_id, sr.cycle_no, sr.planned_date, 
                            sr.due_date, sr.disciplines, sr.deliverables, sr.status, 
-                           sr.weight_factor, sr.evidence_links, sr.actual_issued_at,
+                           sr.weight_factor, sr.invoice_reference, sr.evidence_links, sr.actual_issued_at,
+                           sr.source_phase, sr.billing_phase, sr.billing_rate, sr.billing_amount, sr.is_billed,
                            ps.service_name, ps.phase
                     FROM ServiceReviews sr
                     JOIN ProjectServices ps ON sr.service_id = ps.service_id
@@ -3676,7 +3851,8 @@ class ReviewManagementService:
                 self.cursor.execute("""
                     SELECT sr.review_id, sr.service_id, sr.cycle_no, sr.planned_date, 
                            sr.due_date, sr.disciplines, sr.deliverables, sr.status, 
-                           sr.weight_factor, sr.evidence_links, sr.actual_issued_at,
+                           sr.weight_factor, sr.invoice_reference, sr.evidence_links, sr.actual_issued_at,
+                           sr.source_phase, sr.billing_phase, sr.billing_rate, sr.billing_amount, sr.is_billed,
                            ps.service_name, ps.phase
                     FROM ServiceReviews sr
                     JOIN ProjectServices ps ON sr.service_id = ps.service_id

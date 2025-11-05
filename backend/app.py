@@ -57,6 +57,7 @@ from database import (  # noqa: E402
     get_review_tasks,
     get_revizto_extraction_runs,
     get_service_reviews,
+    get_service_review_billing,
     get_service_templates,
     get_users_list,
     fetch_tasks_notes_view,
@@ -900,6 +901,22 @@ def api_get_service_reviews(project_id, service_id):
     reviews = get_service_reviews(service_id)
     return jsonify(reviews)
 
+@app.route('/api/projects/<int:project_id>/review-billing', methods=['GET'])
+def api_get_project_review_billing(project_id):
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    date_field = request.args.get('date_field', 'actual_issued_at')
+    try:
+        summary = get_service_review_billing(
+            project_id,
+            start_date=start_date,
+            end_date=end_date,
+            date_field=date_field
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(summary)
+
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews', methods=['POST'])
 def api_create_service_review(project_id, service_id):
     body = request.get_json() or {}
@@ -917,6 +934,11 @@ def api_create_service_review(project_id, service_id):
         status=body.get('status', 'planned'),
         weight_factor=body.get('weight_factor', 1.0),
         evidence_links=body.get('evidence_links'),
+        invoice_reference=body.get('invoice_reference'),
+        source_phase=body.get('source_phase'),
+        billing_phase=body.get('billing_phase'),
+        billing_rate=body.get('billing_rate'),
+        billing_amount=body.get('billing_amount'),
         is_billed=body.get('is_billed')
     )
     if review_id:

@@ -369,7 +369,39 @@ def import_health_data(json_folder, project_id=None, db_name=None):
                 # SCOPE_IDENTITY() avoids trigger conflicts with OUTPUT clauses.
                 cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
                 inserted_row = cursor.fetchone()
-                health_check_id = inserted_row[0] if inserted_row else None
+                health_check_id = inserted_row[0] if inserted_row and inserted_row[0] else None
+
+                if not health_check_id:
+                    # Fallback lookup when SCOPE_IDENTITY returns no value (e.g. triggers/identity gaps)
+                    fallback_params = []
+                    where_clauses = []
+
+                    file_name = combined_data.get("strRvtFileName")
+                    if file_name:
+                        where_clauses.append(f"{TblRvtProjHealth.STR_RVT_FILENAME} = ?")
+                        fallback_params.append(file_name)
+
+                    exported_on = combined_data.get("nExportedOn")
+                    if exported_on is not None:
+                        where_clauses.append(f"{TblRvtProjHealth.NEXPORTEDON} = ?")
+                        fallback_params.append(exported_on)
+
+                    if fallback_params:
+                        fallback_sql = f"""
+                            SELECT TOP 1 {TblRvtProjHealth.NID}
+                            FROM {TblRvtProjHealth.TABLE}
+                            WHERE {' AND '.join(where_clauses)}
+                            ORDER BY {TblRvtProjHealth.NID} DESC
+                        """
+                        cursor.execute(fallback_sql, fallback_params)
+                        fallback_row = cursor.fetchone()
+                        if fallback_row:
+                            health_check_id = fallback_row[0]
+                            log(f"[INFO] Resolved health check ID via fallback: {health_check_id} ({project_file_name})")
+                        else:
+                            log(f"[WARNING] Unable to resolve health check ID for {project_file_name} after insert")
+                    else:
+                        log(f"[WARNING] Missing keys to resolve health check ID for {project_file_name}")
 
                 if health_check_id:
                     _persist_family_details(cursor, health_check_id, family_sizes, placed_families)

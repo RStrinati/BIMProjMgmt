@@ -1,3 +1,6 @@
+USE acc_data_schema;
+GO
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -15,7 +18,7 @@ RankedRoles AS (
                    PARTITION BY project_id, user_id
                    ORDER BY role_assigned_at DESC
                ) AS rn
-        FROM dbo.vw_project_user_company_roles
+        FROM acc_data_schema.dbo.vw_project_user_company_roles
     ) sub
     WHERE rn = 1
 ),
@@ -29,7 +32,7 @@ RankedCompanyRoles AS (
                    PARTITION BY project_id, company_id
                    ORDER BY role_assigned_at DESC
                ) AS rn
-        FROM dbo.vw_project_user_company_roles
+        FROM acc_data_schema.dbo.vw_project_user_company_roles
         WHERE company_id IS NOT NULL
     ) sub
     WHERE rn = 1
@@ -155,13 +158,51 @@ AttrBase AS (
      AND CAST(lv.list_id AS NVARCHAR(MAX)) = ica.attribute_value
      AND lv.bim360_project_id = ica.bim360_project_id
      AND lv.bim360_account_id = ica.bim360_account_id
-)
-
-SELECT
-    i.issue_id,
-    i.display_id,
-    i.title,
-    i.status,
+),
+IssuesLatest AS (
+    SELECT *
+    FROM (
+        SELECT
+            i.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY i.issue_id
+                ORDER BY i.updated_at DESC, i.created_at DESC, i.issue_id
+            ) AS rn
+        FROM acc_data_schema.dbo.issues_issues i
+    ) ranked
+    WHERE ranked.rn = 1
+),
+LatestClashAssignment AS (
+    SELECT
+        cag.issue_id,
+        cag.bim360_account_id,
+        cag.bim360_project_id,
+        cag.clash_group_id,
+        cag.title,
+        cag.description,
+        cag.status,
+        cag.clash_test_id,
+        cag.model_set_id,
+        cag.created_at_model_set_version,
+        cag.created_at,
+        cag.created_by
+    FROM (
+        SELECT
+            cag.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY cag.issue_id, cag.bim360_project_id
+                ORDER BY cag.created_at DESC, cag.clash_group_id DESC
+            ) AS rn
+        FROM acc_data_schema.dbo.clashes_assigned_clash_group cag
+    ) cag
+    WHERE cag.rn = 1
+),
+IssueViewBase AS (
+    SELECT
+        i.issue_id,
+        i.display_id,
+        i.title,
+        i.status,
     i.due_date,
     i.description,
     i.created_at,
@@ -262,7 +303,8 @@ SELECT
         SELECT TOP 1 [value]
         FROM OPENJSON(ca.custom_attributes_json)
         WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
-        WHERE [name] = 'Clash Level'
+        WHERE [name] IN ('Clash Level', 'AWS clash level')
+        ORDER BY CASE WHEN [name] = 'Clash Level' THEN 0 ELSE 1 END
     ) AS [Clash_Level],
     
     -- Location: Admin, Fire Pump Building, Gen Yard, MV Room, ROMP 01-04, etc.
@@ -295,9 +337,14 @@ SELECT
         FROM OPENJSON(ca.custom_attributes_json)
         WITH ([name] NVARCHAR(100), [value] NVARCHAR(MAX))
         WHERE [name] = 'Priority'
-    ) AS [Priority]
+    ) AS [Priority],
 
-FROM acc_data_schema.dbo.issues_issues i
+    ROW_NUMBER() OVER (
+        PARTITION BY i.issue_id
+        ORDER BY i.updated_at DESC, i.closed_at DESC, i.created_at DESC, i.issue_id
+    ) AS issue_rn
+
+FROM IssuesLatest i
 
 -- Assignee user
 LEFT JOIN acc_data_schema.dbo.admin_users au 
@@ -326,7 +373,7 @@ LEFT JOIN acc_data_schema.dbo.admin_projects ap
     ON ap.id = i.bim360_project_id
 
 -- Clash group info
-LEFT JOIN acc_data_schema.dbo.clashes_assigned_clash_group cag 
+LEFT JOIN LatestClashAssignment cag 
     ON cag.issue_id = i.issue_id 
    AND cag.bim360_project_id = i.bim360_project_id
 
@@ -364,5 +411,61 @@ OUTER APPLY (
             FOR JSON PATH
         ) AS custom_attributes_json
 ) ca
+
+)
+
+SELECT
+    issue_id,
+    display_id,
+    title,
+    status,
+    due_date,
+    description,
+    created_at,
+    closed_at,
+    clash_group_id,
+    clash_test_id,
+    clash_status,
+    clash_created_at,
+    clash_title,
+    clash_description,
+    latest_comment,
+    latest_comment_by,
+    latest_comment_at,
+    location_id,
+    location_name,
+    location_parent_id,
+    location_tree_name,
+    building_name,
+    level_name,
+    root_location,
+    created_week_start,
+    created_week_label,
+    closed_week_start,
+    closed_week_label,
+    raw_level,
+    normalized_level,
+    is_active_issue,
+    is_active_over_30_days,
+    is_closed_last_14_days,
+    is_closed_last_7_days,
+    is_opened_this_week,
+    is_closed_this_week,
+    assignee_display_name,
+    Discipline,
+    Company,
+    project_id,
+    project_name,
+    pm_project_id,
+    custom_attributes_json,
+    assignee_id,
+    Building_Level,
+    Clash_Level,
+    Location,
+    Location_01,
+    Phase,
+    Priority
+FROM IssueViewBase
+WHERE issue_rn = 1;
 
 GO

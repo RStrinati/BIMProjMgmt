@@ -744,8 +744,13 @@ class ServiceReviews:
     STATUS = "status"
     WEIGHT_FACTOR = "weight_factor"
     EVIDENCE_LINKS = "evidence_links"
+    INVOICE_REFERENCE = "invoice_reference"
     ACTUAL_ISSUED_AT = "actual_issued_at"
     IS_BILLED = "is_billed"
+    SOURCE_PHASE = "source_phase"
+    BILLING_PHASE = "billing_phase"
+    BILLING_RATE = "billing_rate"
+    BILLING_AMOUNT = "billing_amount"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"

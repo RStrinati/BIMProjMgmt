@@ -1,83 +1,26 @@
-[2025-10-31 15:27:38] [SKIP] activities_admin_activities: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_assets_activities: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_bridge_activities: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_cost_activities: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_cost_changes: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_activities: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_custom_attribute_constraints: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_custom_attributes: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_naming_standards: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_permissions: missing merge SQL
-[2025-10-31 15:27:38] [SKIP] activities_docs_standard_attributes: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_issues_activities: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_issues_changes: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_rfis_activities: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_rfis_changes: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_sheets_activities: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_activities: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_object_ball_in_court_companies: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_object_ball_in_court_roles: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_object_ball_in_court_users: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_ball_in_court_companies: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_ball_in_court_roles: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_ball_in_court_users: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_steps: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_tasks: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_transition_attachments: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] activities_submittals_target_watchers: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] admin_account_services: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] admin_accounts: missing merge SQL
-[2025-10-31 15:27:39] [SKIP] admin_business_units: missing merge SQL
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_companies.csv → staging.admin_companies ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_companies: ('0b887f33-d718-4ce5-abec-d480589f7dd0', '10f451ae-309d-469d-9251-89a17ce37214', 'LendleaseOne', None, 'owner', None, None, None, None, None, 'US', None, None, None, None, None, None, datetime.datetime(2025, 10, 8, 10, 23, 57, 755597), 6, 3, None)
-[2025-10-31 15:27:39] [DONE] Processed admin_companies in 0.04s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_companies.csv → staging.admin_project_companies ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_companies: ('8da2e24f-8263-48f9-815c-45552dea3849', '0b887f33-d718-4ce5-abec-d480589f7dd0', '10f451ae-309d-469d-9251-89a17ce37214', 613889911)
-[2025-10-31 15:27:39] [DONE] Processed admin_project_companies in 0.03s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_products.csv → staging.admin_project_products ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_products: ('8da2e24f-8263-48f9-815c-45552dea3849', '10f451ae-309d-469d-9251-89a17ce37214', 'forma', 'active', datetime.datetime(2025, 10, 23, 10, 35, 46, 408000))
-[2025-10-31 15:27:39] [DONE] Processed admin_project_products in 0.03s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_roles.csv → staging.admin_project_roles ...
-[2025-10-31 15:27:39] [ERROR] Column mismatch in staging.admin_project_roles
-[2025-10-31 15:27:39] Missing in CSV: set()
-[2025-10-31 15:27:39] Extra in CSV: {'role_id'}
-[2025-10-31 15:27:39] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_roles.csv import failed: Column mismatch in staging.admin_project_roles
-[2025-10-31 15:27:39] [DONE] Processed admin_project_roles in 0.04s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_services.csv → staging.admin_project_services ...
-[2025-10-31 15:27:39] [DONE] Processed admin_project_services in 0.02s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_user_companies.csv → staging.admin_project_user_companies ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_user_companies: ('10f451ae-309d-469d-9251-89a17ce37214', '0b887f33-d718-4ce5-abec-d480589f7dd0', '8da2e24f-8263-48f9-815c-45552dea3849', '16f6699c-d93e-4883-a8f7-7b6a6e15ac3e')
-[2025-10-31 15:27:39] [DONE] Processed admin_project_user_companies in 0.04s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_user_products.csv → staging.admin_project_user_products ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_user_products: ('8da2e24f-8263-48f9-815c-45552dea3849', '10f451ae-309d-469d-9251-89a17ce37214', '0572c909-98d7-4ea2-bc02-593671e1221a', 'docs', 'project_admin', datetime.datetime(2025, 10, 23, 20, 52, 19, 927000))
-[2025-10-31 15:27:39] [DONE] Processed admin_project_user_products in 0.05s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_user_roles.csv → staging.admin_project_user_roles ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_user_roles: ('8da2e24f-8263-48f9-815c-45552dea3849', '10f451ae-309d-469d-9251-89a17ce37214', '64422341-2b3b-47be-9f22-4dbad45db341', 'd3ed65b2-19df-4dfb-93a9-bc6656cf120d', datetime.datetime(2025, 10, 23, 10, 48, 55, 553000))
-[2025-10-31 15:27:39] [DONE] Processed admin_project_user_roles in 0.04s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_user_services.csv → staging.admin_project_user_services ...
-[2025-10-31 15:27:39] [DONE] Processed admin_project_user_services in 0.02s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_project_users.csv → staging.admin_project_users ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_project_users: ('8da2e24f-8263-48f9-815c-45552dea3849', '10f451ae-309d-469d-9251-89a17ce37214', '16f6699c-d93e-4883-a8f7-7b6a6e15ac3e', 'active', '0b887f33-d718-4ce5-abec-d480589f7dd0', 'project_admin', datetime.datetime(2025, 10, 23, 10, 35, 46, 848000), datetime.datetime(2025, 10, 23, 10, 38, 37, 274000))
-[2025-10-31 15:27:39] [DONE] Processed admin_project_users in 0.06s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_projects.csv → staging.admin_projects ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_projects: ('8da2e24f-8263-48f9-815c-45552dea3849', '10f451ae-309d-469d-9251-89a17ce37214', 'VIC_DC_MEL070 - Site B', None, None, 'Data Center', 0, 'USD', 'active', None, None, None, None, None, None, 'US', 'Australia/Melbourne', None, None, None, None, datetime.datetime(2025, 10, 23, 10, 35, 46, 379000), 1, None, None, datetime.datetime(2025, 10, 27, 1, 29, 32, 406000), None, 20, 7, 'production')
-[2025-10-31 15:27:39] [DONE] Processed admin_projects in 0.05s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_roles.csv → staging.admin_roles ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_roles: ('e83e564b-012d-4c49-a30a-5a4be9001633', '10f451ae-309d-469d-9251-89a17ce37214', 'Construction Manager', 'active')
-[2025-10-31 15:27:39] [DONE] Processed admin_roles in 0.03s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\admin_users.csv → staging.admin_users ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.admin_users: ('16f6699c-d93e-4883-a8f7-7b6a6e15ac3e', 'EN3LPPL7D93Q', '10f451ae-309d-469d-9251-89a17ce37214', 'david.kwok@lendlease.com', 'David Kwok', 'David', 'Kwok', None, None, None, 'VIC', 3000, 'AU', None, None, 'Digital Engineering Manager', 1, 1, 0, 0, 'd3ed65b2-19df-4dfb-93a9-bc6656cf120d', '0b887f33-d718-4ce5-abec-d480589f7dd0', 'active', None, datetime.datetime(2025, 10, 22, 23, 52, 48, 309000), datetime.datetime(2025, 10, 23, 0, 6, 31, 129000))
-[2025-10-31 15:27:39] [DONE] Processed admin_users in 0.07s
-[2025-10-31 15:27:39] [SKIP] clashes_assigned_clash_group: missing CSV
-[2025-10-31 15:27:39] [SKIP] clashes_clash_group_to_clash_id: missing CSV
-[2025-10-31 15:27:39] [SKIP] clashes_clash_test: missing CSV
-[2025-10-31 15:27:39] [SKIP] clashes_closed_clash_group: missing CSV
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_attachments.csv → staging.issues_attachments ...
-[2025-10-31 15:27:39] [ERROR] Column mismatch in staging.issues_attachments
-[2025-10-31 15:27:39] Missing in CSV: {'attachment_name', 'attachment_type'}
-[2025-10-31 15:27:39] Extra in CSV: {'updated_by', 'file_size', 'file_type', 'storage_urn', 'display_name', 'bubble_urn', 'lineage_urn', 'deleted_at', 'version', 'version_urn', 'file_name', 'tip_version_urn', 'deleted_by'}
-[2025-10-31 15:27:39] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_attachments.csv import failed: Column mismatch in staging.issues_attachments
-[2025-10-31 15:27:39] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
+[2025-11-04 10:42:23] [SKIP] admin_companies: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_companies: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_products: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_roles: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_services: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_user_companies: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_user_products: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_user_roles: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_user_services: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_project_users: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_projects: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_roles: missing CSV
+[2025-11-04 10:42:23] [SKIP] admin_users: missing CSV
+[2025-11-04 10:42:23] [SKIP] clashes_assigned_clash_group: missing CSV
+[2025-11-04 10:42:23] [SKIP] clashes_clash_group_to_clash_id: missing CSV
+[2025-11-04 10:42:23] [SKIP] clashes_clash_test: missing CSV
+[2025-11-04 10:42:23] [SKIP] clashes_closed_clash_group: missing CSV
+[2025-11-04 10:42:23] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_attachments.csv → staging.issues_attachments ...
+[2025-11-04 10:42:23] [ERROR] Column mismatch in staging.issues_attachments
+[2025-11-04 10:42:23] Missing in CSV: {'attachment_type', 'attachment_name'}
+[2025-11-04 10:42:23] Extra in CSV: {'lineage_urn', 'version', 'version_urn', 'storage_urn', 'deleted_at', 'display_name', 'file_type', 'updated_by', 'file_name', 'file_size', 'deleted_by', 'bubble_urn', 'tip_version_urn'}
+[2025-11-04 10:42:23] [FAIL] C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_attachments.csv import failed: Column mismatch in staging.issues_attachments
+[2025-11-04 10:42:23] [SQL ERROR] in merge_issues_attachments.sql: ('42S22', "[42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'updated_by'. (207)")
 -- MERGE for issues_attachments
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -102,35 +45,36 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (attachment_id, issue_id, attachment_name, attachment_type, created_by, created_at, updated_by, updated_at)
     VALUES (src.attachment_id, src.issue_id, src.attachment_name, src.attachment_type, src.created_by, src.created_at, src.updated_by, src.updated_at);
-[2025-10-31 15:27:39] [DONE] Processed issues_attachments in 0.05s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
-[2025-10-31 15:27:39] [DONE] Processed issues_checklist_mappings in 0.02s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_comments.csv → staging.issues_comments ...
-[2025-10-31 15:27:39] [DONE] Processed issues_comments in 0.02s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.issues_custom_attribute_list_values: ('e2937629-9b7a-4ced-ae1f-7c6f8a115aba', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', '799a545a-4028-49b3-b455-f36a9316a3d8', 'L1 - Critical')
-[2025-10-31 15:27:39] [DONE] Processed issues_custom_attribute_list_values in 0.06s
-[2025-10-31 15:27:39] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_custom_attributes.csv → staging.issues_custom_attributes ...
-[2025-10-31 15:27:39] [DEBUG] First insert into staging.issues_custom_attributes: ('ca07d3c5-0ff6-429b-8310-907108c6efbc', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 'issueSubtype', 'e2937629-9b7a-4ced-ae1f-7c6f8a115aba', 'AWS Clash Level', None, 'list', 0, None)
-[2025-10-31 15:27:40] [DONE] Processed issues_custom_attributes in 0.16s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_custom_attributes_mappings: ('e2937629-9b7a-4ced-ae1f-7c6f8a115aba', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 'issueSubtype', '2a4a0a4e-500b-59d6-8636-77805d74ef20', 'AWS Clash Level', None, 'list', 0, 0, datetime.datetime(2025, 10, 24, 4, 56, 35, 662000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 24, 4, 56, 35, 662000), 'DFW2VRQVRTHVBWGF')
-[2025-10-31 15:27:40] [DONE] Processed issues_custom_attributes_mappings in 0.05s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_issue_subtypes: ('9796e117-964e-5784-b154-956ed61c7e62', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 'cd35fdd8-566d-53fd-9e24-923adbbc679f', 'Commissioning', 0, 'System', datetime.datetime(2025, 10, 23, 10, 36, 11, 214000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 24, 4, 35, 40, 353000), None, None)
-[2025-10-31 15:27:40] [DONE] Processed issues_issue_subtypes in 0.05s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_issue_types.csv → staging.issues_issue_types ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_issue_types: ('cd35fdd8-566d-53fd-9e24-923adbbc679f', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 'Commissioning', 0, 'System', datetime.datetime(2025, 10, 23, 10, 36, 11, 101000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 24, 4, 35, 40, 368000), None, None)
-[2025-10-31 15:27:40] [DONE] Processed issues_issue_types in 0.04s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_issues.csv → staging.issues_issues ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_issues: ('8e526355-b927-4c43-8d18-f652dde42e51', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 33, 'Hydraulic Issue - Hydraulic pipework to align with Civil pit', None, '5c7efcc2-7a6d-55f5-b8f4-cadcbd56153b', '7bd2334a-3ad4-5451-9642-0f17c20e6aea', 'open', 'DFW2VRQVRTHVBWGF', 'user', None, '43721d39-099e-431a-9b0d-3018269057fd', None, 'urn:adsk.wipprodanz:dm.lineage:2VRX8F4dTLGv_6u-mYL18g', 'DFW2VRQVRTHVBWGF', '6cccc0d2-0cfc-4941-a013-070c258ab8f9', '7dcfe17e-caf5-42a7-ab17-26554224b53f', None, None, None, 'DFW2VRQVRTHVBWGF', '2025-10-30 00:50:49.378', None, None, 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 30, 0, 50, 49, 391000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 30, 0, 50, 52, 273000), None, None, 'urn:adsk.objects:os.object:wip.dm.pt8ix/45a3959e-56cd-44a1-a60c-619f550edacf.jpg', 1, None, None)
-[2025-10-31 15:27:40] [DONE] Processed issues_issues in 0.16s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_root_cause_categories: ('7dcfe17e-caf5-42a7-ab17-26554224b53f', None, None, 'Design', 1, 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), None, None, 1)
-[2025-10-31 15:27:40] [DONE] Processed issues_root_cause_categories in 0.05s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\issues_root_causes.csv → staging.issues_root_causes ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.issues_root_causes: ('003d38e3-ec84-4e84-95e7-a88b1dae3fcc', None, None, 'beb06eb0-6238-4482-b113-11be24f233ac', 'Coordination', 1, 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), 'System', datetime.datetime(2023, 12, 20, 19, 23, 27, 977000), None, None, 1)
-[2025-10-31 15:27:40] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (c4b1d29c-6ce8-46ab-9899-11f544077316). (2627) (SQLExecDirectW)")
+[2025-11-04 10:42:23] [DONE] Processed issues_attachments in 0.12s
+[2025-11-04 10:42:23] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_checklist_mappings.csv → staging.issues_checklist_mappings ...
+[2025-11-04 10:42:23] [DONE] Processed issues_checklist_mappings in 0.27s
+[2025-11-04 10:42:23] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_comments.csv → staging.issues_comments ...
+[2025-11-04 10:42:24] [DEBUG] First insert into staging.issues_comments: ('c7a8b427-7bd8-4659-bfce-fbb75de18b83', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '554f8db6-3a20-4950-bf91-47e86a024a51', 'ICR to remove redundant louvre.', 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 10, 7, 3, 47, 48, 190000))
+[2025-11-04 10:42:24] [DONE] Processed issues_comments in 0.27s
+[2025-11-04 10:42:24] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_custom_attribute_list_values.csv → staging.issues_custom_attribute_list_values ...
+[2025-11-04 10:42:24] [DEBUG] First insert into staging.issues_custom_attribute_list_values: ('83a41e34-74f3-4a39-83c6-e03cc3387947', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '0ca7699a-81f9-493a-a95f-c1abb15914fa', 'Blocker')
+[2025-11-04 10:42:24] [DONE] Processed issues_custom_attribute_list_values in 0.23s
+[2025-11-04 10:42:24] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_custom_attributes.csv → staging.issues_custom_attributes ...
+[2025-11-04 10:42:24] [DEBUG] First insert into staging.issues_custom_attributes: ('554f8db6-3a20-4950-bf91-47e86a024a51', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'issueSubtype', '83a41e34-74f3-4a39-83c6-e03cc3387947', 'Priority', None, 'list', 0, '1958133f-d8c4-4b46-9655-f957f5fb621c')
+[2025-11-04 10:42:24] [DONE] Processed issues_custom_attributes in 0.42s
+[2025-11-04 10:42:24] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_custom_attributes_mappings.csv → staging.issues_custom_attributes_mappings ...
+[2025-11-04 10:42:25] [DEBUG] First insert into staging.issues_custom_attributes_mappings: ('1dea4da8-b331-488f-b98a-8f6339f0f22d', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'issueSubtype', '9d1797a5-7698-5f90-9b3f-c4c47571e14f', 'Priority', None, 'list', 0, 0, datetime.datetime(2025, 7, 27, 23, 4, 23, 159000), 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 7, 27, 23, 4, 23, 159000), 'DFW2VRQVRTHVBWGF')
+[2025-11-04 10:42:25] [DONE] Processed issues_custom_attributes_mappings in 0.25s
+[2025-11-04 10:42:25] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_issue_subtypes.csv → staging.issues_issue_subtypes ...
+[2025-11-04 10:42:25] [DEBUG] First insert into staging.issues_issue_subtypes: ('64c72cd2-d555-5b0a-9158-5f2bf53f4ff3', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', '1586ccb0-dc51-5ccf-a678-82426d168ab9', 'Observation', 1, 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 796000), 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 796000), None, None)
+[2025-11-04 10:42:25] [DONE] Processed issues_issue_subtypes in 0.22s
+[2025-11-04 10:42:25] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_issue_types.csv → staging.issues_issue_types ...
+[2025-11-04 10:42:25] [DEBUG] First insert into staging.issues_issue_types: ('1586ccb0-dc51-5ccf-a678-82426d168ab9', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 'Observation', 1, 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 758000), 'System', datetime.datetime(2024, 7, 3, 4, 4, 14, 809000), None, None)
+[2025-11-04 10:42:25] [DONE] Processed issues_issue_types in 0.18s
+[2025-11-04 10:42:25] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_issues.csv → staging.issues_issues ...
+[2025-11-04 10:42:25] [DEBUG] First insert into staging.issues_issues: ('554f8db6-3a20-4950-bf91-47e86a024a51', '7a870e2e-a4c3-4733-988b-7d7680564de6', 'a24ab8fe-a092-44d0-ab9c-b4754f58c71f', 258, 'MEC v. STR - Mech louvre to drop to avoid brick support angle', None, '516cdd0f-71b7-571c-9117-df641d098aa7', '938ac03d-5196-5104-9b6e-73249e9bb9d1', 'completed', 572392015, 'company', None, '09a8f943-943f-4abe-bf8b-25f28366a92f', 'A2-AA', 'urn:adsk.wipprod:dm.lineage:11L41zcqRrKp6wXlV_lgaw', 'DFW2VRQVRTHVBWGF', '80a060d3-4647-4352-bd1d-ca93ff4985bc', '369f1b01-8c1a-445f-a5f3-85b1adbb9a14', None, None, None, 'DFW2VRQVRTHVBWGF', '2025-09-22 21:47:34.665', None, None, 'DFW2VRQVRTHVBWGF', datetime.datetime(2025, 9, 22, 21, 47, 34, 693000), '7LE2BDLKN4HFGSL5', datetime.datetime(2025, 10, 29, 9, 41, 14, 4000), None, None, 'urn:adsk.objects:os.object:wip.dm.prod/5229bb1e-c3c0-46d9-bd20-62d0ca118f37.jpg', 1, None, None)
+[2025-11-04 10:42:26] [DONE] Processed issues_issues in 0.5s
+[2025-11-04 10:42:26] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_root_cause_categories.csv → staging.issues_root_cause_categories ...
+[2025-11-04 10:42:26] [DEBUG] First insert into staging.issues_root_cause_categories: ('a5cc6ec9-7e42-4413-b90d-1e3dcb6ad61c', None, None, 'Quality', 1, 'System', datetime.datetime(2018, 12, 6, 8, 25, 17, 653000), '8P9VK3RMFR2M', datetime.datetime(2021, 3, 29, 15, 29, 2, 728000), None, None, 1)
+[2025-11-04 10:42:26] [DONE] Processed issues_root_cause_categories in 0.22s
+[2025-11-04 10:42:26] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmp2_ztz6kz\issues_root_causes.csv → staging.issues_root_causes ...
+[2025-11-04 10:42:26] [DEBUG] First insert into staging.issues_root_causes: ('08afdebc-35fb-4cf4-9c3e-521906250108', None, None, '93d1b9cb-deb0-4166-9a48-5f0227feaacb', 'Human - Human error', 1, 'System', datetime.datetime(2018, 12, 6, 8, 25, 18, 28000), '8P9VK3RMFR2M', datetime.datetime(2021, 3, 29, 15, 28, 56, 49000), None, None, 1)
+[2025-11-04 10:42:26] [SQL ERROR] in merge_issues_root_causes.sql: ('23000', "[23000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Violation of PRIMARY KEY constraint 'PK_issues_root_causes'. Cannot insert duplicate key in object 'dbo.issues_root_causes'. The duplicate key value is (e6bbede9-c08d-44d7-8f3b-0610c18932a3). (2627) (SQLExecDirectW)")
 -- MERGE for issues_root_causes
 WITH src_deduped AS (
     SELECT *, ROW_NUMBER() OVER (
@@ -169,12 +113,7 @@ WHEN NOT MATCHED BY TARGET THEN
         src.created_by, src.created_at, src.updated_by, src.updated_at,
         src.deleted_by, src.deleted_at
     );
-[2025-10-31 15:27:40] [DONE] Processed issues_root_causes in 0.08s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\locations_nodes.csv → staging.locations_nodes ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.locations_nodes: ('683b519c-2a59-4d5f-a7d8-0dd18063a30d', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', None, '8fef44f2-17f9-4663-8e02-5c78a4a7fa72', 'Project', 0, datetime.datetime(2025, 10, 23, 10, 36, 3, 534000), datetime.datetime(2025, 10, 23, 10, 36, 3, 534000))
-[2025-10-31 15:27:40] [DONE] Processed locations_nodes in 0.04s
-[2025-10-31 15:27:40] Importing C:\Users\RICOST~1\AppData\Local\Temp\tmpogd8leie\locations_trees.csv → staging.locations_trees ...
-[2025-10-31 15:27:40] [DEBUG] First insert into staging.locations_trees: ('683b519c-2a59-4d5f-a7d8-0dd18063a30d', '10f451ae-309d-469d-9251-89a17ce37214', '8da2e24f-8263-48f9-815c-45552dea3849', 'Default', datetime.datetime(2025, 10, 23, 10, 36, 3, 531000), datetime.datetime(2025, 10, 23, 10, 36, 3, 531000))
-[2025-10-31 15:27:40] [DONE] Processed locations_trees in 0.11s
-[2025-10-31 15:27:40] [SKIP] metadata: missing merge SQL
-[2025-10-31 15:27:40] [SKIP] relationships_entity_relationship: missing merge SQL
+[2025-11-04 10:42:26] [DONE] Processed issues_root_causes in 0.06s
+[2025-11-04 10:42:26] [SKIP] locations_nodes: missing CSV
+[2025-11-04 10:42:26] [SKIP] locations_trees: missing CSV
+[2025-11-04 10:42:26] [SKIP] metadata: missing merge SQL

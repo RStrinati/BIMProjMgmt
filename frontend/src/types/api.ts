@@ -264,10 +264,44 @@ export interface ServiceReview {
   disciplines?: string;
   deliverables?: string;
   status: string;
-  weight_factor: number;
+  weight_factor?: number | null;
+  invoice_reference?: string;
   evidence_links?: string;
   actual_issued_at?: string;
+  source_phase?: string | null;
+  billing_phase?: string | null;
+  billing_rate?: number | null;
+  billing_amount?: number | null;
+  service_name?: string;
+  service_phase?: string;
   is_billed?: boolean;
+}
+
+export interface ReviewBillingRecord extends ServiceReview {
+  billing_date?: string | null;
+}
+
+export interface ReviewBillingPhaseSummary {
+  billing_phase: string;
+  source_phase: string;
+  review_count: number;
+  total_amount: number;
+  slipped_count: number;
+  slipped_amount: number;
+}
+
+export interface ReviewBillingMonthlySummary {
+  period: string;
+  review_count: number;
+  total_amount: number;
+}
+
+export interface ReviewBillingResponse {
+  reviews: ReviewBillingRecord[];
+  summary_by_phase: ReviewBillingPhaseSummary[];
+  monthly_totals: ReviewBillingMonthlySummary[];
+  total_amount: number;
+  total_reviews: number;
 }
 
 export interface ServiceItem {

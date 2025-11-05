@@ -77,6 +77,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
+
     ;WITH latest AS (
         SELECT *,
                ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY source_load_ts DESC) AS rn,
@@ -91,18 +93,17 @@ BEGIN
                ) AS row_hash
         FROM stg.clients
     )
-    , dedup AS (
-        SELECT client_id, client_name, contact_name, contact_email,
-               industry_sector, country, row_hash
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT client_id, client_name, contact_name, contact_email,
+           industry_sector, country, row_hash
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     -- Close existing versions that changed
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.client tgt
-    JOIN dedup src ON tgt.client_bk = src.client_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.client_bk = src.client_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     -- Insert new/changed versions
@@ -123,10 +124,11 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.clients'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.client tgt
            ON tgt.client_bk = src.client_id AND tgt.current_flag = 1
     WHERE tgt.client_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -139,6 +141,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
+
     ;WITH latest AS (
         SELECT *,
                ROW_NUMBER() OVER (PARTITION BY project_type_id ORDER BY source_load_ts DESC) AS rn,
@@ -150,16 +154,15 @@ BEGIN
                ) AS row_hash
         FROM stg.project_types
     )
-    , dedup AS (
-        SELECT project_type_id, project_type_name, category, row_hash
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT project_type_id, project_type_name, category, row_hash
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.project_type tgt
-    JOIN dedup src ON tgt.project_type_bk = src.project_type_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.project_type_bk = src.project_type_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.project_type (
@@ -175,10 +178,11 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.project_types'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.project_type tgt
            ON tgt.project_type_bk = src.project_type_id AND tgt.current_flag = 1
     WHERE tgt.project_type_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -190,6 +194,8 @@ CREATE PROCEDURE warehouse.usp_load_dim_project
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
 
     ;WITH latest AS (
         SELECT *,
@@ -211,18 +217,17 @@ BEGIN
                ) AS row_hash
         FROM stg.projects
     )
-    , dedup AS (
-        SELECT project_id, project_name, client_id, project_type_id, status, priority,
-               start_date, end_date, area_hectares, city, state, country,
-               created_at, updated_at, row_hash
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT project_id, project_name, client_id, project_type_id, status, priority,
+           start_date, end_date, area_hectares, city, state, country,
+           created_at, updated_at, row_hash
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.project tgt
-    JOIN dedup src ON tgt.project_bk = src.project_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.project_bk = src.project_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.project (
@@ -251,12 +256,13 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.projects'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.project tgt
            ON tgt.project_bk = src.project_id AND tgt.current_flag = 1
     LEFT JOIN dim.client tgt_client ON tgt_client.client_bk = src.client_id AND tgt_client.current_flag = 1
     LEFT JOIN dim.project_type tgt_pt ON tgt_pt.project_type_bk = src.project_type_id AND tgt_pt.current_flag = 1
     WHERE tgt.project_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -268,6 +274,8 @@ CREATE PROCEDURE warehouse.usp_load_dim_issue_category
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
 
     ;WITH latest AS (
         SELECT *,
@@ -282,15 +290,14 @@ BEGIN
                ) AS row_hash
         FROM stg.issue_categories
     )
-    , dedup AS (
-        SELECT category_id, category_name, parent_category_id, category_level, description, row_hash
-        FROM latest WHERE rn = 1
-    )
+    SELECT category_id, category_name, parent_category_id, category_level, description, row_hash
+    INTO #dedup
+    FROM latest WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.issue_category tgt
-    JOIN dedup src ON tgt.category_bk = src.category_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.category_bk = src.category_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.issue_category (
@@ -313,13 +320,14 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.issue_categories'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.issue_category tgt
            ON tgt.category_bk = src.category_id AND tgt.current_flag = 1
     LEFT JOIN dim.issue_category parent_dim
            ON parent_dim.category_bk = src.parent_category_id
           AND parent_dim.current_flag = 1
     WHERE tgt.category_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -375,6 +383,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
+
     ;WITH latest AS (
         SELECT
             i.source_system,
@@ -392,7 +402,7 @@ BEGIN
             i.author,
             i.created_at,
             i.closed_at,
-            p.project_sk,
+            COALESCE(p_id.project_sk, p_alias.project_sk, p_name.project_sk) AS project_sk,
             ac.issue_category_sk AS primary_category_sk,
             dc.issue_category_sk AS discipline_category_sk,
             HASHBYTES('SHA2_256',
@@ -409,21 +419,30 @@ BEGIN
                     ISNULL(CONVERT(NVARCHAR(20), dc.issue_category_sk), '')
                 )
             ) AS row_hash
-        FROM stg.issues i
-        LEFT JOIN dim.project p ON p.project_name = i.project_name AND p.current_flag = 1
+     FROM stg.issues i
+     LEFT JOIN dim.project p_id
+         ON p_id.project_bk = TRY_CONVERT(INT, i.project_id_raw)
+        AND p_id.current_flag = 1
+     LEFT JOIN dbo.project_aliases pa
+         ON pa.alias_name = i.project_name
+     LEFT JOIN dim.project p_alias
+         ON p_alias.project_bk = pa.pm_project_id
+        AND p_alias.current_flag = 1
+     LEFT JOIN dim.project p_name
+         ON p_name.project_name = i.project_name
+        AND p_name.current_flag = 1
         LEFT JOIN dim.issue_category ac ON ac.category_name = i.category_primary AND ac.current_flag = 1
         LEFT JOIN dim.issue_category dc ON dc.category_name = i.discipline AND dc.current_flag = 1
     )
-    , dedup AS (
-        SELECT *
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT *
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
-    FROM dim.issue tgt
-    JOIN dedup src
+        FROM dim.issue tgt
+        JOIN #dedup src
       ON tgt.issue_bk = src.issue_id
      AND tgt.source_system = src.source_system
      AND tgt.current_flag = 1
@@ -454,7 +473,7 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.issues'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.issue tgt
            ON tgt.issue_bk = src.issue_id
           AND tgt.source_system = src.source_system
@@ -468,6 +487,7 @@ BEGIN
           AND author.source_system = src.source_system
           AND author.current_flag = 1
     WHERE tgt.issue_sk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -479,6 +499,8 @@ CREATE PROCEDURE warehouse.usp_load_dim_service
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
 
     ;WITH latest AS (
         SELECT *,
@@ -501,16 +523,15 @@ BEGIN
                ) AS row_hash
         FROM stg.project_services
     )
-    , dedup AS (
-        SELECT *
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT *
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.service tgt
-    JOIN dedup src ON tgt.service_bk = src.service_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.service_bk = src.service_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.service (
@@ -536,12 +557,13 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.project_services'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.service tgt
            ON tgt.service_bk = src.service_id AND tgt.current_flag = 1
     LEFT JOIN dim.project proj
            ON proj.project_bk = src.project_id AND proj.current_flag = 1
     WHERE tgt.service_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -568,6 +590,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    IF OBJECT_ID('tempdb..#dedup') IS NOT NULL DROP TABLE #dedup;
+
     ;WITH latest AS (
         SELECT *,
                ROW_NUMBER() OVER (PARTITION BY review_id ORDER BY source_load_ts DESC) AS rn,
@@ -584,16 +608,15 @@ BEGIN
                ) AS row_hash
         FROM stg.service_reviews
     )
-    , dedup AS (
-        SELECT *
-        FROM latest
-        WHERE rn = 1
-    )
+    SELECT *
+    INTO #dedup
+    FROM latest
+    WHERE rn = 1;
     UPDATE tgt
     SET current_flag = 0,
         effective_end = SYSUTCDATETIME()
     FROM dim.review_cycle tgt
-    JOIN dedup src ON tgt.review_bk = src.review_id AND tgt.current_flag = 1
+    JOIN #dedup src ON tgt.review_bk = src.review_id AND tgt.current_flag = 1
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.review_cycle (
@@ -617,12 +640,13 @@ BEGIN
         NULL,
         src.row_hash,
         'stg.service_reviews'
-    FROM dedup src
+    FROM #dedup src
     LEFT JOIN dim.review_cycle tgt
            ON tgt.review_bk = src.review_id AND tgt.current_flag = 1
     LEFT JOIN dim.service svc
            ON svc.service_bk = src.service_id AND svc.current_flag = 1
     WHERE tgt.review_bk IS NULL OR tgt.record_hash <> src.row_hash;
+    DROP TABLE IF EXISTS #dedup;
 END
 GO
 
@@ -769,6 +793,34 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Compute issue counts in a ±14 day window around the review's planned date
+    IF OBJECT_ID('tempdb..#review_issue_counts') IS NOT NULL DROP TABLE #review_issue_counts;
+
+    ;WITH review_windows AS (
+        SELECT
+            rc.review_cycle_sk,
+            rc.service_sk,
+            svc.project_sk,
+            rc.planned_date_sk,
+            DATEADD(DAY, -14, CAST(CONVERT(VARCHAR(8), rc.planned_date_sk) AS DATE)) AS window_start,
+            DATEADD(DAY, 14, CAST(CONVERT(VARCHAR(8), rc.planned_date_sk) AS DATE)) AS window_end
+        FROM dim.review_cycle rc
+        JOIN dim.service svc ON rc.service_sk = svc.service_sk
+        WHERE rc.planned_date_sk IS NOT NULL
+    )
+    SELECT
+        rw.review_cycle_sk,
+        COUNT(DISTINCT CASE WHEN i.created_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd')) 
+                                                        AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd')) 
+                            THEN i.issue_sk END) AS issue_count_window,
+        COUNT(DISTINCT CASE WHEN i.closed_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd')) 
+                                                       AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd')) 
+                            THEN i.issue_sk END) AS issue_closed_window
+    INTO #review_issue_counts
+    FROM review_windows rw
+    LEFT JOIN dim.issue i ON i.project_sk = rw.project_sk AND i.current_flag = 1
+    GROUP BY rw.review_cycle_sk;
+
     INSERT INTO fact.review_cycle (
         review_cycle_sk, service_sk, project_sk, client_sk, project_type_sk,
         planned_date_sk, due_date_sk, actual_date_sk, planned_vs_actual_days,
@@ -789,17 +841,20 @@ BEGIN
         CASE WHEN rc.status = 'overdue' THEN 1 ELSE 0 END,
         rc.status,
         rc.weight_factor,
-        NULL,
-        NULL,
+        ISNULL(ric.issue_count_window, 0),
+        ISNULL(ric.issue_closed_window, 0),
         'warehouse.usp_load_fact_review_cycle'
     FROM dim.review_cycle rc
     JOIN dim.service svc ON rc.service_sk = svc.service_sk
     JOIN dim.project proj ON svc.project_sk = proj.project_sk
+    LEFT JOIN #review_issue_counts ric ON ric.review_cycle_sk = rc.review_cycle_sk
     WHERE NOT EXISTS (
         SELECT 1
         FROM fact.review_cycle fr
         WHERE fr.review_cycle_sk = rc.review_cycle_sk
     );
+
+    DROP TABLE IF EXISTS #review_issue_counts;
 END
 GO
 
@@ -831,6 +886,7 @@ BEGIN
     DECLARE @MonthStartSk INT = CONVERT(INT, FORMAT(@MonthStart, 'yyyyMMdd'));
     DECLARE @MonthEndSk INT = CONVERT(INT, FORMAT(@MonthEnd, 'yyyyMMdd'));
 
+    -- Start from all current projects, not just those with issues
     INSERT INTO fact.project_kpi_monthly (
         project_sk, client_sk, project_type_sk, month_date_sk,
         total_issues, open_issues, closed_issues, high_priority_issues,
@@ -843,28 +899,30 @@ BEGIN
         proj.client_sk,
         proj.project_type_sk,
         @MonthSk,
-        COUNT(*) AS total_issues,
+        COUNT(DISTINCT snapshot.issue_sk) AS total_issues,
         SUM(CASE WHEN snapshot.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
         SUM(CASE WHEN snapshot.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
         SUM(CASE WHEN snapshot.high_priority_flag = 1 THEN 1 ELSE 0 END) AS high_priority_issues,
         AVG(CAST(snapshot.resolution_days AS DECIMAL(9,2))) AS avg_resolution_days,
-        NULL AS review_count,
-        NULL AS completed_reviews,
-        NULL AS overdue_reviews,
+        COUNT(DISTINCT rc.review_cycle_sk) AS review_count,
+        SUM(CASE WHEN rc.status = 'completed' THEN 1 ELSE 0 END) AS completed_reviews,
+        SUM(CASE WHEN rc.status = 'overdue' THEN 1 ELSE 0 END) AS overdue_reviews,
         SUM(CASE WHEN svc.status = 'in_progress' THEN 1 ELSE 0 END) AS services_in_progress,
         SUM(CASE WHEN svc.status = 'completed' THEN 1 ELSE 0 END) AS services_completed,
         SUM(ISNULL(service_month.earned_value, 0)) AS earned_value,
         SUM(ISNULL(service_month.claimed_to_date, 0)) AS claimed_to_date,
         SUM(ISNULL(service_month.variance_fee, 0)) AS variance_fee,
         'warehouse.usp_load_fact_project_kpi_monthly'
-    FROM fact.issue_snapshot snapshot
-    JOIN dim.project proj ON snapshot.project_sk = proj.project_sk
+    FROM dim.project proj
+    LEFT JOIN fact.issue_snapshot snapshot 
+           ON snapshot.project_sk = proj.project_sk
+          AND snapshot.snapshot_date_sk BETWEEN @MonthStartSk AND @MonthEndSk
+    LEFT JOIN dim.service svc ON svc.project_sk = proj.project_sk AND svc.current_flag = 1
     LEFT JOIN fact.service_monthly service_month
-        ON service_month.project_sk = proj.project_sk
-       AND service_month.month_date_sk = @MonthSk
-    LEFT JOIN dim.service svc
-        ON svc.service_sk = service_month.service_sk
-    WHERE snapshot.snapshot_date_sk BETWEEN @MonthStartSk AND @MonthEndSk
+           ON service_month.project_sk = proj.project_sk
+          AND service_month.month_date_sk = @MonthSk
+    LEFT JOIN dim.review_cycle rc ON rc.project_sk = proj.project_sk AND rc.current_flag = 1
+    WHERE proj.current_flag = 1
       AND NOT EXISTS (
             SELECT 1
             FROM fact.project_kpi_monthly existing
@@ -899,5 +957,48 @@ BEGIN
               AND bic.issue_category_sk = issue.discipline_category_sk
               AND bic.category_role = 'discipline'
         );
+
+    -- Review-Issue bridge: link issues created/closed in the review window
+    INSERT INTO brg.review_issue (review_cycle_sk, issue_sk, relationship_type)
+    SELECT DISTINCT
+        rw.review_cycle_sk,
+        i.issue_sk,
+        CASE
+            WHEN i.created_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                                       AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+                 AND i.closed_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                                          AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+            THEN 'opened_and_closed_during'
+            WHEN i.created_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                                       AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+            THEN 'opened_during'
+            WHEN i.closed_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                                      AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+            THEN 'closed_during'
+            ELSE 'active_during'
+        END
+    FROM (
+        SELECT
+            rc.review_cycle_sk,
+            svc.project_sk,
+            DATEADD(DAY, -14, CAST(CONVERT(VARCHAR(8), rc.planned_date_sk) AS DATE)) AS window_start,
+            DATEADD(DAY, 14, CAST(CONVERT(VARCHAR(8), rc.planned_date_sk) AS DATE)) AS window_end
+        FROM dim.review_cycle rc
+        JOIN dim.service svc ON rc.service_sk = svc.service_sk
+        WHERE rc.planned_date_sk IS NOT NULL
+    ) rw
+    JOIN dim.issue i ON i.project_sk = rw.project_sk AND i.current_flag = 1
+    WHERE (
+        i.created_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                              AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+        OR i.closed_date_sk BETWEEN CONVERT(INT, FORMAT(rw.window_start, 'yyyyMMdd'))
+                                AND CONVERT(INT, FORMAT(rw.window_end, 'yyyyMMdd'))
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM brg.review_issue bri
+        WHERE bri.review_cycle_sk = rw.review_cycle_sk
+          AND bri.issue_sk = i.issue_sk
+    );
 END
 GO

@@ -414,64 +414,294 @@ def get_service_reviews(service_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
-                       {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
-                       {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
-                       {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
-                       {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
-                       {S.ServiceReviews.ACTUAL_ISSUED_AT}, {S.ServiceReviews.IS_BILLED}
-                FROM {S.ServiceReviews.TABLE} 
-                WHERE {S.ServiceReviews.SERVICE_ID} = ?
-                ORDER BY {S.ServiceReviews.CYCLE_NO}
-                """,
-                (service_id,)
-            )
-            reviews = [dict(
-                review_id=row[0],
-                service_id=row[1],
-                cycle_no=row[2],
-                planned_date=row[3],
-                due_date=row[4],
-                disciplines=row[5],
-                deliverables=row[6],
-                status=row[7],
-                weight_factor=row[8],
-                evidence_links=row[9],
-                actual_issued_at=row[10],
-                is_billed=bool(row[11]) if row[11] is not None else False
-            ) for row in cursor.fetchall()]
+            supports_billing = _ensure_service_review_billing_columns(cursor)
+            if not supports_billing:
+                logger.warning("ServiceReviews billing metadata columns not found; returning empty billing summary.")
+                return {
+                    'reviews': [],
+                    'summary_by_phase': [],
+                    'monthly_totals': [],
+                    'total_amount': 0.0,
+                    'total_reviews': 0
+                }
+            supports_billing = _ensure_service_review_billing_columns(cursor)
+
+            if supports_billing:
+                cursor.execute(
+                    f"""
+                    SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
+                           {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
+                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
+                           {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
+                           {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
+                           {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
+                           {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
+                           {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT}, 
+                           {S.ServiceReviews.IS_BILLED}
+                    FROM {S.ServiceReviews.TABLE} 
+                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                    ORDER BY {S.ServiceReviews.CYCLE_NO}
+                    """,
+                    (service_id,)
+                )
+                rows = cursor.fetchall()
+                reviews = [dict(
+                    review_id=row[0],
+                    service_id=row[1],
+                    cycle_no=row[2],
+                    planned_date=row[3],
+                    due_date=row[4],
+                    disciplines=row[5],
+                    deliverables=row[6],
+                    status=row[7],
+                    weight_factor=float(row[8]) if row[8] is not None else None,
+                    evidence_links=row[9],
+                    invoice_reference=row[10],
+                    actual_issued_at=row[11],
+                    source_phase=row[12],
+                    billing_phase=row[13],
+                    billing_rate=float(row[14]) if row[14] is not None else None,
+                    billing_amount=float(row[15]) if row[15] is not None else None,
+                    is_billed=bool(row[16]) if row[16] is not None else False
+                ) for row in rows]
+            else:
+                cursor.execute(
+                    f"""
+                    SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
+                           {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
+                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
+                           {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
+                           {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
+                           {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
+                           {S.ServiceReviews.IS_BILLED}
+                    FROM {S.ServiceReviews.TABLE} 
+                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
+                    ORDER BY {S.ServiceReviews.CYCLE_NO}
+                    """,
+                    (service_id,)
+                )
+                rows = cursor.fetchall()
+                reviews = [dict(
+                    review_id=row[0],
+                    service_id=row[1],
+                    cycle_no=row[2],
+                    planned_date=row[3],
+                    due_date=row[4],
+                    disciplines=row[5],
+                    deliverables=row[6],
+                    status=row[7],
+                    weight_factor=float(row[8]) if row[8] is not None else None,
+                    evidence_links=row[9],
+                    invoice_reference=row[10],
+                    actual_issued_at=row[11],
+                    source_phase=None,
+                    billing_phase=None,
+                    billing_rate=None,
+                    billing_amount=None,
+                    is_billed=bool(row[12]) if row[12] is not None else False
+                ) for row in rows]
             return reviews
     except Exception as e:
         logger.error(f"Error fetching service reviews: {e}")
         return []
 
 
+def _to_decimal(value):
+    """Safely convert a value to Decimal or return None."""
+    if value is None or value == '':
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _derive_default_review_rate(unit_type, unit_rate, unit_qty, lump_sum_fee, agreed_fee):
+    """Derive a per-review rate from service financials."""
+    unit_type = (unit_type or '').lower()
+    unit_rate_dec = _to_decimal(unit_rate)
+    unit_qty_dec = _to_decimal(unit_qty)
+    lump_sum_dec = _to_decimal(lump_sum_fee)
+    agreed_fee_dec = _to_decimal(agreed_fee)
+
+    try:
+        if unit_type == 'review':
+            if unit_rate_dec is not None:
+                return float(unit_rate_dec)
+            if unit_qty_dec and unit_qty_dec != 0 and agreed_fee_dec is not None:
+                return float(agreed_fee_dec / unit_qty_dec)
+
+        if unit_type == 'lump_sum':
+            if unit_qty_dec and unit_qty_dec != 0 and lump_sum_dec is not None:
+                return float(lump_sum_dec / unit_qty_dec)
+            if lump_sum_dec is not None:
+                return float(lump_sum_dec)
+
+        if unit_rate_dec is not None:
+            return float(unit_rate_dec)
+
+        if unit_qty_dec and unit_qty_dec != 0 and agreed_fee_dec is not None:
+            return float(agreed_fee_dec / unit_qty_dec)
+
+        if lump_sum_dec is not None:
+            return float(lump_sum_dec)
+
+        if agreed_fee_dec is not None:
+            return float(agreed_fee_dec)
+    except (InvalidOperation, ZeroDivisionError):
+        return None
+
+    return None
+
+
+def _ensure_service_review_billing_columns(cursor) -> bool:
+    """Ensure the ServiceReviews table has billing metadata columns."""
+    global _service_review_billing_columns_ready
+    if _service_review_billing_columns_ready:
+        return bool(_service_review_billing_columns_ready)
+
+    table = S.ServiceReviews.TABLE
+
+    def _column_exists(column: str) -> bool:
+        try:
+            cursor.execute(f"SELECT {column} FROM {table} WHERE 1 = 0")
+            return True
+        except Exception:
+            return False
+
+    missing = [
+        (name, ddl) for name, ddl in _SERVICE_REVIEW_BILLING_COLUMN_DEFINITIONS
+        if not _column_exists(name)
+    ]
+
+    if not missing:
+        _service_review_billing_columns_ready = True
+        return True
+
+    for column_name, definition in missing:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD {column_name} {definition}")
+        except Exception as exc:
+            message = str(exc).lower()
+            # Already exists / duplicate column errors can be ignored silently
+            if 'duplicate' in message or 'exists' in message or 'already' in message:
+                continue
+            logger.warning(f"Unable to add column {column_name} to {table}: {exc}")
+            _service_review_billing_columns_ready = False
+            return False
+
+    connection = getattr(cursor, 'connection', None)
+    if connection:
+        try:
+            connection.commit()
+        except Exception as exc:
+            logger.debug(f"Commit after altering {table} failed (continuing): {exc}")
+
+    _service_review_billing_columns_ready = True
+    return True
+
+
 def create_service_review(service_id, cycle_no, planned_date, due_date=None, 
                          disciplines=None, deliverables=None, status='planned', 
-                         weight_factor=1.0, evidence_links=None, is_billed=None):
+                         weight_factor=1.0, evidence_links=None, invoice_reference=None,
+                         source_phase=None, billing_phase=None, billing_rate=None,
+                         billing_amount=None, is_billed=None):
     """Create a new review for a service."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
+            status = (status or 'planned')
+            final_weight = weight_factor if weight_factor is not None else 1.0
+            try:
+                final_weight = float(final_weight)
+            except (ValueError, TypeError):
+                final_weight = 1.0
+
             effective_is_billed = is_billed
             if effective_is_billed is None:
-                effective_is_billed = 1 if (status or '').lower() == 'completed' else 0
+                effective_is_billed = 1 if status.lower() == 'completed' else 0
 
+            # Derive default billing metadata from the service record
+            supports_billing = _ensure_service_review_billing_columns(cursor)
             cursor.execute(
                 f"""
-                INSERT INTO {S.ServiceReviews.TABLE} (
-                    {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.CYCLE_NO}, 
-                    {S.ServiceReviews.PLANNED_DATE}, {S.ServiceReviews.DUE_DATE}, 
-                    {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
-                    {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
-                    {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.IS_BILLED}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                SELECT {S.ProjectServices.PHASE}, {S.ProjectServices.UNIT_TYPE}, 
+                       {S.ProjectServices.UNIT_QTY}, {S.ProjectServices.UNIT_RATE}, 
+                       {S.ProjectServices.LUMP_SUM_FEE}, {S.ProjectServices.AGREED_FEE}
+                FROM {S.ProjectServices.TABLE}
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
                 """,
-                (service_id, cycle_no, planned_date, due_date, disciplines, 
-                 deliverables, status, weight_factor, evidence_links, int(bool(effective_is_billed)))
+                (service_id,)
             )
+            service_row = cursor.fetchone()
+            service_phase = service_row[0] if service_row else None
+            derived_rate = None
+            if service_row:
+                derived_rate = _derive_default_review_rate(
+                    service_row[1], service_row[3], service_row[2], service_row[4], service_row[5]
+                )
+
+            final_source_phase = source_phase or service_phase
+            final_billing_phase = billing_phase or final_source_phase or service_phase
+
+            effective_rate = billing_rate if billing_rate is not None else derived_rate or 0.0
+            try:
+                effective_rate = float(effective_rate)
+            except (ValueError, TypeError):
+                effective_rate = 0.0
+
+            effective_amount = billing_amount
+            if effective_amount is None:
+                try:
+                    effective_amount = float(Decimal(str(effective_rate or 0)) * Decimal(str(final_weight or 1)))
+                except (InvalidOperation, ValueError, TypeError):
+                    effective_amount = float(effective_rate or 0) * float(final_weight or 1)
+            else:
+                try:
+                    effective_amount = float(effective_amount)
+                except (ValueError, TypeError):
+                    effective_amount = float(effective_rate or 0) * float(final_weight or 1)
+
+            if supports_billing:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {S.ServiceReviews.TABLE} (
+                        {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.CYCLE_NO}, 
+                        {S.ServiceReviews.PLANNED_DATE}, {S.ServiceReviews.DUE_DATE}, 
+                        {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
+                        {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
+                        {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
+                        {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
+                        {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT},
+                        {S.ServiceReviews.IS_BILLED}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        service_id, cycle_no, planned_date, due_date, disciplines,
+                        deliverables, status, final_weight, evidence_links, invoice_reference,
+                        final_source_phase, final_billing_phase, effective_rate, effective_amount,
+                        int(bool(effective_is_billed))
+                    )
+                )
+            else:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {S.ServiceReviews.TABLE} (
+                        {S.ServiceReviews.SERVICE_ID}, {S.ServiceReviews.CYCLE_NO}, 
+                        {S.ServiceReviews.PLANNED_DATE}, {S.ServiceReviews.DUE_DATE}, 
+                        {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
+                        {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
+                        {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
+                        {S.ServiceReviews.IS_BILLED}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        service_id, cycle_no, planned_date, due_date, disciplines,
+                        deliverables, status, final_weight, evidence_links, invoice_reference,
+                        int(bool(effective_is_billed))
+                    )
+                )
             conn.commit()
             return cursor.lastrowid
     except Exception as e:
@@ -484,14 +714,21 @@ def update_service_review(review_id, **kwargs):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            supports_billing = _ensure_service_review_billing_columns(cursor)
             update_fields = {}
             allowed_fields = [
                 S.ServiceReviews.CYCLE_NO, S.ServiceReviews.PLANNED_DATE, 
                 S.ServiceReviews.DUE_DATE, S.ServiceReviews.DISCIPLINES, 
                 S.ServiceReviews.DELIVERABLES, S.ServiceReviews.STATUS, 
                 S.ServiceReviews.WEIGHT_FACTOR, S.ServiceReviews.EVIDENCE_LINKS, 
-                S.ServiceReviews.ACTUAL_ISSUED_AT, S.ServiceReviews.IS_BILLED
+                S.ServiceReviews.INVOICE_REFERENCE, S.ServiceReviews.ACTUAL_ISSUED_AT, 
+                S.ServiceReviews.IS_BILLED
             ]
+            if supports_billing:
+                allowed_fields.extend([
+                    S.ServiceReviews.SOURCE_PHASE, S.ServiceReviews.BILLING_PHASE,
+                    S.ServiceReviews.BILLING_RATE, S.ServiceReviews.BILLING_AMOUNT
+                ])
             
             status_update = None
             for key, value in kwargs.items():
@@ -501,12 +738,48 @@ def update_service_review(review_id, **kwargs):
                         update_fields[key] = value
                     elif key == S.ServiceReviews.IS_BILLED:
                         update_fields[key] = int(bool(value))
+                    elif supports_billing and key in (S.ServiceReviews.BILLING_RATE, S.ServiceReviews.BILLING_AMOUNT, S.ServiceReviews.WEIGHT_FACTOR):
+                        try:
+                            update_fields[key] = float(value) if value is not None else None
+                        except (ValueError, TypeError):
+                            update_fields[key] = None
+                    elif key == S.ServiceReviews.WEIGHT_FACTOR:
+                        try:
+                            update_fields[key] = float(value) if value is not None else None
+                        except (ValueError, TypeError):
+                            update_fields[key] = None
                     else:
                         update_fields[key] = value
             
             if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
                 # Auto-align billed flag with completed status if not explicitly provided.
                 update_fields[S.ServiceReviews.IS_BILLED] = 1 if status_update == 'completed' else 0
+
+            if supports_billing:
+                needs_recalc_amount = False
+                if S.ServiceReviews.BILLING_AMOUNT not in update_fields:
+                    if any(field in update_fields for field in (S.ServiceReviews.BILLING_RATE, S.ServiceReviews.WEIGHT_FACTOR)):
+                        needs_recalc_amount = True
+
+                if needs_recalc_amount:
+                    cursor.execute(
+                        f"""
+                        SELECT {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.WEIGHT_FACTOR}
+                        FROM {S.ServiceReviews.TABLE}
+                        WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                        """,
+                        (review_id,)
+                    )
+                    current_values = cursor.fetchone()
+                    current_rate = current_values[0] if current_values else 0
+                    current_weight = current_values[1] if current_values else 1
+                    new_rate = update_fields.get(S.ServiceReviews.BILLING_RATE, current_rate)
+                    new_weight = update_fields.get(S.ServiceReviews.WEIGHT_FACTOR, current_weight)
+                    try:
+                        new_amount = float(Decimal(str(new_rate or 0)) * Decimal(str(new_weight or 1)))
+                    except (InvalidOperation, ValueError, TypeError):
+                        new_amount = float(new_rate or 0) * float(new_weight or 1)
+                    update_fields[S.ServiceReviews.BILLING_AMOUNT] = new_amount
             
             if not update_fields:
                 return False
@@ -525,6 +798,171 @@ def update_service_review(review_id, **kwargs):
         return False
 
 
+def get_service_review_billing(project_id, start_date=None, end_date=None, date_field='actual_issued_at'):
+    """Return detailed review-level billing data for a project, including monthly summaries."""
+    date_field = (date_field or 'actual_issued_at').lower()
+    valid_fields = {'actual_issued_at', 'planned_date', 'due_date'}
+    if date_field not in valid_fields:
+        raise ValueError("date_field must be one of 'actual_issued_at', 'planned_date', or 'due_date'")
+
+    def _coerce_date(value):
+        if value is None or value == '':
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value).date()
+            except ValueError:
+                try:
+                    return datetime.strptime(value, '%Y-%m-%d').date()
+                except ValueError as exc:
+                    raise ValueError(f"Invalid date format '{value}'. Use YYYY-MM-DD.") from exc
+        raise ValueError(f"Unsupported date value: {value!r}")
+
+    start_dt = _coerce_date(start_date)
+    end_dt = _coerce_date(end_date)
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            if date_field == 'actual_issued_at':
+                billing_expr = f"COALESCE(sr.{S.ServiceReviews.ACTUAL_ISSUED_AT}, sr.{S.ServiceReviews.PLANNED_DATE})"
+            elif date_field == 'planned_date':
+                billing_expr = f"sr.{S.ServiceReviews.PLANNED_DATE}"
+            else:
+                billing_expr = f"sr.{S.ServiceReviews.DUE_DATE}"
+
+            filters = [f"ps.{S.ProjectServices.PROJECT_ID} = ?"]
+            params = [project_id]
+            if start_dt:
+                filters.append(f"CAST(({billing_expr}) AS DATE) >= ?")
+                params.append(start_dt.strftime('%Y-%m-%d'))
+            if end_dt:
+                filters.append(f"CAST(({billing_expr}) AS DATE) <= ?")
+                params.append(end_dt.strftime('%Y-%m-%d'))
+
+            where_clause = " AND ".join(filters)
+
+            cursor.execute(
+                f"""
+                SELECT sr.{S.ServiceReviews.REVIEW_ID}, sr.{S.ServiceReviews.SERVICE_ID},
+                       ps.{S.ProjectServices.SERVICE_NAME}, ps.{S.ProjectServices.PHASE},
+                       sr.{S.ServiceReviews.CYCLE_NO}, sr.{S.ServiceReviews.STATUS},
+                       sr.{S.ServiceReviews.SOURCE_PHASE}, sr.{S.ServiceReviews.BILLING_PHASE},
+                       sr.{S.ServiceReviews.BILLING_RATE}, sr.{S.ServiceReviews.BILLING_AMOUNT},
+                       sr.{S.ServiceReviews.WEIGHT_FACTOR}, sr.{S.ServiceReviews.PLANNED_DATE},
+                       sr.{S.ServiceReviews.DUE_DATE}, sr.{S.ServiceReviews.ACTUAL_ISSUED_AT},
+                       {billing_expr} AS billing_reference_date,
+                       sr.{S.ServiceReviews.INVOICE_REFERENCE}, sr.{S.ServiceReviews.IS_BILLED}
+                FROM {S.ServiceReviews.TABLE} sr
+                INNER JOIN {S.ProjectServices.TABLE} ps
+                    ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE {where_clause}
+                ORDER BY billing_reference_date, sr.{S.ServiceReviews.REVIEW_ID}
+                """,
+                params
+            )
+            rows = cursor.fetchall()
+    except pyodbc.Error as exc:
+        logger.error(f"Error fetching review billing data: {exc}")
+        return {
+            'reviews': [],
+            'summary_by_phase': [],
+            'monthly_totals': [],
+            'total_amount': 0.0,
+            'total_reviews': 0
+        }
+
+    reviews: List[Dict[str, Any]] = []
+    phase_summary: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    monthly_totals: Dict[str, Dict[str, Any]] = {}
+    total_amount = 0.0
+
+    for row in rows:
+        billing_rate = float(row[8]) if row[8] is not None else 0.0
+        billing_amount = float(row[9]) if row[9] is not None else 0.0
+        billing_rate = round(billing_rate, 2)
+        billing_amount = round(billing_amount, 2)
+        weight_factor = float(row[10]) if row[10] is not None else None
+        planned = row[11]
+        due = row[12]
+        issued = row[13]
+        billing_date_value = row[14]
+
+        if isinstance(billing_date_value, datetime):
+            billing_date = billing_date_value.date()
+        elif isinstance(billing_date_value, date):
+            billing_date = billing_date_value
+        else:
+            billing_date = None
+
+        billing_date_iso = billing_date.isoformat() if billing_date else None
+
+        review = {
+            'review_id': row[0],
+            'service_id': row[1],
+            'service_name': row[2],
+            'service_phase': row[3],
+            'cycle_no': row[4],
+            'status': row[5],
+            'source_phase': row[6],
+            'billing_phase': row[7],
+            'billing_rate': billing_rate,
+            'billing_amount': billing_amount,
+            'weight_factor': weight_factor,
+            'planned_date': planned.isoformat() if isinstance(planned, (datetime, date)) else planned,
+            'due_date': due.isoformat() if isinstance(due, (datetime, date)) else due,
+            'actual_issued_at': issued.isoformat() if isinstance(issued, (datetime, date)) else issued,
+            'billing_date': billing_date_iso,
+            'invoice_reference': row[15],
+            'is_billed': bool(row[16])
+        }
+        reviews.append(review)
+
+        total_amount += billing_amount
+
+        summary_key = (review['billing_phase'] or 'Unassigned', review['source_phase'] or 'Unassigned')
+        summary_entry = phase_summary.setdefault(summary_key, {
+            'billing_phase': summary_key[0],
+            'source_phase': summary_key[1],
+            'review_count': 0,
+            'total_amount': 0.0,
+            'slipped_count': 0,
+            'slipped_amount': 0.0
+        })
+        summary_entry['review_count'] += 1
+        summary_entry['total_amount'] += billing_amount
+        if summary_key[0] != summary_key[1]:
+            summary_entry['slipped_count'] += 1
+            summary_entry['slipped_amount'] += billing_amount
+
+        period_key = billing_date.strftime('%Y-%m') if billing_date else 'Unscheduled'
+        month_entry = monthly_totals.setdefault(period_key, {'period': period_key, 'review_count': 0, 'total_amount': 0.0})
+        month_entry['review_count'] += 1
+        month_entry['total_amount'] += billing_amount
+
+    summary_by_phase = []
+    for entry in phase_summary.values():
+        entry['total_amount'] = round(entry['total_amount'], 2)
+        entry['slipped_amount'] = round(entry['slipped_amount'], 2)
+        summary_by_phase.append(entry)
+    summary_by_phase.sort(key=lambda item: (item['billing_phase'] or '', item['source_phase'] or ''))
+
+    monthly_summary = []
+    for entry in sorted(monthly_totals.values(), key=lambda item: item['period']):
+        entry['total_amount'] = round(entry['total_amount'], 2)
+        monthly_summary.append(entry)
+
+    return {
+        'reviews': reviews,
+        'summary_by_phase': summary_by_phase,
+        'monthly_totals': monthly_summary,
+        'total_amount': round(total_amount, 2),
+        'total_reviews': len(reviews)
+    }
 def delete_service_review(review_id):
     """Delete a service review."""
     try:
@@ -796,6 +1234,7 @@ import json
 import pyodbc
 import os
 import pandas as pd
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta, date, time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -808,6 +1247,13 @@ logger = logging.getLogger(__name__)
 
 _table_column_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
 _control_model_metadata_supported: Optional[bool] = None
+_service_review_billing_columns_ready: Optional[bool] = None
+_SERVICE_REVIEW_BILLING_COLUMN_DEFINITIONS = [
+    (S.ServiceReviews.SOURCE_PHASE, "NVARCHAR(200) NULL"),
+    (S.ServiceReviews.BILLING_PHASE, "NVARCHAR(200) NULL"),
+    (S.ServiceReviews.BILLING_RATE, "DECIMAL(18,2) NULL"),
+    (S.ServiceReviews.BILLING_AMOUNT, "DECIMAL(18,2) NULL"),
+]
 
 
 def _ensure_control_model_metadata_column(conn) -> bool:

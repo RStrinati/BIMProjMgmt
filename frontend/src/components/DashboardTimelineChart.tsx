@@ -32,7 +32,6 @@ const MAX_TICKS = 12;
 const MIN_TICKS = 2;
 const LEFT_COLUMN_WIDTH_PX = 260;
 const BAR_HEIGHT_PX = 10;
-const MARKER_SIZE_PX = 14;
 const ROW_HEIGHT_PX = 76;
 const VIRTUALIZATION_THRESHOLD = 40;
 const VIRTUALIZATION_OVERSCAN = 6;
@@ -154,16 +153,27 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
         maxTimestamp = value;
       }
     };
+    const applyParsedReviewBounds = (review: ParsedReview) => {
+      updateBounds(review.plannedDate);
+      updateBounds(review.dueDate);
+    };
+    const applyParsedProjectBounds = (project: ParsedProject) => {
+      updateBounds(project.startDate);
+      updateBounds(project.endDate);
+      project.reviews.forEach(applyParsedReviewBounds);
+    };
 
     const parsedProjects: ParsedProject[] = projects.map((project) => {
       const cachedProject = projectCacheRef.current.get(project.project_id);
       if (cachedProject && cachedProject.source === project) {
+        applyParsedProjectBounds(cachedProject.parsed);
         return cachedProject.parsed;
       }
 
       const parsedReviews: ParsedReview[] = (project.review_items ?? []).map((review) => {
         const cachedReview = reviewCacheRef.current.get(review.review_id);
         if (cachedReview && cachedReview.source === review) {
+          applyParsedReviewBounds(cachedReview.parsed);
           return cachedReview.parsed;
         }
 
@@ -174,8 +184,7 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
           status: review.status,
           serviceName: review.service_name,
         };
-        updateBounds(parsed.plannedDate);
-        updateBounds(parsed.dueDate);
+        applyParsedReviewBounds(parsed);
         reviewCacheRef.current.set(review.review_id, { source: review, parsed });
         return parsed;
       });
@@ -195,8 +204,7 @@ const useTimelineContext = (projects?: DashboardTimelineProject[]) => {
         rawEnd: project.end_date ?? null,
       };
 
-      updateBounds(parsedProject.startDate);
-      updateBounds(parsedProject.endDate);
+      applyParsedProjectBounds(parsedProject);
 
       projectCacheRef.current.set(project.project_id, {
         source: project,
@@ -312,16 +320,16 @@ function DashboardTimelineChart({
     !!startBoundary && !!endBoundary && !isBefore(today, startBoundary) && !isAfter(today, endBoundary);
   const trackBackgroundColor =
     theme.palette.mode === 'light'
-      ? alpha(theme.palette.grey[100], 0.9)
-      : alpha(theme.palette.grey[900], 0.6);
+      ? alpha(theme.palette.common.white, 0.9)
+      : alpha(theme.palette.background.paper, 0.7);
   const axisBackgroundColor =
     theme.palette.mode === 'light'
       ? alpha(theme.palette.background.paper, 0.8)
       : alpha(theme.palette.background.default, 0.6);
   const weekendFill =
     theme.palette.mode === 'light'
-      ? alpha(theme.palette.grey[400], 0.25)
-      : alpha(theme.palette.grey[700], 0.35);
+      ? alpha(theme.palette.grey[300], 0.15)
+      : alpha(theme.palette.grey[700], 0.3);
 
   const roundedTrackWidth = Math.round(trackWidth);
   const timelineContainerWidth = mdUp
@@ -410,15 +418,34 @@ function DashboardTimelineChart({
   const renderLegend = () => (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 3 }}>
       {Object.entries(STATUS_COLOR_MAP).map(([status, paletteKey]) => (
-        <Box key={status} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          key={status}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 1.25,
+            py: 0.75,
+            borderRadius: 999,
+            border: '1px solid',
+            borderColor: alpha(theme.palette.divider, 0.2),
+            bgcolor: theme.palette.background.paper,
+            boxShadow:
+              theme.palette.mode === 'light'
+                ? '0 1px 3px rgba(15, 23, 42, 0.1)'
+                : '0 1px 3px rgba(0, 0, 0, 0.4)',
+          }}
+        >
           <Box
             sx={{
-              width: 12,
-              height: 12,
+              width: 8,
+              height: 8,
               borderRadius: '50%',
               bgcolor: paletteKey,
-              border: '1px solid',
-              borderColor: 'divider',
+              boxShadow:
+                theme.palette.mode === 'light'
+                  ? '0 0 0 2px rgba(255,255,255,0.85)'
+                  : '0 0 0 2px rgba(0,0,0,0.6)',
             }}
           />
           <Typography variant="caption" color="text.secondary">
@@ -469,6 +496,9 @@ function DashboardTimelineChart({
     parsedProjects.length,
   ]);
 
+  const visibleStartIndex = virtualizationMetrics.startIndex;
+  const visibleEndIndex = virtualizationMetrics.endIndex;
+
   const projectLayouts = useMemo<ProjectLayout[]>(() => {
     if (!parsedProjects.length) {
       return [];
@@ -479,8 +509,19 @@ function DashboardTimelineChart({
         .filter(Boolean)
         .join(' \u2022 ');
 
+    const startIndex = virtualizationEnabled ? visibleStartIndex : 0;
+    const endIndex = virtualizationEnabled ? visibleEndIndex : parsedProjects.length;
+
+    if (startIndex >= endIndex) {
+      return [];
+    }
+
+    const source = virtualizationEnabled
+      ? parsedProjects.slice(startIndex, endIndex)
+      : parsedProjects;
+
     if (startBoundaryTime === null) {
-      return parsedProjects.map((project) => {
+      return source.map((project) => {
         const reviewMarkers: ReviewMarker[] = [];
         project.reviews.forEach((review) => {
           const reviewDate = review.plannedDate ?? review.dueDate;
@@ -511,15 +552,15 @@ function DashboardTimelineChart({
       });
     }
 
-    return parsedProjects.map((project) => {
+    return source.map((project) => {
       const start = project.startDate;
       const end = project.endDate;
+      const startOffset = start ? getTimelineOffset(start) : null;
+      const endOffset = end ? getTimelineOffset(end) : null;
       let left = 0;
       let width = 0;
 
-      if (start && end) {
-        const startOffset = getTimelineOffset(start);
-        const endOffset = getTimelineOffset(end);
+      if (startOffset !== null && endOffset !== null) {
         left = Math.max(0, Math.min(Math.min(startOffset, endOffset), roundedTrackWidth));
         const rawInclusiveEnd = Math.max(startOffset, endOffset) + pixelsPerDay;
         const inclusiveEnd = Math.max(left, Math.min(rawInclusiveEnd, roundedTrackWidth));
@@ -568,16 +609,16 @@ function DashboardTimelineChart({
         reviewMarkers,
       };
     });
-  }, [parsedProjects, startBoundaryTime, pixelsPerDay, roundedTrackWidth, getTimelineOffset]);
-
-  const visibleProjectLayouts = useMemo(
-    () =>
-      projectLayouts.slice(
-        virtualizationMetrics.startIndex,
-        virtualizationMetrics.endIndex,
-      ),
-    [projectLayouts, virtualizationMetrics],
-  );
+  }, [
+    parsedProjects,
+    virtualizationEnabled,
+    visibleStartIndex,
+    visibleEndIndex,
+    startBoundaryTime,
+    pixelsPerDay,
+    roundedTrackWidth,
+    getTimelineOffset,
+  ]);
 
   const tickPositions = useMemo(
     () =>
@@ -601,6 +642,57 @@ function DashboardTimelineChart({
       addDays(startBoundary, index),
     );
   }, [startBoundary, totalDays]);
+
+  const monthSegments = useMemo(() => {
+    if (!daySequence.length) {
+      return [] as {
+        key: string;
+        label: string;
+        year: string;
+        showYear: boolean;
+        width: number;
+      }[];
+    }
+
+    const segments: {
+      key: string;
+      label: string;
+      year: string;
+      showYear: boolean;
+      width: number;
+    }[] = [];
+    let segmentStart = 0;
+    let currentKey = format(daySequence[0], 'yyyy-MM');
+
+    const pushSegment = (endIndex: number) => {
+      if (endIndex <= segmentStart) {
+        return;
+      }
+      const startDate = daySequence[segmentStart];
+      const dayCount = endIndex - segmentStart;
+      segments.push({
+        key: `${currentKey}-${segmentStart}`,
+        label: format(startDate, 'MMMM'),
+        year: format(startDate, 'yyyy'),
+        showYear:
+          segmentStart === 0 ||
+          startDate.getFullYear() !== daySequence[Math.max(segmentStart - 1, 0)].getFullYear(),
+        width: dayCount * pixelsPerDay,
+      });
+    };
+
+    daySequence.forEach((day, index) => {
+      const key = format(day, 'yyyy-MM');
+      if (key !== currentKey) {
+        pushSegment(index);
+        segmentStart = index;
+        currentKey = key;
+      }
+    });
+    pushSegment(daySequence.length);
+
+    return segments;
+  }, [daySequence, pixelsPerDay]);
 
   const isWeekend = (date: Date) => {
     const day = date.getDay();
@@ -701,17 +793,6 @@ function DashboardTimelineChart({
     );
   }
 
-  const axisLeftColumnSx = {
-    flex: `0 0 ${LEFT_COLUMN_WIDTH_PX}px`,
-    pr: 2,
-    py: 0.5,
-    position: 'sticky' as const,
-    left: 0,
-    zIndex: 2,
-    bgcolor: axisBackgroundColor,
-    backdropFilter: 'blur(4px)',
-  };
-
   const rowLeftColumnSx = {
     flex: `0 0 ${LEFT_COLUMN_WIDTH_PX}px`,
     pr: 2,
@@ -725,53 +806,52 @@ function DashboardTimelineChart({
     borderColor: alpha(theme.palette.divider, 0.6),
   };
 
-  const axisRow = (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', mb: 1.5, gap: 0 }}>
-      {mdUp && (
-        <Box sx={axisLeftColumnSx}>
-          <Typography variant='caption' color='text.secondary'>
-            Timeline
-          </Typography>
-        </Box>
-      )}
+  const monthHeaderRow = monthSegments.length > 0 && (
+    <Box sx={{ display: 'flex', gap: 0, mb: 1 }}>
+      {mdUp && <Box sx={{ flex: `0 0 ${LEFT_COLUMN_WIDTH_PX}px` }} />}
       <Box
         sx={{
-          position: 'relative',
-          height: 40,
+          display: 'flex',
           width: roundedTrackWidth,
-          bgcolor: axisBackgroundColor,
-          borderRadius: 20,
+          borderRadius: 12,
           border: '1px solid',
-          borderColor: alpha(theme.palette.divider, 0.5),
-          boxShadow:
-            theme.palette.mode === 'light'
-              ? 'inset 0 1px 0 rgba(255,255,255,0.8)'
-              : 'inset 0 1px 0 rgba(255,255,255,0.06)',
+          borderColor: alpha(theme.palette.divider, 0.25),
           overflow: 'hidden',
+          bgcolor:
+            theme.palette.mode === 'light'
+              ? alpha(theme.palette.common.white, 0.95)
+              : alpha(theme.palette.background.paper, 0.8),
         }}
       >
-        {tickPositions.map(({ date, left, iso }) => (
+        {monthSegments.map((segment, index) => (
           <Box
-            key={iso}
+            key={segment.key}
             sx={{
-              position: 'absolute',
-              left,
-              bottom: 4,
-              transform: 'translateX(-50%)',
+              flex: `0 0 ${segment.width}px`,
+              width: `${segment.width}px`,
+              minWidth: `${segment.width}px`,
+              px: 1.5,
+              py: 0.75,
+              borderRight: index === monthSegments.length - 1 ? 'none' : '1px solid',
+              borderColor: alpha(theme.palette.divider, 0.2),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               textAlign: 'center',
             }}
           >
-            <Typography variant='caption' color='text.secondary'>
-              {format(date, 'd MMM')}
-            </Typography>
-            <Box
+            <Typography
+              variant="caption"
               sx={{
-                width: 1,
-                height: 14,
-                bgcolor: 'divider',
-                mx: 'auto',
+                fontWeight: 600,
+                color: 'text.secondary',
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
               }}
-            />
+            >
+              {segment.label}
+              {segment.showYear ? ` ${segment.year}` : ''}
+            </Typography>
           </Box>
         ))}
       </Box>
@@ -805,7 +885,7 @@ function DashboardTimelineChart({
                 flex: `0 0 ${pixelsPerDay}px`,
                 width: `${pixelsPerDay}px`,
                 minWidth: `${pixelsPerDay}px`,
-                py: 0.5,
+                py: 0.75,
                 textAlign: 'center',
                 borderLeft: index === 0 ? 'none' : '1px solid',
                 borderColor: alpha(theme.palette.divider, 0.2),
@@ -843,11 +923,11 @@ function DashboardTimelineChart({
         </Typography>
 
         <Box sx={{ overflowX: 'auto', pb: 2 }} ref={scrollContainerRef}>
-          <Box sx={{ minWidth: timelineContainerWidth }}>
-            {axisRow}
-            {dayHeaderRow}
+        <Box sx={{ minWidth: timelineContainerWidth }}>
+          {monthHeaderRow}
+          {dayHeaderRow}
 
-            <Box
+          <Box
               ref={listContainerRef}
               sx={{
                 maxHeight: virtualizationEnabled ? '70vh' : 'none',
@@ -858,7 +938,7 @@ function DashboardTimelineChart({
               {virtualizationEnabled && virtualizationMetrics.paddingTop > 0 && (
                 <Box sx={{ height: virtualizationMetrics.paddingTop }} />
               )}
-              {visibleProjectLayouts.map(({ project, bar, rangeLabel, metaCompact, reviewMarkers }) => (
+              {projectLayouts.map(({ project, bar, rangeLabel, metaCompact, reviewMarkers }) => (
                 <Box
                   key={project.projectId}
                   sx={{
@@ -902,13 +982,13 @@ function DashboardTimelineChart({
                       width: `${roundedTrackWidth}px`,
                       minWidth: `${roundedTrackWidth}px`,
                       bgcolor: trackBackgroundColor,
-                      borderRadius: 14,
+                      borderRadius: 12,
                       border: '1px solid',
-                      borderColor: alpha(theme.palette.divider, 0.3),
+                      borderColor: alpha(theme.palette.divider, 0.18),
                       boxShadow:
                         theme.palette.mode === 'light'
-                          ? 'inset 0 1px 0 rgba(255,255,255,0.75)'
-                          : 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                          ? '0 1px 3px rgba(15, 23, 42, 0.12)'
+                          : '0 1px 3px rgba(0, 0, 0, 0.5)',
                       overflow: 'hidden',
                     }}
                   >
@@ -947,7 +1027,7 @@ function DashboardTimelineChart({
                           left: segment.left,
                           width: segment.width,
                           bgcolor: weekendFill,
-                          opacity: theme.palette.mode === 'light' ? 0.45 : 0.35,
+                          opacity: theme.palette.mode === 'light' ? 0.28 : 0.22,
                           pointerEvents: 'none',
                           zIndex: 1,
                         }}
@@ -958,14 +1038,22 @@ function DashboardTimelineChart({
                       <Box
                         sx={{
                           position: 'absolute',
-                          top: mdUp ? '50%' : '60%',
+                          top: mdUp ? '48%' : '62%',
                           left: bar.left,
                           width: bar.width,
                           transform: 'translateY(-50%)',
                           height: BAR_HEIGHT_PX,
-                          bgcolor: 'primary.main',
-                          opacity: 0.3,
+                          bgcolor: alpha(
+                            theme.palette.primary.main,
+                            theme.palette.mode === 'light' ? 0.25 : 0.35,
+                          ),
+                          border: '1px solid',
+                          borderColor: alpha(theme.palette.primary.main, 0.4),
                           borderRadius: 999,
+                          boxShadow:
+                            theme.palette.mode === 'light'
+                              ? '0 2px 6px rgba(15, 23, 42, 0.12)'
+                              : '0 2px 6px rgba(0, 0, 0, 0.5)',
                           zIndex: 3,
                         }}
                       />
@@ -1001,7 +1089,7 @@ function DashboardTimelineChart({
                           left,
                           width: 1,
                           bgcolor: 'divider',
-                          opacity: 0.3,
+                          opacity: 0.18,
                           pointerEvents: 'none',
                           zIndex: 2,
                         }}
@@ -1038,19 +1126,36 @@ function DashboardTimelineChart({
                         <Box
                           sx={{
                             position: 'absolute',
-                            top: mdUp ? '50%' : '70%',
+                            top: mdUp ? '48%' : '68%',
                             left: marker.left,
                             transform: 'translate(-50%, -50%)',
-                            width: MARKER_SIZE_PX,
-                            height: MARKER_SIZE_PX,
+                            width: 14,
+                            height: 14,
                             borderRadius: '50%',
-                            bgcolor: marker.colorKey,
+                            bgcolor: theme.palette.background.paper,
                             border: '2px solid',
-                            borderColor: theme.palette.background.paper,
-                            boxShadow: 1,
+                            borderColor: alpha(theme.palette.primary.main, 0.2),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow:
+                              theme.palette.mode === 'light'
+                                ? '0 2px 6px rgba(15, 23, 42, 0.18)'
+                                : '0 2px 8px rgba(0, 0, 0, 0.45)',
                             zIndex: 4,
                           }}
-                        />
+                        >
+                          <Box
+                            sx={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              bgcolor: marker.colorKey,
+                              boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                            }}
+                          >
+                          </Box>
+                        </Box>
                       </Tooltip>
                     ))}
                   </Box>

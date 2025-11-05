@@ -6,6 +6,8 @@ import type {
   FileServiceTemplate,
   FileServiceTemplatePayload,
   ApplyTemplateResult,
+  ServiceReview,
+  ReviewBillingResponse,
 } from '@/types/api';
 
 export interface ServiceTemplate {
@@ -40,21 +42,6 @@ export interface ProjectService {
   billing_progress_pct?: number;
   billed_amount?: number;
   agreed_fee_remaining?: number;
-}
-
-export interface ServiceReview {
-  review_id: number;
-  service_id: number;
-  cycle_no: number;
-  planned_date: string;
-  due_date?: string;
-  disciplines?: string;
-  deliverables?: string;
-  status: string;
-  weight_factor: number;
-  evidence_links?: string;
-  actual_issued_at?: string;
-  is_billed?: boolean;
 }
 
 export type ProjectServicesListResponse =
@@ -157,7 +144,12 @@ export const serviceReviewsApi = {
     deliverables?: string;
     status?: string;
     weight_factor?: number;
+    invoice_reference?: string;
     evidence_links?: string;
+    source_phase?: string;
+    billing_phase?: string;
+    billing_rate?: number;
+    billing_amount?: number;
     is_billed?: boolean;
   }) => apiClient.post<{ review_id: number }>(`/projects/${projectId}/services/${serviceId}/reviews`, data),
 
@@ -166,6 +158,14 @@ export const serviceReviewsApi = {
 
   delete: (projectId: number, serviceId: number, reviewId: number) =>
     apiClient.delete<{ success: boolean }>(`/projects/${projectId}/services/${serviceId}/reviews/${reviewId}`),
+
+  getBillingSummary: (
+    projectId: number,
+    params?: { start_date?: string; end_date?: string; date_field?: 'actual_issued_at' | 'planned_date' | 'due_date' },
+  ) =>
+    apiClient
+      .get<ReviewBillingResponse>(`/projects/${projectId}/review-billing`, { params })
+      .then((response) => response.data),
 };
 
 // Service Items API
