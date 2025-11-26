@@ -19,6 +19,8 @@ import type {
   ReviztoExtractionRunsResponse,
   StartReviztoExtractionRequest,
   StartReviztoExtractionResponse,
+  ReviztoStatusResponse,
+  ReviztoProjectsResponse,
   RevitHealthFilesResponse,
   RevitHealthSummary,
   ControlModelConfiguration,
@@ -125,47 +127,87 @@ export const controlModelsApi = {
 export const reviztoApi = {
   /**
    * Get Revizto extraction runs for a project (paginated)
-   * GET /api/projects/:project_id/revizto-extractions
+   * GET /api/revizto/extraction-runs
    */
   getExtractionRuns: async (
     page: number = 1,
     pageSize: number = 25,
     projectId?: number
   ): Promise<ReviztoExtractionRunsResponse> => {
-    // If projectId is provided, use project-scoped endpoint
-    const url = projectId
-      ? `/projects/${projectId}/revizto-extractions`
-      : `/revizto-extractions`;
-    const response = await apiClient.get<ReviztoExtractionRunsResponse>(url, {
-      params: { page, limit: pageSize },
+    // Backend currently exposes a global list with optional limit; no pagination support yet.
+    const response = await apiClient.get<{ runs: any[] }>(`/revizto/extraction-runs`, {
+      params: { limit: pageSize },
     });
-    return response.data;
+    const runs = (response.data?.runs ?? []).map((run, idx) => ({
+      id: run.id ?? idx + 1,
+      run_id: run.run_id,
+      project_id: run.project_id ?? projectId ?? null,
+      export_folder: run.export_folder ?? '',
+      start_time: run.start_time,
+      end_time: run.end_time,
+      status: run.status ?? 'unknown',
+      records_extracted: run.issues_extracted ?? run.records_extracted ?? 0,
+      error_message: run.error_message ?? null,
+      extracted_by: run.extracted_by ?? null,
+    }));
+    return {
+      runs,
+      total_count: runs.length,
+      page,
+      page_size: pageSize,
+    };
   },
 
   /**
    * Get last Revizto extraction run (global or project)
-   * GET /api/projects/:project_id/revizto-extractions/last
+   * GET /api/revizto/extraction-runs/last
    */
   getLastRun: async (projectId?: number): Promise<ReviztoExtractionRun> => {
-    const url = projectId
-      ? `/projects/${projectId}/revizto-extractions/last`
-      : `/revizto-extractions/last`;
-    const response = await apiClient.get<ReviztoExtractionRun>(url);
-    return response.data;
+    const response = await apiClient.get<any>(`/revizto/extraction-runs/last`);
+    const run = response.data || {};
+    return {
+      id: run.id ?? 1,
+      run_id: run.run_id ?? run.id ?? 'unknown',
+      project_id: run.project_id ?? projectId ?? null,
+      export_folder: run.export_folder ?? '',
+      start_time: run.start_time ?? '',
+      end_time: run.end_time ?? null,
+      status: run.status ?? 'unknown',
+      records_extracted: run.issues_extracted ?? run.records_extracted ?? 0,
+      error_message: run.error_message ?? null,
+      extracted_by: run.extracted_by ?? null,
+    };
   },
 
   /**
    * Start a new Revizto extraction run
-   * POST /api/projects/:project_id/revizto-extract
+   * POST /api/revizto/start-extraction
    */
   startExtraction: async (
     request: StartReviztoExtractionRequest
   ): Promise<StartReviztoExtractionResponse> => {
-    const projectId = request.project_id;
-    const url = projectId
-      ? `/projects/${projectId}/revizto-extract`
-      : `/revizto-extract`;
-    const response = await apiClient.post<StartReviztoExtractionResponse>(url, request);
+    const response = await apiClient.post<StartReviztoExtractionResponse>(
+      `/revizto/start-extraction`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Get Revizto exporter status (CLI passthrough)
+   * GET /api/revizto/status
+   */
+  getStatus: async (): Promise<ReviztoStatusResponse> => {
+    const response = await apiClient.get<ReviztoStatusResponse>(`/revizto/status`);
+    return response.data;
+  },
+
+  /**
+   * List Revizto projects from exporter (CLI passthrough)
+   * GET /api/revizto/projects
+   */
+  listProjects: async (): Promise<ReviztoProjectsResponse> => {
+    const response = await apiClient.get<ReviztoProjectsResponse>(`/revizto/projects`);
     return response.data;
   },
 };

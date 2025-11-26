@@ -266,6 +266,92 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('warehouse.usp_load_dim_project_alias', 'P') IS NOT NULL
+    DROP PROCEDURE warehouse.usp_load_dim_project_alias;
+GO
+
+CREATE PROCEDURE warehouse.usp_load_dim_project_alias
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF OBJECT_ID('tempdb..#alias_dedup') IS NOT NULL DROP TABLE #alias_dedup;
+
+    ;WITH latest AS (
+        SELECT
+            pa.pm_project_id,
+            pa.alias_name,
+            pa.alias_type,
+            ROW_NUMBER() OVER (
+                PARTITION BY pa.pm_project_id, pa.alias_name
+                ORDER BY pa.source_load_ts DESC
+            ) AS rn,
+            HASHBYTES(
+                'SHA2_256',
+                CONCAT_WS(
+                    '|',
+                    ISNULL(pa.alias_name, ''),
+                    ISNULL(pa.alias_type, ''),
+                    ISNULL(CONVERT(NVARCHAR(20), pa.pm_project_id), '')
+                )
+            ) AS row_hash
+        FROM stg.project_aliases pa
+    )
+    SELECT
+        l.pm_project_id,
+        l.alias_name,
+        l.alias_type,
+        l.row_hash,
+        proj.project_sk
+    INTO #alias_dedup
+    FROM latest l
+    JOIN dim.project proj
+         ON proj.project_bk = l.pm_project_id
+        AND proj.current_flag = 1
+    WHERE l.rn = 1;
+
+    UPDATE tgt
+    SET current_flag = 0,
+        effective_end = SYSUTCDATETIME()
+    FROM dim.project_alias tgt
+    JOIN #alias_dedup src
+      ON tgt.pm_project_id = src.pm_project_id
+     AND tgt.alias_name = src.alias_name
+     AND tgt.current_flag = 1
+    WHERE tgt.record_hash <> src.row_hash;
+
+    INSERT INTO dim.project_alias (
+        pm_project_id,
+        alias_name,
+        alias_type,
+        project_sk,
+        current_flag,
+        effective_start,
+        effective_end,
+        record_hash,
+        record_source
+    )
+    SELECT
+        src.pm_project_id,
+        src.alias_name,
+        src.alias_type,
+        src.project_sk,
+        1,
+        SYSUTCDATETIME(),
+        NULL,
+        src.row_hash,
+        'stg.project_aliases'
+    FROM #alias_dedup src
+    LEFT JOIN dim.project_alias tgt
+           ON tgt.pm_project_id = src.pm_project_id
+          AND tgt.alias_name = src.alias_name
+          AND tgt.current_flag = 1
+    WHERE tgt.project_alias_sk IS NULL OR tgt.record_hash <> src.row_hash;
+
+    DROP TABLE IF EXISTS #alias_dedup;
+END
+GO
+
 IF OBJECT_ID('warehouse.usp_load_dim_issue_category', 'P') IS NOT NULL
     DROP PROCEDURE warehouse.usp_load_dim_issue_category;
 GO
@@ -402,12 +488,13 @@ BEGIN
             i.author,
             i.created_at,
             i.closed_at,
-            COALESCE(p_id.project_sk, p_alias.project_sk, p_name.project_sk) AS project_sk,
+            COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk) AS project_sk,
             ac.issue_category_sk AS primary_category_sk,
             dc.issue_category_sk AS discipline_category_sk,
             HASHBYTES('SHA2_256',
                 CONCAT_WS('|',
                     ISNULL(i.project_id_raw, ''),
+                    ISNULL(CONVERT(NVARCHAR(20), COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk)), ''),
                     ISNULL(i.status, ''),
                     ISNULL(i.priority, ''),
                     ISNULL(i.title, ''),
@@ -423,11 +510,9 @@ BEGIN
      LEFT JOIN dim.project p_id
          ON p_id.project_bk = TRY_CONVERT(INT, i.project_id_raw)
         AND p_id.current_flag = 1
-     LEFT JOIN dbo.project_aliases pa
-         ON pa.alias_name = i.project_name
-     LEFT JOIN dim.project p_alias
-         ON p_alias.project_bk = pa.pm_project_id
-        AND p_alias.current_flag = 1
+     LEFT JOIN dim.project_alias palias
+         ON palias.alias_name = i.project_name
+        AND palias.current_flag = 1
      LEFT JOIN dim.project p_name
          ON p_name.project_name = i.project_name
         AND p_name.current_flag = 1
@@ -701,7 +786,8 @@ BEGIN
     LEFT JOIN stg.processed_issues proc_issue
            ON proc_issue.issue_id = issue.issue_bk
           AND proc_issue.source_system = issue.source_system
-    WHERE existing.issue_snapshot_sk IS NULL;
+    WHERE issue.current_flag = 1
+      AND existing.issue_snapshot_sk IS NULL;
 END
 GO
 
@@ -731,7 +817,8 @@ BEGIN
         issue.project_sk,
         'warehouse.usp_load_fact_issue_activity'
     FROM dim.issue issue
-    WHERE issue.closed_date_sk = CONVERT(INT, FORMAT(@Today, 'yyyyMMdd'))
+    WHERE issue.current_flag = 1
+      AND issue.closed_date_sk = CONVERT(INT, FORMAT(@Today, 'yyyyMMdd'))
       AND NOT EXISTS (
             SELECT 1
             FROM fact.issue_activity fa
@@ -883,10 +970,85 @@ BEGIN
 
     DECLARE @MonthStart DATE = CONVERT(DATE, CONVERT(VARCHAR(8), @MonthSk));
     DECLARE @MonthEnd DATE = EOMONTH(@MonthStart);
-    DECLARE @MonthStartSk INT = CONVERT(INT, FORMAT(@MonthStart, 'yyyyMMdd'));
-    DECLARE @MonthEndSk INT = CONVERT(INT, FORMAT(@MonthEnd, 'yyyyMMdd'));
+    DECLARE @Today DATE = CAST(GETDATE() AS DATE);
 
-    -- Start from all current projects, not just those with issues
+    DELETE FROM fact.project_kpi_monthly WHERE month_date_sk = @MonthSk;
+
+    ;WITH resolved_issues AS (
+        SELECT
+            CONCAT(vi.source, ':', vi.issue_id) AS issue_key,
+            COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk) AS project_sk,
+            UPPER(CONVERT(NVARCHAR(50), vi.status)) AS status,
+            UPPER(CONVERT(NVARCHAR(50), vi.priority)) AS priority,
+            vi.created_at,
+            vi.closed_at
+        FROM dbo.vw_ProjectManagement_AllIssues vi
+        LEFT JOIN dim.project p_id
+               ON p_id.project_bk = TRY_CONVERT(
+                    INT,
+                    CONVERT(NVARCHAR(50), vi.project_id)
+               )
+              AND p_id.current_flag = 1
+        LEFT JOIN dim.project_alias palias
+               ON palias.alias_name = vi.project_name
+              AND palias.current_flag = 1
+        LEFT JOIN dim.project p_name
+               ON p_name.project_name = vi.project_name
+              AND p_name.current_flag = 1
+        WHERE vi.issue_id IS NOT NULL
+    ),
+    issue_metrics AS (
+        SELECT
+            ri.project_sk,
+            COUNT(DISTINCT ri.issue_key) AS total_issues,
+            SUM(CASE WHEN ri.closed_at IS NULL OR CAST(ri.closed_at AS DATE) > @MonthEnd THEN 1 ELSE 0 END) AS open_issues,
+            SUM(CASE WHEN ri.closed_at IS NOT NULL AND CAST(ri.closed_at AS DATE) <= @MonthEnd THEN 1 ELSE 0 END) AS closed_issues,
+            SUM(CASE WHEN ri.priority IN ('CRITICAL','HIGH','URGENT') THEN 1 ELSE 0 END) AS high_priority_issues,
+            AVG(
+                CASE 
+                    WHEN ri.closed_at IS NOT NULL 
+                         AND ri.created_at IS NOT NULL 
+                         AND CAST(ri.closed_at AS DATE) >= CAST(ri.created_at AS DATE)
+                    THEN CONVERT(DECIMAL(18,4), DATEDIFF(DAY, ri.created_at, ri.closed_at))
+                END
+            ) AS avg_resolution_days
+        FROM resolved_issues ri
+        WHERE ri.project_sk IS NOT NULL
+          AND (ri.created_at IS NULL OR CAST(ri.created_at AS DATE) <= @MonthEnd)
+        GROUP BY ri.project_sk
+    ),
+    service_status AS (
+        SELECT
+            p.project_sk,
+            SUM(CASE WHEN LOWER(ps.status) = 'in_progress' THEN 1 ELSE 0 END) AS services_in_progress,
+            SUM(CASE WHEN LOWER(ps.status) = 'completed' THEN 1 ELSE 0 END) AS services_completed
+        FROM dim.project p
+        INNER JOIN dbo.ProjectServices ps
+            ON ps.project_id = p.project_bk
+        WHERE p.current_flag = 1
+        GROUP BY p.project_sk
+    ),
+    review_metrics AS (
+        SELECT
+            p.project_sk,
+            COUNT(sr.review_id) AS total_reviews,
+            SUM(CASE WHEN sr.status IN ('completed', 'report_issued', 'closed') THEN 1 ELSE 0 END) AS completed_reviews,
+            SUM(
+                CASE
+                    WHEN sr.status NOT IN ('completed', 'report_issued', 'closed')
+                         AND sr.due_date IS NOT NULL
+                         AND sr.due_date < @Today
+                    THEN 1 ELSE 0
+                END
+            ) AS overdue_reviews
+        FROM dim.project p
+        INNER JOIN dbo.ProjectServices ps
+            ON ps.project_id = p.project_bk
+        INNER JOIN dbo.ServiceReviews sr
+            ON sr.service_id = ps.service_id
+        WHERE p.current_flag = 1
+        GROUP BY p.project_sk
+    )
     INSERT INTO fact.project_kpi_monthly (
         project_sk, client_sk, project_type_sk, month_date_sk,
         total_issues, open_issues, closed_issues, high_priority_issues,
@@ -899,37 +1061,30 @@ BEGIN
         proj.client_sk,
         proj.project_type_sk,
         @MonthSk,
-        COUNT(DISTINCT snapshot.issue_sk) AS total_issues,
-        SUM(CASE WHEN snapshot.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
-        SUM(CASE WHEN snapshot.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
-        SUM(CASE WHEN snapshot.high_priority_flag = 1 THEN 1 ELSE 0 END) AS high_priority_issues,
-        AVG(CAST(snapshot.resolution_days AS DECIMAL(9,2))) AS avg_resolution_days,
-        COUNT(DISTINCT rc.review_cycle_sk) AS review_count,
-        SUM(CASE WHEN rc.status = 'completed' THEN 1 ELSE 0 END) AS completed_reviews,
-        SUM(CASE WHEN rc.status = 'overdue' THEN 1 ELSE 0 END) AS overdue_reviews,
-        SUM(CASE WHEN svc.status = 'in_progress' THEN 1 ELSE 0 END) AS services_in_progress,
-        SUM(CASE WHEN svc.status = 'completed' THEN 1 ELSE 0 END) AS services_completed,
+        ISNULL(im.total_issues, 0) AS total_issues,
+        ISNULL(im.open_issues, 0) AS open_issues,
+        ISNULL(im.closed_issues, 0) AS closed_issues,
+        ISNULL(im.high_priority_issues, 0) AS high_priority_issues,
+        CAST(im.avg_resolution_days AS DECIMAL(9,2)) AS avg_resolution_days,
+        MAX(ISNULL(rm.total_reviews, 0)) AS review_count,
+        MAX(ISNULL(rm.completed_reviews, 0)) AS completed_reviews,
+        MAX(ISNULL(rm.overdue_reviews, 0)) AS overdue_reviews,
+        MAX(ISNULL(ss.services_in_progress, 0)) AS services_in_progress,
+        MAX(ISNULL(ss.services_completed, 0)) AS services_completed,
         SUM(ISNULL(service_month.earned_value, 0)) AS earned_value,
         SUM(ISNULL(service_month.claimed_to_date, 0)) AS claimed_to_date,
         SUM(ISNULL(service_month.variance_fee, 0)) AS variance_fee,
         'warehouse.usp_load_fact_project_kpi_monthly'
     FROM dim.project proj
-    LEFT JOIN fact.issue_snapshot snapshot 
-           ON snapshot.project_sk = proj.project_sk
-          AND snapshot.snapshot_date_sk BETWEEN @MonthStartSk AND @MonthEndSk
-    LEFT JOIN dim.service svc ON svc.project_sk = proj.project_sk AND svc.current_flag = 1
+    LEFT JOIN issue_metrics im ON im.project_sk = proj.project_sk
+    LEFT JOIN service_status ss ON ss.project_sk = proj.project_sk
+    LEFT JOIN review_metrics rm ON rm.project_sk = proj.project_sk
     LEFT JOIN fact.service_monthly service_month
            ON service_month.project_sk = proj.project_sk
           AND service_month.month_date_sk = @MonthSk
-    LEFT JOIN dim.review_cycle rc ON rc.project_sk = proj.project_sk AND rc.current_flag = 1
     WHERE proj.current_flag = 1
-      AND NOT EXISTS (
-            SELECT 1
-            FROM fact.project_kpi_monthly existing
-            WHERE existing.project_sk = proj.project_sk
-              AND existing.month_date_sk = @MonthSk
-        )
-    GROUP BY proj.project_sk, proj.client_sk, proj.project_type_sk;
+    GROUP BY proj.project_sk, proj.client_sk, proj.project_type_sk, im.total_issues, im.open_issues,
+             im.closed_issues, im.high_priority_issues, im.avg_resolution_days;
 END
 GO
 

@@ -316,6 +316,7 @@ export interface ServiceItem {
   status: 'planned' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'critical';
   assigned_to?: string;
+  invoice_reference?: string;
   evidence_links?: string;
   notes?: string;
   created_at: string;

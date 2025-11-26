@@ -6,5 +6,6 @@
 export { ACCConnectorPanel } from './ACCConnectorPanel';
 export { ACCDataImportPanel } from './ACCDataImportPanel';
 export { ACCIssuesPanel } from './ACCIssuesPanel';
+export { ACCSyncPanel } from './ACCSyncPanel';
 export { ReviztoImportPanel } from './ReviztoImportPanel';
 export { RevitHealthPanel } from './RevitHealthPanel';

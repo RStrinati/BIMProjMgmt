@@ -986,14 +986,33 @@ def get_service_items(service_id, item_type=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            invoice_supported = _ensure_service_item_invoice_column(cursor)
             
+            columns = [
+                S.ServiceItems.ITEM_ID,
+                S.ServiceItems.SERVICE_ID,
+                S.ServiceItems.ITEM_TYPE,
+                S.ServiceItems.TITLE,
+                S.ServiceItems.DESCRIPTION,
+                S.ServiceItems.PLANNED_DATE,
+                S.ServiceItems.DUE_DATE,
+                S.ServiceItems.ACTUAL_DATE,
+                S.ServiceItems.STATUS,
+                S.ServiceItems.PRIORITY,
+                S.ServiceItems.ASSIGNED_TO,
+            ]
+            if invoice_supported:
+                columns.append(S.ServiceItems.INVOICE_REFERENCE)
+            columns.extend([
+                S.ServiceItems.EVIDENCE_LINKS,
+                S.ServiceItems.NOTES,
+                S.ServiceItems.CREATED_AT,
+                S.ServiceItems.UPDATED_AT,
+                S.ServiceItems.IS_BILLED,
+            ])
+
             query = f"""
-                SELECT {S.ServiceItems.ITEM_ID}, {S.ServiceItems.SERVICE_ID}, {S.ServiceItems.ITEM_TYPE},
-                       {S.ServiceItems.TITLE}, {S.ServiceItems.DESCRIPTION}, {S.ServiceItems.PLANNED_DATE},
-                       {S.ServiceItems.DUE_DATE}, {S.ServiceItems.ACTUAL_DATE}, {S.ServiceItems.STATUS},
-                       {S.ServiceItems.PRIORITY}, {S.ServiceItems.ASSIGNED_TO}, {S.ServiceItems.EVIDENCE_LINKS},
-                       {S.ServiceItems.NOTES}, {S.ServiceItems.CREATED_AT}, {S.ServiceItems.UPDATED_AT},
-                       {S.ServiceItems.IS_BILLED}
+                SELECT {', '.join(columns)}
                 FROM {S.ServiceItems.TABLE}
                 WHERE {S.ServiceItems.SERVICE_ID} = ?
             """
@@ -1010,23 +1029,48 @@ def get_service_items(service_id, item_type=None):
             
             items = []
             for row in rows:
+                idx = 0
+                item_id = row[idx]; idx += 1
+                service_id = row[idx]; idx += 1
+                item_type = row[idx]; idx += 1
+                title = row[idx]; idx += 1
+                description = row[idx]; idx += 1
+                planned_date = row[idx]; idx += 1
+                due_date = row[idx]; idx += 1
+                actual_date = row[idx]; idx += 1
+                status = row[idx]; idx += 1
+                priority = row[idx]; idx += 1
+                assigned_to = row[idx]; idx += 1
+
+                invoice_reference = None
+                if invoice_supported:
+                    invoice_reference = row[idx]
+                    idx += 1
+
+                evidence_links = row[idx]; idx += 1
+                notes = row[idx]; idx += 1
+                created_at = row[idx]; idx += 1
+                updated_at = row[idx]; idx += 1
+                is_billed_val = row[idx] if idx < len(row) else None
+
                 items.append({
-                    'item_id': row[0],
-                    'service_id': row[1],
-                    'item_type': row[2],
-                    'title': row[3],
-                    'description': row[4],
-                    'planned_date': row[5].isoformat() if row[5] else None,
-                    'due_date': row[6].isoformat() if row[6] else None,
-                    'actual_date': row[7].isoformat() if row[7] else None,
-                    'status': row[8],
-                    'priority': row[9],
-                    'assigned_to': row[10],
-                    'evidence_links': row[11],
-                    'notes': row[12],
-                    'created_at': row[13].isoformat() if row[13] else None,
-                    'updated_at': row[14].isoformat() if row[14] else None,
-                    'is_billed': bool(row[15]) if row[15] is not None else False,
+                    'item_id': item_id,
+                    'service_id': service_id,
+                    'item_type': item_type,
+                    'title': title,
+                    'description': description,
+                    'planned_date': planned_date.isoformat() if planned_date else None,
+                    'due_date': due_date.isoformat() if due_date else None,
+                    'actual_date': actual_date.isoformat() if actual_date else None,
+                    'status': status,
+                    'priority': priority,
+                    'assigned_to': assigned_to,
+                    'invoice_reference': invoice_reference,
+                    'evidence_links': evidence_links,
+                    'notes': notes,
+                    'created_at': created_at.isoformat() if created_at else None,
+                    'updated_at': updated_at.isoformat() if updated_at else None,
+                    'is_billed': bool(is_billed_val) if is_billed_val is not None else False,
                 })
             
             return items
@@ -1041,6 +1085,7 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            invoice_supported = _ensure_service_item_invoice_column(cursor)
             
             # Build dynamic insert query
             columns = [S.ServiceItems.SERVICE_ID, S.ServiceItems.ITEM_TYPE, S.ServiceItems.TITLE, 
@@ -1067,6 +1112,8 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
                 'notes': S.ServiceItems.NOTES,
                 'is_billed': S.ServiceItems.IS_BILLED
             }
+            if invoice_supported:
+                optional_fields['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
             
             for field, column in optional_fields.items():
                 if field in kwargs and kwargs[field] is not None:
@@ -1101,6 +1148,7 @@ def update_service_item(item_id, **kwargs):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            invoice_supported = _ensure_service_item_invoice_column(cursor)
             
             # Build dynamic update query
             updates = []
@@ -1121,6 +1169,8 @@ def update_service_item(item_id, **kwargs):
                 'notes': S.ServiceItems.NOTES,
                 'is_billed': S.ServiceItems.IS_BILLED
             }
+            if invoice_supported:
+                field_mappings['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
             
             for field, column in field_mappings.items():
                 if field in kwargs:
@@ -1248,6 +1298,7 @@ logger = logging.getLogger(__name__)
 _table_column_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
 _control_model_metadata_supported: Optional[bool] = None
 _service_review_billing_columns_ready: Optional[bool] = None
+_service_item_invoice_column_ready: Optional[bool] = None
 _SERVICE_REVIEW_BILLING_COLUMN_DEFINITIONS = [
     (S.ServiceReviews.SOURCE_PHASE, "NVARCHAR(200) NULL"),
     (S.ServiceReviews.BILLING_PHASE, "NVARCHAR(200) NULL"),
@@ -1328,6 +1379,42 @@ def _control_model_metadata_column_exists(conn) -> bool:
         logger.warning("Failed to inspect tblControlModels metadata column: %s", exc)
         _control_model_metadata_supported = False
     return bool(_control_model_metadata_supported)
+
+
+def _ensure_service_item_invoice_column(cursor) -> bool:
+    """
+    Ensure the ServiceItems table has the invoice_reference column.
+    Keeps backward compatibility when migrations have not been applied yet.
+    """
+    global _service_item_invoice_column_ready
+    if _service_item_invoice_column_ready is not None:
+        return _service_item_invoice_column_ready
+
+    table = S.ServiceItems.TABLE
+    column = S.ServiceItems.INVOICE_REFERENCE
+    try:
+        cursor.execute(f"SELECT {column} FROM {table} WHERE 1 = 0")
+        _service_item_invoice_column_ready = True
+        return True
+    except Exception:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD {column} NVARCHAR(200) NULL")
+            connection = getattr(cursor, 'connection', None)
+            if connection:
+                try:
+                    connection.commit()
+                except Exception:
+                    pass
+            _service_item_invoice_column_ready = True
+            return True
+        except Exception as exc:
+            message = str(exc).lower()
+            if 'duplicate' in message or 'exists' in message or 'already' in message:
+                _service_item_invoice_column_ready = True
+                return True
+            logger.warning("Invoice reference column unavailable on ServiceItems: %s", exc)
+            _service_item_invoice_column_ready = False
+            return False
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""

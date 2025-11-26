@@ -202,6 +202,21 @@ BEGIN
 END
 GO
 
+/* PROJECT ALIASES */
+IF OBJECT_ID('stg.project_aliases', 'U') IS NULL
+BEGIN
+    CREATE TABLE stg.project_aliases (
+        pm_project_id    INT           NOT NULL,
+        alias_name       NVARCHAR(510) NOT NULL,
+        alias_type       NVARCHAR(100) NULL, -- optional classifier (name, code, legacy_id, etc.)
+        record_source    NVARCHAR(50)  NOT NULL,
+        source_load_ts   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        record_hash      BINARY(32)    NULL,
+        CONSTRAINT pk_stg_project_aliases PRIMARY KEY (pm_project_id, alias_name, source_load_ts)
+    );
+END
+GO
+
 /* ISSUE CATEGORY LOOKUP */
 IF OBJECT_ID('stg.issue_categories', 'U') IS NULL
 BEGIN

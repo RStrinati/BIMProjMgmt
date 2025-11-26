@@ -13,7 +13,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Dict, Iterable, List, Optional, Sequence
 
 import pyodbc  # type: ignore
@@ -56,10 +56,14 @@ class WarehousePipeline:
         with get_db_connection(self.warehouse_db) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO ctl.etl_run (pipeline_name, status) VALUES (?, ?)",
+                """
+                INSERT INTO ctl.etl_run (pipeline_name, status)
+                OUTPUT INSERTED.run_id
+                VALUES (?, ?)
+                """,
                 (self.pipeline_name, "running"),
             )
-            self._current_run_id = cursor.execute("SELECT SCOPE_IDENTITY()").fetchone()[0]
+            self._current_run_id = cursor.fetchone()[0]
             conn.commit()
         logger.info("Started ETL run id=%s", self._current_run_id)
 
@@ -461,30 +465,30 @@ class WarehousePipeline:
                 weight_factor,
                 evidence_links,
                 last_updated_at
-            FROM vw_ServiceReviews_WithAudit -- assumed helper view with last_updated_at
+            FROM vw_ServiceReviews_WithAudit
             WHERE last_updated_at IS NOT NULL AND last_updated_at > ?
         """
-        try:
+        fallback_query = """
+            SELECT
+                review_id,
+                service_id,
+                cycle_no,
+                planned_date,
+                due_date,
+                actual_issued_at,
+                status,
+                disciplines,
+                deliverables,
+                weight_factor,
+                evidence_links,
+                COALESCE(actual_issued_at, planned_date) AS last_updated_at
+            FROM ServiceReviews
+            WHERE COALESCE(actual_issued_at, planned_date) > ?
+        """
+
+        if self._source_object_exists("vw_ServiceReviews_WithAudit", "V"):
             rows = self._fetch_source_rows(select_query, watermark)
-        except pyodbc.ProgrammingError:
-            # fallback if helper view doesn't exist
-            fallback_query = """
-                SELECT
-                    review_id,
-                    service_id,
-                    cycle_no,
-                    planned_date,
-                    due_date,
-                    actual_issued_at,
-                    status,
-                    disciplines,
-                    deliverables,
-                    weight_factor,
-                    evidence_links,
-                    COALESCE(actual_issued_at, planned_date) AS last_updated_at
-                FROM ServiceReviews
-                WHERE COALESCE(actual_issued_at, planned_date) > ?
-            """
+        else:
             rows = self._fetch_source_rows(fallback_query, watermark)
 
         if not rows:
@@ -505,24 +509,98 @@ class WarehousePipeline:
                 row.review_id,
                 row.service_id,
                 row.cycle_no,
-                row.planned_date,
-                row.due_date,
-                row.actual_issued_at,
+                self._safe_datetime(row.planned_date),
+                self._safe_datetime(row.due_date),
+                self._safe_datetime(row.actual_issued_at),
                 row.status,
                 row.disciplines,
                 row.deliverables,
                 row.weight_factor,
                 row.evidence_links,
-                row.last_updated_at,
+                self._safe_datetime(getattr(row, "last_updated_at", None))
+                or self._safe_datetime(row.actual_issued_at)
+                or self._safe_datetime(row.planned_date),
                 record_source,
             )
             for row in rows
         ]
 
         self._bulk_insert(insert_sql, insert_rows)
-        latest = max(row.last_updated_at for row in rows if row.last_updated_at is not None)
+        latest_candidates = [
+            self._safe_datetime(getattr(row, "last_updated_at", None))
+            or self._safe_datetime(row.actual_issued_at)
+            or self._safe_datetime(row.planned_date)
+            for row in rows
+        ]
+        latest = max(candidate for candidate in latest_candidates if candidate is not None)
         self._set_watermark(process, source_object, latest, len(rows))
         logger.info("Loaded %s service reviews.", len(rows))
+        return len(rows)
+
+    def load_staging_project_aliases(self) -> int:
+        """Load project alias mappings to support dim.project resolution."""
+        process = "stg_project_aliases"
+        source_object = "dbo.project_aliases"
+        watermark = self._get_watermark(process, source_object)
+        logger.info("Loading project aliases (watermark=%s)", watermark.isoformat())
+
+        table_name = "dbo.project_aliases"
+        has_created_at = self._source_column_exists(table_name, "created_at")
+        has_alias_type = self._source_column_exists(table_name, "alias_type")
+        alias_type_select = "alias_type" if has_alias_type else "NULL AS alias_type"
+
+        if has_created_at:
+            select_query = f"""
+                SELECT
+                    pm_project_id,
+                    alias_name,
+                    {alias_type_select},
+                    created_at
+                FROM {table_name}
+                WHERE created_at IS NOT NULL AND created_at > ?
+            """
+            rows = self._fetch_source_rows(select_query, watermark)
+        else:
+            select_query = f"""
+                SELECT
+                    pm_project_id,
+                    alias_name,
+                    {alias_type_select}
+                FROM {table_name}
+            """
+            rows = self._fetch_source_rows(select_query)
+
+        if not rows:
+            logger.info("No alias changes detected.")
+            return 0
+
+        insert_sql = """
+            INSERT INTO stg.project_aliases (
+                pm_project_id,
+                alias_name,
+                alias_type,
+                record_source,
+                source_load_ts
+            ) VALUES (?, ?, ?, ?, SYSUTCDATETIME())
+        """
+        record_source = "dbo.project_aliases"
+        insert_rows = [
+            (
+                row.pm_project_id,
+                row.alias_name,
+                getattr(row, "alias_type", None),
+                record_source,
+            )
+            for row in rows
+        ]
+        self._bulk_insert(insert_sql, insert_rows)
+
+        if has_created_at:
+            latest = max(row.created_at for row in rows if row.created_at is not None)
+        else:
+            latest = datetime.now(timezone.utc)
+        self._set_watermark(process, source_object, latest, len(rows))
+        logger.info("Loaded %s project aliases.", len(rows))
         return len(rows)
 
     # ------------------------------------------------------------------
@@ -541,6 +619,7 @@ class WarehousePipeline:
             "EXEC warehouse.usp_load_dim_client",
             "EXEC warehouse.usp_load_dim_project_type",
             "EXEC warehouse.usp_load_dim_project",
+            "EXEC warehouse.usp_load_dim_project_alias",
             "EXEC warehouse.usp_load_dim_issue_category",
             "EXEC warehouse.usp_load_dim_user",
             "EXEC warehouse.usp_load_dim_issue",
@@ -635,6 +714,60 @@ class WarehousePipeline:
             cursor.execute(query, params)
             return cursor.fetchall()
 
+    @staticmethod
+    def _safe_datetime(value: Optional[object]) -> Optional[datetime]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value if value.year >= 1900 else None
+        from datetime import date
+
+        if isinstance(value, date):
+            try:
+                candidate = datetime.combine(value, datetime.min.time())
+                return candidate if candidate.year >= 1900 else None
+            except ValueError:
+                return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if parsed.year < 1900:
+                return None
+            return parsed
+        except (ValueError, TypeError):
+            return None
+
+    def _source_object_exists(self, object_name: str, object_type: Optional[str] = None) -> bool:
+        query = """
+            SELECT 1
+            FROM sys.objects
+            WHERE object_id = OBJECT_ID(?)
+        """
+        params: List[object] = [object_name]
+        if object_type:
+            query += " AND type = ?"
+            params.append(object_type)
+        with get_db_connection(self.source_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return cursor.fetchone() is not None
+
+    def _source_column_exists(self, table_name: str, column_name: str) -> bool:
+        if "." in table_name:
+            schema_name, base_table = table_name.split(".", 1)
+        else:
+            schema_name, base_table = "dbo", table_name
+        query = """
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = ?
+        """
+        with get_db_connection(self.source_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (schema_name, base_table, column_name))
+            return cursor.fetchone() is not None
+
     def _bulk_insert(self, insert_sql: str, rows: Iterable[tuple]) -> None:
         with get_db_connection(self.warehouse_db) as conn:
             cursor = conn.cursor()
@@ -644,9 +777,20 @@ class WarehousePipeline:
             try:
                 cursor.fast_executemany = True
                 cursor.executemany(insert_sql, batch)
-            except pyodbc.ProgrammingError:
+            except (pyodbc.ProgrammingError, pyodbc.DataError) as exc:
+                logger.warning("Bulk insert fallback due to %s: %s", type(exc).__name__, exc)
                 cursor.fast_executemany = False
-                cursor.executemany(insert_sql, batch)
+                for idx, row in enumerate(batch):
+                    try:
+                        cursor.execute(insert_sql, row)
+                    except (pyodbc.ProgrammingError, pyodbc.DataError) as row_exc:
+                        logger.error(
+                            "Failed to insert row %s into staging: %s | values=%s",
+                            idx,
+                            row_exc,
+                            row,
+                        )
+                        raise
             conn.commit()
 
     @staticmethod
@@ -670,6 +814,7 @@ class WarehousePipeline:
                 "projects": self.load_staging_projects(),
                 "services": self.load_staging_services(),
                 "service_reviews": self.load_staging_service_reviews(),
+                "project_aliases": self.load_staging_project_aliases(),
             }
             logger.info("Staging summary: %s", staged_counts)
 

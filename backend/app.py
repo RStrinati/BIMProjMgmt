@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+import subprocess
 from pathlib import Path
 from datetime import date, datetime
 from decimal import Decimal
@@ -16,7 +17,14 @@ from flask import Flask, jsonify, request
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 
-from config import ACC_SERVICE_TOKEN, ACC_SERVICE_URL, REVIZTO_SERVICE_TOKEN, REVIZTO_SERVICE_URL
+from config import (
+    ACC_SERVICE_TOKEN,
+    ACC_SERVICE_URL,
+    APS_AUTH_LOGIN_PATH,
+    APS_AUTH_SERVICE_URL,
+    REVIZTO_SERVICE_TOKEN,
+    REVIZTO_SERVICE_URL,
+)
 
 from database import (  # noqa: E402
     add_bookmark,
@@ -56,6 +64,7 @@ from database import (  # noqa: E402
     get_review_summary,
     get_review_tasks,
     get_revizto_extraction_runs,
+    complete_revizto_extraction_run,
     get_service_reviews,
     get_service_review_billing,
     get_service_templates,
@@ -96,6 +105,81 @@ from constants import schema as S  # noqa: E402
 from review_validation import ValidationError, validate_template  # noqa: E402
 from review_management_service import ReviewManagementService  # noqa: E402
 from services.project_alias_service import ProjectAliasManager  # noqa: E402
+
+
+# --- Revizto utility helpers ---
+
+def _find_revizto_exporter():
+    """Locate the Revizto exporter executable and return (path, searched_paths)."""
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    possible_paths = [
+        # New packaged locations (preferred)
+        os.path.join(project_root, "services", "revizto-dotnet", "publish", "ReviztoDataExporter.exe"),
+        os.path.join(project_root, "services", "revizto-dotnet", "bin", "Debug", "net9.0-windows", "win-x64", "ReviztoDataExporter.exe"),
+        # Legacy/tooling fallback
+        os.path.join(project_root, "tools", "ReviztoDataExporter.exe"),
+        # Standard Windows installs
+        r"C:\Program Files\Revizto\DataExporter\ReviztoDataExporter.exe",
+        r"C:\Program Files (x86)\Revizto\DataExporter\ReviztoDataExporter.exe",
+        r"C:\Revizto\DataExporter\ReviztoDataExporter.exe",
+    ]
+
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path, possible_paths
+    return None, possible_paths
+
+
+def _run_revizto_cli(exe_path, cli_args, timeout=900):
+    """Run the Revizto exporter in CLI mode and capture parsed JSON plus raw output."""
+    try:
+        command = [exe_path] + cli_args
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(exe_path),
+            timeout=timeout,
+        )
+
+        parsed = None
+        parse_error = None
+        stdout = (completed.stdout or "").strip()
+        if stdout:
+            # Try to parse the last JSON-looking line first to tolerate banner text
+            for line in reversed(stdout.splitlines()):
+                stripped = line.strip()
+                if stripped.startswith("{") and stripped.endswith("}"):
+                    try:
+                        parsed = json.loads(stripped)
+                        break
+                    except Exception:
+                        continue
+            if parsed is None:
+                try:
+                    parsed = json.loads(stdout)
+                except Exception as exc:  # noqa: BLE001 - need to surface parse failures
+                    parse_error = str(exc)
+
+        return {
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout": stdout,
+            "stderr": (completed.stderr or "").strip(),
+            "parsed": parsed,
+            "parse_error": parse_error,
+        }
+    except Exception as exc:  # noqa: BLE001 - capture and bubble up unexpected errors
+        logging.exception("Error running Revizto CLI")
+        return {
+            "command": cli_args,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": str(exc),
+            "parsed": None,
+            "parse_error": str(exc),
+        }
+
 
 def _extract_project_payload(body):
     """Extract and normalize project payload from request body."""
@@ -2435,6 +2519,86 @@ def get_acc_data_import_logs_endpoint(project_id):
         return jsonify({'error': str(e)}), 500
 
 
+# --- ACC Sync (APS Auth Demo) ---
+
+def _call_aps_service(path, method="get", params=None, json_body=None):
+    """Proxy helper to the APS auth demo service."""
+    base_url = APS_AUTH_SERVICE_URL.rstrip('/')
+    url = f"{base_url}/{path.lstrip('/')}"
+    try:
+        response = requests.request(
+            method,
+            url,
+            params=params,
+            json=json_body,
+            timeout=30,
+        )
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {"raw": response.text or ""}
+        return response.status_code, payload
+    except Exception as exc:
+        logging.exception("Error calling APS auth service")
+        return 502, {"error": "APS auth service unavailable", "details": str(exc)}
+
+
+@app.route('/api/aps-sync/login-url', methods=['GET'])
+def get_aps_sync_login_url():
+    """Expose the APS login URL used by the auth demo service."""
+    login_path = request.args.get('path') or APS_AUTH_LOGIN_PATH or '/login-pkce'
+    base_url = APS_AUTH_SERVICE_URL.rstrip('/')
+    login_url = f"{base_url}/{login_path.lstrip('/')}"
+    return jsonify({
+        "login_url": login_url,
+        "service_base": base_url,
+        "flow": "pkce" if "pkce" in login_path.lower() else "3-legged",
+        "note": "Opens Autodesk sign-in via aps-auth-demo service; keep this window open during login."
+    })
+
+
+@app.route('/api/aps-sync/hubs', methods=['GET'])
+def get_aps_sync_hubs():
+    """List hubs available to the currently authenticated APS user."""
+    status_code, payload = _call_aps_service('my-hubs')
+
+    # If user-token call failed, fall back to generic hubs endpoint
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service('hubs')
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": "Failed to fetch hubs from APS service",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+
+    return jsonify(payload)
+
+
+@app.route('/api/aps-sync/hubs/<path:hub_id>/projects', methods=['GET'])
+def get_aps_sync_projects(hub_id):
+    """List projects for a hub using APS auth demo service."""
+    status_code, payload = _call_aps_service(f"my-projects/{hub_id}")
+
+    # Fall back to app-token project listing if user token is missing
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service(f"projects/{hub_id}")
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": f"Failed to fetch projects for hub {hub_id}",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+
+    return jsonify(payload)
+
+
 # --- ACC Issues Display (Query acc_data_schema) ---
 
 @app.route('/api/projects/<int:project_id>/acc-issues', methods=['GET'])
@@ -2651,21 +2815,122 @@ def start_revizto_extraction():
         body = request.get_json() or {}
         export_folder = body.get('export_folder')
         notes = body.get('notes', '')
-        
-        run_id = start_revizto_extraction_run(export_folder, notes)
-        
-        if run_id:
+
+        app_path, searched_paths = _find_revizto_exporter()
+        if not app_path:
             return jsonify({
-                'success': True,
-                'run_id': run_id,
-                'export_folder': export_folder,
-                'notes': notes
-            })
-        else:
+                'error': 'Revizto Data Exporter not found',
+                'searched_paths': searched_paths
+            }), 404
+
+        if not export_folder:
+            export_folder = os.path.join(os.path.dirname(app_path), "Exports")
+        os.makedirs(export_folder, exist_ok=True)
+
+        run_id = start_revizto_extraction_run(export_folder, notes)
+        if not run_id:
             return jsonify({'error': 'Failed to start extraction'}), 500
+
+        # Kick off CLI refresh then export-all. This runs synchronously so we can record completion.
+        refresh_result = _run_revizto_cli(app_path, ["refresh"])
+        export_args = ["export-all"]
+        if export_folder:
+            export_args.append(export_folder)
+        export_result = _run_revizto_cli(app_path, export_args)
+
+        export_parsed = export_result.get("parsed") or {}
+        projects_exported = 0
+        try:
+            if isinstance(export_parsed, dict):
+                projects_exported = (
+                    export_parsed.get("successfulExports")
+                    or (len(export_parsed.get("results", []) or []))
+                    or 0
+                )
+        except Exception:
+            projects_exported = 0
+
+        overall_success = (
+            refresh_result.get("returncode") == 0
+            and export_result.get("returncode") == 0
+            and (not isinstance(export_parsed, dict) or export_parsed.get("success", True))
+        )
+        status_value = 'completed' if overall_success else 'failed'
+
+        complete_revizto_extraction_run(
+            run_id,
+            projects_extracted=projects_exported,
+            issues_extracted=0,
+            licenses_extracted=0,
+            status=status_value
+        )
+
+        return jsonify({
+            'success': overall_success,
+            'run_id': run_id,
+            'status': status_value,
+            'export_folder': export_folder,
+            'notes': notes,
+            'refresh': refresh_result,
+            'export': export_result,
+        })
             
     except Exception as e:
         logging.exception("Error starting Revizto extraction")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/revizto/status', methods=['GET'])
+def get_revizto_status_cli():
+    """Get Revizto exporter status via CLI."""
+    try:
+        app_path, searched_paths = _find_revizto_exporter()
+        if not app_path:
+            return jsonify({
+                'error': 'Revizto Data Exporter not found',
+                'searched_paths': searched_paths
+            }), 404
+
+        status_result = _run_revizto_cli(app_path, ["status"])
+        if status_result.get("returncode") != 0:
+            return jsonify({
+                'error': 'Revizto status command failed',
+                'result': status_result
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'result': status_result
+        })
+    except Exception as e:
+        logging.exception("Error getting Revizto status")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/revizto/projects', methods=['GET'])
+def list_revizto_projects_cli():
+    """List Revizto projects via CLI (JSON passthrough)."""
+    try:
+        app_path, searched_paths = _find_revizto_exporter()
+        if not app_path:
+            return jsonify({
+                'error': 'Revizto Data Exporter not found',
+                'searched_paths': searched_paths
+            }), 404
+
+        projects_result = _run_revizto_cli(app_path, ["list-projects"])
+        if projects_result.get("returncode") != 0:
+            return jsonify({
+                'error': 'Revizto list-projects command failed',
+                'result': projects_result
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'result': projects_result
+        })
+    except Exception as e:
+        logging.exception("Error listing Revizto projects")
         return jsonify({'error': str(e)}), 500
 
 
@@ -3063,39 +3328,21 @@ def launch_application():
 def launch_revizto_exporter():
     """Launch Revizto Data Exporter application"""
     try:
-        # Common installation paths for Revizto Data Exporter
-        # Get project root (one level up from backend)
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        possible_paths = [
-            # Local development path (same as Tkinter app)
-            os.path.join(project_root, "tools", "ReviztoDataExporter.exe"),
-            # Local development path alternative
-            os.path.join(project_root, "services", "revizto-dotnet", "ReviztoDataExporter", "bin", "Debug", "net9.0-windows", "win-x64", "ReviztoDataExporter.exe"),
-            # Standard installation paths
-            r"C:\Program Files\Revizto\DataExporter\ReviztoDataExporter.exe",
-            r"C:\Program Files (x86)\Revizto\DataExporter\ReviztoDataExporter.exe",
-            r"C:\Revizto\DataExporter\ReviztoDataExporter.exe",
-        ]
-        
         # Check for custom path in request
         body = request.get_json() or {}
         custom_path = body.get('app_path')
-        
+
+        app_path, searched_paths = _find_revizto_exporter()
         if custom_path:
-            possible_paths.insert(0, custom_path)
-        
-        # Find the executable
-        app_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                app_path = path
-                break
-        
+            if os.path.exists(custom_path):
+                app_path = custom_path
+            else:
+                searched_paths.insert(0, custom_path)
+
         if not app_path:
             return jsonify({
                 'error': 'Revizto Data Exporter not found',
-                'searched_paths': possible_paths,
+                'searched_paths': searched_paths,
                 'message': 'Please install Revizto Data Exporter or provide the path in the request'
             }), 404
         
@@ -3191,6 +3438,7 @@ def api_create_service_item(project_id, service_id):
             status=data.get('status', 'planned'),
             priority=data.get('priority', 'medium'),
             assigned_to=data.get('assigned_to'),
+            invoice_reference=data.get('invoice_reference'),
             evidence_links=data.get('evidence_links'),
             notes=data.get('notes'),
             is_billed=data.get('is_billed')

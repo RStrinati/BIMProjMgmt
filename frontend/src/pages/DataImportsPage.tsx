@@ -32,12 +32,14 @@ import {
   AccountTree as ReviztoIcon,
   HealthAndSafety as HealthIcon,
   FolderOpen as ProjectIcon,
+  SyncAlt as SyncIcon,
 } from '@mui/icons-material';
 import { projectsApi } from '@/api/projects';
 import { ACCConnectorPanel } from '@/components/dataImports/ACCConnectorPanel';
 import { ACCDataImportPanel } from '@/components/dataImports/ACCDataImportPanel';
 import { ReviztoImportPanel } from '@/components/dataImports/ReviztoImportPanel';
 import { RevitHealthPanel } from '@/components/dataImports/RevitHealthPanel';
+import { ACCSyncPanel } from '@/components/dataImports/ACCSyncPanel';
 import type { Project } from '@/types/api';
 
 interface TabPanelProps {
@@ -253,6 +255,12 @@ const DataImportsPage: React.FC = () => {
           }}
         >
           <Tab
+            icon={<SyncIcon />}
+            iconPosition="start"
+            label="ACC Sync"
+            sx={{ textTransform: 'none' }}
+          />
+          <Tab
             icon={<CloudDownloadIcon />}
             iconPosition="start"
             label="ACC Desktop Connector"
@@ -282,15 +290,18 @@ const DataImportsPage: React.FC = () => {
         {effectiveProjectId ? (
           <>
             <TabPanel value={tabValue} index={0}>
-              <ACCConnectorPanel projectId={effectiveProjectId} projectName={project?.project_name} />
+              <ACCSyncPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
             <TabPanel value={tabValue} index={1}>
-              <ACCDataImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
+              <ACCConnectorPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
             <TabPanel value={tabValue} index={2}>
-              <ReviztoImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
+              <ACCDataImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
             <TabPanel value={tabValue} index={3}>
+              <ReviztoImportPanel projectId={effectiveProjectId} projectName={project?.project_name} />
+            </TabPanel>
+            <TabPanel value={tabValue} index={4}>
               <RevitHealthPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
           </>

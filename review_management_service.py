@@ -592,6 +592,8 @@ class ReviewManagementService:
 
                 assigned_to   NVARCHAR(100) NULL,
 
+                invoice_reference NVARCHAR(200) NULL,  -- invoice number or shared folder link
+
                 evidence_links NVARCHAR(MAX) NULL,  -- JSON array of links
 
                 notes         NVARCHAR(MAX) NULL,

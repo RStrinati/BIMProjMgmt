@@ -24,21 +24,6 @@ BEGIN
 END
 GO
 
-/* REVIEW TO ISSUE BRIDGE */
-IF OBJECT_ID('brg.review_issue', 'U') IS NULL
-BEGIN
-    CREATE TABLE brg.review_issue (
-        review_cycle_sk INT        NOT NULL,
-        issue_sk        INT        NOT NULL,
-        relationship    NVARCHAR(32) NOT NULL, -- created_within_window / closed_after_review / referenced
-        window_start_sk INT        NULL,
-        window_end_sk   INT        NULL,
-        load_ts         DATETIME2  NOT NULL DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT pk_brg_review_issue PRIMARY KEY (review_cycle_sk, issue_sk, relationship)
-    );
-END
-GO
-
 /* SERVICE STAGE BRIDGE */
 IF OBJECT_ID('brg.service_stage', 'U') IS NULL
 BEGIN

@@ -183,6 +183,7 @@ export const serviceItemsApi = {
     status?: string;
     priority?: string;
     assigned_to?: string;
+    invoice_reference?: string;
     evidence_links?: string;
     notes?: string;
     is_billed?: boolean;

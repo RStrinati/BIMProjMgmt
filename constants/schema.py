@@ -795,6 +795,7 @@ class ServiceItems:
     STATUS = "status"  # 'planned', 'in_progress', 'completed', 'overdue', 'cancelled'
     PRIORITY = "priority"  # 'low', 'medium', 'high', 'critical'
     ASSIGNED_TO = "assigned_to"
+    INVOICE_REFERENCE = "invoice_reference"
     EVIDENCE_LINKS = "evidence_links"
     NOTES = "notes"
     CREATED_AT = "created_at"

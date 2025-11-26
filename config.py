@@ -25,6 +25,8 @@ class Config:
     # External Service Endpoints
     ACC_SERVICE_URL = os.getenv("ACC_SERVICE_URL", "http://localhost:4000/api/v1")
     REVIZTO_SERVICE_URL = os.getenv("REVIZTO_SERVICE_URL", "http://localhost:5000/api/v1")
+    APS_AUTH_SERVICE_URL = os.getenv("APS_AUTH_SERVICE_URL", "http://localhost:3000")
+    APS_AUTH_LOGIN_PATH = os.getenv("APS_AUTH_LOGIN_PATH", "/login-pkce")
 
     # Service Auth Tokens (managed by token broker)
     ACC_SERVICE_TOKEN = os.getenv("ACC_SERVICE_TOKEN", "")
@@ -45,3 +47,5 @@ ACC_SERVICE_URL = Config.ACC_SERVICE_URL
 REVIZTO_SERVICE_URL = Config.REVIZTO_SERVICE_URL
 ACC_SERVICE_TOKEN = Config.ACC_SERVICE_TOKEN
 REVIZTO_SERVICE_TOKEN = Config.REVIZTO_SERVICE_TOKEN
+APS_AUTH_SERVICE_URL = Config.APS_AUTH_SERVICE_URL
+APS_AUTH_LOGIN_PATH = Config.APS_AUTH_LOGIN_PATH

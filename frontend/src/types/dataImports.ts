@@ -172,6 +172,25 @@ export interface StartReviztoExtractionResponse {
   export_folder: string;
 }
 
+export interface ReviztoCliResult {
+  command: string[];
+  returncode: number;
+  stdout: string;
+  stderr: string;
+  parsed?: any;
+  parse_error?: string | null;
+}
+
+export interface ReviztoStatusResponse {
+  success: boolean;
+  result: ReviztoCliResult;
+}
+
+export interface ReviztoProjectsResponse {
+  success: boolean;
+  result: ReviztoCliResult;
+}
+
 // ============================================================================
 // Revit Health Check Types
 // ============================================================================

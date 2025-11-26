@@ -482,6 +482,7 @@ function ServiceRow({
                         <TableCell>Due Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Priority</TableCell>
+                        <TableCell>Invoice / Folder</TableCell>
                         <TableCell>Billed</TableCell>
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
@@ -527,6 +528,7 @@ function ServiceRow({
                               size="small"
                             />
                           </TableCell>
+                          <TableCell>{renderInvoiceReference(item.invoice_reference)}</TableCell>
                           <TableCell>
                             <Chip
                               label={item.is_billed ? 'Yes' : 'No'}
@@ -608,6 +610,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     status: 'planned',
     priority: 'medium',
     assigned_to: '',
+    invoice_reference: '',
     evidence_links: '',
     notes: '',
     is_billed: false,
@@ -1076,6 +1079,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         status: item.status,
         priority: item.priority,
         assigned_to: item.assigned_to || '',
+        invoice_reference: item.invoice_reference || '',
         evidence_links: item.evidence_links || '',
         notes: item.notes || '',
         is_billed: item.is_billed ?? (item.status === 'completed'),
@@ -1092,6 +1096,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         status: 'planned',
         priority: 'medium',
         assigned_to: '',
+        invoice_reference: '',
         evidence_links: '',
         notes: '',
         is_billed: false,
@@ -1661,6 +1666,15 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             <TextField
               fullWidth
               type="date"
+              label="Planned Date"
+              value={itemFormData.planned_date}
+              onChange={(e) => setItemFormData(prev => ({ ...prev, planned_date: e.target.value }))}
+              margin="normal"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              type="date"
               label="Due Date"
               value={itemFormData.due_date}
               onChange={(e) => setItemFormData(prev => ({ ...prev, due_date: e.target.value }))}
@@ -1719,6 +1733,24 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                 </MenuItem>
               ))}
             </TextField>
+            <TextField
+              fullWidth
+              label="Invoice Reference or Folder Link"
+              value={itemFormData.invoice_reference}
+              onChange={(e) => setItemFormData(prev => ({ ...prev, invoice_reference: e.target.value }))}
+              margin="normal"
+              helperText="Add an invoice number or a shared folder URL to keep billing context with the item."
+            />
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Evidence Links"
+              value={itemFormData.evidence_links}
+              onChange={(e) => setItemFormData(prev => ({ ...prev, evidence_links: e.target.value }))}
+              margin="normal"
+              placeholder="https://..."
+            />
           </Box>
         </DialogContent>
         <DialogActions>

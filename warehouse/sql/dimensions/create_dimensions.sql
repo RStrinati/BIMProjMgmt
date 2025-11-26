@@ -248,3 +248,27 @@ BEGIN
     CREATE UNIQUE INDEX uq_dim_review_stage_current ON dim.review_stage(stage_bk) WHERE current_flag = 1;
 END
 GO
+
+/* PROJECT ALIAS DIMENSION */
+IF OBJECT_ID('dim.project_alias', 'U') IS NULL
+BEGIN
+    CREATE TABLE dim.project_alias (
+        project_alias_sk INT IDENTITY(1,1) PRIMARY KEY,
+        pm_project_id    INT           NOT NULL,
+        alias_name       NVARCHAR(510) NOT NULL,
+        alias_type       NVARCHAR(100) NULL,
+        project_sk       INT           NOT NULL,
+        current_flag     BIT           NOT NULL DEFAULT 1,
+        effective_start  DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        effective_end    DATETIME2     NULL,
+        record_hash      BINARY(32)    NULL,
+        record_source    NVARCHAR(50)  NOT NULL,
+        CONSTRAINT fk_dim_project_alias_project
+            FOREIGN KEY (project_sk) REFERENCES dim.project(project_sk)
+    );
+
+    CREATE UNIQUE INDEX ux_project_alias_current
+        ON dim.project_alias(pm_project_id, alias_name, current_flag)
+        WHERE current_flag = 1;
+END
+GO

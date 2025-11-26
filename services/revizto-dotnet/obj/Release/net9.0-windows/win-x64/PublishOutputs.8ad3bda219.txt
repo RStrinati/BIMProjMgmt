@@ -1,0 +1,5 @@
+C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\publish\ReviztoDataExporter.pdb
+C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\publish\appsettings.json
+C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\publish\sni.dll
+C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\publish\SQLite.Interop.dll
+C:\Users\RicoStrinati\Documents\research\ReviztoAPI\ReviztoDataExporter\publish\ReviztoDataExporter.exe
