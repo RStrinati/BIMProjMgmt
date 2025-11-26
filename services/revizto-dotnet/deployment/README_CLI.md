@@ -4,6 +4,8 @@
 
 The Revizto Data Exporter has been enhanced with a command-line interface (CLI) that allows integration with Python tkinter applications, PowerShell scripts, batch files, and other automation tools.
 
+> Legacy note: Tkinter integration is retained here for reference only; the primary UI path for the BIM tool is now the web frontend.
+
 ## Files Created
 
 - **ReviztoDataExporter.exe** - Main executable (located in `publish/` folder)

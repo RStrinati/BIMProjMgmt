@@ -5,8 +5,6 @@ import datetime
 import re
 import sqlparse
 import time
-import tkinter as tk
-from tkinter import ttk, messagebox
 import zipfile
 import tempfile
 import shutil
@@ -353,71 +351,3 @@ def import_acc_data(folder_path, db=None, merge_dir="sql", show_skip_summary=Tru
         shutil.rmtree(temp_dir)
 
     return summary
-def run_acc_import(project_dropdown, acc_folder_entry, acc_summary_listbox):
-    selected = project_dropdown.get()
-    if " - " not in selected:
-        return False, "Select a valid project."
-
-    project_id = selected.split(" - ")[0]
-    folder_path = acc_folder_entry.get().strip()
-
-    # Fall back to stored path if entry is blank
-    if not folder_path:
-        folder_path = get_acc_folder_path(project_id)
-
-    if not folder_path:
-        return False, "Select a valid folder or ZIP file."
-
-    if os.path.isfile(folder_path):
-        if not folder_path.lower().endswith(".zip"):
-            return False, "Selected file must be a .zip archive."
-    elif not os.path.isdir(folder_path):
-        return False, "Select a valid folder or ZIP file."
-
-    folder_name = os.path.basename(folder_path.rstrip(os.sep))
-    confirm = messagebox.askyesno(
-        "Confirm Import",
-        f"Import ACC data from '{folder_name}'?",
-    )
-    if not confirm:
-        return False, "Import canceled."
-
-    progress_win = tk.Toplevel()
-    progress_win.title("Importing ACC Data")
-    progress_win.transient(acc_folder_entry.winfo_toplevel())
-    progress_win.grab_set()
-    lbl_status = ttk.Label(progress_win, text=f"Importing '{folder_name}'...")
-    lbl_status.pack(padx=20, pady=(20, 10))
-    pb = ttk.Progressbar(progress_win, mode="indeterminate")
-    pb.pack(padx=20, pady=(0, 20))
-    pb.start()
-    progress_win.update()
-
-    summary = import_acc_data(folder_path)
-
-    pb.stop()
-    lbl_status.config(text="Import complete")
-    progress_win.update()
-    time.sleep(0.5)
-    progress_win.destroy()
-
-
-    if not summary:
-        return False, "ACC import failed or found no data."
-
-    summary_text = f"✅ Imported: {os.path.basename(folder_path)}\n"
-    for stat in summary:
-        summary_text += (
-            f"{stat['table']} — Total: {stat['rows_total']}, "
-            f"Valid: {stat['rows_valid']}, "
-            f"Skipped: {stat['rows_skipped']}, "
-            f"Errors: {stat['rows_errors']}\n"
-        )
-
-    log_acc_import(project_id, os.path.basename(folder_path), summary_text)
-
-    acc_summary_listbox.delete(0, "end")
-    for line in summary_text.strip().split("\n"):
-        acc_summary_listbox.insert("end", line)
-
-    return True, "ACC data imported successfully."

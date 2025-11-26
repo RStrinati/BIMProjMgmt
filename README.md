@@ -22,9 +22,8 @@ This system manages construction project reviews, scheduling, billing workflows,
 
 ### Core Components
 
-- **UI**: Tkinter desktop application (`run_enhanced_ui.py`) with 8+ specialized tabs
-- **Backend**: Flask API (`backend/app.py`) serving REST endpoints
-- **Frontend**: React app (`frontend/app.js`) with Material-UI components (legacy)
+- **Web UI**: React + TypeScript app in `frontend/` (Vite + MUI)
+- **Backend**: Flask API (`backend/app.py`) serving REST endpoints for the web client
 - **Database**: SQL Server with 3 integrated databases:
   - `ProjectManagement` - Main project/review data
   - `acc_data_schema` - Autodesk Construction Cloud imports
@@ -39,6 +38,7 @@ Project Setup → Review Cycles → Task Assignment → Progress Tracking → Bi
      ↓              ↓                ↓                   ↓                ↓
 External Data: ACC ZIP files, Revit health checks, IFC models → Analytics Dashboard
 ```
+The legacy Tkinter desktop UI has been retired in favor of the web experience; archived references now live in `docs/archive/desktop-ui`.
 
 ## ⚠️ Important: Codebase Cleanup Required
 
@@ -102,14 +102,22 @@ REVIT_HEALTH_DB=RevitHealthCheckDB
    python tools/check_schema.py --autofix --update-constants
    ```
 
-4. **Launch the application**
+4. **Launch the backend API**
    ```bash
-   python run_enhanced_ui.py
+   python backend/app.py
+   ```
+
+5. **Launch the web UI**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
    ```
 
 ## 📚 Application Modules
+These modules surface through the web dashboard:
 
-### 1. Project Setup Tab
+### 1. Project Setup
 - Create and configure new projects
 - Apply service templates (SINSW-MPHS, AWS-Day1, NEXTDC-S5)
 - Manage project bookmarks and quick access

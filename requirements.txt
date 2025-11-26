@@ -5,7 +5,6 @@ plotly
 python-dateutil
 ifcopenshell
 sqlparse
-tkcalendar
 Flask
 Flask-Cors
 pytest

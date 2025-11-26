@@ -1,8 +1,8 @@
 """
-Python Tkinter Integration Example for Revizto Data Exporter
+Legacy Python Tkinter integration example for the Revizto Data Exporter.
 
-This example shows how to integrate the Revizto Data Exporter executable
-into your Python tkinter application.
+The desktop UI has been retired in favor of the web frontend; this sample is
+kept for reference only.
 
 Requirements:
 - ReviztoDataExporter.exe (located in the same directory or specify full path)
