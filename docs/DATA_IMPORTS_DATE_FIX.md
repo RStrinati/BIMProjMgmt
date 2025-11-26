@@ -205,7 +205,7 @@ Navigate to: http://localhost:5174/data-imports
 
 ## Related Documentation
 
-- [Data Imports Implementation Guide](./DATA_IMPORTS_IMPLEMENTATION.md)
+- [Data Imports Implementation Summary](./DATA_IMPORTS_IMPLEMENTATION_SUMMARY.md)
 - [React Component Development](./DEVELOPER_ONBOARDING.md)
 - [TypeScript Best Practices](./DEVELOPER_ONBOARDING.md)
 

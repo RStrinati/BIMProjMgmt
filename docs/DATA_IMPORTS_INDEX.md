@@ -181,7 +181,7 @@
 
 ### Original Roadmap
 
-**File**: [`REACT_DATA_IMPORTS_IMPLEMENTATION_ROADMAP.md`](./REACT_DATA_IMPORTS_IMPLEMENTATION_ROADMAP.md)
+**File**: [`REACT_DATA_IMPORTS_IMPLEMENTATION_ROADMAP.md`](./archive/desktop-ui/REACT_DATA_IMPORTS_IMPLEMENTATION_ROADMAP.md)
 
 **What it is**: Original 4-week implementation plan
 
@@ -200,7 +200,7 @@
 
 ### Quick Reference
 
-**File**: [`DATA_IMPORTS_QUICK_REF.md`](./DATA_IMPORTS_QUICK_REF.md)
+**File**: [`DATA_IMPORTS_QUICK_REF.md`](./archive/desktop-ui/DATA_IMPORTS_QUICK_REF.md)
 
 **What it is**: Quick reference for daily development
 
@@ -218,7 +218,7 @@
 
 ### ACC Desktop Connector Location
 
-**File**: [`ACC_DESKTOP_CONNECTOR_LOCATION.md`](./ACC_DESKTOP_CONNECTOR_LOCATION.md)
+**File**: [`ACC_DESKTOP_CONNECTOR_LOCATION.md`](./archive/desktop-ui/ACC_DESKTOP_CONNECTOR_LOCATION.md)
 
 **What it is**: Clarification that Desktop Connector UI is in Project Setup, not Data Imports
 
@@ -501,7 +501,7 @@ The Data Imports feature is **fully implemented** with both backend API and Reac
 ## 📞 Support
 
 For questions or issues:
-1. Check the [Quick Reference Guide](./DATA_IMPORTS_QUICK_REF.md)
+1. Check the [Quick Reference Guide](./archive/desktop-ui/DATA_IMPORTS_QUICK_REF.md)
 2. Review the [Troubleshooting Section](./REACT_DATA_IMPORTS_IMPLEMENTATION_COMPLETE.md#troubleshooting)
 3. Check [Testing Results](./BACKEND_API_TESTING_RESULTS.md) for known issues
 

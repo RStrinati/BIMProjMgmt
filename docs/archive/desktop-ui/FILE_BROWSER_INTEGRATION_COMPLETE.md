@@ -652,9 +652,9 @@ const handleRunImporter = async () => {
 
 ## Related Documentation
 
-- [Data Imports Implementation](./DATA_IMPORTS_IMPLEMENTATION_SUMMARY.md)
-- [Backend API Reference](./BACKEND_API_IMPLEMENTATION_COMPLETE.md)
-- [React Component Guide](./REACT_DATA_IMPORTS_IMPLEMENTATION_COMPLETE.md)
+- [Data Imports Implementation](../../DATA_IMPORTS_IMPLEMENTATION_SUMMARY.md)
+- [Backend API Reference](../../BACKEND_API_IMPLEMENTATION_COMPLETE.md)
+- [React Component Guide](../../REACT_DATA_IMPORTS_IMPLEMENTATION_COMPLETE.md)
 
 ---
 

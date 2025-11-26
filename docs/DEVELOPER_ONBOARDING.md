@@ -60,7 +60,7 @@ conn.close()                         # ❌ Manual cleanup
 
 **Read This First**:
 1. **Roadmap**: [REACT_INTEGRATION_ROADMAP.md](./REACT_INTEGRATION_ROADMAP.md) - Complete implementation plan
-2. **API Blockers**: [FRONTEND_INTEGRATION_BLOCKERS.md](./FRONTEND_INTEGRATION_BLOCKERS.md) - Known issues and gaps
+2. **API Blockers**: [FRONTEND_INTEGRATION_BLOCKERS.md](./archive/desktop-ui/FRONTEND_INTEGRATION_BLOCKERS.md) - Known issues and gaps
 
 **Timeline Overview**:
 - **Phase 1 (Weeks 1-4)**: Project setup, API client, first component
@@ -85,8 +85,8 @@ conn.close()                         # ❌ Manual cleanup
 | Document | Content |
 |----------|---------|
 | [DB_MIGRATION_PHASE4_COMPLETE.md](./DB_MIGRATION_PHASE4_COMPLETE.md) | October 2025 migration (73 connections) |
-| [DB_MIGRATION_SESSION3_COMPLETE.md](./DB_MIGRATION_SESSION3_COMPLETE.md) | Session 3 migration (39 connections) |
-| [DATABASE_MIGRATION_COMPLETE.md](./DATABASE_MIGRATION_COMPLETE.md) | Overall migration summary (~191 connections) |
+| [DB_MIGRATION_SESSION3_COMPLETE.md](./archive/desktop-ui/DB_MIGRATION_SESSION3_COMPLETE.md) | Session 3 migration (39 connections) |
+| [DATABASE_MIGRATION_COMPLETE.md](./archive/desktop-ui/DATABASE_MIGRATION_COMPLETE.md) | Overall migration summary (~191 connections) |
 
 ---
 

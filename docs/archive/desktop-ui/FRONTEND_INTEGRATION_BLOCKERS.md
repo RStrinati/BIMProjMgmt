@@ -693,9 +693,9 @@ export function ProjectsPage() {
 ## 🔗 Related Documentation
 
 - [REVIEW_TAB_MODERNIZATION_ROADMAP.md](./REVIEW_TAB_MODERNIZATION_ROADMAP.md) - Strategic modernization plan
-- [ROADMAP.md](./ROADMAP.md) - Overall product roadmap
-- [database_schema.md](./database_schema.md) - Database structure reference
-- [shared/project_service.py](../shared/project_service.py) - Example service layer
+- [ROADMAP.md](../../ROADMAP.md) - Overall product roadmap
+- [database_schema.md](../../database_schema.md) - Database structure reference
+- [shared/project_service.py](../../../shared/project_service.py) - Example service layer
 
 ---
 

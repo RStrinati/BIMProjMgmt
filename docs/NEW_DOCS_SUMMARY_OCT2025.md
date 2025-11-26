@@ -266,7 +266,7 @@ Today we created comprehensive developer documentation to ensure the team follow
 
 ### For Frontend Developers (Starting Frontend Work)
 1. Read [REACT_INTEGRATION_ROADMAP.md](./REACT_INTEGRATION_ROADMAP.md)
-2. Review [FRONTEND_INTEGRATION_BLOCKERS.md](./FRONTEND_INTEGRATION_BLOCKERS.md)
+2. Review [FRONTEND_INTEGRATION_BLOCKERS.md](./archive/desktop-ui/FRONTEND_INTEGRATION_BLOCKERS.md)
 3. Read database guide (backend integration)
 4. Follow phase-by-phase implementation plan
 

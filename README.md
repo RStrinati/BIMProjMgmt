@@ -43,10 +43,10 @@ The legacy Tkinter desktop UI has been retired in favor of the web experience; a
 ## ⚠️ Important: Codebase Cleanup Required
 
 **This codebase requires organization cleanup before active development.** See:
-- 📋 **[CLEANUP_SUMMARY.md](./CLEANUP_SUMMARY.md)** - Executive summary of cleanup needed
-- 🚀 **[CLEANUP_QUICKSTART.md](./CLEANUP_QUICKSTART.md)** - Start cleanup immediately (10 min)
-- 📊 **[CLEANUP_REPORT.md](./CLEANUP_REPORT.md)** - Complete analysis and action plan
-- 📁 **[FILE_ORGANIZATION_GUIDE.md](./FILE_ORGANIZATION_GUIDE.md)** - Organization rules for developers
+- 📋 **[CLEANUP_SUMMARY.md](./docs/cleanup/CLEANUP_SUMMARY.md)** - Executive summary of cleanup needed
+- 🚀 **[CLEANUP_QUICKSTART.md](./docs/cleanup/CLEANUP_QUICKSTART.md)** - Start cleanup immediately (10 min)
+- 📊 **[CLEANUP_REPORT.md](./docs/cleanup/CLEANUP_REPORT.md)** - Complete analysis and action plan
+- 📁 **[FILE_ORGANIZATION_GUIDE.md](./docs/cleanup/FILE_ORGANIZATION_GUIDE.md)** - Organization rules for developers
 
 **Quick cleanup:** Run `.\scripts\cleanup_phase1.ps1 -DryRun` to see what will be fixed.
 
@@ -99,7 +99,7 @@ REVIT_HEALTH_DB=RevitHealthCheckDB
 
 3. **Initialize database schema**
    ```bash
-   python tools/check_schema.py --autofix --update-constants
+   python scripts/check_schema.py --autofix --update-constants
    ```
 
 4. **Launch the backend API**
@@ -170,13 +170,13 @@ These modules surface through the web dashboard:
 ### Database Schema Management
 ```bash
 # Validate schema compatibility
-python tools/check_schema.py
+   python scripts/check_schema.py
 
 # Auto-fix schema issues
-python tools/check_schema.py --autofix
+   python scripts/check_schema.py --autofix
 
 # Update schema constants
-python tools/check_schema.py --update-constants
+   python scripts/check_schema.py --update-constants
 ```
 
 ### Data Import Operations
@@ -259,37 +259,32 @@ python -m pytest --cov=. tests/
 
 ```
 BIMProjMngmt/
-├── run_enhanced_ui.py          # Main application launcher
-├── database.py                 # Database access layer
-├── review_management_service.py # Review business logic
-├── config.py                   # Configuration management
-├── requirements.txt            # Python dependencies
-│
-├── ui/                         # UI components (modular)
-│   ├── tab_project.py
-│   ├── tab_review.py
-│   ├── tab_issue_analytics.py
-│   ├── enhanced_task_management.py
-│   └── project_alias_tab.py
-│
-├── handlers/                   # Data import handlers
-│   ├── acc_handler.py
-│   ├── rvt_health_importer.py
-│   └── process_ifc.py
-│
-├── services/                   # Business logic services
-├── constants/                  # Schema constants
-│   └── schema.py
-│
-├── sql/                        # Database scripts
-│   ├── tables/                 # Table creation scripts
-│   ├── views/                  # View definitions
-│   └── migrations/             # Schema migrations
-│
-├── templates/                  # Service templates (JSON)
-├── tests/                      # Test suite
-├── tools/                      # Utility scripts
-└── docs/                       # Documentation
+??? backend/                    # Flask API
+??? frontend/                   # React web UI (Vite)
+??? database.py                 # Database access layer
+??? review_management_service.py # Review business logic
+??? config.py                   # Configuration management
+??? requirements.txt            # Python dependencies
+
+??? handlers/                   # Data import handlers (ACC, Revit)
+?   ??? acc_handler.py
+?   ??? rvt_health_importer.py
+?   ??? process_ifc.py
+
+??? services/                   # Runtime services (incl. revizto-dotnet)
+??? constants/                  # Schema constants
+?   ??? schema.py
+
+??? sql/                        # Database scripts
+?   ??? tables/                 # Table creation scripts
+?   ??? views/                  # View definitions
+?   ??? migrations/             # Schema migrations
+
+??? templates/                  # Service templates (JSON)
+??? tests/                      # Test suite
+??? scripts/                    # Entrypoint/ops scripts
+??? tools/                      # Maintenance utilities (db/, imports/, analytics/, docs/)
+??? docs/                       # Documentation
 ```
 
 ## 🔐 Security & Best Practices

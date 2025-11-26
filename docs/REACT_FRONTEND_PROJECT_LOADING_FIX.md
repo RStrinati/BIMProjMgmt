@@ -283,9 +283,9 @@ For large datasets, consider:
 ## Related Documentation
 
 - [Backend API Implementation](./BACKEND_API_IMPLEMENTATION_COMPLETE.md)
-- [React Frontend Setup](./REACT_FRONTEND_SETUP_COMPLETE.md)
-- [Data Flow Analysis](./DATA_FLOW_ANALYSIS.md)
-- [Database Schema](./constants/schema.py)
+- [React Integration Roadmap](./REACT_INTEGRATION_ROADMAP.md)
+- [Data Flow Analysis](./archive/desktop-ui/DATA_FLOW_ANALYSIS.md)
+- [Database Schema](../constants/schema.py)
 
 ---
 
