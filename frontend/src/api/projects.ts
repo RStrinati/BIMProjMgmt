@@ -32,18 +32,20 @@ export const projectsApi = {
   },
 
   // Get project statistics
-  getStats: async (): Promise<{
+  getStats: async (options?: { projectIds?: number[] }): Promise<{
     total: number;
     active: number;
     completed: number;
     on_hold: number;
   }> => {
-    const response = await apiClient.get('/projects/stats');
+    const response = await apiClient.get('/projects/stats', {
+      params: options?.projectIds?.length ? { project_ids: options.projectIds.join(',') } : undefined,
+    });
     return response.data;
   },
 
   // Get review statistics for all projects
-  getReviewStats: async (): Promise<Record<number, {
+  getReviewStats: async (options?: { projectIds?: number[] }): Promise<Record<number, {
     total_reviews: number;
     completed_reviews: number;
     planned_reviews: number;
@@ -53,7 +55,9 @@ export const projectsApi = {
     latest_review_date: string | null;
     upcoming_reviews_30_days: number;
   }>> => {
-    const response = await apiClient.get('/project_review_statistics');
+    const response = await apiClient.get('/project_review_statistics', {
+      params: options?.projectIds?.length ? { project_ids: options.projectIds.join(',') } : undefined,
+    });
     return response.data;
   },
 

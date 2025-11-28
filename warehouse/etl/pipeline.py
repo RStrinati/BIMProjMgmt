@@ -166,6 +166,7 @@ class WarehousePipeline:
                 WHERE
                     (created_at IS NOT NULL AND created_at > ?)
                     OR (closed_at IS NOT NULL AND closed_at > ?)
+                    OR (last_activity_date IS NOT NULL AND last_activity_date > ?)
             )
             SELECT
                 source,
@@ -178,12 +179,13 @@ class WarehousePipeline:
                 assignee,
                 author,
                 created_at,
-                closed_at
+                closed_at,
+                last_activity_date
             FROM source_issues
             WHERE rn = 1
         """
 
-        rows = self._fetch_source_rows(select_query, watermark, watermark)
+        rows = self._fetch_source_rows(select_query, watermark, watermark, watermark)
         if not rows:
             logger.info("No new issue rows to load.")
             return 0
@@ -228,7 +230,7 @@ class WarehousePipeline:
             [
                 value
                 for row in rows
-                for value in (row.created_at, row.closed_at)
+                for value in (row.created_at, row.closed_at, getattr(row, "last_activity_date", None))
                 if value is not None
             ],
             default=watermark,

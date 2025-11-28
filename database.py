@@ -4428,8 +4428,8 @@ def get_all_projects_issues_overview():
         }
 
 
-def get_project_review_statistics():
-    """Get review statistics for all projects."""
+def get_project_review_statistics(project_ids: Optional[List[int]] = None):
+    """Get review statistics for projects (optionally filtered by IDs)."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -4448,10 +4448,17 @@ def get_project_review_statistics():
                     COUNT(CASE WHEN sr.{S.ServiceReviews.PLANNED_DATE} >= GETDATE() AND sr.{S.ServiceReviews.PLANNED_DATE} <= DATEADD(day, 30, GETDATE()) THEN 1 END) as upcoming_reviews_30_days
                 FROM {S.ProjectServices.TABLE} ps
                 LEFT JOIN {S.ServiceReviews.TABLE} sr ON ps.{S.ProjectServices.SERVICE_ID} = sr.{S.ServiceReviews.SERVICE_ID}
-                GROUP BY ps.{S.ProjectServices.PROJECT_ID}
             """
+
+            params: List[Any] = []
+            if project_ids:
+                placeholders = ', '.join('?' for _ in project_ids)
+                query += f" WHERE ps.{S.ProjectServices.PROJECT_ID} IN ({placeholders})"
+                params.extend(project_ids)
+
+            query += f" GROUP BY ps.{S.ProjectServices.PROJECT_ID}"
             
-            cursor.execute(query)
+            cursor.execute(query, tuple(params))
             results = cursor.fetchall()
             
             # Convert to dictionary format
@@ -4742,8 +4749,284 @@ def _format_task_notes_row(row: tuple) -> Dict[str, Any]:
         'notes': row[13],
         'created_at': row[14].isoformat() if row[14] else None,
         'updated_at': row[15].isoformat() if row[15] else None,
-    }
+        }
 
+
+def get_warehouse_dashboard_metrics(
+    project_ids: Optional[List[int]] = None,
+    client_ids: Optional[List[int]] = None,
+    project_type_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve curated warehouse metrics for the dashboard.
+
+    Pulls from mart/fact views so the UI can surface project health,
+    issue trends, review performance, and service/financial signals
+    without bespoke per-widget queries.
+    """
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            def _in_clause(column: str, values: Optional[List[int]]) -> tuple[str, List[int]]:
+                if not values:
+                    return "", []
+                placeholders = ", ".join("?" for _ in values)
+                return f" AND {column} IN ({placeholders})", list(values)
+
+            proj_filter_sql, proj_params = _in_clause("p.project_bk", project_ids)
+            client_filter_sql, client_params = _in_clause("c.client_bk", client_ids)
+            type_filter_sql, type_params = _in_clause("pt.project_type_bk", project_type_ids)
+            filter_params = proj_params + client_params + type_params
+
+            # Project health (current month snapshot across projects)
+            cursor.execute(
+                f"""
+                WITH latest_month AS (
+                    SELECT MAX(month_date_sk) AS month_date_sk FROM fact.project_kpi_monthly
+                )
+                SELECT
+                    COUNT(DISTINCT p.project_sk) AS projects,
+                    SUM(ISNULL(k.open_issues, 0)) AS open_issues,
+                    SUM(ISNULL(k.high_priority_issues, 0)) AS high_priority_issues,
+                    AVG(NULLIF(k.avg_resolution_days, 0)) AS avg_resolution_days,
+                    SUM(ISNULL(k.review_count, 0)) AS review_count,
+                    SUM(ISNULL(k.completed_reviews, 0)) AS completed_reviews,
+                    SUM(ISNULL(k.overdue_reviews, 0)) AS overdue_reviews,
+                    SUM(ISNULL(k.services_in_progress, 0)) AS services_in_progress,
+                    SUM(ISNULL(k.services_completed, 0)) AS services_completed,
+                    SUM(ISNULL(k.earned_value, 0)) AS earned_value,
+                    SUM(ISNULL(k.claimed_to_date, 0)) AS claimed_to_date,
+                    SUM(ISNULL(k.variance_fee, 0)) AS variance_fee
+                FROM dim.project p WITH (NOLOCK)
+                CROSS JOIN latest_month lm
+                LEFT JOIN fact.project_kpi_monthly k
+                    ON k.project_sk = p.project_sk
+                   AND (lm.month_date_sk IS NULL OR k.month_date_sk = lm.month_date_sk)
+                LEFT JOIN dim.client c ON c.client_sk = COALESCE(k.client_sk, p.client_sk)
+                LEFT JOIN dim.project_type pt ON pt.project_type_sk = COALESCE(k.project_type_sk, p.project_type_sk)
+                WHERE p.current_flag = 1
+                {proj_filter_sql}
+                {client_filter_sql}
+                {type_filter_sql}
+                """
+            , tuple(filter_params))
+            ph_row = cursor.fetchone()
+            project_health = {
+                "projects": ph_row[0] or 0 if ph_row else 0,
+                "open_issues": ph_row[1] or 0 if ph_row else 0,
+                "high_priority_issues": ph_row[2] or 0 if ph_row else 0,
+                "avg_resolution_days": float(ph_row[3]) if ph_row and ph_row[3] is not None else None,
+                "review_count": ph_row[4] or 0 if ph_row else 0,
+                "completed_reviews": ph_row[5] or 0 if ph_row else 0,
+                "overdue_reviews": ph_row[6] or 0 if ph_row else 0,
+                "services_in_progress": ph_row[7] or 0 if ph_row else 0,
+                "services_completed": ph_row[8] or 0 if ph_row else 0,
+                "earned_value": float(ph_row[9]) if ph_row and ph_row[9] is not None else 0.0,
+                "claimed_to_date": float(ph_row[10]) if ph_row and ph_row[10] is not None else 0.0,
+                "variance_fee": float(ph_row[11]) if ph_row and ph_row[11] is not None else 0.0,
+            }
+
+            # Issue trends (last 60 days)
+            cursor.execute(
+                f"""
+                SELECT
+                    CAST(d.[date] AS date) AS snapshot_date,
+                    SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
+                    SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
+                    AVG(NULLIF(s.backlog_age_days, 0)) AS avg_backlog_days,
+                    AVG(NULLIF(s.resolution_days, 0)) AS avg_resolution_days,
+                    AVG(NULLIF(s.urgency_score, 0)) AS avg_urgency,
+                    AVG(NULLIF(s.sentiment_score, 0)) AS avg_sentiment
+                FROM fact.issue_snapshot s WITH (NOLOCK)
+                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                LEFT JOIN dim.client c ON s.client_sk = c.client_sk
+                LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
+                WHERE d.[date] >= DATEADD(day, -60, CAST(GETDATE() AS date))
+                  AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                {proj_filter_sql}
+                {client_filter_sql}
+                {type_filter_sql}
+                GROUP BY CAST(d.[date] AS date)
+                ORDER BY CAST(d.[date] AS date)
+                """
+            , tuple(filter_params))
+            issue_trends = [
+                {
+                    "date": (row[0].isoformat() if isinstance(row[0], (datetime, date)) else str(row[0]))
+                    if row[0] is not None
+                    else None,
+                    "open_issues": int(row[1] or 0),
+                    "closed_issues": int(row[2] or 0),
+                    "avg_backlog_days": float(row[3]) if row[3] is not None else None,
+                    "avg_resolution_days": float(row[4]) if row[4] is not None else None,
+                    "avg_urgency": float(row[5]) if row[5] is not None else None,
+                    "avg_sentiment": float(row[6]) if row[6] is not None else None,
+                }
+                for row in cursor.fetchall()
+            ]
+
+            # Review performance
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(1) AS total_reviews,
+                    SUM(CASE WHEN ISNULL(f.is_completed, 0) = 1 THEN 1 ELSE 0 END) AS completed_reviews,
+                    SUM(CASE WHEN ISNULL(f.is_overdue, 0) = 1 THEN 1 ELSE 0 END) AS overdue_reviews,
+                    AVG(CAST(f.planned_vs_actual_days AS FLOAT)) AS avg_planned_vs_actual_days
+                FROM fact.review_cycle f WITH (NOLOCK)
+                JOIN dim.service s ON f.service_sk = s.service_sk
+                JOIN dim.project p ON f.project_sk = p.project_sk
+                LEFT JOIN dim.client c ON f.client_sk = c.client_sk
+                LEFT JOIN dim.project_type pt ON f.project_type_sk = pt.project_type_sk
+                WHERE p.current_flag = 1
+                {proj_filter_sql}
+                {client_filter_sql}
+                {type_filter_sql}
+                """
+            , tuple(filter_params))
+            rv_row = cursor.fetchone()
+            completed_reviews = rv_row[1] or 0 if rv_row else 0
+            overdue_reviews = rv_row[2] or 0 if rv_row else 0
+            on_time_completed = max(completed_reviews - overdue_reviews, 0)
+            on_time_rate = (
+                round(on_time_completed / completed_reviews, 4) if completed_reviews > 0 else None
+            )
+            review_performance = {
+                "total_reviews": rv_row[0] or 0 if rv_row else 0,
+                "completed_reviews": completed_reviews,
+                "overdue_reviews": overdue_reviews,
+                "avg_planned_vs_actual_days": float(rv_row[3]) if rv_row and rv_row[3] is not None else None,
+                "on_time_rate": on_time_rate,
+            }
+
+            # Service / financial signals (latest month)
+            cursor.execute(
+                f"""
+                WITH latest_month AS (
+                    SELECT MAX(month_date_sk) AS month_date_sk FROM fact.service_monthly
+                )
+                SELECT
+                    SUM(ISNULL(sm.earned_value, 0)) AS earned_value,
+                    SUM(ISNULL(sm.claimed_to_date, 0)) AS claimed_to_date,
+                    SUM(ISNULL(sm.variance_fee, 0)) AS variance_fee,
+                    AVG(NULLIF(sm.progress_pct, 0)) AS avg_progress_pct
+                FROM fact.service_monthly sm WITH (NOLOCK)
+                CROSS JOIN latest_month lm
+                JOIN dim.project p ON sm.project_sk = p.project_sk
+                LEFT JOIN dim.client c ON sm.client_sk = c.client_sk
+                LEFT JOIN dim.project_type pt ON sm.project_type_sk = pt.project_type_sk
+                WHERE (lm.month_date_sk IS NULL OR sm.month_date_sk = lm.month_date_sk)
+                  AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                {proj_filter_sql}
+                {client_filter_sql}
+                {type_filter_sql}
+                """
+            , tuple(filter_params))
+            sf_row = cursor.fetchone()
+            service_financials = {
+                "earned_value": float(sf_row[0]) if sf_row and sf_row[0] is not None else 0.0,
+                "claimed_to_date": float(sf_row[1]) if sf_row and sf_row[1] is not None else 0.0,
+                "variance_fee": float(sf_row[2]) if sf_row and sf_row[2] is not None else 0.0,
+                "avg_progress_pct": float(sf_row[3]) if sf_row and sf_row[3] is not None else None,
+            }
+
+            return {
+                "project_health": project_health,
+                "issue_trends": issue_trends,
+                "review_performance": review_performance,
+                "service_financials": service_financials,
+            }
+    except Exception as e:
+        logger.error(f"Error fetching warehouse dashboard metrics: {e}")
+        return {
+            "project_health": {},
+            "issue_trends": [],
+            "review_performance": {},
+            "service_financials": {},
+            "error": str(e),
+        }
+
+
+def get_warehouse_issues_history(
+    project_ids: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Return weekly issue status counts using latest snapshot per issue/week.
+
+    Uses fact.issue_snapshot joined to dim.date and dim.project to allow optional project filters.
+    """
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            proj_filter_sql = ""
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                proj_filter_sql = (
+                    f" AND (p.project_bk IN ({placeholders}) "
+                    f"OR p.project_sk IN (SELECT project_sk FROM dim.project WHERE project_bk IN ({placeholders})))"
+                )
+                params.extend(project_ids)
+                params.extend(project_ids)
+
+            cursor.execute(
+                f"""
+                WITH classified AS (
+                    SELECT
+                        d.week_start_date AS week_start,
+                        s.issue_sk,
+                        CASE
+                            WHEN LOWER(ISNULL(s.status, '')) LIKE '%open%' THEN 'Open'
+                            WHEN LOWER(ISNULL(s.status, '')) LIKE '%progress%' THEN 'In progress'
+                            WHEN LOWER(ISNULL(s.status, '')) LIKE '%complete%' THEN 'Completed'
+                            WHEN LOWER(ISNULL(s.status, '')) LIKE '%close%' THEN 'Closed'
+                            ELSE 'Other'
+                        END AS status_class,
+                        s.snapshot_date_sk,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY d.week_start_date, s.issue_sk
+                            ORDER BY s.snapshot_date_sk DESC
+                        ) AS rn
+                    FROM fact.issue_snapshot s WITH (NOLOCK)
+                    JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                    LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                    WHERE 1 = 1
+                    {proj_filter_sql}
+                ),
+                weekly_latest AS (
+                    SELECT
+                        week_start,
+                        issue_sk,
+                        status_class AS status,
+                        rn
+                    FROM classified
+                )
+                SELECT
+                    week_start,
+                    status,
+                    COUNT(1) AS issue_count
+                FROM weekly_latest
+                WHERE rn = 1
+                GROUP BY week_start, status
+                ORDER BY week_start
+                """
+            , tuple(params))
+
+            rows = cursor.fetchall()
+            return [
+                {
+                    "week_start": row[0].isoformat() if row[0] else None,
+                    "status": row[1] or "unknown",
+                    "count": int(row[2] or 0),
+                }
+                for row in rows
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching warehouse issues history: {e}")
+        return []
 
 _TASK_NOTES_BASE_QUERY = f"""
     SELECT

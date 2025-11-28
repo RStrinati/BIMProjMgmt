@@ -55,6 +55,8 @@ from database import (  # noqa: E402
     get_project_folders,
     get_project_health_files,
     get_projects_full,
+    get_warehouse_dashboard_metrics,
+    get_warehouse_issues_history,
     get_client_by_id,
     get_clients_detailed,
     get_project_services,
@@ -108,6 +110,22 @@ from services.project_alias_service import ProjectAliasManager  # noqa: E402
 
 
 # --- Revizto utility helpers ---
+
+def _parse_id_list(param_name: str) -> list[int]:
+    """Parse comma-separated ID list from query params."""
+    raw = request.args.get(param_name)
+    if not raw:
+        return []
+    ids: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.append(int(part))
+        except ValueError:
+            continue
+    return ids
 
 def _find_revizto_exporter():
     """Locate the Revizto exporter executable and return (path, searched_paths)."""
@@ -1103,18 +1121,24 @@ def api_get_projects_full():
 def api_projects_stats():
     """Get project statistics for dashboard"""
     try:
+        project_ids = _parse_id_list("project_ids")
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                f"""
+            base_query = f"""
                 SELECT {S.Projects.STATUS}, COUNT(*)
                 FROM {S.Projects.TABLE}
-                GROUP BY {S.Projects.STATUS}
-                """
-            )
+            """
+            params: list[int] = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                base_query += f" WHERE {S.Projects.ID} IN ({placeholders})"
+                params.extend(project_ids)
+            base_query += f" GROUP BY {S.Projects.STATUS}"
+
+            cursor.execute(base_query, tuple(params))
             rows = cursor.fetchall()
 
-        totals = { (row[0] or '').strip().lower(): int(row[1] or 0) for row in rows }
+        totals = {(row[0] or "").strip().lower(): int(row[1] or 0) for row in rows}
         stats = {
             'total': sum(totals.values()),
             'active': totals.get('active', 0),
@@ -2059,6 +2083,36 @@ def api_dashboard_stats():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dashboard/warehouse-metrics', methods=['GET'])
+def api_dashboard_warehouse_metrics():
+    """Expose curated warehouse metrics for the dashboard."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        client_ids = _parse_id_list("client_ids")
+        type_ids = _parse_id_list("type_ids")
+        metrics = get_warehouse_dashboard_metrics(
+            project_ids=project_ids or None,
+            client_ids=client_ids or None,
+            project_type_ids=type_ids or None,
+        )
+        return jsonify(metrics)
+    except Exception as e:
+        logging.exception("Error fetching warehouse dashboard metrics")
+        return jsonify({'error': 'Failed to fetch warehouse metrics', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/issues-history', methods=['GET'])
+def api_dashboard_issues_history():
+    """Return historical issue counts by status (weekly) with optional project filter."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        history = get_warehouse_issues_history(project_ids=project_ids or None)
+        return jsonify(history)
+    except Exception as e:
+        logging.exception("Error fetching issues history")
+        return jsonify({'error': 'Failed to fetch issues history', 'details': str(e)}), 500
 
 
 @app.route('/api/project_bookmarks/<int:project_id>', methods=['GET', 'POST'])
@@ -3421,7 +3475,8 @@ def api_get_project_review_statistics():
     """Get review statistics for all projects."""
     try:
         from database import get_project_review_statistics
-        stats = get_project_review_statistics()
+        project_ids = _parse_id_list("project_ids")
+        stats = get_project_review_statistics(project_ids=project_ids or None)
         return jsonify(stats)
     except Exception as e:
         logging.exception("Error fetching project review statistics")

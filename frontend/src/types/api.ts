@@ -92,6 +92,52 @@ export interface DashboardTimelineResponse {
   } | null;
 }
 
+export interface WarehouseDashboardMetrics {
+  project_health: {
+    projects?: number;
+    open_issues?: number;
+    high_priority_issues?: number;
+    avg_resolution_days?: number | null;
+    review_count?: number;
+    completed_reviews?: number;
+    overdue_reviews?: number;
+    services_in_progress?: number;
+    services_completed?: number;
+    earned_value?: number;
+    claimed_to_date?: number;
+    variance_fee?: number;
+  };
+  issue_trends: Array<{
+    date: string | null;
+    open_issues: number;
+    closed_issues: number;
+    avg_backlog_days: number | null;
+    avg_resolution_days: number | null;
+    avg_urgency: number | null;
+    avg_sentiment: number | null;
+  }>;
+  review_performance: {
+    total_reviews?: number;
+    completed_reviews?: number;
+    overdue_reviews?: number;
+    on_time_rate?: number | null;
+    avg_planned_vs_actual_days?: number | null;
+  };
+  service_financials: {
+    earned_value?: number;
+    claimed_to_date?: number;
+    variance_fee?: number;
+    avg_progress_pct?: number | null;
+  };
+  error?: string;
+}
+
+export interface IssueHistoryPoint {
+  week_start: string | null;
+  status: string;
+  count: number;
+}
+
 export interface TaskItem {
   label?: string;
   title?: string;

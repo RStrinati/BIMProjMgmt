@@ -791,6 +791,78 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('warehouse.usp_backfill_issue_snapshot', 'P') IS NOT NULL
+    DROP PROCEDURE warehouse.usp_backfill_issue_snapshot;
+GO
+
+CREATE PROCEDURE warehouse.usp_backfill_issue_snapshot
+    @StartDate DATE = NULL,
+    @EndDate   DATE = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @Start DATE = ISNULL(@StartDate, (SELECT MIN([date]) FROM dim.date));
+    DECLARE @End   DATE = ISNULL(@EndDate, CAST(SYSUTCDATETIME() AS DATE));
+
+    ;WITH date_span AS (
+        SELECT date_sk, [date]
+        FROM dim.date
+        WHERE [date] BETWEEN @Start AND @End
+    )
+    INSERT INTO fact.issue_snapshot (
+        snapshot_date_sk, issue_sk, project_sk, client_sk, project_type_sk,
+        status, is_open, is_closed, backlog_age_days, resolution_days,
+        urgency_score, complexity_score, sentiment_score, comment_count,
+        high_priority_flag, record_source
+    )
+    SELECT
+        d.date_sk,
+        i.issue_sk,
+        i.project_sk,
+        p.client_sk,
+        p.project_type_sk,
+        CASE
+            WHEN i.closed_date_sk IS NOT NULL AND i.closed_date_sk <= d.date_sk THEN 'closed'
+            ELSE i.status
+        END AS status,
+        CASE WHEN i.closed_date_sk IS NULL OR i.closed_date_sk > d.date_sk THEN 1 ELSE 0 END AS is_open,
+        CASE WHEN i.closed_date_sk IS NOT NULL AND i.closed_date_sk <= d.date_sk THEN 1 ELSE 0 END AS is_closed,
+        CASE
+            WHEN i.created_date_sk IS NOT NULL
+                 AND i.created_date_sk <= d.date_sk
+            THEN DATEDIFF(DAY, CAST(CONVERT(VARCHAR(8), i.created_date_sk) AS DATE), d.[date])
+            ELSE NULL
+        END AS backlog_age_days,
+        CASE
+            WHEN i.closed_date_sk IS NOT NULL
+                 AND i.created_date_sk IS NOT NULL
+                 AND i.closed_date_sk <= d.date_sk
+            THEN DATEDIFF(DAY, CAST(CONVERT(VARCHAR(8), i.created_date_sk) AS DATE), CAST(CONVERT(VARCHAR(8), i.closed_date_sk) AS DATE))
+            ELSE NULL
+        END AS resolution_days,
+        proc_issue.urgency_score,
+        proc_issue.complexity_score,
+        proc_issue.sentiment_score,
+        proc_issue.comment_count,
+        CASE WHEN i.priority IN ('critical', 'high') THEN 1 ELSE 0 END AS high_priority_flag,
+        'warehouse.usp_backfill_issue_snapshot' AS record_source
+    FROM dim.issue i
+    JOIN date_span d
+      ON i.created_date_sk IS NULL OR i.created_date_sk <= d.date_sk
+    LEFT JOIN dim.project p ON i.project_sk = p.project_sk
+    LEFT JOIN stg.processed_issues proc_issue
+           ON proc_issue.issue_id = i.issue_bk
+          AND proc_issue.source_system = i.source_system
+    LEFT JOIN fact.issue_snapshot existing
+           ON existing.issue_sk = i.issue_sk
+          AND existing.snapshot_date_sk = d.date_sk
+    WHERE i.current_flag = 1
+      AND (i.created_date_sk IS NULL OR i.created_date_sk <= d.date_sk)
+      AND existing.issue_snapshot_sk IS NULL;
+END
+GO
+
 IF OBJECT_ID('warehouse.usp_load_fact_issue_activity', 'P') IS NOT NULL
     DROP PROCEDURE warehouse.usp_load_fact_issue_activity;
 GO
