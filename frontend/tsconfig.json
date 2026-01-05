@@ -30,7 +30,8 @@
     "src",
   ],
   "exclude": [
-    "src/components/dataImports/ACCDataImportPanel_broken.tsx"
+    "src/components/dataImports/ACCDataImportPanel_broken.tsx",
+    "src/components/dashboards/**/*"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

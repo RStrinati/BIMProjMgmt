@@ -7,6 +7,7 @@ export interface Project {
   contract_number?: string;
   client_id?: number | null;
   client_name?: string;
+  project_manager?: string | null;
   type_id?: number;
   type_name?: string;
   project_type?: string; // Alternative field name used by backend
@@ -129,6 +130,107 @@ export interface WarehouseDashboardMetrics {
     variance_fee?: number;
     avg_progress_pct?: number | null;
   };
+  backlog_age?: {
+    bucket_0_7: number;
+    bucket_8_30: number;
+    bucket_31_90: number;
+    bucket_90_plus: number;
+    avg_age_days?: number | null;
+  };
+  control_models?: {
+    projects_with_control_models: number;
+    projects_missing: number;
+  };
+  data_freshness?: {
+    revizto_last_run?: string | null;
+    revizto_projects_extracted?: number | null;
+    acc_last_import?: string | null;
+    acc_last_import_project_id?: number | null;
+  };
+  error?: string;
+}
+
+export interface RevitHealthDashboardMetrics {
+  summary: {
+    total_files: number;
+    projects: number;
+    avg_health_score: number | null;
+    min_health_score: number | null;
+    max_health_score: number | null;
+    good_files: number;
+    fair_files: number;
+    poor_files: number;
+    critical_files: number;
+    files_with_link_issues: number;
+    total_warnings: number;
+    total_critical_warnings: number;
+    latest_check_date: string | null;
+  };
+  trend: Array<{
+    year_month: string;
+    avg_health_score: number | null;
+    files: number;
+  }>;
+  categories?: {
+    good: { count: number; pct: number | null };
+    fair: { count: number; pct: number | null };
+    poor: { count: number; pct: number | null };
+    critical: { count: number; pct: number | null };
+  };
+  by_discipline?: Array<{
+    discipline: string;
+    discipline_full_name?: string | null;
+    total_files: number;
+    avg_health_score: number | null;
+    total_warnings: number;
+    total_critical_warnings: number;
+    files_with_link_issues: number;
+    good_files: number;
+    fair_files: number;
+    poor_files: number;
+    critical_files: number;
+  }>;
+  top_files?: Array<{
+    file_name: string;
+    project_id: number | null;
+    discipline: string | null;
+    discipline_full_name?: string | null;
+    health_score: number | null;
+    health_category: string | null;
+    total_warnings: number | null;
+    critical_warnings: number | null;
+    link_health_flag: string | null;
+    export_datetime: string | null;
+  }>;
+  error?: string;
+}
+
+export interface NamingComplianceMetrics {
+  summary: {
+    total_files: number;
+    valid_files: number;
+    invalid_files: number;
+    compliance_pct: number | null;
+    latest_validated: string | null;
+  };
+  by_discipline: Array<{
+    discipline: string;
+    total_files: number;
+    valid_files: number;
+    invalid_files: number;
+    valid_pct: number | null;
+  }>;
+  recent_invalid: Array<{
+    file_name: string;
+    project_name: string | null;
+    discipline: string | null;
+    validation_status: string | null;
+    validation_reason: string | null;
+    failed_field_name: string | null;
+    failed_field_value: string | null;
+    failed_field_reason: string | null;
+    validated_date: string | null;
+  }>;
   error?: string;
 }
 

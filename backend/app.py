@@ -57,6 +57,9 @@ from database import (  # noqa: E402
     get_projects_full,
     get_warehouse_dashboard_metrics,
     get_warehouse_issues_history,
+    get_revit_health_dashboard_summary,
+    get_naming_compliance_dashboard_metrics,
+    revalidate_revit_naming,
     get_client_by_id,
     get_clients_detailed,
     get_project_services,
@@ -71,6 +74,10 @@ from database import (  # noqa: E402
     get_service_review_billing,
     get_service_templates,
     get_users_list,
+    get_control_points_dashboard,
+    get_model_register,
+    get_naming_compliance_table,
+    get_revizto_issues_detail,
     fetch_tasks_notes_view,
     insert_task_notes_record,
     update_task_notes_record,
@@ -94,6 +101,16 @@ from database import (  # noqa: E402
     update_project_details,
     update_project_folders,
     update_client,
+    get_all_users,
+    create_user,
+    update_user,
+    delete_user,
+    assign_service_to_user,
+    assign_review_to_user,
+    get_user_assignments,
+    reassign_user_work,
+    get_user_workload_summary,
+    get_project_lead_user_id,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -1154,9 +1171,173 @@ def api_projects_stats():
 
 @app.route('/api/users', methods=['GET'])
 def api_get_users():
-    users = get_users_list()
-    data = [{'user_id': uid, 'name': name} for uid, name in users]
-    return jsonify(data)
+    """Get all users with full details."""
+    users = get_all_users()
+    return jsonify(users)
+
+
+@app.route('/api/users', methods=['POST'])
+def api_create_user():
+    """Create a new user."""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data.get('name') or not data.get('name').strip():
+            return jsonify({'error': 'User name is required'}), 400
+        if not data.get('email') or not data.get('email').strip():
+            return jsonify({'error': 'Email is required'}), 400
+        
+        # Role is optional, default to 'User'
+        role = data.get('role', 'User').strip()
+        name = data.get('name').strip()
+        email = data.get('email').strip()
+        
+        if create_user(name, role, email):
+            return jsonify({'message': 'User created successfully'}), 201
+        else:
+            return jsonify({'error': 'Failed to create user'}), 500
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+def api_update_user(user_id):
+    """Update an existing user."""
+    try:
+        data = request.get_json()
+        
+        # Validate at least one field is provided
+        if not any(data.get(field) is not None for field in ['name', 'role', 'email']):
+            return jsonify({'error': 'At least one field must be provided'}), 400
+        
+        # Validate name and email if provided
+        if data.get('name') is not None and not data.get('name').strip():
+            return jsonify({'error': 'User name cannot be empty'}), 400
+        if data.get('email') is not None and not data.get('email').strip():
+            return jsonify({'error': 'Email cannot be empty'}), 400
+        
+        if update_user(
+            user_id,
+            name=data.get('name').strip() if data.get('name') else None,
+            role=data.get('role').strip() if data.get('role') else None,
+            email=data.get('email').strip() if data.get('email') else None
+        ):
+            return jsonify({'message': 'User updated successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to update user'}), 500
+    except Exception as e:
+        logger.error(f"Error updating user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+def api_delete_user(user_id):
+    """Delete a user."""
+    try:
+        if delete_user(user_id):
+            return jsonify({'message': 'User deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to delete user'}), 500
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- User Assignment Endpoints ---
+
+@app.route('/api/services/<int:service_id>/assign', methods=['PUT'])
+def api_assign_service(service_id):
+    """Assign a service to a user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if user_id is None:
+            return jsonify({'error': 'user_id is required'}), 400
+        
+        if assign_service_to_user(service_id, user_id):
+            return jsonify({'message': 'Service assigned successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to assign service'}), 500
+    except Exception as e:
+        logger.error(f"Error assigning service: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reviews/<int:review_id>/assign', methods=['PUT'])
+def api_assign_review(review_id):
+    """Assign a review to a user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if user_id is None:
+            return jsonify({'error': 'user_id is required'}), 400
+        
+        if assign_review_to_user(review_id, user_id):
+            return jsonify({'message': 'Review assigned successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to assign review'}), 500
+    except Exception as e:
+        logger.error(f"Error assigning review: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/<int:user_id>/assignments', methods=['GET'])
+def api_get_user_assignments(user_id):
+    """Get all assignments for a user."""
+    try:
+        assignments = get_user_assignments(user_id)
+        return jsonify(assignments), 200
+    except Exception as e:
+        logger.error(f"Error getting user assignments: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/reassign', methods=['POST'])
+def api_reassign_user_work():
+    """Reassign work from one user to another."""
+    try:
+        data = request.get_json()
+        from_user_id = data.get('from_user_id')
+        to_user_id = data.get('to_user_id')
+        project_id = data.get('project_id')  # Optional
+        
+        if from_user_id is None or to_user_id is None:
+            return jsonify({'error': 'from_user_id and to_user_id are required'}), 400
+        
+        result = reassign_user_work(from_user_id, to_user_id, project_id)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error reassigning user work: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/workload', methods=['GET'])
+def api_get_user_workload():
+    """Get workload summary for all users."""
+    try:
+        workload = get_user_workload_summary()
+        return jsonify(workload), 200
+    except Exception as e:
+        logger.error(f"Error getting user workload: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/lead-user', methods=['GET'])
+def api_get_project_lead_user(project_id):
+    """Get the user_id of the project's internal lead."""
+    try:
+        user_id = get_project_lead_user_id(project_id)
+        if user_id is not None:
+            return jsonify({'user_id': user_id}), 200
+        else:
+            return jsonify({'error': 'Project lead not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting project lead user: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/reference/<table>', methods=['GET'])
@@ -2115,6 +2296,162 @@ def api_dashboard_issues_history():
         return jsonify({'error': 'Failed to fetch issues history', 'details': str(e)}), 500
 
 
+@app.route('/api/dashboard/revit-health', methods=['GET'])
+def api_dashboard_revit_health():
+    """Return aggregated Revit model health metrics for the dashboard."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        metrics = get_revit_health_dashboard_summary(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+        )
+        return jsonify(metrics)
+    except Exception as e:
+        logging.exception("Error fetching Revit health dashboard metrics")
+        return jsonify({'error': 'Failed to fetch Revit health metrics', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/naming-compliance', methods=['GET'])
+def api_dashboard_naming_compliance():
+    """Return file naming compliance metrics for the dashboard."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        metrics = get_naming_compliance_dashboard_metrics(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+        )
+        return jsonify(metrics)
+    except Exception as e:
+        logging.exception("Error fetching naming compliance metrics")
+        return jsonify({'error': 'Failed to fetch naming compliance', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/naming-compliance/table', methods=['GET'])
+def api_dashboard_naming_compliance_table():
+    """Paginated naming compliance rows."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "validated_date")
+        sort_dir = request.args.get("sort_dir", "desc")
+        data = get_naming_compliance_table(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching naming compliance table")
+        return jsonify({'error': 'Failed to fetch naming compliance table', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/control-points', methods=['GET'])
+def api_dashboard_control_points():
+    """Control/Survey point compliance rows + project summary."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "validated_date")
+        sort_dir = request.args.get("sort_dir", "desc")
+        data = get_control_points_dashboard(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching control points dashboard")
+        return jsonify({'error': 'Failed to fetch control points', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/model-register', methods=['GET'])
+def api_dashboard_model_register():
+    """Model register (Revit-derived) paginated."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "last_seen_at")
+        sort_dir = request.args.get("sort_dir", "desc")
+        data = get_model_register(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching model register")
+        return jsonify({'error': 'Failed to fetch model register', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/issues-detail', methods=['GET'])
+def api_dashboard_issues_detail():
+    """Revizto issues detail with latest comment."""
+    try:
+        project_uuid = request.args.get("project_uuid")
+        status = request.args.get("status")
+        priority = request.args.get("priority")
+        location = request.args.get("location")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "updated_at")
+        sort_dir = request.args.get("sort_dir", "desc")
+        data = get_revizto_issues_detail(
+            project_uuid=project_uuid or None,
+            status=status or None,
+            priority=priority or None,
+            location=location or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching issues detail")
+        return jsonify({'error': 'Failed to fetch issues detail', 'details': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/revit-health/revalidate-naming', methods=['POST'])
+def api_revalidate_project_naming(project_id: int):
+    """Re-run Revit naming validation for a specific project."""
+    try:
+        stats = revalidate_revit_naming(project_ids=[project_id])
+        status_code = 200 if "error" not in stats else 500
+        return jsonify(stats), status_code
+    except Exception as e:
+        logging.exception("Error revalidating naming for project %s", project_id)
+        return jsonify({'error': 'Failed to revalidate naming', 'details': str(e)}), 500
+
+
+@app.route('/api/revit-health/revalidate-naming', methods=['POST'])
+def api_revalidate_all_naming():
+    """Re-run Revit naming validation for all projects (admin use)."""
+    try:
+        stats = revalidate_revit_naming()
+        status_code = 200 if "error" not in stats else 500
+        return jsonify(stats), status_code
+    except Exception as e:
+        logging.exception("Error revalidating naming (all projects)")
+        return jsonify({'error': 'Failed to revalidate naming', 'details': str(e)}), 500
+
+
 @app.route('/api/project_bookmarks/<int:project_id>', methods=['GET', 'POST'])
 def api_project_bookmarks_enhanced(project_id):
     """Enhanced project bookmarks API"""
@@ -2310,6 +2647,114 @@ def api_get_resources():
 # ============================================================================
 # DATA IMPORTS API ENDPOINTS
 # ============================================================================
+
+# --- Desktop File/Folder Browser (native dialogs) ---
+
+@app.route('/api/file-browser/select-file', methods=['POST'])
+def select_file():
+    """Open a native file dialog and return the selected file path."""
+    options = request.get_json() or {}
+    title = options.get('title') or "Select File"
+    file_types = options.get('file_types') or [["All Files", "*.*"]]
+    initial_dir = options.get('initial_dir') or os.getcwd()
+
+    def _normalize_file_types(raw_types):
+        normalized: list[tuple[str, str]] = []
+        for entry in raw_types:
+            if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                normalized.append((str(entry[0]), str(entry[1])))
+        return normalized or [("All Files", "*.*")]
+
+    root = None
+    try:
+        from tkinter import Tk, filedialog
+
+        root = Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            # Some platforms/window managers may not support this attribute
+            pass
+
+        file_path = filedialog.askopenfilename(
+            title=title,
+            filetypes=_normalize_file_types(file_types),
+            initialdir=initial_dir,
+        )
+    except Exception as exc:
+        logging.exception("Error opening file selection dialog")
+        return jsonify({
+            "success": False,
+            "error": "file_dialog_unavailable",
+            "message": str(exc),
+        }), 500
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+    if not file_path:
+        return jsonify({"success": False, "message": "No file selected"})
+
+    return jsonify({
+        "success": True,
+        "file_path": file_path,
+        "file_name": os.path.basename(file_path),
+        "exists": os.path.exists(file_path),
+    })
+
+
+@app.route('/api/file-browser/select-folder', methods=['POST'])
+def select_folder():
+    """Open a native folder dialog and return the selected folder path."""
+    options = request.get_json() or {}
+    title = options.get('title') or "Select Folder"
+    initial_dir = options.get('initial_dir') or os.getcwd()
+
+    root = None
+    try:
+        from tkinter import Tk, filedialog
+
+        root = Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        folder_path = filedialog.askdirectory(
+            title=title,
+            initialdir=initial_dir,
+            mustexist=True,
+        )
+    except Exception as exc:
+        logging.exception("Error opening folder selection dialog")
+        return jsonify({
+            "success": False,
+            "error": "folder_dialog_unavailable",
+            "message": str(exc),
+        }), 500
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+    if not folder_path:
+        return jsonify({"success": False, "message": "No folder selected"})
+
+    normalized_path = os.path.normpath(folder_path)
+    return jsonify({
+        "success": True,
+        "folder_path": normalized_path,
+        "folder_name": os.path.basename(normalized_path),
+        "exists": os.path.exists(normalized_path),
+    })
+
 
 # --- ACC Desktop Connector File Extraction ---
 

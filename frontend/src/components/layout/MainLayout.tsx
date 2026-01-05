@@ -13,6 +13,10 @@ import {
   Toolbar,
   Typography,
   Divider,
+  Breadcrumbs,
+  Link as MuiLink,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -23,6 +27,7 @@ import {
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   CloudUpload as CloudUploadIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -36,9 +41,9 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Projects', icon: <FolderIcon />, path: '/projects' },
+  { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
   { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
-  { text: 'Reviews', icon: <CheckCircleIcon />, path: '/reviews' },
+  { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
   { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
 ];
@@ -49,11 +54,43 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const breadcrumbs = (() => {
+    const segments = location.pathname.split('/').filter(Boolean);
+    if (!segments.length) return [];
+
+    const labelMap: Record<string, string> = {
+      projects: 'Projects',
+      'data-imports': 'Data Imports',
+      analytics: 'Analytics',
+      tasks: 'Tasks',
+      reviews: 'Reviews',
+    };
+
+    const items: { label: string; path: string }[] = [];
+    let cumulative = '';
+    segments.forEach((segment, idx) => {
+      cumulative += `/${segment}`;
+      const label =
+        labelMap[segment] ||
+        (idx === 1 && segments[0] === 'projects' ? `Project ${segment}` : segment);
+      items.push({ label, path: cumulative });
+    });
+
+    return items;
+  })();
+
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = search.trim();
+    navigate(trimmed ? `/projects?search=${encodeURIComponent(trimmed)}` : '/projects');
   };
 
   const drawer = (
@@ -116,9 +153,60 @@ export function MainLayout({ children }: MainLayoutProps) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            BIM Project Management System
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" noWrap component="div">
+                BIM Project Management System
+              </Typography>
+              {breadcrumbs.length > 0 && (
+                <Breadcrumbs aria-label="breadcrumb" sx={{ color: 'common.white', mt: 0.25 }}>
+                  <MuiLink
+                    underline="hover"
+                    color="inherit"
+                    onClick={() => navigate('/')}
+                    sx={{ cursor: 'pointer' }}
+                  >
+                    Dashboard
+                  </MuiLink>
+                  {breadcrumbs.map((crumb, idx) =>
+                    idx === breadcrumbs.length - 1 ? (
+                      <Typography key={crumb.path} color="inherit">
+                        {crumb.label}
+                      </Typography>
+                    ) : (
+                      <MuiLink
+                        key={crumb.path}
+                        underline="hover"
+                        color="inherit"
+                        onClick={() => navigate(crumb.path)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        {crumb.label}
+                      </MuiLink>
+                    ),
+                  )}
+                </Breadcrumbs>
+              )}
+            </Box>
+            <Box sx={{ flexGrow: 1 }} />
+            <Box component="form" onSubmit={submitSearch} sx={{ minWidth: { xs: '100%', sm: 280 }, maxWidth: 400 }}>
+              <TextField
+                size="small"
+                variant="outlined"
+                fullWidth
+                placeholder="Global search (projects, services)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+          </Box>
         </Toolbar>
       </AppBar>
       <Box

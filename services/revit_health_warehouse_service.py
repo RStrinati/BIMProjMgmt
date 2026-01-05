@@ -373,6 +373,260 @@ class RevitHealthWarehouseService:
         except Exception as e:
             logger.exception("❌ Error getting all projects summary")
             return []
+    
+    # ========================================
+    # DATA WAREHOUSE MART METHODS
+    # ========================================
+    
+    def get_project_health_from_warehouse(self, project_id: int) -> Dict:
+        """
+        Get project health from data warehouse fact table
+        More performant than querying operational view for analytics
+        
+        Args:
+            project_id: Project ID from ProjectManagement DB
+            
+        Returns:
+            Dictionary with warehouse health metrics and compliance data
+        """
+        try:
+            with get_db_connection('ProjectManagement') as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT 
+                        project_name,
+                        project_number,
+                        client_name,
+                        total_files,
+                        control_model_files,
+                        avg_health_score,
+                        min_health_score,
+                        max_health_score,
+                        good_files,
+                        fair_files,
+                        poor_files,
+                        critical_files,
+                        total_warnings,
+                        total_critical_warnings,
+                        naming_compliance_pct,
+                        coordinates_compliance_pct,
+                        grids_compliance_pct,
+                        levels_compliance_pct,
+                        overall_compliance_pct,
+                        last_health_check_date,
+                        avg_days_since_export
+                    FROM mart.v_project_health_summary
+                    WHERE project_id = ?
+                """, (project_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'project_name': row[0],
+                        'project_number': row[1],
+                        'client_name': row[2],
+                        'total_files': row[3] or 0,
+                        'control_model_files': row[4] or 0,
+                        'avg_health_score': round(float(row[5]), 2) if row[5] else 0,
+                        'min_health_score': row[6] or 0,
+                        'max_health_score': row[7] or 0,
+                        'health_distribution': {
+                            'good': row[8] or 0,
+                            'fair': row[9] or 0,
+                            'poor': row[10] or 0,
+                            'critical': row[11] or 0
+                        },
+                        'total_warnings': row[12] or 0,
+                        'total_critical_warnings': row[13] or 0,
+                        'validation_compliance': {
+                            'naming': round(float(row[14]), 2) if row[14] else 0,
+                            'coordinates': round(float(row[15]), 2) if row[15] else 0,
+                            'grids': round(float(row[16]), 2) if row[16] else 0,
+                            'levels': round(float(row[17]), 2) if row[17] else 0,
+                            'overall': round(float(row[18]), 2) if row[18] else 0
+                        },
+                        'last_check': row[19].isoformat() if row[19] else None,
+                        'avg_days_since_export': round(float(row[20]), 1) if row[20] else 0
+                    }
+                    
+                return {}
+                    
+        except Exception as e:
+            logger.exception(f"❌ Error getting warehouse health for project {project_id}")
+            return {}
+    
+    def get_health_trends_from_warehouse(self, project_id: int, months: int = 6) -> pd.DataFrame:
+        """
+        Get health trends from warehouse (more efficient than operational query)
+        
+        Args:
+            project_id: Project ID
+            months: Number of months to look back
+            
+        Returns:
+            DataFrame with monthly health trends
+        """
+        try:
+            with get_db_connection('ProjectManagement') as conn:
+                query = """
+                    SELECT 
+                        year_month_name,
+                        discipline_code,
+                        files_checked,
+                        avg_health_score,
+                        total_warnings,
+                        naming_compliance_pct,
+                        coordinates_compliance_pct,
+                        grids_compliance_pct,
+                        levels_compliance_pct,
+                        overall_compliance_pct,
+                        avg_file_size_mb,
+                        avg_view_efficiency_pct
+                    FROM mart.v_health_trends_monthly
+                    WHERE project_id = ?
+                      AND year_month >= FORMAT(DATEADD(MONTH, -?, GETDATE()), 'yyyy-MM')
+                    ORDER BY year_number DESC, month_number DESC
+                """
+                
+                df = pd.read_sql(query, conn, params=(project_id, months))
+                return df
+                
+        except Exception as e:
+            logger.exception(f"❌ Error getting warehouse health trends for project {project_id}")
+            return pd.DataFrame()
+    
+    def get_all_projects_from_warehouse(self) -> List[Dict]:
+        """
+        Get all projects health summary from warehouse marts
+        Optimized for dashboard display with latest metrics
+        
+        Returns:
+            List of project health summaries with key metrics
+        """
+        try:
+            with get_db_connection('ProjectManagement') as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT 
+                        project_id,
+                        project_name,
+                        project_number,
+                        client_name,
+                        project_status,
+                        total_files,
+                        avg_health_score,
+                        good_files,
+                        fair_files,
+                        poor_files,
+                        critical_files,
+                        total_warnings,
+                        overall_compliance_pct,
+                        last_health_check_date
+                    FROM mart.v_project_health_summary
+                    ORDER BY project_name
+                """)
+                
+                return [{
+                    'project_id': row[0],
+                    'project_name': row[1],
+                    'project_number': row[2],
+                    'client_name': row[3],
+                    'project_status': row[4],
+                    'total_files': row[5] or 0,
+                    'avg_health_score': round(float(row[6]), 2) if row[6] else 0,
+                    'good_files': row[7] or 0,
+                    'fair_files': row[8] or 0,
+                    'poor_files': row[9] or 0,
+                    'critical_files': row[10] or 0,
+                    'total_warnings': row[11] or 0,
+                    'overall_compliance': round(float(row[12]), 2) if row[12] else 0,
+                    'last_check': row[13].isoformat() if row[13] else None
+                } for row in cursor.fetchall()]
+                
+        except Exception as e:
+            logger.exception("❌ Error getting all projects from warehouse")
+            return []
+    
+    def get_discipline_health_trends(self, project_id: int, discipline_code: str, months: int = 12) -> pd.DataFrame:
+        """
+        Get health trends for specific discipline
+        
+        Args:
+            project_id: Project ID
+            discipline_code: Discipline code (A, S, M, E, P, etc.)
+            months: Number of months to look back
+            
+        Returns:
+            DataFrame with discipline-specific trends
+        """
+        try:
+            with get_db_connection('ProjectManagement') as conn:
+                query = """
+                    SELECT 
+                        year_month_name,
+                        files_checked,
+                        avg_health_score,
+                        total_warnings,
+                        avg_warnings_per_file,
+                        naming_compliance_pct,
+                        coordinates_compliance_pct,
+                        overall_compliance_pct,
+                        avg_file_size_mb,
+                        very_large_files
+                    FROM mart.v_health_trends_monthly
+                    WHERE project_id = ?
+                      AND discipline_code = ?
+                      AND year_month >= FORMAT(DATEADD(MONTH, -?, GETDATE()), 'yyyy-MM')
+                    ORDER BY year_number DESC, month_number DESC
+                """
+                
+                df = pd.read_sql(query, conn, params=(project_id, discipline_code, months))
+                return df
+                
+        except Exception as e:
+            logger.exception(f"❌ Error getting discipline health trends for {discipline_code}")
+            return pd.DataFrame()
+    
+    def run_warehouse_etl(self, debug: bool = True) -> Tuple[bool, str]:
+        """
+        Execute warehouse ETL to load latest health data into fact tables
+        
+        Args:
+            debug: Enable debug output
+            
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            with get_db_connection('ProjectManagement') as conn:
+                cursor = conn.cursor()
+                
+                # Step 1: Load staging
+                logger.info("Loading staging table...")
+                cursor.execute(f"EXEC warehouse.usp_load_stg_revit_health @debug = ?", (1 if debug else 0,))
+                
+                # Get output messages
+                messages = []
+                while cursor.nextset():
+                    pass
+                
+                # Step 2: Load fact table
+                logger.info("Loading fact table...")
+                cursor.execute(f"EXEC warehouse.usp_load_fact_revit_health_daily @debug = ?", (1 if debug else 0,))
+                
+                while cursor.nextset():
+                    pass
+                
+                conn.commit()
+                
+                logger.info("✅ Warehouse ETL completed successfully")
+                return True, "ETL completed successfully"
+                
+        except Exception as e:
+            logger.exception(f"❌ Error running warehouse ETL: {e}")
+            return False, str(e)
 
 
 def get_warehouse_service() -> RevitHealthWarehouseService:

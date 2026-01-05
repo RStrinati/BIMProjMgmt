@@ -1,5 +1,9 @@
 import apiClient from './client';
-import type { WarehouseDashboardMetrics } from '@/types/api';
+import type {
+  WarehouseDashboardMetrics,
+  RevitHealthDashboardMetrics,
+  NamingComplianceMetrics,
+} from '@/types/api';
 
 export const dashboardApi = {
   getWarehouseMetrics: async (options?: {
@@ -29,5 +33,25 @@ export const dashboardApi = {
       status: string;
       count: number;
     }[];
+  },
+
+  getRevitHealthMetrics: async (options?: { projectIds?: number[]; discipline?: string }): Promise<RevitHealthDashboardMetrics> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    const response = await apiClient.get<RevitHealthDashboardMetrics>('/dashboard/revit-health', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
+  getNamingCompliance: async (options?: { projectIds?: number[]; discipline?: string }): Promise<NamingComplianceMetrics> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    const response = await apiClient.get<NamingComplianceMetrics>('/dashboard/naming-compliance', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
   },
 };

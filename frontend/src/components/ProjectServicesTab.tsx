@@ -1036,7 +1036,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
         disciplines: review.disciplines || '',
         deliverables: review.deliverables || '',
         status: review.status,
-        weight_factor: review.weight_factor,
+        weight_factor: review.weight_factor ?? 1,
         invoice_reference: review.invoice_reference || '',
         evidence_links: review.evidence_links || '',
         is_billed: review.is_billed ?? (review.status === 'completed'),

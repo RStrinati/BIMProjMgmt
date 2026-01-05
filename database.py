@@ -98,18 +98,20 @@ def get_project_services(project_id):
             cursor = conn.cursor()
             cursor.execute(
                 f"""
-                SELECT {S.ProjectServices.SERVICE_ID}, {S.ProjectServices.PROJECT_ID}, 
-                       {S.ProjectServices.PHASE}, {S.ProjectServices.SERVICE_CODE}, 
-                       {S.ProjectServices.SERVICE_NAME}, {S.ProjectServices.UNIT_TYPE}, 
-                       {S.ProjectServices.UNIT_QTY}, {S.ProjectServices.UNIT_RATE}, 
-                       {S.ProjectServices.LUMP_SUM_FEE}, {S.ProjectServices.AGREED_FEE}, 
-                       {S.ProjectServices.BILL_RULE}, {S.ProjectServices.NOTES}, 
-                       {S.ProjectServices.CREATED_AT}, {S.ProjectServices.UPDATED_AT}, 
-                       {S.ProjectServices.STATUS}, {S.ProjectServices.PROGRESS_PCT}, 
-                       {S.ProjectServices.CLAIMED_TO_DATE}
-                FROM {S.ProjectServices.TABLE} 
-                WHERE {S.ProjectServices.PROJECT_ID} = ?
-                ORDER BY {S.ProjectServices.CREATED_AT}
+                SELECT ps.{S.ProjectServices.SERVICE_ID}, ps.{S.ProjectServices.PROJECT_ID}, 
+                       ps.{S.ProjectServices.PHASE}, ps.{S.ProjectServices.SERVICE_CODE}, 
+                       ps.{S.ProjectServices.SERVICE_NAME}, ps.{S.ProjectServices.UNIT_TYPE}, 
+                       ps.{S.ProjectServices.UNIT_QTY}, ps.{S.ProjectServices.UNIT_RATE}, 
+                       ps.{S.ProjectServices.LUMP_SUM_FEE}, ps.{S.ProjectServices.AGREED_FEE}, 
+                       ps.{S.ProjectServices.BILL_RULE}, ps.{S.ProjectServices.NOTES}, 
+                       ps.{S.ProjectServices.CREATED_AT}, ps.{S.ProjectServices.UPDATED_AT}, 
+                       ps.{S.ProjectServices.STATUS}, ps.{S.ProjectServices.PROGRESS_PCT}, 
+                       ps.{S.ProjectServices.CLAIMED_TO_DATE}, ps.{S.ProjectServices.ASSIGNED_USER_ID},
+                       u.{S.Users.NAME} AS assigned_user_name
+                FROM {S.ProjectServices.TABLE} ps
+                LEFT JOIN {S.Users.TABLE} u ON ps.{S.ProjectServices.ASSIGNED_USER_ID} = u.{S.Users.ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+                ORDER BY ps.{S.ProjectServices.CREATED_AT}
                 """,
                 (project_id,)
             )
@@ -131,7 +133,9 @@ def get_project_services(project_id):
                 updated_at=row[13],
                 status=row[14],
                 progress_pct=row[15],
-                claimed_to_date=row[16]
+                claimed_to_date=row[16],
+                assigned_user_id=row[17],
+                assigned_user_name=row[18],
             ) for row in rows]
 
             if not services:
@@ -1305,6 +1309,24 @@ _SERVICE_REVIEW_BILLING_COLUMN_DEFINITIONS = [
     (S.ServiceReviews.BILLING_RATE, "DECIMAL(18,2) NULL"),
     (S.ServiceReviews.BILLING_AMOUNT, "DECIMAL(18,2) NULL"),
 ]
+
+
+def _serialize_datetime(value):
+    """
+    Safely serialize datetime/date values (including pyodbc/pandas types) to ISO strings.
+    Falls back to str() for unexpected values.
+    """
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+    except Exception:
+        pass
+    try:
+        return value.isoformat()
+    except Exception:
+        return str(value)
 
 
 def _ensure_control_model_metadata_column(conn) -> bool:
@@ -4932,11 +4954,112 @@ def get_warehouse_dashboard_metrics(
                 "avg_progress_pct": float(sf_row[3]) if sf_row and sf_row[3] is not None else None,
             }
 
+            # Backlog age distribution using latest snapshot
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk FROM fact.issue_snapshot
+                )
+                SELECT
+                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 0 AND 7 THEN 1 ELSE 0 END) AS bucket_0_7,
+                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 8 AND 30 THEN 1 ELSE 0 END) AS bucket_8_30,
+                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 31 AND 90 THEN 1 ELSE 0 END) AS bucket_31_90,
+                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) > 90 THEN 1 ELSE 0 END) AS bucket_90_plus,
+                    AVG(NULLIF(s.backlog_age_days, 0)) AS avg_age_days
+                FROM fact.issue_snapshot s WITH (NOLOCK)
+                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                LEFT JOIN dim.client c ON s.client_sk = c.client_sk
+                LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
+                WHERE (p.current_flag = 1 OR p.current_flag IS NULL)
+                {proj_filter_sql}
+                {client_filter_sql}
+                {type_filter_sql}
+                """
+            , tuple(filter_params))
+            backlog_row = cursor.fetchone() or [0, 0, 0, 0, None]
+            backlog_age = {
+                "bucket_0_7": int(backlog_row[0] or 0),
+                "bucket_8_30": int(backlog_row[1] or 0),
+                "bucket_31_90": int(backlog_row[2] or 0),
+                "bucket_90_plus": int(backlog_row[3] or 0),
+                "avg_age_days": float(backlog_row[4]) if backlog_row[4] is not None else None,
+            }
+
+            # Model readiness (control model coverage) from project DB
+            ctrl_models = {"projects_with_control_models": 0, "projects_missing_control_models": 0}
+            try:
+                with get_db_connection() as pm_conn:
+                    pm_cursor = pm_conn.cursor()
+                    ctrl_params: List[Any] = []
+                    ctrl_filter_sql = ""
+                    if project_ids:
+                        placeholders = ", ".join("?" for _ in project_ids)
+                        ctrl_filter_sql = f" AND project_id IN ({placeholders})"
+                        ctrl_params.extend(project_ids)
+                    pm_cursor.execute(
+                        f"""
+                        SELECT COUNT(DISTINCT project_id)
+                        FROM ProjectManagement.dbo.tblControlModels
+                        WHERE ISNULL(is_active, 0) = 1
+                        {ctrl_filter_sql}
+                        """
+                    , tuple(ctrl_params))
+                    active_count = pm_cursor.fetchone()
+                    active_value = int(active_count[0] or 0) if active_count else 0
+                    total_projects = int(project_health.get("projects") or 0)
+                    ctrl_models["projects_with_control_models"] = active_value
+                    ctrl_models["projects_missing_control_models"] = max(total_projects - active_value, 0)
+            except Exception as ctrl_exc:
+                logger.warning("Failed to compute control model readiness: %s", ctrl_exc)
+
+            # Data freshness from latest Revizto and ACC imports
+            data_freshness = {
+                "revizto_last_run": None,
+                "revizto_projects_extracted": None,
+                "acc_last_import": None,
+                "acc_last_import_project_id": None,
+            }
+            try:
+                last_run = get_last_revizto_extraction_run()
+                if last_run:
+                    data_freshness["revizto_last_run"] = _serialize_datetime(last_run.get("end_time") or last_run.get("start_time"))
+                    data_freshness["revizto_projects_extracted"] = last_run.get("projects_extracted")
+            except Exception as rev_exc:
+                logger.warning("Failed to fetch last Revizto run: %s", rev_exc)
+
+            try:
+                with get_db_connection() as pm_conn:
+                    pm_cursor = pm_conn.cursor()
+                    acc_params: List[Any] = []
+                    acc_filter_sql = ""
+                    if project_ids:
+                        placeholders = ", ".join("?" for _ in project_ids)
+                        acc_filter_sql = f" WHERE project_id IN ({placeholders})"
+                        acc_params.extend(project_ids)
+                    pm_cursor.execute(
+                        f"""
+                        SELECT TOP 1 project_id, import_date
+                        FROM {S.ACCImportLogs.TABLE}
+                        {acc_filter_sql}
+                        ORDER BY import_date DESC
+                        """
+                    , tuple(acc_params))
+                    acc_row = pm_cursor.fetchone()
+                    if acc_row:
+                        data_freshness["acc_last_import_project_id"] = acc_row[0]
+                        data_freshness["acc_last_import"] = _serialize_datetime(acc_row[1])
+            except Exception as acc_exc:
+                logger.warning("Failed to fetch ACC import freshness: %s", acc_exc)
+
             return {
                 "project_health": project_health,
                 "issue_trends": issue_trends,
                 "review_performance": review_performance,
                 "service_financials": service_financials,
+                "backlog_age": backlog_age,
+                "control_models": ctrl_models,
+                "data_freshness": data_freshness,
             }
     except Exception as e:
         logger.error(f"Error fetching warehouse dashboard metrics: {e}")
@@ -5027,6 +5150,874 @@ def get_warehouse_issues_history(
     except Exception as e:
         logger.error(f"Error fetching warehouse issues history: {e}")
         return []
+
+
+def get_revit_health_dashboard_summary(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Aggregate model health statistics for dashboard use from fact.revit_health_daily.
+
+    Returns overall summary plus month-level trend of average health scores.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Latest record per file to avoid double-counting historical snapshots
+            where_clauses = []
+            params: List[Any] = []
+
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"f.project_key IN ({placeholders})")
+                params.extend(project_ids)
+
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(df.discipline_code,'')) = LOWER(?)")
+                params.append(discipline)
+
+            where_sql = ""
+            if where_clauses:
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+
+            cursor.execute(
+                f"""
+                WITH latest_per_file AS (
+                    SELECT
+                        f.*,
+                        df.discipline_code,
+                        df.discipline_full_name,
+                        df.file_name_bk,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY f.project_key, f.file_name_key
+                            ORDER BY f.export_datetime DESC, f.health_fact_id DESC
+                        ) AS rn
+                    FROM fact.revit_health_daily f
+                    INNER JOIN dim.revit_file df
+                        ON f.file_name_key = df.revit_file_key
+                       AND df.current_flag = 1
+                    {where_sql}
+                ),
+                latest AS (
+                    SELECT * FROM latest_per_file WHERE rn = 1
+                )
+                SELECT
+                    COUNT(*) AS total_files,
+                    COUNT(DISTINCT project_key) AS projects,
+                    AVG(CAST(health_score AS FLOAT)) AS avg_health_score,
+                    MIN(health_score) AS min_health_score,
+                    MAX(health_score) AS max_health_score,
+                    SUM(CASE WHEN health_category = 'Good' THEN 1 ELSE 0 END) AS good_files,
+                    SUM(CASE WHEN health_category = 'Fair' THEN 1 ELSE 0 END) AS fair_files,
+                    SUM(CASE WHEN health_category = 'Poor' THEN 1 ELSE 0 END) AS poor_files,
+                    SUM(CASE WHEN health_category = 'Critical' THEN 1 ELSE 0 END) AS critical_files,
+                    SUM(CASE WHEN link_health_flag LIKE '%Issue%' THEN 1 ELSE 0 END) AS files_with_link_issues,
+                    SUM(total_warnings) AS total_warnings,
+                    SUM(critical_warnings) AS total_critical_warnings,
+                    MAX(export_datetime) AS latest_check_date
+                FROM latest
+                """
+            , tuple(params))
+            summary_row = cursor.fetchone() or [None] * 13
+            summary = {
+                "total_files": summary_row[0] or 0,
+                "projects": summary_row[1] or 0,
+                "avg_health_score": float(summary_row[2]) if summary_row[2] is not None else None,
+                "min_health_score": summary_row[3],
+                "max_health_score": summary_row[4],
+                "good_files": summary_row[5] or 0,
+                "fair_files": summary_row[6] or 0,
+                "poor_files": summary_row[7] or 0,
+                "critical_files": summary_row[8] or 0,
+                "files_with_link_issues": summary_row[9] or 0,
+                "total_warnings": summary_row[10] or 0,
+                "total_critical_warnings": summary_row[11] or 0,
+                "latest_check_date": summary_row[12].isoformat() if summary_row[12] else None,
+            }
+
+            total_files = summary["total_files"] or 0
+            categories = {
+                "good": {
+                    "count": summary["good_files"],
+                    "pct": round((summary["good_files"] / total_files) * 100, 1) if total_files else None,
+                },
+                "fair": {
+                    "count": summary["fair_files"],
+                    "pct": round((summary["fair_files"] / total_files) * 100, 1) if total_files else None,
+                },
+                "poor": {
+                    "count": summary["poor_files"],
+                    "pct": round((summary["poor_files"] / total_files) * 100, 1) if total_files else None,
+                },
+                "critical": {
+                    "count": summary["critical_files"],
+                    "pct": round((summary["critical_files"] / total_files) * 100, 1) if total_files else None,
+                },
+            }
+
+            # Monthly trend of average health score (last 6 months)
+            cursor.execute(
+                f"""
+                WITH latest_per_file AS (
+                    SELECT
+                        f.*,
+                        df.discipline_code,
+                        df.discipline_full_name,
+                        df.file_name_bk,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY f.project_key, f.file_name_key
+                            ORDER BY f.export_datetime DESC, f.health_fact_id DESC
+                        ) AS rn
+                    FROM fact.revit_health_daily f
+                    INNER JOIN dim.revit_file df
+                        ON f.file_name_key = df.revit_file_key
+                       AND df.current_flag = 1
+                    {where_sql}
+                ),
+                latest AS (
+                    SELECT * FROM latest_per_file WHERE rn = 1
+                )
+                SELECT TOP 6
+                    FORMAT(export_datetime, 'yyyy-MM') AS year_month,
+                    CAST(AVG(CAST(health_score AS FLOAT)) AS DECIMAL(10,2)) AS avg_health_score,
+                    COUNT(*) AS files
+                FROM latest
+                GROUP BY FORMAT(export_datetime, 'yyyy-MM')
+                ORDER BY year_month DESC
+                """
+            , tuple(params))
+            trend = [
+                {
+                    "year_month": row[0],
+                    "avg_health_score": float(row[1]) if row[1] is not None else None,
+                    "files": int(row[2] or 0),
+                }
+                for row in cursor.fetchall()
+            ]
+
+            # Breakdown by discipline (current flag only)
+            cursor.execute(
+                f"""
+                WITH latest_per_file AS (
+                    SELECT
+                        f.*,
+                        df.discipline_code,
+                        df.discipline_full_name,
+                        df.file_name_bk,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY f.project_key, f.file_name_key
+                            ORDER BY f.export_datetime DESC, f.health_fact_id DESC
+                        ) AS rn
+                    FROM fact.revit_health_daily f
+                    INNER JOIN dim.revit_file df
+                        ON f.file_name_key = df.revit_file_key
+                       AND df.current_flag = 1
+                    {where_sql}
+                ),
+                latest AS (
+                    SELECT * FROM latest_per_file WHERE rn = 1
+                )
+                SELECT
+                    ISNULL(NULLIF(discipline_code, ''), 'Unknown') AS discipline,
+                    discipline_full_name,
+                    COUNT(*) AS files,
+                    CAST(AVG(CAST(health_score AS FLOAT)) AS DECIMAL(10,2)) AS avg_health_score,
+                    SUM(total_warnings) AS total_warnings,
+                    SUM(critical_warnings) AS total_critical_warnings,
+                    SUM(CASE WHEN link_health_flag LIKE '%Issue%' THEN 1 ELSE 0 END) AS files_with_link_issues,
+                    SUM(CASE WHEN health_category = 'Good' THEN 1 ELSE 0 END) AS good_files,
+                    SUM(CASE WHEN health_category = 'Fair' THEN 1 ELSE 0 END) AS fair_files,
+                    SUM(CASE WHEN health_category = 'Poor' THEN 1 ELSE 0 END) AS poor_files,
+                    SUM(CASE WHEN health_category = 'Critical' THEN 1 ELSE 0 END) AS critical_files
+                FROM latest
+                GROUP BY ISNULL(NULLIF(discipline_code, ''), 'Unknown'), discipline_full_name
+                ORDER BY files DESC
+                """
+            , tuple(params))
+            by_discipline = [
+                {
+                    "discipline": row[0],
+                    "discipline_full_name": row[1],
+                    "total_files": int(row[2] or 0),
+                    "avg_health_score": float(row[3]) if row[3] is not None else None,
+                    "total_warnings": int(row[4] or 0),
+                    "total_critical_warnings": int(row[5] or 0),
+                    "files_with_link_issues": int(row[6] or 0),
+                    "good_files": int(row[7] or 0),
+                    "fair_files": int(row[8] or 0),
+                    "poor_files": int(row[9] or 0),
+                    "critical_files": int(row[10] or 0),
+                }
+                for row in cursor.fetchall()
+            ]
+
+            # Top risky files (latest snapshot per file) ranked by warnings then score
+            cursor.execute(
+                f"""
+                WITH latest_per_file AS (
+                    SELECT
+                        f.*,
+                        df.discipline_code,
+                        df.discipline_full_name,
+                        df.file_name_bk,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY f.project_key, f.file_name_key
+                            ORDER BY f.export_datetime DESC, f.health_fact_id DESC
+                        ) AS rn
+                    FROM fact.revit_health_daily f
+                    INNER JOIN dim.revit_file df
+                        ON f.file_name_key = df.revit_file_key
+                       AND df.current_flag = 1
+                    {where_sql}
+                ),
+                latest AS (
+                    SELECT * FROM latest_per_file WHERE rn = 1
+                )
+                SELECT TOP 10
+                    ISNULL(file_name_bk, 'Unknown') AS file_name,
+                    project_key,
+                    discipline_code,
+                    discipline_full_name,
+                    health_score,
+                    health_category,
+                    total_warnings,
+                    critical_warnings,
+                    link_health_flag,
+                    export_datetime
+                FROM latest
+                ORDER BY total_warnings DESC, critical_warnings DESC, health_score ASC
+                """
+            , tuple(params))
+            top_files = [
+                {
+                    "file_name": row[0],
+                    "project_id": row[1],
+                    "discipline": row[2],
+                    "discipline_full_name": row[3],
+                    "health_score": row[4],
+                    "health_category": row[5],
+                    "total_warnings": row[6],
+                    "critical_warnings": row[7],
+                    "link_health_flag": row[8],
+                    "export_datetime": row[9].isoformat() if row[9] else None,
+                }
+                for row in cursor.fetchall()
+            ]
+
+            return {
+                "summary": summary,
+                "trend": trend,
+                "categories": categories,
+                "by_discipline": by_discipline,
+                "top_files": top_files,
+            }
+    except Exception as exc:
+        logger.error("Error fetching Revit health dashboard summary: %s", exc)
+        return {"summary": {}, "trend": [], "error": str(exc)}
+
+
+def get_naming_compliance_dashboard_metrics(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Aggregate file naming validation results from vw_FileNameValidation for dashboard use.
+
+    Returns overall summary, per-discipline breakdown, and recent invalid files.
+    """
+    try:
+        from config import Config
+        with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
+            cursor = conn.cursor()
+
+            # Latest validation per file (view already keeps latest per file via rn=1)
+            where_clauses = []
+            params: List[Any] = []
+
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
+                params.append(discipline)
+
+            where_sql = ""
+            if where_clauses:
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_files,
+                    SUM(CASE WHEN LOWER(ISNULL(validation_status,'')) = 'valid' THEN 1 ELSE 0 END) AS valid_files,
+                    SUM(CASE WHEN LOWER(ISNULL(validation_status,'')) <> 'valid' THEN 1 ELSE 0 END) AS invalid_files,
+                    MAX(validated_date) AS latest_validated
+                FROM dbo.vw_FileNameValidation
+                {where_sql}
+                """
+            , tuple(params))
+            row = cursor.fetchone() or [0, 0, 0, None]
+            total_files = int(row[0] or 0)
+            valid_files = int(row[1] or 0)
+            invalid_files = int(row[2] or 0)
+            latest_validated = row[3].isoformat() if row[3] else None
+            compliance_pct = round((valid_files / total_files) * 100, 1) if total_files else None
+
+            cursor.execute(
+                f"""
+                WITH latest_invalid AS (
+                    SELECT
+                        v.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY v.project_name, v.NormalizedFileName
+                            ORDER BY v.validated_date DESC, v.nId DESC
+                        ) AS rn
+                    FROM dbo.vw_FileNameValidation v
+                    WHERE LOWER(ISNULL(v.validation_status,'')) <> 'valid'
+                    {(' AND ' + ' AND '.join(where_clauses)) if where_clauses else ''}
+                )
+                SELECT TOP 10
+                    strRvtFileName,
+                    project_name,
+                    discipline_full_name,
+                    validation_status,
+                    validation_reason,
+                    failed_field_name,
+                    failed_field_value,
+                    failed_field_reason,
+                    validated_date
+                FROM latest_invalid
+                WHERE rn = 1
+                ORDER BY validated_date DESC, nId DESC
+                """
+            , tuple(params))
+            recent_invalid = []
+            for rec in cursor.fetchall():
+                recent_invalid.append(
+                    {
+                        "file_name": rec[0],
+                        "project_name": rec[1],
+                        "discipline": rec[2],
+                        "validation_status": rec[3],
+                        "validation_reason": rec[4],
+                        "failed_field_name": rec[5],
+                        "failed_field_value": rec[6],
+                        "failed_field_reason": rec[7],
+                        "validated_date": rec[8].isoformat() if rec[8] else None,
+                    }
+                )
+
+            cursor.execute(
+                f"""
+                SELECT
+                    discipline_full_name,
+                    COUNT(*) AS total_files,
+                    SUM(CASE WHEN LOWER(ISNULL(validation_status,'')) = 'valid' THEN 1 ELSE 0 END) AS valid_files,
+                    SUM(CASE WHEN LOWER(ISNULL(validation_status,'')) <> 'valid' THEN 1 ELSE 0 END) AS invalid_files
+                FROM dbo.vw_FileNameValidation
+                {where_sql}
+                GROUP BY discipline_full_name
+                """
+            , tuple(params))
+            by_discipline = []
+            for rec in cursor.fetchall():
+                total = int(rec[1] or 0)
+                valid = int(rec[2] or 0)
+                invalid = int(rec[3] or 0)
+                pct = round((valid / total) * 100, 1) if total else None
+                by_discipline.append(
+                    {
+                        "discipline": rec[0] or "Unspecified",
+                        "total_files": total,
+                        "valid_files": valid,
+                        "invalid_files": invalid,
+                        "valid_pct": pct,
+                    }
+                )
+
+            return {
+                "summary": {
+                    "total_files": total_files,
+                    "valid_files": valid_files,
+                    "invalid_files": invalid_files,
+                    "compliance_pct": compliance_pct,
+                    "latest_validated": latest_validated,
+                },
+                "by_discipline": by_discipline,
+                "recent_invalid": recent_invalid,
+            }
+    except Exception as exc:
+        logger.error("Error fetching naming compliance metrics: %s", exc)
+        return {"summary": {}, "by_discipline": [], "recent_invalid": [], "error": str(exc)}
+
+
+def revalidate_revit_naming(
+    project_ids: Optional[List[int]] = None,
+    limit: Optional[int] = None,
+) -> Dict[str, int]:
+    """
+    Re-run naming validation for Revit health files. If project_ids is provided,
+    only those projects are validated. Returns counts of processed/updated rows.
+    """
+    from services.revit_naming_validator_service import RevitNamingValidator
+
+    validator = RevitNamingValidator()
+    stats = {"processed": 0, "updated": 0}
+
+    try:
+        with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
+            cursor = conn.cursor()
+
+            where_clauses = ["nDeletedOn IS NULL"]
+            params: List[Any] = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            where_sql = " WHERE " + " AND ".join(where_clauses)
+            top_clause = f"TOP {limit}" if limit else ""
+
+            cursor.execute(
+                f"""
+                SELECT {top_clause}
+                    nId,
+                    strRvtFileName
+                FROM dbo.tblRvtProjHealth
+                {where_sql}
+                ORDER BY nId DESC
+                """
+            , tuple(params))
+
+            rows = cursor.fetchall()
+            for row in rows:
+                stats["processed"] += 1
+                health_check_id = row[0]
+                file_name = row[1] or ""
+                status, reason, disc_code, disc_name = validator.validate_file_naming(file_name)
+                cursor.execute(
+                    """
+                    UPDATE dbo.tblRvtProjHealth
+                    SET validation_status = ?,
+                        validation_reason = ?,
+                        discipline_code = ?,
+                        discipline_full_name = ?,
+                        validated_date = GETDATE()
+                    WHERE nId = ?
+                    """,
+                    (status, reason, disc_code, disc_name, health_check_id),
+                )
+                stats["updated"] += cursor.rowcount
+
+            conn.commit()
+    except Exception as exc:
+        logger.error("Error revalidating Revit naming: %s", exc)
+        stats["error"] = str(exc)
+
+    return stats
+
+
+def get_naming_compliance_table(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "validated_date",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """
+    Paginated naming compliance rows from mart.v_naming_compliance_files.
+    """
+    sort_map = {
+        "file_name": "file_name",
+        "discipline": "discipline",
+        "validation_status": "validation_status",
+        "validated_date": "validated_date",
+        "failed_field_name": "failed_field_name",
+    }
+    sort_column = sort_map.get(sort_by, "validated_date")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"pm_project_id IN ({placeholders})")
+        params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+        params.append(discipline)
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(f"SELECT COUNT(*) FROM mart.v_naming_compliance_files {where_sql}", tuple(params))
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    file_name,
+                    discipline,
+                    validation_status,
+                    validation_reason,
+                    failed_field_name,
+                    failed_field_value,
+                    failed_field_reason,
+                    validated_date
+                FROM mart.v_naming_compliance_files
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "file_name": row[2],
+                        "discipline": row[3],
+                        "validation_status": row[4],
+                        "validation_reason": row[5],
+                        "failed_field_name": row[6],
+                        "failed_field_value": row[7],
+                        "failed_field_reason": row[8],
+                        "validated_date": row[9].isoformat() if row[9] else None,
+                    }
+                )
+
+            return {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+            }
+    except Exception as exc:
+        logger.error("Error fetching naming compliance table: %s", exc)
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}
+
+
+def get_control_points_dashboard(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "validated_date",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """
+    Return control/survey point compliance rows plus project summary.
+    """
+    sort_map = {
+        "model_file_name": "model_file_name",
+        "discipline": "discipline",
+        "validated_date": "validated_date",
+    }
+    sort_column = sort_map.get(sort_by, "validated_date")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"pm_project_id IN ({placeholders})")
+        params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+        params.append(discipline)
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(f"SELECT COUNT(*) FROM mart.v_control_points_compliance {where_sql}", tuple(params))
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    strProjectName,
+                    model_file_name,
+                    discipline,
+                    validated_date,
+                    pbp_eastwest,
+                    pbp_northsouth,
+                    pbp_elevation,
+                    pbp_angle_true_north,
+                    survey_eastwest,
+                    survey_northsouth,
+                    survey_elevation,
+                    pbp_compliant,
+                    survey_compliant
+                FROM mart.v_control_points_compliance
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "discipline": row[3],
+                        "validated_date": row[4].isoformat() if row[4] else None,
+                        "pbp_eastwest": row[5],
+                        "pbp_northsouth": row[6],
+                        "pbp_elevation": row[7],
+                        "pbp_angle_true_north": row[8],
+                        "survey_eastwest": row[9],
+                        "survey_northsouth": row[10],
+                        "survey_elevation": row[11],
+                        "pbp_compliant": bool(row[12]) if row[12] is not None else None,
+                        "survey_compliant": bool(row[13]) if row[13] is not None else None,
+                    }
+                )
+
+            # Project-level summary
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    control_file_name,
+                    control_discipline_code,
+                    is_active,
+                    latest_validated,
+                    files_checked
+                FROM mart.v_control_points_project_summary
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            summary = []
+            for row in cursor.fetchall():
+                summary.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "control_file_name": row[2],
+                        "control_discipline_code": row[3],
+                        "is_active": bool(row[4]) if row[4] is not None else None,
+                        "latest_validated": row[5].isoformat() if row[5] else None,
+                        "files_checked": row[6],
+                    }
+                )
+
+            return {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "project_summary": summary,
+            }
+    except Exception as exc:
+        logger.error("Error fetching control points dashboard: %s", exc)
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "project_summary": [],
+            "error": str(exc),
+        }
+
+
+def get_model_register(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "last_seen_at",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """
+    Paginated model register from mart.v_model_register.
+    """
+    sort_map = {
+        "file_name": "file_name",
+        "project_name": "project_name",
+        "discipline": "discipline",
+        "last_seen_at": "last_seen_at",
+    }
+    sort_column = sort_map.get(sort_by, "last_seen_at")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"pm_project_id IN ({placeholders})")
+        params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+        params.append(discipline)
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM mart.v_model_register {where_sql}", tuple(params))
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    file_name,
+                    discipline,
+                    last_seen_at,
+                    file_size_mb
+                FROM mart.v_model_register
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "file_name": row[2],
+                        "discipline": row[3],
+                        "last_seen_at": row[4].isoformat() if row[4] else None,
+                        "file_size_mb": row[5],
+                    }
+                )
+
+            return {"items": items, "total": total, "page": page, "page_size": page_size}
+    except Exception as exc:
+        logger.error("Error fetching model register: %s", exc)
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}
+
+
+def get_revizto_issues_detail(
+    project_uuid: Optional[str] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    location: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "updated_at",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """
+    Paginated Revizto issue detail from mart.v_revizto_issues_detail.
+    """
+    sort_map = {
+        "status": "status",
+        "priority": "priority",
+        "location": "location",
+        "created_at": "created_at",
+        "updated_at": "updated_at",
+    }
+    sort_column = sort_map.get(sort_by, "updated_at")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_uuid:
+        where_clauses.append("projectUuid = ?")
+        params.append(project_uuid)
+    if status:
+        where_clauses.append("LOWER(ISNULL(status,'')) = LOWER(?)")
+        params.append(status)
+    if priority:
+        where_clauses.append("LOWER(ISNULL(priority,'')) = LOWER(?)")
+        params.append(priority)
+    if location:
+        where_clauses.append("LOWER(ISNULL(location,'')) = LOWER(?)")
+        params.append(location)
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM mart.v_revizto_issues_detail {where_sql}", tuple(params))
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    issueId,
+                    projectUuid,
+                    issue_uuid,
+                    status,
+                    priority,
+                    title,
+                    company,
+                    location,
+                    clash_level,
+                    created_at,
+                    updated_at,
+                    tags_json,
+                    latest_comment_text,
+                    latest_comment_at
+                FROM mart.v_revizto_issues_detail
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "issue_id": row[0],
+                        "project_uuid": str(row[1]) if row[1] is not None else None,
+                        "issue_uuid": row[2],
+                        "status": row[3],
+                        "priority": row[4],
+                        "title": row[5],
+                        "company": row[6],
+                        "location": row[7],
+                        "clash_level": row[8],
+                        "created_at": row[9],
+                        "updated_at": row[10],
+                        "tags_json": row[11],
+                        "latest_comment_text": row[12],
+                        "latest_comment_at": row[13],
+                    }
+                )
+
+            return {"items": items, "total": total, "page": page, "page_size": page_size}
+    except Exception as exc:
+        logger.error("Error fetching Revizto issues detail: %s", exc)
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}
+
 
 _TASK_NOTES_BASE_QUERY = f"""
     SELECT
@@ -5264,6 +6255,368 @@ def update_task_notes_record(task_id: int, updates: Dict[str, Any]) -> Optional[
     return get_task_notes_record(task_id)
 
 
+# --- User Assignment Management Functions ---
+
+def assign_service_to_user(service_id, user_id):
+    """Assign a project service to a specific user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.ProjectServices.TABLE}
+                SET {S.ProjectServices.ASSIGNED_USER_ID} = ?,
+                    {S.ProjectServices.UPDATED_AT} = ?
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
+                """,
+                (user_id, datetime.utcnow(), service_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error assigning service to user: {e}")
+        return False
+
+
+def assign_review_to_user(review_id, user_id):
+    """Assign a service review to a specific user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.ServiceReviews.TABLE}
+                SET {S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                """,
+                (user_id, review_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error assigning review to user: {e}")
+        return False
+
+
+def get_user_assignments(user_id):
+    """Get all services and reviews assigned to a specific user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get assigned services with project context
+            cursor.execute(
+                f"""
+                SELECT 
+                    ps.{S.ProjectServices.SERVICE_ID},
+                    ps.{S.ProjectServices.SERVICE_NAME},
+                    ps.{S.ProjectServices.SERVICE_CODE},
+                    ps.{S.ProjectServices.STATUS},
+                    p.{S.Projects.ID},
+                    p.{S.Projects.NAME},
+                    ps.{S.ProjectServices.PROGRESS_PCT}
+                FROM {S.ProjectServices.TABLE} ps
+                INNER JOIN {S.Projects.TABLE} p 
+                    ON ps.{S.ProjectServices.PROJECT_ID} = p.{S.Projects.ID}
+                WHERE ps.{S.ProjectServices.ASSIGNED_USER_ID} = ?
+                ORDER BY ps.{S.ProjectServices.CREATED_AT} DESC
+                """,
+                (user_id,)
+            )
+            
+            services = [dict(
+                service_id=row[0],
+                service_name=row[1],
+                service_code=row[2],
+                status=row[3],
+                project_id=row[4],
+                project_name=row[5],
+                progress_pct=row[6]
+            ) for row in cursor.fetchall()]
+            
+            # Get assigned reviews with service and project context
+            cursor.execute(
+                f"""
+                SELECT 
+                    sr.{S.ServiceReviews.REVIEW_ID},
+                    sr.{S.ServiceReviews.CYCLE_NO},
+                    sr.{S.ServiceReviews.STATUS},
+                    sr.{S.ServiceReviews.DUE_DATE},
+                    ps.{S.ProjectServices.SERVICE_NAME},
+                    ps.{S.ProjectServices.SERVICE_ID},
+                    p.{S.Projects.NAME},
+                    p.{S.Projects.ID}
+                FROM {S.ServiceReviews.TABLE} sr
+                INNER JOIN {S.ProjectServices.TABLE} ps 
+                    ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                INNER JOIN {S.Projects.TABLE} p 
+                    ON ps.{S.ProjectServices.PROJECT_ID} = p.{S.Projects.ID}
+                WHERE sr.{S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                ORDER BY sr.{S.ServiceReviews.DUE_DATE} ASC
+                """,
+                (user_id,)
+            )
+            
+            reviews = [dict(
+                review_id=row[0],
+                cycle_no=row[1],
+                status=row[2],
+                due_date=row[3].isoformat() if row[3] else None,
+                service_name=row[4],
+                service_id=row[5],
+                project_name=row[6],
+                project_id=row[7]
+            ) for row in cursor.fetchall()]
+            
+            return {
+                'services': services,
+                'reviews': reviews,
+                'summary': {
+                    'total_services': len(services),
+                    'total_reviews': len(reviews),
+                    'active_reviews': len([r for r in reviews if r['status'] not in ['completed', 'cancelled']])
+                }
+            }
+    except Exception as e:
+        logger.error(f"Error getting user assignments: {e}")
+        return {'services': [], 'reviews': [], 'summary': {}}
+
+
+def reassign_user_work(from_user_id, to_user_id, project_id=None):
+    """Reassign all services and reviews from one user to another."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Reassign services
+            if project_id:
+                cursor.execute(
+                    f"""
+                    UPDATE {S.ProjectServices.TABLE}
+                    SET {S.ProjectServices.ASSIGNED_USER_ID} = ?,
+                        {S.ProjectServices.UPDATED_AT} = ?
+                    WHERE {S.ProjectServices.ASSIGNED_USER_ID} = ?
+                      AND {S.ProjectServices.PROJECT_ID} = ?
+                    """,
+                    (to_user_id, datetime.utcnow(), from_user_id, project_id)
+                )
+            else:
+                cursor.execute(
+                    f"""
+                    UPDATE {S.ProjectServices.TABLE}
+                    SET {S.ProjectServices.ASSIGNED_USER_ID} = ?,
+                        {S.ProjectServices.UPDATED_AT} = ?
+                    WHERE {S.ProjectServices.ASSIGNED_USER_ID} = ?
+                    """,
+                    (to_user_id, datetime.utcnow(), from_user_id)
+                )
+            
+            services_reassigned = cursor.rowcount
+            
+            # Reassign reviews
+            if project_id:
+                cursor.execute(
+                    f"""
+                    UPDATE {S.ServiceReviews.TABLE}
+                    SET {S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                    WHERE {S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                      AND {S.ServiceReviews.SERVICE_ID} IN (
+                          SELECT {S.ProjectServices.SERVICE_ID}
+                          FROM {S.ProjectServices.TABLE}
+                          WHERE {S.ProjectServices.PROJECT_ID} = ?
+                      )
+                    """,
+                    (to_user_id, from_user_id, project_id)
+                )
+            else:
+                cursor.execute(
+                    f"""
+                    UPDATE {S.ServiceReviews.TABLE}
+                    SET {S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                    WHERE {S.ServiceReviews.ASSIGNED_USER_ID} = ?
+                    """,
+                    (to_user_id, from_user_id)
+                )
+            
+            reviews_reassigned = cursor.rowcount
+            conn.commit()
+            
+            return {
+                'services_reassigned': services_reassigned,
+                'reviews_reassigned': reviews_reassigned
+            }
+    except Exception as e:
+        logger.error(f"Error reassigning user work: {e}")
+        return {'services_reassigned': 0, 'reviews_reassigned': 0}
+
+
+def get_project_lead_user_id(project_id):
+    """Get the user_id of the project's internal lead."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT u.{S.Users.ID}
+                FROM {S.Projects.TABLE} p
+                INNER JOIN {S.Users.TABLE} u 
+                    ON p.{S.Projects.INTERNAL_LEAD} = u.{S.Users.NAME}
+                WHERE p.{S.Projects.ID} = ?
+                """,
+                (project_id,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        logger.error(f"Error getting project lead user ID: {e}")
+        return None
+
+
+def get_user_workload_summary():
+    """Get workload summary for all users."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT 
+                    u.user_id,
+                    u.name,
+                    u.email,
+                    u.role,
+                    COUNT(DISTINCT ps.service_id) AS assigned_services,
+                    COUNT(DISTINCT sr.review_id) AS assigned_reviews,
+                    SUM(CASE 
+                        WHEN sr.status NOT IN ('completed', 'cancelled') 
+                        THEN 1 ELSE 0 
+                    END) AS active_reviews,
+                    SUM(CASE 
+                        WHEN sr.status NOT IN ('completed', 'cancelled') 
+                        AND sr.due_date < GETDATE() 
+                        THEN 1 ELSE 0 
+                    END) AS overdue_reviews,
+                    COUNT(DISTINCT ps.project_id) AS projects
+                FROM users u
+                LEFT JOIN ProjectServices ps ON u.user_id = ps.assigned_user_id
+                LEFT JOIN ServiceReviews sr ON u.user_id = sr.assigned_user_id
+                GROUP BY u.user_id, u.name, u.email, u.role
+                HAVING COUNT(DISTINCT ps.service_id) > 0 
+                    OR COUNT(DISTINCT sr.review_id) > 0
+                ORDER BY active_reviews DESC, assigned_reviews DESC
+                """
+            )
+            
+            return [dict(
+                user_id=row[0],
+                name=row[1],
+                email=row[2],
+                role=row[3],
+                assigned_services=row[4] or 0,
+                assigned_reviews=row[5] or 0,
+                active_reviews=row[6] or 0,
+                overdue_reviews=row[7] or 0,
+                projects=row[8] or 0
+            ) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Error getting user workload summary: {e}")
+        return []
+
+
+# --- User Management Functions ---
+
+def get_all_users():
+    """Fetch all users with full details."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.Users.ID}, {S.Users.NAME}, {S.Users.ROLE}, 
+                       {S.Users.EMAIL}, {S.Users.CREATED_AT}
+                FROM {S.Users.TABLE}
+                ORDER BY {S.Users.NAME};
+                """
+            )
+            users = [dict(
+                user_id=row[0],
+                name=row[1],
+                role=row[2],
+                email=row[3],
+                created_at=row[4].isoformat() if row[4] else None
+            ) for row in cursor.fetchall()]
+            return users
+    except Exception as e:
+        logger.error(f"Error fetching all users: {e}")
+        return []
+
+
+def create_user(name, role, email):
+    """Create a new user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.Users.TABLE} (
+                    {S.Users.NAME}, {S.Users.ROLE}, {S.Users.EMAIL}, {S.Users.CREATED_AT}
+                ) VALUES (?, ?, ?, ?);
+                """,
+                (name, role, email, datetime.utcnow())
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        return False
+
+
+def update_user(user_id, name=None, role=None, email=None):
+    """Update an existing user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            update_fields = {}
+            
+            if name is not None:
+                update_fields[S.Users.NAME] = name
+            if role is not None:
+                update_fields[S.Users.ROLE] = role
+            if email is not None:
+                update_fields[S.Users.EMAIL] = email
+            
+            if not update_fields:
+                return False
+            
+            set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+            values = list(update_fields.values()) + [user_id]
+            
+            cursor.execute(
+                f"UPDATE {S.Users.TABLE} SET {set_clause} WHERE {S.Users.ID} = ?",
+                values
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating user: {e}")
+        return False
+
+
+def delete_user(user_id):
+    """Delete a user."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.Users.TABLE} WHERE {S.Users.ID} = ?",
+                (user_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        return False
+
+
 def archive_task_record(task_id: int) -> bool:
     """Soft-delete a task by marking it archived."""
     with get_db_connection() as conn:
@@ -5335,4 +6688,3 @@ def toggle_task_item_completion(task_id: int, item_index: int) -> Optional[Dict[
         conn.commit()
 
     return get_task_notes_record(task_id)
-

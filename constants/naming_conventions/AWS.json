@@ -49,7 +49,7 @@
     {
       "name": "Discipline",
       "position": 5,
-      "allowed_values": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+      "allowed_values": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "SC", "T", "U", "V", "W", "X", "Y", "Z"],
       "mapped_values": {
         "A": "Architect",
         "B": "Building Surveyor",

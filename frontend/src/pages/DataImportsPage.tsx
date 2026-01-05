@@ -24,6 +24,11 @@ import {
   MenuItem,
   SelectChangeEvent,
   Chip,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  Grid,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -57,11 +62,36 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+type RunStatus = 'success' | 'error' | 'running';
+type RunHistory = {
+  id: string;
+  projectId: number | null;
+  source: string;
+  status: RunStatus;
+  startedAt: string;
+  duration?: string;
+  notes?: string;
+};
+
 const DataImportsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() => {
+    const stored = localStorage.getItem('data_import_selected_project');
+    if (!stored) return null;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+  const tabLabels = ['ACC Sync', 'ACC Desktop Connector', 'ACC Data Import', 'Revizto Extraction', 'Revit Health Check'];
+  const [runHistory, setRunHistory] = useState<RunHistory[]>(() => {
+    try {
+      const stored = localStorage.getItem('data_import_run_history');
+      return stored ? (JSON.parse(stored) as RunHistory[]) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Use URL project ID if available, otherwise use selected project ID
   const effectiveProjectId = id ? Number(id) : selectedProjectId;
@@ -90,8 +120,33 @@ const DataImportsPage: React.FC = () => {
   useEffect(() => {
     if (id) {
       setSelectedProjectId(Number(id));
+      localStorage.setItem('data_import_selected_project', id);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (selectedProjectId !== null && !Number.isNaN(selectedProjectId)) {
+      localStorage.setItem('data_import_selected_project', String(selectedProjectId));
+    }
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    localStorage.setItem('data_import_run_history', JSON.stringify(runHistory));
+  }, [runHistory]);
+
+  const recordRun = (status: RunStatus) => {
+    const now = new Date();
+    const newRun: RunHistory = {
+      id: `${now.getTime()}-${Math.random().toString(16).slice(2, 6)}`,
+      projectId: effectiveProjectId ?? null,
+      source: tabLabels[tabValue] || 'Data Import',
+      status,
+      startedAt: now.toISOString(),
+            duration: status === 'running' ? undefined : '--',
+      notes: project ? `Logged for ${project.project_name}` : undefined,
+    };
+    setRunHistory((prev) => [newRun, ...prev].slice(0, 25));
+  };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -328,6 +383,86 @@ const DataImportsPage: React.FC = () => {
           </Box>
         )}
       </Paper>
+
+      <Grid container spacing={2} sx={{ mx: 3, mt: 3 }}>
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 2 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+              <Typography variant="h6">Recent Runs</Typography>
+              <Box display="flex" gap={1}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={!effectiveProjectId}
+                  onClick={() => recordRun('success')}
+                >
+                  Record run for current tab
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setRunHistory([])}
+                >
+                  Clear
+                </Button>
+              </Box>
+            </Box>
+            {runHistory.length === 0 ? (
+              <Alert severity="info">No runs logged yet. Record your first run to keep a trail.</Alert>
+            ) : (
+              <List dense>
+                {runHistory.map((run) => (
+                  <React.Fragment key={run.id}>
+                    <ListItem
+                      secondaryAction={(
+                        <Chip
+                          label={run.status}
+                          color={
+                            run.status === 'success'
+                              ? 'success'
+                              : run.status === 'error'
+                              ? 'error'
+                              : 'warning'
+                          }
+                          size="small"
+                        />
+                      )}
+                    >
+                      <ListItemText
+                        primary={`${run.source} • ${run.projectId ? `Project ${run.projectId}` : 'No project'}`}
+                        secondary={`${new Date(run.startedAt).toLocaleString()} ${run.notes ? `— ${run.notes}` : ''}`}
+                      />
+                    </ListItem>
+                    <Divider component="li" />
+                  </React.Fragment>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Guidance & Checks
+            </Typography>
+            <List dense>
+              <ListItem>
+                <ListItemText primary="Confirm the project scope and data source before syncing." />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Run ACC Sync before ACC Data Import to keep models current." />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Use Revizto extraction for issue triage, then log the run above." />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Track Revit Health Check results weekly to catch model decay." />
+              </ListItem>
+            </List>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };

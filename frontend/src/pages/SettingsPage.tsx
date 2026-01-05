@@ -32,6 +32,8 @@ import apiClient from '../api/client';
 import ClientsTab from '../components/settings/ClientsTab';
 import ServiceTemplatesTab from '../components/settings/ServiceTemplatesTab';
 import ProjectAliasesTab from '../components/settings/ProjectAliasesTab';
+import NamingConventionsTab from '../components/settings/NamingConventionsTab';
+import UsersTab from '../components/settings/UsersTab';
 
 interface ProjectType {
   type_id: number;
@@ -83,6 +85,8 @@ export default function SettingsPage() {
           <Tab label="Clients" />
           <Tab label="Service Templates" />
           <Tab label="Project Aliases" />
+          <Tab label="Naming Conventions" />
+          <Tab label="Users" />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -99,6 +103,14 @@ export default function SettingsPage() {
 
         <TabPanel value={tabValue} index={3}>
           <ProjectAliasesTab />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={4}>
+          <NamingConventionsTab />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={5}>
+          <UsersTab />
         </TabPanel>
       </Paper>
     </Container>

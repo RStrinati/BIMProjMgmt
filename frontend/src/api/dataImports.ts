@@ -94,6 +94,15 @@ export const revitHealthApi = {
       files_by_score: data.files_by_score ?? {},
     };
   },
+
+  /**
+   * Re-run naming validation for a project.
+   * POST /api/projects/:project_id/revit-health/revalidate-naming
+   */
+  revalidateNaming: async (projectId: number): Promise<{ processed: number; updated: number }> => {
+    const response = await apiClient.post(`/projects/${projectId}/revit-health/revalidate-naming`);
+    return response.data;
+  },
 };
 // ============================================================================
 // Control Model API

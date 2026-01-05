@@ -57,6 +57,9 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationSuccess, setValidationSuccess] = useState<string | null>(null);
 
   // Query for health files
   const {
@@ -153,6 +156,22 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
     return 'Poor';
   };
 
+  const handleRunValidation = async () => {
+    try {
+      setValidating(true);
+      setValidationError(null);
+      setValidationSuccess(null);
+      const result = await revitHealthApi.revalidateNaming(projectId);
+      setValidationSuccess(`Re-validated ${result.processed} files (updated ${result.updated}).`);
+      refetchSummary();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to run naming validation';
+      setValidationError(message);
+    } finally {
+      setValidating(false);
+    }
+  };
+
   const formatFileSize = (sizeMb: number | null): string => {
     if (sizeMb === null) return 'N/A';
     if (sizeMb < 1) return `${(sizeMb * 1024).toFixed(1)} KB`;
@@ -171,6 +190,17 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
       </Typography>
 
       <ControlModelConfigurator projectId={projectId} projectName={projectName} />
+
+      {validationError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setValidationError(null)}>
+          {validationError}
+        </Alert>
+      )}
+      {validationSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setValidationSuccess(null)}>
+          {validationSuccess}
+        </Alert>
+      )}
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -319,6 +349,15 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
             disabled={filesLoading || summaryLoading || importing}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={validating ? <CircularProgress size={20} /> : <RunIcon />}
+            onClick={handleRunValidation}
+            disabled={validating}
+          >
+            {validating ? 'Validating...' : 'Re-run Naming Validation'}
           </Button>
         </Stack>
       </Paper>

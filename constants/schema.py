@@ -731,6 +731,7 @@ class ProjectServices:
     STATUS = "status"
     PROGRESS_PCT = "progress_pct"
     CLAIMED_TO_DATE = "claimed_to_date"
+    ASSIGNED_USER_ID = "assigned_user_id"
 
 class ServiceReviews:
     TABLE = "ServiceReviews"
@@ -751,6 +752,7 @@ class ServiceReviews:
     BILLING_PHASE = "billing_phase"
     BILLING_RATE = "billing_rate"
     BILLING_AMOUNT = "billing_amount"
+    ASSIGNED_USER_ID = "assigned_user_id"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"
@@ -795,6 +797,7 @@ class ServiceItems:
     STATUS = "status"  # 'planned', 'in_progress', 'completed', 'overdue', 'cancelled'
     PRIORITY = "priority"  # 'low', 'medium', 'high', 'critical'
     ASSIGNED_TO = "assigned_to"
+    ASSIGNED_USER_ID = "assigned_user_id"
     INVOICE_REFERENCE = "invoice_reference"
     EVIDENCE_LINKS = "evidence_links"
     NOTES = "notes"

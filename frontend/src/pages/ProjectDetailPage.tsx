@@ -16,6 +16,7 @@ import {
   CardContent,
   Tabs,
   Tab,
+  Stack,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -91,7 +92,7 @@ const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useState(1);
 
   const { data: project, isLoading, error } = useQuery<Project>({
     queryKey: ['project', id],
@@ -207,6 +208,26 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
+  const totalServiceAgreedRaw = Number(project.total_service_agreed_fee ?? project.agreed_fee ?? 0);
+  const totalServiceBilledRaw = Number(project.total_service_billed_amount ?? 0);
+  const totalServiceAgreed = Number.isFinite(totalServiceAgreedRaw) ? Math.max(totalServiceAgreedRaw, 0) : 0;
+  const totalServiceBilled = Number.isFinite(totalServiceBilledRaw) ? Math.max(totalServiceBilledRaw, 0) : 0;
+  const serviceBilledPctRaw =
+    project.service_billed_pct !== undefined && project.service_billed_pct !== null
+      ? Number(project.service_billed_pct)
+      : Number.NaN;
+  let billedPercent =
+    Number.isFinite(serviceBilledPctRaw) && !Number.isNaN(serviceBilledPctRaw)
+      ? serviceBilledPctRaw
+      : totalServiceAgreed > 0
+        ? (totalServiceBilled / totalServiceAgreed) * 100
+        : 0;
+  if (!Number.isFinite(billedPercent)) {
+    billedPercent = 0;
+  }
+  const clampedBilledPercent = Math.min(Math.max(billedPercent, 0), 100);
+  const unbilledAmount = Math.max(totalServiceAgreed - totalServiceBilled, 0);
+
   return (
     <Profiler id="ProjectDetailPage" onRender={profilerLog}>
       <Box>
@@ -248,22 +269,105 @@ const ProjectDetailPage: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Overview Summary */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Status & Priority
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Chip label={project.status} color={getStatusColor(project.status ?? '')} />
+                <Chip label={`Priority: ${priorityLabel}`} color="info" variant="outlined" />
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Client: {project.client_name || 'N/A'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Type: {project.project_type || 'N/A'}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Schedule & Lead
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start: {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'N/A'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                End: {project.end_date ? new Date(project.end_date).toLocaleDateString() : 'N/A'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Lead: {projectLeadName || 'Unassigned'}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Billing Summary
+              </Typography>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <CircularProgress
+                  variant="determinate"
+                  value={clampedBilledPercent}
+                  size={60}
+                  thickness={4}
+                  sx={{ color: clampedBilledPercent >= 99 ? 'success.main' : 'primary.main' }}
+                />
+                <Box>
+                  <Typography variant="h6">
+                    {Math.round(clampedBilledPercent)}% billed
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatNumericDisplay(totalServiceBilled)} / {formatNumericDisplay(totalServiceAgreed)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {unbilledAmount > 0 ? `Unbilled ${formatNumericDisplay(unbilledAmount)}` : 'Fully billed'}
+                  </Typography>
+                </Box>
+              </Stack>
+              <Button
+                variant="outlined"
+                size="small"
+                sx={{ mt: 1 }}
+                onClick={() => setTabValue(0)}
+              >
+                Manage services
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Main Content */}
       <Grid container spacing={3}>
         {/* Left Column - Project Details */}
         <Grid item xs={12} md={8}>
           <Paper>
             <Tabs value={tabValue} onChange={handleTabChange}>
-              <Tab label="Details" />
               <Tab label="Services" />
+              <Tab label="Details" />
               <Tab label="Reviews" />
               <Tab label="Tasks" />
               <Tab label="Files" />
             </Tabs>
             <Divider />
 
-            {/* Details Tab */}
+            {/* Services Tab */}
             <TabPanel value={tabValue} index={0}>
+              <ProjectServicesTab projectId={Number(id)} />
+            </TabPanel>
+
+            {/* Details Tab */}
+            <TabPanel value={tabValue} index={1}>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -387,11 +491,6 @@ const ProjectDetailPage: React.FC = () => {
               </Grid>
             </TabPanel>
 
-            {/* Services Tab */}
-            <TabPanel value={tabValue} index={1}>
-              <ProjectServicesTab projectId={Number(id)} />
-            </TabPanel>
-
             {/* Reviews Tab */}
             <TabPanel value={tabValue} index={2}>
               <Alert severity="info">
@@ -450,6 +549,13 @@ const ProjectDetailPage: React.FC = () => {
                 </Button>
                 <Button variant="outlined" startIcon={<FolderIcon />} fullWidth>
                   Open Folder
+                </Button>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={() => navigate(`/projects/${id}/data-imports`)}
+                >
+                  Data Imports
                 </Button>
               </Box>
             </CardContent>

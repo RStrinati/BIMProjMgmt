@@ -1,6 +1,6 @@
-import { Profiler, Suspense, lazy, useMemo, useState } from 'react';
+import { Profiler, Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -15,6 +15,10 @@ import {
   InputAdornment,
   CircularProgress,
   Alert,
+  Stack,
+  Checkbox,
+  FormControlLabel,
+  Tooltip,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -22,6 +26,7 @@ import {
   Edit as EditIcon,
   Visibility as VisibilityIcon,
   FilterList as FilterListIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 import { projectsApi, usersApi } from '@/api';
 import type { Project, User } from '@/types/api';
@@ -68,7 +73,13 @@ const formatNumericDisplay = (value: number | string | null | undefined): string
 
 export function ProjectsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [managerFilters, setManagerFilters] = useState<string[]>([]);
+  const [clientFilters, setClientFilters] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
@@ -116,25 +127,82 @@ export function ProjectsPage() {
   );
   const formatCurrency = (value?: number | null) => currencyFormatter.format(value ?? 0);
 
-  // Filter projects based on search
+  // Sync filters with URL to keep header/global search aligned
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    const trimmedSearch = searchTerm.trim();
+    if (trimmedSearch) {
+      next.set('search', trimmedSearch);
+    } else {
+      next.delete('search');
+    }
+
+    const setList = (key: string, values: string[]) => {
+      if (values.length) {
+        next.set(key, values.join(','));
+      } else {
+        next.delete(key);
+      }
+    };
+
+    setList('status', statusFilters);
+    setList('type', typeFilters);
+    setList('manager', managerFilters);
+    setList('client', clientFilters);
+    setSearchParams(next, { replace: true });
+  }, [searchTerm, statusFilters, typeFilters, managerFilters, clientFilters]);
+
+  useEffect(() => {
+    const parseList = (key: string) => {
+      const raw = searchParams.get(key);
+      return raw ? raw.split(',').filter(Boolean) : [];
+    };
+    setSearchTerm(searchParams.get('search') ?? '');
+    setStatusFilters(parseList('status'));
+    setTypeFilters(parseList('type'));
+    setManagerFilters(parseList('manager'));
+    setClientFilters(parseList('client'));
+  }, [searchParams.toString()]);
+
+  const toggleFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
+    setter(
+      current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value],
+    );
+  };
+
+  // Filter projects based on search and chips
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
   const filteredProjects = projects?.filter((project) => {
-    if (!normalizedSearch) {
-      return true;
+    if (normalizedSearch) {
+      const searchableValues = [
+        project.project_name,
+        project.project_number,
+        project.contract_number,
+        project.client_name,
+        project.naming_convention,
+      ];
+      const matchesSearch = searchableValues
+        .map((value) => (value ? value.toString().toLowerCase() : ''))
+        .some((value) => value.includes(normalizedSearch));
+      if (!matchesSearch) {
+        return false;
+      }
     }
 
-    const searchableValues = [
-      project.project_name,
-      project.project_number,
-      project.contract_number,
-      project.client_name,
-      project.naming_convention,
-    ];
+    const status = (project.status || '').toString();
+    const type = (project.project_type || '').toString();
+    const manager = (project.project_manager || '').toString();
+    const client = (project.client_name || '').toString();
 
-    return searchableValues
-      .map((value) => (value ? value.toString().toLowerCase() : ''))
-      .some((value) => value.includes(normalizedSearch));
+    if (statusFilters.length && !statusFilters.includes(status)) return false;
+    if (typeFilters.length && !typeFilters.includes(type)) return false;
+    if (managerFilters.length && !managerFilters.includes(manager)) return false;
+    if (clientFilters.length && !clientFilters.includes(client)) return false;
+
+    return true;
   });
 
   const getStatusColor = (status?: string): 'success' | 'warning' | 'error' | 'default' => {
@@ -171,6 +239,45 @@ export function ProjectsPage() {
     setSelectedProject(null);
   };
 
+  const filterOptions = useMemo(() => {
+    const statuses = new Set<string>();
+    const types = new Set<string>();
+    const managers = new Set<string>();
+    const clients = new Set<string>();
+    (projects ?? []).forEach((p) => {
+      if (p.status) statuses.add(p.status);
+      if (p.project_type) types.add(p.project_type);
+      if (p.project_manager) managers.add(p.project_manager);
+      if (p.client_name) clients.add(p.client_name);
+    });
+    const sort = (values: Set<string>) => Array.from(values).sort((a, b) => a.localeCompare(b));
+    return {
+      statuses: sort(statuses),
+      types: sort(types),
+      managers: sort(managers),
+      clients: sort(clients),
+    };
+  }, [projects]);
+
+  const handleToggleSelect = (projectId: number) => {
+    setSelectedProjectIds((prev) =>
+      prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId],
+    );
+  };
+
+  const handleCopySelection = async () => {
+    if (!filteredProjects || selectedProjectIds.length === 0) return;
+    const payload = filteredProjects
+      .filter((p) => selectedProjectIds.includes(p.project_id))
+      .map((p) => `${p.project_name} (${p.project_number ?? 'N/A'})`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(payload);
+    } catch (error) {
+      console.error('Failed to copy selection', error);
+    }
+  };
+
   return (
     <Profiler id="ProjectsPage" onRender={profilerLog}>
       <Box>
@@ -183,6 +290,90 @@ export function ProjectsPage() {
           Manage all your BIM construction projects
         </Typography>
       </Box>
+
+      {/* Filter chips and bulk actions */}
+      <Stack spacing={2} sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="subtitle2" color="text.secondary">
+            Status
+          </Typography>
+          {filterOptions.statuses.map((status) => (
+            <Chip
+              key={status}
+              label={status}
+              size="small"
+              color={statusFilters.includes(status) ? 'primary' : 'default'}
+              onClick={() => toggleFilter(status, statusFilters, setStatusFilters)}
+            />
+          ))}
+          {!filterOptions.statuses.length && <Chip label="No statuses yet" size="small" variant="outlined" />}
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="subtitle2" color="text.secondary">
+            Type
+          </Typography>
+          {filterOptions.types.map((type) => (
+            <Chip
+              key={type}
+              label={type}
+              size="small"
+              color={typeFilters.includes(type) ? 'primary' : 'default'}
+              onClick={() => toggleFilter(type, typeFilters, setTypeFilters)}
+            />
+          ))}
+          {!filterOptions.types.length && <Chip label="No project types yet" size="small" variant="outlined" />}
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="subtitle2" color="text.secondary">
+            Manager
+          </Typography>
+          {filterOptions.managers.map((manager) => (
+            <Chip
+              key={manager}
+              label={manager}
+              size="small"
+              color={managerFilters.includes(manager) ? 'primary' : 'default'}
+              onClick={() => toggleFilter(manager, managerFilters, setManagerFilters)}
+            />
+          ))}
+          {!filterOptions.managers.length && <Chip label="No managers yet" size="small" variant="outlined" />}
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="subtitle2" color="text.secondary">
+            Client
+          </Typography>
+          {filterOptions.clients.map((client) => (
+            <Chip
+              key={client}
+              label={client}
+              size="small"
+              color={clientFilters.includes(client) ? 'primary' : 'default'}
+              onClick={() => toggleFilter(client, clientFilters, setClientFilters)}
+            />
+          ))}
+          {!filterOptions.clients.length && <Chip label="No clients yet" size="small" variant="outlined" />}
+        </Stack>
+
+        {selectedProjectIds.length > 0 && (
+          <Alert
+            severity="info"
+            action={(
+              <Stack direction="row" spacing={1}>
+                <Tooltip title="Copy selected projects to clipboard">
+                  <IconButton color="inherit" size="small" onClick={handleCopySelection}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Button size="small" onClick={() => setSelectedProjectIds([])}>
+                  Clear selection
+                </Button>
+              </Stack>
+            )}
+          >
+            {selectedProjectIds.length} project(s) selected for bulk actions
+          </Alert>
+        )}
+      </Stack>
 
       {/* Stats Cards */}
       {stats && (
@@ -259,9 +450,19 @@ export function ProjectsPage() {
         >
           New Project
         </Button>
-        <IconButton>
-          <FilterListIcon />
-        </IconButton>
+        <Tooltip title="Reset filters">
+          <IconButton
+            onClick={() => {
+              setStatusFilters([]);
+              setTypeFilters([]);
+              setManagerFilters([]);
+              setClientFilters([]);
+              setSearchTerm('');
+            }}
+          >
+            <FilterListIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* Loading State */}
@@ -319,39 +520,110 @@ export function ProjectsPage() {
               <Grid item xs={12} sm={6} md={4} key={project.project_id}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <CardContent sx={{ flexGrow: 1, p: 2, pb: 1.5 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: 1.5,
-                        mb: showBillingSummary ? 1.5 : 1,
-                      }}
-                    >
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <FormControlLabel
+                          control={(
+                            <Checkbox
+                              checked={selectedProjectIds.includes(project.project_id)}
+                              onChange={() => handleToggleSelect(project.project_id)}
+                            />
+                          )}
+                          label=""
+                          sx={{ m: 0 }}
+                        />
+                        <Box>
                           <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
                             {project.project_name}
                           </Typography>
-                          {project.status && (
-                            <Chip
-                              label={project.status}
-                              color={getStatusColor(project.status)}
-                              size="small"
-                            />
-                          )}
-                          {priorityLabel && (
-                            <Chip
-                              label={`Priority: ${priorityLabel}`}
-                              color="info"
-                              size="small"
-                            />
-                          )}
+                          <Typography variant="body2" color="text.secondary">
+                            Project #: {projectNumber || 'N/A'}
+                          </Typography>
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                          Project #: {projectNumber || 'N/A'}
-                        </Typography>
                       </Box>
+                      <Stack direction="column" spacing={0.5} alignItems="flex-end">
+                        {project.status && (
+                          <Chip
+                            label={project.status}
+                            color={getStatusColor(project.status)}
+                            size="small"
+                          />
+                        )}
+                        {priorityLabel && (
+                          <Chip
+                            label={`Priority: ${priorityLabel}`}
+                            color="info"
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </Stack>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: showBillingSummary ? '1fr auto' : '1fr',
+                        gap: 1.5,
+                        mt: 1.5,
+                        mb: showBillingSummary ? 1.5 : 1,
+                      }}
+                    >
+                      <Stack spacing={0.5}>
+                        {project.client_name && (
+                          <Typography variant="body2" color="text.secondary">
+                            Client: {project.client_name}
+                          </Typography>
+                        )}
+
+                        {project.project_type && (
+                          <Typography variant="body2" color="text.secondary">
+                            Type: {project.project_type}
+                          </Typography>
+                        )}
+
+                        {projectLeadName && (
+                          <Typography variant="body2" color="text.secondary">
+                            Lead: {projectLeadName}
+                          </Typography>
+                        )}
+
+                        {areaDisplay && (
+                          <Typography variant="body2" color="text.secondary">
+                            Area: {areaDisplay} ha
+                          </Typography>
+                        )}
+
+                        {capacityDisplay && (
+                          <Typography variant="body2" color="text.secondary">
+                            Capacity: {capacityDisplay} MW
+                          </Typography>
+                        )}
+
+                        {project.naming_convention && (
+                          <Typography variant="body2" color="text.secondary">
+                            Naming: {project.naming_convention}
+                          </Typography>
+                        )}
+
+                        {project.description && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mt: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                            }}
+                          >
+                            {project.description}
+                          </Typography>
+                        )}
+                      </Stack>
+
                       {showBillingSummary && (
                         <Box sx={{ textAlign: 'center', minWidth: 96 }}>
                           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
@@ -400,59 +672,6 @@ export function ProjectsPage() {
                         </Box>
                       )}
                     </Box>
-
-                    {project.client_name && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Client: {project.client_name}
-                      </Typography>
-                    )}
-
-                    {project.project_type && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Type: {project.project_type}
-                      </Typography>
-                    )}
-
-                    {areaDisplay && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Area: {areaDisplay} ha
-                      </Typography>
-                    )}
-
-                    {capacityDisplay && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Capacity: {capacityDisplay} MW
-                      </Typography>
-                    )}
-
-                    {project.naming_convention && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Naming: {project.naming_convention}
-                      </Typography>
-                    )}
-
-                    {projectLeadName && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        Lead: {projectLeadName}
-                      </Typography>
-                    )}
-
-                    {project.description && (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          mt: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                        }}
-                      >
-                        {project.description}
-                      </Typography>
-                    )}
 
                     {/* Review Statistics */}
                     {reviewStats && reviewStats[project.project_id] && (
