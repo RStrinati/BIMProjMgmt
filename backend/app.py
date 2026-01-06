@@ -57,6 +57,9 @@ from database import (  # noqa: E402
     get_projects_full,
     get_warehouse_dashboard_metrics,
     get_warehouse_issues_history,
+    get_dashboard_issues_kpis,
+    get_dashboard_issues_charts,
+    get_dashboard_issues_table,
     get_revit_health_dashboard_summary,
     get_naming_compliance_dashboard_metrics,
     revalidate_revit_naming,
@@ -2296,6 +2299,60 @@ def api_dashboard_issues_history():
         return jsonify({'error': 'Failed to fetch issues history', 'details': str(e)}), 500
 
 
+@app.route('/api/dashboard/issues-kpis', methods=['GET'])
+def api_dashboard_issues_kpis():
+    """Return KPI totals for the Issues dashboard section."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        data = get_dashboard_issues_kpis(project_ids=project_ids or None)
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching issues KPIs")
+        return jsonify({'error': 'Failed to fetch issues KPIs', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/issues-charts', methods=['GET'])
+def api_dashboard_issues_charts():
+    """Return chart-ready groupings for the Issues dashboard section."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        data = get_dashboard_issues_charts(project_ids=project_ids or None)
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching issues charts")
+        return jsonify({'error': 'Failed to fetch issues charts', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/issues-table', methods=['GET'])
+def api_dashboard_issues_table():
+    """Return paginated issues rows for dashboard drill-down."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        status = request.args.get("status")
+        priority = request.args.get("priority")
+        discipline = request.args.get("discipline")
+        zone = request.args.get("zone")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "created_at")
+        sort_dir = request.args.get("sort_dir", "desc")
+        data = get_dashboard_issues_table(
+            project_ids=project_ids or None,
+            status=status or None,
+            priority=priority or None,
+            discipline=discipline or None,
+            zone=zone or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching issues table")
+        return jsonify({'error': 'Failed to fetch issues table', 'details': str(e)}), 500
+
+
 @app.route('/api/dashboard/revit-health', methods=['GET'])
 def api_dashboard_revit_health():
     """Return aggregated Revit model health metrics for the dashboard."""
@@ -3501,6 +3558,209 @@ def import_revit_health_data(project_id):
         
     except Exception as e:
         logging.exception(f"Error importing Revit health data for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- Dynamo Batch Automation ---
+
+@app.route('/api/dynamo/scripts', methods=['GET'])
+def get_dynamo_scripts():
+    """Get available Dynamo scripts"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+        
+        service = DynamoBatchService()
+        category = request.args.get('category')
+        active_only = request.args.get('active_only', 'true').lower() == 'true'
+        
+        scripts = service.get_scripts(category=category, active_only=active_only)
+        
+        return jsonify({
+            'success': True,
+            'scripts': scripts,
+            'count': len(scripts)
+        })
+    except Exception as e:
+        logging.exception("Error fetching Dynamo scripts")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dynamo/jobs', methods=['GET'])
+def get_dynamo_jobs():
+    """Get Dynamo batch jobs"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+        
+        service = DynamoBatchService()
+        project_id = request.args.get('project_id', type=int)
+        status = request.args.get('status')
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        jobs = service.get_jobs(
+            project_id=project_id,
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+        
+        return jsonify({
+            'success': True,
+            'jobs': jobs,
+            'count': len(jobs)
+        })
+    except Exception as e:
+        logging.exception("Error fetching Dynamo jobs")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dynamo/jobs/<int:job_id>', methods=['GET'])
+def get_dynamo_job_status(job_id):
+    """Get detailed status of a specific job"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+        
+        service = DynamoBatchService()
+        job = service.get_job_status(job_id)
+        
+        if not job:
+            return jsonify({'error': f'Job {job_id} not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'job': job
+        })
+    except Exception as e:
+        logging.exception(f"Error fetching job {job_id} status")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dynamo/jobs', methods=['POST'])
+def create_dynamo_job():
+    """Create a new Dynamo batch job"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+        
+        body = request.get_json()
+        
+        # Validate required fields
+        required = ['job_name', 'script_id', 'file_paths']
+        missing = [f for f in required if f not in body]
+        if missing:
+            return jsonify({
+                'error': f'Missing required fields: {", ".join(missing)}'
+            }), 400
+        
+        service = DynamoBatchService()
+        job_id = service.create_job(
+            job_name=body['job_name'],
+            script_id=body['script_id'],
+            file_paths=body['file_paths'],
+            project_id=body.get('project_id'),
+            created_by=body.get('created_by'),
+            configuration=body.get('configuration')
+        )
+        
+        if not job_id:
+            return jsonify({'error': 'Failed to create job'}), 500
+        
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'message': f'Job created successfully with {len(body["file_paths"])} files'
+        }), 201
+        
+    except Exception as e:
+        logging.exception("Error creating Dynamo job")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dynamo/jobs/<int:job_id>/execute', methods=['POST'])
+def execute_dynamo_job(job_id):
+    """Execute a Dynamo batch job"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+        
+        service = DynamoBatchService()
+        success, message = service.execute_job(job_id)
+        
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': message
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'job_id': job_id
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error executing job {job_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/revit-files', methods=['GET'])
+def get_project_revit_files(project_id):
+    """Get list of Revit files for a project"""
+    try:
+        from database import get_project_folders
+        
+        # Get project folders
+        folders = get_project_folders(project_id)
+        
+        if not folders or not folders.get('folder_path'):
+            return jsonify({
+                'success': False,
+                'error': 'No folder path configured for this project'
+            }), 404
+        
+        folder_path = folders['folder_path']
+        
+        if not os.path.exists(folder_path):
+            return jsonify({
+                'success': False,
+                'error': f'Project folder does not exist: {folder_path}'
+            }), 404
+        
+        # Find all .rvt files recursively
+        revit_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.lower().endswith('.rvt'):
+                    full_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(full_path, folder_path)
+                    
+                    try:
+                        stat = os.stat(full_path)
+                        file_size_mb = stat.st_size / (1024 * 1024)
+                        modified_date = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    except Exception:
+                        file_size_mb = 0
+                        modified_date = None
+                    
+                    revit_files.append({
+                        'file_name': file,
+                        'file_path': full_path,
+                        'relative_path': relative_path,
+                        'file_size_mb': round(file_size_mb, 2),
+                        'modified_date': modified_date
+                    })
+        
+        # Sort by modified date (newest first)
+        revit_files.sort(key=lambda x: x['modified_date'] or '', reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'project_id': project_id,
+            'folder_path': folder_path,
+            'files': revit_files,
+            'count': len(revit_files)
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error getting Revit files for project {project_id}")
         return jsonify({'error': str(e)}), 500
 
 

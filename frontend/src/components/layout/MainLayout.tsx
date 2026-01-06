@@ -24,7 +24,6 @@ import {
   Folder as FolderIcon,
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
-  Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   CloudUpload as CloudUploadIcon,
   Search as SearchIcon,
@@ -45,7 +44,6 @@ const menuItems: MenuItem[] = [
   { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
   { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
   { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
 ];
 
 interface MainLayoutProps {
@@ -69,7 +67,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     const labelMap: Record<string, string> = {
       projects: 'Projects',
       'data-imports': 'Data Imports',
-      analytics: 'Analytics',
       tasks: 'Tasks',
       reviews: 'Reviews',
     };

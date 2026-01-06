@@ -6,7 +6,6 @@ import { theme } from './theme/theme';
 import { MainLayout } from './components/layout/MainLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import DataImportsPage from './pages/DataImportsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -38,7 +37,6 @@ function App() {
               <Route path="/data-imports" element={<DataImportsPage />} />
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
               <Route path="/tasks" element={<TasksNotesPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

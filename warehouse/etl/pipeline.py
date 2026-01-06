@@ -145,28 +145,68 @@ class WarehousePipeline:
         select_query = """
             WITH source_issues AS (
                 SELECT
-                    source,
-                    CAST(issue_id AS NVARCHAR(255)) AS issue_id,
-                    project_name,
-                    CAST(project_id AS NVARCHAR(255)) AS project_id_raw,
-                    status,
-                    priority,
-                    title,
-                    assignee,
-                    author,
-                    created_at,
-                    closed_at,
+                    pm.source,
+                    CAST(pm.issue_id AS NVARCHAR(255)) AS issue_id,
+                    pm.project_name,
+                    CAST(pm.project_id AS NVARCHAR(255)) AS project_id_raw,
+                    pm.status,
+                    pm.priority,
+                    ve.Priority AS acc_priority,
+                    ve.Discipline AS acc_discipline,
+                    ve.location_name AS acc_location_name,
+                    ve.root_location,
+                    ve.building_name,
+                    ve.level_name,
+                    rv.tags_json AS revizto_tags_json,
+                    rv.position_properties_decoded AS revizto_position_properties,
+                    prio_map.normalized_priority AS mapped_priority,
+                    loc_map.location_root AS mapped_location_root,
+                    loc_map.location_building AS mapped_location_building,
+                    loc_map.location_level AS mapped_location_level,
+                    pm.title,
+                    pm.assignee,
+                    pm.author,
+                    pm.created_at,
+                    pm.closed_at,
                     ROW_NUMBER() OVER (
-                        PARTITION BY source, issue_id
+                        PARTITION BY pm.source, pm.issue_id
                         ORDER BY
-                            CASE WHEN created_at IS NOT NULL THEN created_at ELSE '1900-01-01' END DESC,
-                            CASE WHEN closed_at IS NOT NULL THEN closed_at ELSE '1900-01-01' END DESC
+                            CASE WHEN pm.created_at IS NOT NULL THEN pm.created_at ELSE '1900-01-01' END DESC,
+                            CASE WHEN pm.closed_at IS NOT NULL THEN pm.closed_at ELSE '1900-01-01' END DESC
                     ) AS rn
-                FROM vw_ProjectManagement_AllIssues
+                FROM vw_ProjectManagement_AllIssues pm
+                LEFT JOIN acc_data_schema.dbo.vw_issues_expanded ve
+                    ON CAST(ve.display_id AS NVARCHAR(255)) = pm.issue_id
+                   AND pm.source = 'ACC'
+                LEFT JOIN ReviztoData.dbo.vw_ReviztoProjectIssues_Deconstructed rv
+                    ON CAST(rv.issue_number AS NVARCHAR(255)) = pm.issue_id
+                   AND pm.source = 'Revizto'
+                OUTER APPLY (
+                    SELECT TOP (1) m.normalized_priority
+                    FROM dbo.issue_priority_map m
+                    WHERE m.source_system = pm.source
+                      AND m.raw_priority = COALESCE(ve.Priority, pm.priority)
+                      AND (m.project_id = CAST(pm.project_id AS NVARCHAR(100)) OR m.project_id IS NULL)
+                    ORDER BY CASE WHEN m.project_id = CAST(pm.project_id AS NVARCHAR(100)) THEN 0 ELSE 1 END,
+                             CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
+                ) prio_map
+                OUTER APPLY (
+                    SELECT TOP (1) m.location_root, m.location_building, m.location_level
+                    FROM dbo.issue_location_map m
+                    WHERE m.source_system = pm.source
+                      AND m.raw_location = COALESCE(
+                          ve.location_name,
+                          ve.root_location,
+                          rv.position_properties_decoded,
+                          JSON_VALUE(rv.tags_json, '$[0]')
+                      )
+                      AND (m.project_id = CAST(pm.project_id AS NVARCHAR(100)) OR m.project_id IS NULL)
+                    ORDER BY CASE WHEN m.project_id = CAST(pm.project_id AS NVARCHAR(100)) THEN 0 ELSE 1 END,
+                             CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
+                ) loc_map
                 WHERE
-                    (created_at IS NOT NULL AND created_at > ?)
-                    OR (closed_at IS NOT NULL AND closed_at > ?)
-                    OR (last_activity_date IS NOT NULL AND last_activity_date > ?)
+                    (pm.created_at IS NOT NULL AND pm.created_at > ?)
+                    OR (pm.closed_at IS NOT NULL AND pm.closed_at > ?)
             )
             SELECT
                 source,
@@ -175,17 +215,28 @@ class WarehousePipeline:
                 project_id_raw,
                 status,
                 priority,
+                acc_priority,
+                acc_discipline,
+                acc_location_name,
+                root_location,
+                building_name,
+                level_name,
+                revizto_tags_json,
+                revizto_position_properties,
+                mapped_priority,
+                mapped_location_root,
+                mapped_location_building,
+                mapped_location_level,
                 title,
                 assignee,
                 author,
                 created_at,
-                closed_at,
-                last_activity_date
+                closed_at
             FROM source_issues
             WHERE rn = 1
         """
 
-        rows = self._fetch_source_rows(select_query, watermark, watermark, watermark)
+        rows = self._fetch_source_rows(select_query, watermark, watermark)
         if not rows:
             logger.info("No new issue rows to load.")
             return 0
@@ -193,11 +244,12 @@ class WarehousePipeline:
         insert_sql = """
             INSERT INTO stg.issues (
                 source_system, issue_id, project_name, project_id_raw, status, priority,
-                title, description, assignee, author, created_at, closed_at,
+                priority_normalized, title, description, assignee, author, created_at, closed_at,
                 last_activity_date, due_date, discipline, category_primary,
-                category_secondary, record_source, source_load_ts
+                category_secondary, location_raw, location_root, location_building, location_level,
+                record_source, source_load_ts
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
         """
         record_source = "ProjectManagement"
         insert_rows = [
@@ -208,17 +260,30 @@ class WarehousePipeline:
                 row.project_id_raw,
                 row.status,
                 row.priority,
+                row.mapped_priority or self._normalize_priority(row.acc_priority or row.priority),
                 row.title,
                 getattr(row, "description", None),
                 row.assignee,
                 row.author,
                 row.created_at,
                 row.closed_at,
-                getattr(row, "last_activity_date", None),
+                None,
                 getattr(row, "due_date", None),
-                getattr(row, "discipline", None),
+                getattr(row, "acc_discipline", None)
+                or (row.assignee if row.source == "Revizto" else None),
                 getattr(row, "primary_category", None),
                 getattr(row, "secondary_category", None),
+                getattr(row, "acc_location_name", None)
+                or getattr(row, "root_location", None)
+                or getattr(row, "revizto_position_properties", None)
+                or self._extract_revizto_tag(row.revizto_tags_json),
+                getattr(row, "mapped_location_root", None)
+                or getattr(row, "root_location", None)
+                or self._extract_revizto_tag(row.revizto_tags_json),
+                getattr(row, "mapped_location_building", None)
+                or getattr(row, "building_name", None),
+                getattr(row, "mapped_location_level", None)
+                or getattr(row, "level_name", None),
                 record_source,
             )
             for row in rows
@@ -227,12 +292,7 @@ class WarehousePipeline:
         self._bulk_insert(insert_sql, insert_rows)
 
         latest = max(
-            [
-                value
-                for row in rows
-                for value in (row.created_at, row.closed_at, getattr(row, "last_activity_date", None))
-                if value is not None
-            ],
+            [value for row in rows for value in (row.created_at, row.closed_at) if value is not None],
             default=watermark,
         )
         self._set_watermark(process, source_object, latest, len(rows))
@@ -803,6 +863,43 @@ class WarehousePipeline:
         if max_length is not None and len(text) > max_length:
             return text[:max_length]
         return text
+
+    @staticmethod
+    def _normalize_priority(value: Optional[object]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        key = text.upper()
+        if key in ("NONE", "N/A", "NA", "NULL", "UNKNOWN"):
+            return None
+        if key in ("BLOCKER", "CRITICAL", "L1 - CRITICAL"):
+            return "Critical"
+        if key in ("MAJOR", "L2 - IMPORTANT"):
+            return "High"
+        if key in ("MINOR", "L3 - SIGNIFICANT"):
+            return "Medium"
+        if key in ("TRIVIAL", "L4 - MINOR"):
+            return "Low"
+        return text.title()
+
+    @staticmethod
+    def _extract_revizto_tag(value: Optional[object]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            import json
+
+            parsed = json.loads(text)
+        except (TypeError, json.JSONDecodeError):
+            return text
+        if isinstance(parsed, list) and parsed:
+            return str(parsed[0])
+        return None
 
     # ------------------------------------------------------------------
     # Orchestration

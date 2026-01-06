@@ -3,6 +3,9 @@ import type {
   WarehouseDashboardMetrics,
   RevitHealthDashboardMetrics,
   NamingComplianceMetrics,
+  DashboardIssuesKpis,
+  DashboardIssuesCharts,
+  DashboardIssuesTable,
 } from '@/types/api';
 
 export const dashboardApi = {
@@ -33,6 +36,52 @@ export const dashboardApi = {
       status: string;
       count: number;
     }[];
+  },
+
+  getIssuesKpis: async (options?: { projectIds?: number[] }): Promise<DashboardIssuesKpis> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    const response = await apiClient.get<DashboardIssuesKpis>('/dashboard/issues-kpis', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
+  getIssuesCharts: async (options?: { projectIds?: number[] }): Promise<DashboardIssuesCharts> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    const response = await apiClient.get<DashboardIssuesCharts>('/dashboard/issues-charts', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
+  getIssuesTable: async (options?: {
+    projectIds?: number[];
+    status?: string;
+    priority?: string;
+    discipline?: string;
+    zone?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<DashboardIssuesTable> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.status) params.status = options.status;
+    if (options?.priority) params.priority = options.priority;
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.zone) params.zone = options.zone;
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+
+    const response = await apiClient.get<DashboardIssuesTable>('/dashboard/issues-table', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
   },
 
   getRevitHealthMetrics: async (options?: { projectIds?: number[]; discipline?: string }): Promise<RevitHealthDashboardMetrics> => {

@@ -5152,6 +5152,437 @@ def get_warehouse_issues_history(
         return []
 
 
+def get_dashboard_issues_kpis(
+    project_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """Return KPI counts for the Issues dashboard section."""
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            proj_filter_sql = ""
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                proj_filter_sql = f" AND p.project_bk IN ({placeholders})"
+                params.extend(project_ids)
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT s.issue_sk, s.project_sk, s.is_open, s.backlog_age_days
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                )
+                SELECT
+                    COUNT(DISTINCT li.issue_sk) AS total_issues,
+                    SUM(CASE WHEN li.is_open = 1 THEN 1 ELSE 0 END) AS active_issues,
+                    SUM(CASE WHEN li.backlog_age_days > 30 THEN 1 ELSE 0 END) AS over_30_days
+                FROM latest_issues li
+                LEFT JOIN dim.project p ON li.project_sk = p.project_sk
+                WHERE (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                """,
+                tuple(params),
+            )
+            row = cursor.fetchone()
+            totals = {
+                "total_issues": int(row[0] or 0) if row else 0,
+                "active_issues": int(row[1] or 0) if row else 0,
+                "over_30_days": int(row[2] or 0) if row else 0,
+            }
+
+            cursor.execute(
+                f"""
+                WITH review_anchor AS (
+                    SELECT
+                        svc.project_sk,
+                        MAX(COALESCE(rc.due_date_sk, rc.planned_date_sk)) AS last_review_date_sk
+                    FROM dim.review_cycle rc
+                    JOIN dim.service svc ON rc.service_sk = svc.service_sk
+                    WHERE rc.current_flag = 1
+                    GROUP BY svc.project_sk
+                )
+                SELECT
+                    COUNT(1) AS closed_since_review
+                FROM dim.issue i
+                JOIN dim.project p ON i.project_sk = p.project_sk
+                JOIN review_anchor ra ON ra.project_sk = p.project_sk
+                WHERE i.current_flag = 1
+                  AND i.closed_date_sk IS NOT NULL
+                  AND i.closed_date_sk >= ra.last_review_date_sk
+                {proj_filter_sql}
+                """,
+                tuple(params),
+            )
+            row = cursor.fetchone()
+            totals["closed_since_review"] = int(row[0] or 0) if row else 0
+            return totals
+    except Exception as e:
+        logger.error("Error fetching issues KPIs: %s", e)
+        return {
+            "total_issues": 0,
+            "active_issues": 0,
+            "over_30_days": 0,
+            "closed_since_review": 0,
+        }
+
+
+def get_dashboard_issues_charts(
+    project_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """Return chart-ready groupings for the Issues dashboard."""
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+            params: List[Any] = []
+            proj_filter_sql = ""
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                proj_filter_sql = f" AND p.project_bk IN ({placeholders})"
+                params.extend(project_ids)
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                )
+                SELECT
+                    CASE
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%open%' THEN 'Open'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%progress%' THEN 'In progress'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%complete%' THEN 'Completed'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%close%' THEN 'Closed'
+                        ELSE 'Other'
+                    END AS status_group,
+                    COUNT(1) AS issue_count
+                FROM fact.issue_snapshot s
+                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                WHERE (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                GROUP BY
+                    CASE
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%open%' THEN 'Open'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%progress%' THEN 'In progress'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%complete%' THEN 'Completed'
+                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%close%' THEN 'Closed'
+                        ELSE 'Other'
+                    END
+                ORDER BY issue_count DESC
+                """,
+                tuple(params),
+            )
+            status_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                )
+                SELECT
+                    COALESCE(i.priority_normalized, 'Unassigned') AS priority_group,
+                    COUNT(1) AS issue_count
+                FROM fact.issue_snapshot s
+                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                JOIN dim.issue i ON s.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                WHERE i.current_flag = 1
+                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                GROUP BY COALESCE(i.priority_normalized, 'Unassigned')
+                ORDER BY issue_count DESC
+                """,
+                tuple(params),
+            )
+            priority_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                )
+                SELECT
+                    COALESCE(
+                        ic.level1_name,
+                        CASE WHEN i.source_system = 'Revizto' THEN u.display_name END,
+                        'Unassigned'
+                    ) AS discipline,
+                    COUNT(DISTINCT s.issue_sk) AS issue_count
+                FROM fact.issue_snapshot s
+                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                JOIN dim.issue i ON s.issue_sk = i.issue_sk
+                LEFT JOIN brg.issue_category bic
+                    ON s.issue_sk = bic.issue_sk AND bic.category_role = 'discipline'
+                LEFT JOIN dim.issue_category ic ON bic.issue_category_sk = ic.issue_category_sk
+                LEFT JOIN dim.[user] u
+                    ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                WHERE i.current_flag = 1
+                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                GROUP BY
+                    COALESCE(
+                        ic.level1_name,
+                        CASE WHEN i.source_system = 'Revizto' THEN u.display_name END,
+                        'Unassigned'
+                    )
+                ORDER BY issue_count DESC
+                """,
+                tuple(params),
+            )
+            discipline_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                )
+                SELECT
+                    COALESCE(i.location_root, 'Unassigned') AS zone_root,
+                    COUNT(1) AS issue_count
+                FROM fact.issue_snapshot s
+                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                JOIN dim.issue i ON s.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                WHERE i.current_flag = 1
+                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                GROUP BY COALESCE(i.location_root, 'Unassigned')
+                ORDER BY issue_count DESC
+                """,
+                tuple(params),
+            )
+            zone_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                WITH latest_day AS (
+                    SELECT MAX(d.[date]) AS max_date
+                    FROM fact.issue_snapshot s
+                    JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                )
+                SELECT
+                    CAST(d.[date] AS date) AS snapshot_date,
+                    SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
+                    SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
+                    COUNT(1) AS total_issues
+                FROM fact.issue_snapshot s
+                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                CROSS JOIN latest_day ld
+                WHERE d.[date] >= DATEADD(day, -90, ld.max_date)
+                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
+                {proj_filter_sql}
+                GROUP BY CAST(d.[date] AS date)
+                ORDER BY CAST(d.[date] AS date)
+                """,
+                tuple(params),
+            )
+            trend_rows = cursor.fetchall()
+
+            return {
+                "status": [{"label": row[0], "value": int(row[1] or 0)} for row in status_rows],
+                "priority": [{"label": row[0], "value": int(row[1] or 0)} for row in priority_rows],
+                "discipline": [{"label": row[0], "value": int(row[1] or 0)} for row in discipline_rows],
+                "zone": [{"label": row[0], "value": int(row[1] or 0)} for row in zone_rows],
+                "trend_90d": [
+                    {
+                        "date": row[0].isoformat() if row[0] else None,
+                        "open": int(row[1] or 0),
+                        "closed": int(row[2] or 0),
+                        "total": int(row[3] or 0),
+                    }
+                    for row in trend_rows
+                ],
+            }
+    except Exception as e:
+        logger.error("Error fetching issues charts: %s", e)
+        return {"status": [], "priority": [], "discipline": [], "zone": [], "trend_90d": []}
+
+
+def get_dashboard_issues_table(
+    project_ids: Optional[List[int]] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    discipline: Optional[str] = None,
+    zone: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """Return paginated issues rows for dashboard drill-down."""
+    allowed_sort = {
+        "created_at": "created_at",
+        "status": "status",
+        "priority": "priority",
+        "project_name": "project_name",
+        "issue_id": "issue_id",
+    }
+    sort_col = allowed_sort.get(sort_by, "created_at")
+    sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    offset = max(page - 1, 0) * page_size
+    status_case = (
+        "CASE "
+        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%open%' THEN 'Open' "
+        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%progress%' THEN 'In progress' "
+        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%complete%' THEN 'Completed' "
+        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%close%' THEN 'Closed' "
+        "ELSE 'Other' "
+        "END"
+    )
+    discipline_case = (
+        "COALESCE("
+        "ic.level1_name, "
+        "CASE WHEN i.source_system = 'Revizto' THEN u.display_name END"
+        ")"
+    )
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+            params: List[Any] = []
+            where_clauses = ["i.current_flag = 1"]
+
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"p.project_bk IN ({placeholders})")
+                params.extend(project_ids)
+
+            if status:
+                where_clauses.append(f"LOWER({status_case}) = LOWER(?)")
+                params.append(status)
+
+            if priority:
+                where_clauses.append("LOWER(ISNULL(i.priority_normalized,'')) = LOWER(?)")
+                params.append(priority)
+
+            if discipline:
+                where_clauses.append(f"LOWER(ISNULL({discipline_case},'')) = LOWER(?)")
+                params.append(discipline)
+
+            if zone:
+                where_clauses.append("LOWER(ISNULL(i.location_root,'')) = LOWER(?)")
+                params.append(zone)
+
+            where_sql = " AND ".join(where_clauses)
+
+            cursor.execute(
+                f"""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                ),
+                latest_status AS (
+                    SELECT s.issue_sk, s.status
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                enriched AS (
+                    SELECT
+                        i.issue_sk,
+                        i.issue_bk AS issue_id,
+                        i.source_system,
+                        p.project_name,
+                        COALESCE(ls.status, i.status) AS status,
+                        COALESCE(i.priority_normalized, i.priority) AS priority,
+                        i.title,
+                        ve.Clash_Level AS clash_level,
+                        ve.latest_comment AS latest_comment,
+                        ve.Company AS company,
+                        ic.level1_name AS discipline,
+                        COALESCE(i.location_root, i.location_raw, 'Unassigned') AS zone,
+                        i.location_root,
+                        i.location_building,
+                        i.location_level,
+                        CASE
+                            WHEN i.created_date_sk IS NOT NULL
+                            THEN CAST(CONVERT(VARCHAR(8), i.created_date_sk) AS date)
+                            ELSE NULL
+                        END AS created_at
+                    FROM dim.issue i
+                    LEFT JOIN latest_status ls ON ls.issue_sk = i.issue_sk
+                    LEFT JOIN dim.project p ON i.project_sk = p.project_sk
+                    LEFT JOIN brg.issue_category bic
+                        ON i.issue_sk = bic.issue_sk AND bic.category_role = 'discipline'
+                    LEFT JOIN dim.issue_category ic ON bic.issue_category_sk = ic.issue_category_sk
+                    LEFT JOIN dim.[user] u
+                        ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                    LEFT JOIN acc_data_schema.dbo.vw_issues_expanded ve
+                        ON i.source_system = 'ACC'
+                       AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                    WHERE {where_sql}
+                ),
+                numbered AS (
+                    SELECT
+                        *,
+                        COUNT(1) OVER() AS total_count,
+                        ROW_NUMBER() OVER (ORDER BY {sort_col} {sort_direction}) AS rn
+                    FROM enriched
+                )
+                SELECT
+                    issue_id,
+                    source_system,
+                    project_name,
+                    status,
+                    priority,
+                    clash_level,
+                    title,
+                    latest_comment,
+                    company,
+                    zone,
+                    location_root,
+                    location_building,
+                    location_level,
+                    created_at,
+                    total_count
+                FROM numbered
+                WHERE rn BETWEEN ? AND ?
+                ORDER BY rn
+                """,
+                tuple(params + [offset + 1, offset + page_size]),
+            )
+
+            rows = cursor.fetchall()
+            total_count = int(rows[0][-1]) if rows else 0
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "rows": [
+                    {
+                        "issue_id": row[0],
+                        "source": row[1],
+                        "project_name": row[2],
+                        "status": row[3],
+                        "priority": row[4],
+                        "clash_level": row[5],
+                        "title": row[6],
+                        "latest_comment": row[7],
+                        "company": row[8],
+                        "zone": row[9],
+                        "location_root": row[10],
+                        "location_building": row[11],
+                        "location_level": row[12],
+                        "created_at": row[13].isoformat() if row[13] else None,
+                    }
+                    for row in rows
+                ],
+            }
+    except Exception as e:
+        logger.error("Error fetching issues table: %s", e)
+        return {"page": page, "page_size": page_size, "total_count": 0, "rows": []}
+
+
 def get_revit_health_dashboard_summary(
     project_ids: Optional[List[int]] = None,
     discipline: Optional[str] = None,

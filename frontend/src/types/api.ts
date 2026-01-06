@@ -240,6 +240,55 @@ export interface IssueHistoryPoint {
   count: number;
 }
 
+export interface DashboardIssuesKpis {
+  total_issues: number;
+  active_issues: number;
+  over_30_days: number;
+  closed_since_review: number;
+}
+
+export interface DashboardIssueChartSlice {
+  label: string;
+  value: number;
+}
+
+export interface DashboardIssuesCharts {
+  status: DashboardIssueChartSlice[];
+  priority: DashboardIssueChartSlice[];
+  discipline: DashboardIssueChartSlice[];
+  zone: DashboardIssueChartSlice[];
+  trend_90d: Array<{
+    date: string | null;
+    open: number;
+    closed: number;
+    total: number;
+  }>;
+}
+
+export interface DashboardIssuesTableRow {
+  issue_id: string;
+  source: string | null;
+  project_name: string | null;
+  status: string | null;
+  priority: string | null;
+  clash_level: string | null;
+  title: string | null;
+  latest_comment: string | null;
+  company: string | null;
+  zone: string | null;
+  location_root: string | null;
+  location_building: string | null;
+  location_level: string | null;
+  created_at: string | null;
+}
+
+export interface DashboardIssuesTable {
+  page: number;
+  page_size: number;
+  total_count: number;
+  rows: DashboardIssuesTableRow[];
+}
+
 export interface TaskItem {
   label?: string;
   title?: string;

@@ -483,11 +483,16 @@ BEGIN
             i.project_id_raw,
             i.status,
             i.priority,
+            i.priority_normalized,
             i.title,
             i.assignee,
             i.author,
             i.created_at,
             i.closed_at,
+            i.location_raw,
+            i.location_root,
+            i.location_building,
+            i.location_level,
             COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk) AS project_sk,
             ac.issue_category_sk AS primary_category_sk,
             dc.issue_category_sk AS discipline_category_sk,
@@ -497,13 +502,18 @@ BEGIN
                     ISNULL(CONVERT(NVARCHAR(20), COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk)), ''),
                     ISNULL(i.status, ''),
                     ISNULL(i.priority, ''),
+                    ISNULL(i.priority_normalized, ''),
                     ISNULL(i.title, ''),
                     ISNULL(i.assignee, ''),
                     ISNULL(i.author, ''),
                     ISNULL(CONVERT(NVARCHAR(30), i.created_at, 126), ''),
                     ISNULL(CONVERT(NVARCHAR(30), i.closed_at, 126), ''),
                     ISNULL(CONVERT(NVARCHAR(20), ac.issue_category_sk), ''),
-                    ISNULL(CONVERT(NVARCHAR(20), dc.issue_category_sk), '')
+                    ISNULL(CONVERT(NVARCHAR(20), dc.issue_category_sk), ''),
+                    ISNULL(i.location_raw, ''),
+                    ISNULL(i.location_root, ''),
+                    ISNULL(i.location_building, ''),
+                    ISNULL(i.location_level, '')
                 )
             ) AS row_hash
      FROM stg.issues i
@@ -516,8 +526,18 @@ BEGIN
      LEFT JOIN dim.project p_name
          ON p_name.project_name = i.project_name
         AND p_name.current_flag = 1
+        OUTER APPLY (
+            SELECT TOP (1) m.normalized_discipline
+            FROM dbo.issue_discipline_map m
+            WHERE m.source_system = i.source_system
+              AND m.raw_discipline = i.discipline
+              AND m.active_flag = 1
+              AND (m.project_id = i.project_id_raw OR m.project_id IS NULL)
+            ORDER BY CASE WHEN m.project_id = i.project_id_raw THEN 0 ELSE 1 END,
+                     CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
+        ) dm
         LEFT JOIN dim.issue_category ac ON ac.category_name = i.category_primary AND ac.current_flag = 1
-        LEFT JOIN dim.issue_category dc ON dc.category_name = i.discipline AND dc.current_flag = 1
+        LEFT JOIN dim.issue_category dc ON dc.category_name = COALESCE(dm.normalized_discipline, i.discipline) AND dc.current_flag = 1
     )
     SELECT *
     INTO #dedup
@@ -534,9 +554,10 @@ BEGIN
     WHERE tgt.record_hash <> src.row_hash;
 
     INSERT INTO dim.issue (
-        issue_bk, source_system, project_sk, title, status, priority,
+        issue_bk, source_system, project_sk, title, status, priority, priority_normalized,
         assignee_sk, author_sk, created_date_sk, closed_date_sk,
         discipline_category_sk, primary_category_sk, secondary_category_sk,
+        location_raw, location_root, location_building, location_level,
         current_flag, effective_start, effective_end, record_hash, record_source
     )
     SELECT
@@ -546,6 +567,7 @@ BEGIN
         src.title,
         src.status,
         src.priority,
+        src.priority_normalized,
         assignee.user_sk,
         author.user_sk,
         CASE WHEN src.created_at IS NOT NULL THEN CONVERT(INT, FORMAT(src.created_at, 'yyyyMMdd')) END,
@@ -553,6 +575,10 @@ BEGIN
         src.discipline_category_sk,
         src.primary_category_sk,
         NULL,
+        src.location_raw,
+        src.location_root,
+        src.location_building,
+        src.location_level,
         1,
         SYSUTCDATETIME(),
         NULL,

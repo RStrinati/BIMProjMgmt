@@ -2,12 +2,11 @@
 
 ## Architecture Overview
 
-This is a **BIM (Building Information Modeling) project management system** with a **Tkinter desktop application** managing construction project reviews, scheduling, and billing workflows.
+This is a **BIM (Building Information Modeling) project management system** with a **React-based web application** managing construction project reviews, scheduling, and billing workflows.
 
 ### Core Components
-- **UI**: Tkinter desktop application (`run_enhanced_ui.py`) with multiple tabs
-- **Backend**: Flask API (`backend/app.py`) serving REST endpoints
-- **Frontend**: React app (`frontend/app.js`) with Material-UI components (legacy)
+- **Frontend**: React + TypeScript SPA (`frontend/`) with Material-UI components, Vite bundler, React Router, and React Query
+- **Backend**: Flask API (`backend/app.py`) serving REST endpoints to the web client
 - **Database**: SQL Server with 3 databases:
   - `ProjectManagement` - Main project/review data
   - `acc_data_schema` - Autodesk Construction Cloud imports
@@ -34,11 +33,16 @@ python check_schema.py --autofix --update-constants
 
 ### Application Launch
 ```bash
-# Full stack with auto-schema fix
-python run_enhanced_ui.py
+# Backend API (Flask)
+cd backend
+python app.py
+# Runs on http://localhost:5000
 
-# Launches the enhanced Tkinter UI with all project management tabs
-# Automatically runs schema validation and fixes
+# Frontend (React + Vite dev server)
+cd frontend
+npm install
+npm run dev
+# Runs on http://localhost:5173
 ```
 
 ### Database Connection Pattern
@@ -87,6 +91,7 @@ finally:
 ### Error Handling
 - Database operations: Check `conn is None` before proceeding
 - API endpoints: Return JSON error responses with appropriate HTTP codes
+- Frontend: Use React Query for error states and retry logic
 - Log errors with context for debugging
 
 ### Import Organization
@@ -94,6 +99,8 @@ finally:
 - Business logic services in dedicated modules (`review_management_service.py`)
 - API routes in `backend/app.py`
 - Configuration in `config.py`
+- React components in `frontend/src/components/`
+- API client functions in `frontend/src/api/`
 
 ## Integration Points
 
@@ -117,13 +124,21 @@ finally:
 ### Date Handling
 - Use `datetime` objects, convert to string for SQL: `date.strftime('%Y-%m-%d')`
 - Database expects `DATE`/`DATETIME2` formats
-- Frontend uses HTML5 date inputs
+- Frontend uses HTML5 date inputs and ISO 8601 format
 
-### UI State Management
-- Tkinter variables (`tk.StringVar`, `tk.IntVar`) for component state
-- ttk widgets with proper styling and theming
-- ProjectNotificationSystem for inter-tab communication
-- Automatic UI updates via observer pattern
+### React Frontend State Management
+- React Query (`@tanstack/react-query`) for server state
+- Local component state with React hooks (`useState`, `useEffect`)
+- Material-UI (`@mui/material`) for UI components
+- React Router for navigation
+- Axios for HTTP requests
+
+### API Communication
+- Backend Flask API at `http://localhost:5000`
+- Frontend dev server at `http://localhost:5173`
+- CORS enabled for local development
+- RESTful endpoints with JSON payloads
+- Error responses with appropriate HTTP status codes
 
 ### Testing Approach
 - Database state verification: `check_database_state.py`
@@ -134,14 +149,16 @@ finally:
 ## File Organization Reference
 
 ### Key Files by Function
-- `run_enhanced_ui.py` - Main application launcher with schema auto-fix
-- `app.py` - Legacy application launcher (deprecated)
-- `backend/app.py` - Flask API endpoints
+- `backend/app.py` - Flask API endpoints and application server
 - `database.py` - All database operations
 - `review_management_service.py` - Complex review business logic
 - `config.py` - Environment configuration
 - `constants/schema.py` - Database schema constants
-- `frontend/app.js` - React UI components (legacy)
+- `frontend/src/App.tsx` - React application root
+- `frontend/src/main.tsx` - React application entry point
+- `frontend/src/pages/` - Page components for routing
+- `frontend/src/components/` - Reusable React components
+- `frontend/src/api/` - API client functions
 
 ### Data Import Handlers
 - `acc_handler.py` - ACC data processing
@@ -153,6 +170,28 @@ finally:
 - `check_schema.py` - Schema validation and auto-fix
 - `verify_schema.py` - Schema verification
 - `debug_*.py` - Various debugging tools
+
+## Development Stack
+
+### Backend Technologies
+- **Python 3.12+** - Core application language
+- **Flask** - REST API web framework
+- **pyodbc** - SQL Server database connectivity
+- **Flask-CORS** - Cross-origin resource sharing
+
+### Frontend Technologies
+- **React 18.2+** - UI library
+- **TypeScript 5.2+** - Type-safe JavaScript
+- **Vite 5.0** - Build tool and dev server
+- **Material-UI 5.14+** - Component library
+- **React Router 6.20+** - Client-side routing
+- **React Query 5.8+** - Server state management
+- **Axios 1.6+** - HTTP client
+- **Recharts 2.12+** - Data visualization
+
+### Database
+- **SQL Server 2019+** - Primary database
+- **ODBC Driver 18** - Database connectivity
 
 Remember: This system manages **real construction project workflows** with **financial and scheduling implications**. Always verify database operations and maintain data integrity.</content>
 <parameter name="filePath">c:\Users\RicoStrinati\Documents\research\BIMProjMngmt\.github\copilot-instructions.md

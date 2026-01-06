@@ -25,6 +25,8 @@ import {
   Alert,
   Tooltip,
   TextField,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -39,12 +41,35 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { revitHealthApi } from '@/api/dataImports';
 import { ControlModelConfigurator } from '@/components/dataImports/ControlModelConfigurator';
+import { DynamoBatchRunner } from '@/components/dataImports/DynamoBatchRunner';
 import { fileBrowserApi, scriptApi } from '@/api/fileBrowser';
 import { formatDate } from '@/utils/dateUtils';
 
 interface RevitHealthPanelProps {
   projectId: number;
   projectName?: string;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`revit-health-tabpanel-${index}`}
+      aria-labelledby={`revit-health-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+    </div>
+  );
 }
 
 export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
@@ -60,6 +85,7 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationSuccess, setValidationSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Query for health files
   const {
@@ -189,18 +215,32 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
         View and analyze Revit model health check data for {projectName || `Project #${projectId}`}.
       </Typography>
 
-      <ControlModelConfigurator projectId={projectId} projectName={projectName} />
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+          <Tab label="Validate Control Models" />
+          <Tab label="Import Health Data" />
+          <Tab label="Run Health Scripts" />
+        </Tabs>
+      </Box>
 
-      {validationError && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setValidationError(null)}>
-          {validationError}
-        </Alert>
-      )}
-      {validationSuccess && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setValidationSuccess(null)}>
-          {validationSuccess}
-        </Alert>
-      )}
+      {/* Tab 0: Control Model Configurator */}
+      <TabPanel value={activeTab} index={0}>
+        <ControlModelConfigurator projectId={projectId} projectName={projectName} />
+      </TabPanel>
+
+      {/* Tab 1: Import Health Data */}
+      <TabPanel value={activeTab} index={1}>
+        {validationError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setValidationError(null)}>
+            {validationError}
+          </Alert>
+        )}
+        {validationSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setValidationSuccess(null)}>
+            {validationSuccess}
+          </Alert>
+        )}
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -490,6 +530,12 @@ export const RevitHealthPanel: React.FC<RevitHealthPanelProps> = ({
           </Alert>
         )}
       </Paper>
+      </TabPanel>
+
+      {/* Tab 2: Run Health Scripts */}
+      <TabPanel value={activeTab} index={2}>
+        <DynamoBatchRunner projectId={projectId} projectName={projectName} />
+      </TabPanel>
     </Box>
   );
 };

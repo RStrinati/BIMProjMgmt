@@ -1,9 +1,10 @@
-import { Profiler, useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react';
+import { Profiler, useDeferredValue, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Chip,
+  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -11,24 +12,52 @@ import {
   Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
   Typography,
   Button,
   TextField,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useQuery } from '@tanstack/react-query';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  Treemap,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { projectsApi } from '@/api';
 import { dashboardApi } from '@/api/dashboard';
 import DashboardTimelineChart from '@/components/DashboardTimelineChart';
 import type {
   DashboardTimelineProject,
   WarehouseDashboardMetrics,
-  IssueHistoryPoint,
   RevitHealthDashboardMetrics,
   NamingComplianceMetrics,
+  DashboardIssuesKpis,
+  DashboardIssuesCharts,
+  DashboardIssuesTable,
 } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
 import { useNavigate } from 'react-router-dom';
+import { chartColorSchemes } from '@/components/dashboards/themes';
 
 const EMPTY_PROJECTS: DashboardTimelineProject[] = [];
 const TIMELINE_WINDOW_MONTHS = 12;
@@ -162,61 +191,17 @@ function RadialGauge({ value, color = '#2e7d32' }: RadialGaugeProps) {
   );
 }
 
-type WireframeCardProps = {
-  title: string;
-  description: string;
-  checklist: string[];
-  accent?: string;
+type TabPanelProps = {
+  children: ReactNode;
+  value: number;
+  index: number;
 };
 
-function WireframeCard({ title, description, checklist, accent = '#1976d2' }: WireframeCardProps) {
+function TabPanel({ children, value, index }: TabPanelProps) {
   return (
-    <Card sx={{ height: '100%', borderStyle: 'dashed', borderColor: (theme) => theme.palette.divider }}>
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {description}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              width: 54,
-              height: 54,
-              borderRadius: '50%',
-              border: `3px dashed ${accent}`,
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 700,
-              color: accent,
-            }}
-            aria-label="placeholder chart"
-          >
-            UI
-          </Box>
-        </Stack>
-        <Stack spacing={0.75} sx={{ mt: 2 }}>
-          {checklist.map((item, idx) => (
-            <Stack key={idx} direction="row" spacing={1} alignItems="flex-start">
-              <Box
-                sx={{
-                  width: 10,
-                  height: 10,
-                  mt: 0.5,
-                  borderRadius: 0.5,
-                  bgcolor: accent,
-                  opacity: 0.5,
-                }}
-              />
-              <Typography variant="body2">{item}</Typography>
-            </Stack>
-          ))}
-        </Stack>
-      </CardContent>
-    </Card>
+    <Box role="tabpanel" hidden={value !== index} id={`dashboard-tabpanel-${index}`} aria-labelledby={`dashboard-tab-${index}`}>
+      {value === index ? children : null}
+    </Box>
   );
 }
 
@@ -246,6 +231,7 @@ export function DashboardPage() {
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [isFiltering, startFiltering] = useTransition();
+  const [dashboardTab, setDashboardTab] = useState(0);
 
   const timelineProjects = timelineData?.projects ?? EMPTY_PROJECTS;
 
@@ -254,16 +240,20 @@ export function DashboardPage() {
       const managers = new Set<string>();
       const types = new Set<string>();
       const clients = new Set<string>();
+      const normalize = (value?: string | null) => (value ?? '').trim();
 
       timelineProjects.forEach((project) => {
         if (project.project_manager) {
-          managers.add(project.project_manager);
+          const cleaned = normalize(project.project_manager);
+          if (cleaned) managers.add(cleaned);
         }
         if (project.project_type) {
-          types.add(project.project_type);
+          const cleaned = normalize(project.project_type);
+          if (cleaned) types.add(cleaned);
         }
         if (project.client_name) {
-          clients.add(project.client_name);
+          const cleaned = normalize(project.client_name);
+          if (cleaned) clients.add(cleaned);
         }
       });
 
@@ -280,17 +270,27 @@ export function DashboardPage() {
   );
 
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>('all');
+  const [issueStatus, setIssueStatus] = useState<string>('all');
+  const [issuePriority, setIssuePriority] = useState<string>('all');
+  const [issueDiscipline, setIssueDiscipline] = useState<string>('all');
+  const [issueZone, setIssueZone] = useState<string>('all');
+  const [issuePage, setIssuePage] = useState(1);
+  const [issuePageSize, setIssuePageSize] = useState(25);
 
   const filteredProjects = useMemo(() => {
     if (!timelineProjects.length) {
       return timelineProjects;
     }
+    const normalize = (value?: string | null) => (value ?? '').trim().toLowerCase();
 
     return timelineProjects.filter((project) => {
       const managerMatches =
-        selectedManager === 'all' || project.project_manager === selectedManager;
-      const typeMatches = selectedType === 'all' || project.project_type === selectedType;
-      const clientMatches = selectedClient === 'all' || project.client_name === selectedClient;
+        selectedManager === 'all' ||
+        normalize(project.project_manager) === normalize(selectedManager);
+      const typeMatches =
+        selectedType === 'all' || normalize(project.project_type) === normalize(selectedType);
+      const clientMatches =
+        selectedClient === 'all' || normalize(project.client_name) === normalize(selectedClient);
       const projectMatches =
         selectedProjects.length === 0 || selectedProjects.includes(project.project_id ?? -1);
       return managerMatches && typeMatches && clientMatches && projectMatches;
@@ -322,6 +322,10 @@ export function DashboardPage() {
     localStorage.setItem('dashboard_saved_views', JSON.stringify(savedViews));
   }, [savedViews]);
 
+  useEffect(() => {
+    setIssuePage(1);
+  }, [issueStatus, issuePriority, issueDiscipline, issueZone, targetProjectIds]);
+
   const handleSaveView = () => {
     const trimmed = viewName.trim();
     if (!trimmed) return;
@@ -351,6 +355,9 @@ export function DashboardPage() {
   const handleRefresh = () => {
     refetchTimeline();
     refetchWarehouse();
+    refetchIssuesKpis();
+    refetchIssuesCharts();
+    refetchIssuesTable();
   };
 
   const navigateProjectsWithFilters = (filters: { status?: string; manager?: string; type?: string; client?: string }) => {
@@ -365,6 +372,8 @@ export function DashboardPage() {
   const {
     data: warehouseMetrics,
     isLoading: isWarehouseMetricsLoading,
+    isError: isWarehouseMetricsError,
+    error: warehouseMetricsError,
     refetch: refetchWarehouse,
     dataUpdatedAt: warehouseUpdatedAt,
   } = useQuery<WarehouseDashboardMetrics>({
@@ -375,11 +384,47 @@ export function DashboardPage() {
       }),
   });
 
-  const { data: issuesHistory } = useQuery<IssueHistoryPoint[]>({
-    queryKey: ['dashboard', 'issues-history', targetProjectIds],
+  const { data: issuesKpis, refetch: refetchIssuesKpis } = useQuery<DashboardIssuesKpis>({
+    queryKey: ['dashboard', 'issues-kpis', targetProjectIds],
     queryFn: () =>
-      dashboardApi.getIssuesHistory({
+      dashboardApi.getIssuesKpis({
         projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+      }),
+  });
+
+  const { data: issuesCharts, refetch: refetchIssuesCharts } = useQuery<DashboardIssuesCharts>({
+    queryKey: ['dashboard', 'issues-charts', targetProjectIds],
+    queryFn: () =>
+      dashboardApi.getIssuesCharts({
+        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+      }),
+  });
+
+  const {
+    data: issuesTable,
+    isLoading: isIssuesTableLoading,
+    refetch: refetchIssuesTable,
+  } = useQuery<DashboardIssuesTable>({
+    queryKey: [
+      'dashboard',
+      'issues-table',
+      targetProjectIds,
+      issueStatus,
+      issuePriority,
+      issueDiscipline,
+      issueZone,
+      issuePage,
+      issuePageSize,
+    ],
+    queryFn: () =>
+      dashboardApi.getIssuesTable({
+        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        status: issueStatus !== 'all' ? issueStatus : undefined,
+        priority: issuePriority !== 'all' ? issuePriority : undefined,
+        discipline: issueDiscipline !== 'all' ? issueDiscipline : undefined,
+        zone: issueZone !== 'all' ? issueZone : undefined,
+        page: issuePage,
+        pageSize: issuePageSize,
       }),
   });
 
@@ -401,21 +446,12 @@ export function DashboardPage() {
       }),
   });
 
-  const latestIssueTrend = useMemo(() => {
-    const rows = warehouseMetrics?.issue_trends ?? [];
-    if (!rows.length) {
-      return null;
-    }
-    const ordered = rows
-      .filter((row) => row.date)
-      .sort((a, b) => new Date(a.date || '').getTime() - new Date(b.date || '').getTime());
-    if (!ordered.length) {
-      return null;
-    }
-    const last = ordered[ordered.length - 1];
-    const previous = ordered.length > 1 ? ordered[ordered.length - 2] : undefined;
-    return { last, previous };
-  }, [warehouseMetrics]);
+  const warehouseMetricsErrorMessage =
+    warehouseMetrics?.error ||
+    (warehouseMetricsError instanceof Error ? warehouseMetricsError.message : undefined) ||
+    (isWarehouseMetricsError ? 'Failed to load warehouse metrics.' : undefined);
+  const hasWarehouseMetrics =
+    !isWarehouseMetricsLoading && !isWarehouseMetricsError && !warehouseMetricsErrorMessage && Boolean(warehouseMetrics);
 
   const onTimeRatePct =
     warehouseMetrics?.review_performance?.on_time_rate != null
@@ -450,57 +486,44 @@ export function DashboardPage() {
     return date.toLocaleString();
   };
 
-  const stackedHistory = useMemo(() => {
-    if (!issuesHistory?.length) return null;
-    const statuses = ['Closed', 'Completed', 'In progress', 'Open'];
-    const byWeek: Record<string, Record<string, number>> = {};
-    issuesHistory.forEach((row) => {
-      const week = row.week_start || 'unknown';
-      if (!byWeek[week]) byWeek[week] = {};
-      byWeek[week][row.status] = row.count;
-    });
-    const weeks = Object.keys(byWeek).sort();
-    const width = Math.max(720, weeks.length * 80);
-    const height = 360;
-    const padding = 40;
-    const step = weeks.length > 1 ? (width - padding * 2) / (weeks.length - 1) : 0;
-    const maxY = Math.max(
-      ...weeks.map((w) => statuses.reduce((sum, st) => sum + (byWeek[w][st] || 0), 0)),
-      1,
-    );
-    const gridLines = Array.from({ length: 5 }, (_, idx) => Math.round((maxY / 4) * idx));
-    const scaleY = (val: number) =>
-      height - padding - (Math.min(val, maxY) / maxY) * (height - padding * 2);
+  const renderOptionLabel = (option: string) => (option === 'all' ? 'All' : option);
 
-    const series = statuses.map((status) => {
-      const color =
-        status === 'Closed'
-          ? '#9e9e9e'
-          : status === 'Completed'
-          ? '#4caf50'
-          : status === 'In progress'
-          ? '#5c6bc0'
-          : '#f57c00';
-      const points = weeks.map((week, idx) => ({
-        x: padding + idx * step,
-        y: scaleY(byWeek[week][status] || 0),
-        value: byWeek[week][status] || 0,
-        week,
-      }));
-      const path =
-        points.length === 0
-          ? ''
-          : points
-              .map((p, idx) => `${idx === 0 ? 'M' : 'L'}${p.x},${p.y}`)
-              .join(' ')
-              .concat(
-                ` L${points[points.length - 1].x},${height - padding} L${points[0].x},${height - padding} Z`,
-              );
-      return { status, color, points, path };
-    });
+  const issuesPalette = useMemo(
+    () => [
+      ...chartColorSchemes.disciplines,
+      '#ef6c00',
+      '#00897b',
+      '#5c6bc0',
+      '#8d6e63',
+      '#78909c',
+    ],
+    [],
+  );
 
-    return { width, height, padding, series, weeks, gridLines, maxY };
-  }, [issuesHistory]);
+  const getSliceColor = (index: number) => issuesPalette[index % issuesPalette.length];
+
+  const statusData = issuesCharts?.status ?? [];
+  const priorityData = issuesCharts?.priority ?? [];
+  const disciplineData = issuesCharts?.discipline ?? [];
+  const zoneData = issuesCharts?.zone ?? [];
+  const trendData = issuesCharts?.trend_90d ?? [];
+
+  const zoneTreemapData = useMemo(
+    () =>
+      zoneData.map((entry) => ({
+        name: entry.label,
+        size: entry.value,
+      })),
+    [zoneData],
+  );
+
+  const issueStatusOptions = useMemo(() => ['all', ...statusData.map((row) => row.label)], [statusData]);
+  const issuePriorityOptions = useMemo(() => ['all', ...priorityData.map((row) => row.label)], [priorityData]);
+  const issueDisciplineOptions = useMemo(
+    () => ['all', ...disciplineData.map((row) => row.label)],
+    [disciplineData],
+  );
+  const issueZoneOptions = useMemo(() => ['all', ...zoneData.map((row) => row.label)], [zoneData]);
 
   const lastUpdated = useMemo(() => {
     const timestamps = [timelineUpdatedAt, warehouseUpdatedAt].filter((t): t is number => Boolean(t));
@@ -531,99 +554,6 @@ export function DashboardPage() {
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Slice live warehouse metrics across issues, reviews, and services.
         </Typography>
-
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 3,
-            borderRadius: 2,
-            border: (theme) => `1px dashed ${theme.palette.divider}`,
-            background: (theme) => theme.palette.background.default,
-          }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-            Wireframe Preview (Power BI parity)
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Placeholder layout to mirror the PBI pages: slicers remain global (Project, Building, Discipline, Zone/Location, Date).
-            Each block notes the data we need to wire from the warehouse/API.
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="File Naming + Control Points"
-                description="Table-first view of validation status with project/building/discipline slicers."
-                checklist={[
-                  'Table: file name, validation status, failed field/value, reason, validated date',
-                  'Donuts: Project Base Point vs Survey Point compliance (compliant vs non-compliant)',
-                  'Tables: Control Project Base/Survey points and per-model Base/Survey points with compliance',
-                ]}
-                accent="#0288d1"
-              />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="Model Register"
-                description="ACC desktop connector inventory by discipline."
-                checklist={[
-                  'Table: project, discipline, file name, modified date, file location, published-last-week flag',
-                  'KPI: number of models (filtered)',
-                  'Actions: open in file browser / ACC (future)',
-                ]}
-                accent="#7b1fa2"
-              />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="Issues"
-                description="Mirrors PBI: high-level stats + drill-down table."
-                checklist={[
-                  'KPIs: Active, Total, >30d, Closed since review',
-                  'Charts: status donut, priority pie, discipline bar, zone treemap, 90d trend line',
-                  'Table: id, clash level/priority, status, title, latest comment, company, location/zone',
-                ]}
-                accent="#c62828"
-              />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="Model Health"
-                description="Warnings, grids/levels, families per model with compliance flags."
-                checklist={[
-                  'KPIs: avg health score, critical files, warnings totals',
-                  'Trend: monthly avg health score sparkline',
-                  'Table: per-model counts (warnings, links, grids/levels, families) with pass/fail',
-                ]}
-                accent="#2e7d32"
-              />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="Financials & Operations"
-                description="Keep current earned value/service progress until richer data lands."
-                checklist={[
-                  'Gauge: earned value vs claimed vs variance',
-                  'Table (future): service milestones, billing phases, slipped items',
-                  'Drill links: analytics, data imports, services board',
-                ]}
-                accent="#ff8f00"
-              />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <WireframeCard
-                title="Global Filters & Saved Views"
-                description="Reuse current filter set plus Building/Zone when data is wired."
-                checklist={[
-                  'Project, Manager, Type, Client, Discipline',
-                  'Planned additions: Building, Zone/Location (for issues and control points)',
-                  'Saved views persist across pages',
-                ]}
-                accent="#546e7a"
-              />
-            </Grid>
-          </Grid>
-        </Paper>
 
         <Paper
           elevation={0}
@@ -751,17 +681,18 @@ export function DashboardPage() {
               <Select
                 labelId="filter-projects-label"
                 multiple
-                value={selectedProjects.map(String)}
+                value={selectedProjects}
                 label="Projects"
                 onChange={(event) => {
-                  const values = event.target.value as string[];
+                  const raw = event.target.value;
+                  const values = Array.isArray(raw) ? raw : [raw];
                   const ids = values.map((v) => Number(v)).filter((v) => !Number.isNaN(v));
                   startFiltering(() => setSelectedProjects(ids));
                 }}
                 renderValue={(selected) => {
                   if (!selected.length) return 'All';
                   const names = timelineProjects
-                    .filter((p) => selected.includes(String(p.project_id)))
+                    .filter((p) => selected.includes(p.project_id ?? -1))
                     .map((p) => p.project_name);
                   return names.join(', ');
                 }}
@@ -780,7 +711,7 @@ export function DashboardPage() {
             <Box sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, color: 'text.secondary' }}>
               <Typography variant="caption">
                 Showing {deferredProjects.length} of {timelineProjects.length} projects
-                {isFiltering && ' · updating...'}
+                {isFiltering && ' updating...'}
               </Typography>
             </Box>
           </Stack>
@@ -826,564 +757,837 @@ export function DashboardPage() {
           </Button>
         </Stack>
 
-        {!isWarehouseMetricsLoading && warehouseMetrics && !warehouseMetrics.error && (
-          <>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Health Overview
+        {isWarehouseMetricsLoading && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Loading warehouse metrics...
+          </Typography>
+        )}
+
+        {!isWarehouseMetricsLoading && warehouseMetricsErrorMessage && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 3,
+              borderRadius: 2,
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+              background: (theme) => theme.palette.background.paper,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Warehouse metrics are unavailable: {warehouseMetricsErrorMessage}
             </Typography>
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6} lg={3}>
-                <StatCard
-                  title="Open Issues"
-                  value={numberFormatter(warehouseMetrics.project_health?.open_issues)}
-                  color="primary.main"
-                  helper="Current month (warehouse)"
-                  onClick={() => navigateProjectsWithFilters({ status: 'Active' })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <StatCard
-                  title="High Priority"
-                  value={numberFormatter(warehouseMetrics.project_health?.high_priority_issues)}
-                  color="error.main"
-                  helper="Issues flagged critical"
-                  onClick={() => navigate('/analytics')}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <StatCard
-                  title="Overdue Reviews"
-                  value={numberFormatter(warehouseMetrics.project_health?.overdue_reviews)}
-                  color="warning.main"
-                  helper="Review cycles past due"
-                  onClick={() => navigateProjectsWithFilters({ status: 'Active' })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <StatCard
-                  title="Services In Progress"
-                  value={numberFormatter(warehouseMetrics.project_health?.services_in_progress)}
-                  color="info.main"
-                  helper="Active services this month"
-                  onClick={() => navigate('/projects')}
-                />
-              </Grid>
-            </Grid>
+          </Paper>
+        )}
 
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Model Ops Signals
-            </Typography>
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6} lg={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Typography color="text.secondary" gutterBottom variant="h6">
-                        Model Readiness
-                      </Typography>
-                    </Stack>
-                    <Stack spacing={1} sx={{ mb: 2 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        {controlCoveragePct != null ? `${controlCoveragePct}%` : '--'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Projects with active control models
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        With control models: {numberFormatter(warehouseMetrics.control_models?.projects_with_control_models)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Missing: {numberFormatter(warehouseMetrics.control_models?.projects_missing)}
-                      </Typography>
-                    </Stack>
-                    <StackedBar
-                      segments={[
-                        { value: warehouseMetrics.control_models?.projects_with_control_models || 0, color: '#2e7d32' },
-                        { value: warehouseMetrics.control_models?.projects_missing || 0, color: '#c62828' },
-                      ]}
-                    />
-                  </CardContent>
-                </Card>
-              </Grid>
+        <Tabs
+          value={dashboardTab}
+          onChange={(_, value) => setDashboardTab(value)}
+          sx={{ mb: 3 }}
+        >
+          <Tab label="Overview" id="dashboard-tab-0" aria-controls="dashboard-tabpanel-0" />
+          <Tab label="Issues" id="dashboard-tab-1" aria-controls="dashboard-tabpanel-1" />
+          <Tab label="Health Metrics" id="dashboard-tab-2" aria-controls="dashboard-tabpanel-2" />
+        </Tabs>
 
-              <Grid item xs={12} md={6} lg={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography color="text.secondary" gutterBottom variant="h6">
-                      Data Freshness
-                    </Typography>
-                    <Stack spacing={1}>
-                      <Typography variant="body2" color="text.secondary">
-                        Revizto last run: {formatDateTime(warehouseMetrics.data_freshness?.revizto_last_run)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Projects extracted: {numberFormatter(warehouseMetrics.data_freshness?.revizto_projects_extracted)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        ACC import: {formatDateTime(warehouseMetrics.data_freshness?.acc_last_import)}
-                      </Typography>
-                      {warehouseMetrics.data_freshness?.acc_last_import_project_id ? (
-                        <Typography variant="body2" color="text.secondary">
-                          Project ID: {warehouseMetrics.data_freshness.acc_last_import_project_id}
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                    <Button sx={{ mt: 2 }} size="small" onClick={() => navigate('/data-imports')}>
-                      Check imports
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {namingCompliance && (
-                <>
-                  <Grid item xs={12}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-                      File Naming Compliance
-                    </Typography>
-                  </Grid>
-
-                  <Grid item xs={12} md={6} lg={3}>
-                    <StatCard
-                      title="Compliance"
-                      value={namingCompliancePct != null ? `${namingCompliancePct}%` : '--'}
-                      helper={`Valid: ${numberFormatter(namingCompliance.summary.valid_files)} / ${numberFormatter(
-                        namingCompliance.summary.total_files,
-                      )}`}
-                      color="success.main"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={6} lg={3}>
-                    <StatCard
-                      title="Invalid Files"
-                      value={numberFormatter(namingCompliance.summary.invalid_files)}
-                      helper={`Last validated: ${formatDateTime(namingCompliance.summary.latest_validated)}`}
-                      color="error.main"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={6} lg={6}>
-                    <Card sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography color="text.secondary" gutterBottom variant="h6">
-                          By Discipline
-                        </Typography>
-                        <Stack spacing={1}>
-                          {(namingCompliance.by_discipline || []).map((d) => (
-                            <Stack key={d.discipline} direction="row" justifyContent="space-between" alignItems="center">
-                              <Typography variant="body2">{d.discipline}</Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {numberFormatter(d.valid_files)}/{numberFormatter(d.total_files)}{' '}
-                                {d.valid_pct != null ? `(${d.valid_pct}%)` : ''}
-                              </Typography>
-                            </Stack>
-                          ))}
-                          {(!namingCompliance.by_discipline || namingCompliance.by_discipline.length === 0) && (
-                            <Typography variant="body2" color="text.secondary">
-                              No discipline data available.
-                            </Typography>
-                          )}
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Card>
-                      <CardContent>
-                        <Typography color="text.secondary" gutterBottom variant="h6">
-                          Recent Invalid Files
-                        </Typography>
-                        <Box sx={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr>
-                                <th align="left">File</th>
-                                <th align="left">Project</th>
-                                <th align="left">Discipline</th>
-                                <th align="left">Reason</th>
-                                <th align="left">Failed Field</th>
-                                <th align="left">Validated</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(namingCompliance.recent_invalid || []).map((row, idx) => (
-                                <tr key={idx}>
-                                  <td>{row.file_name}</td>
-                                  <td>{row.project_name}</td>
-                                  <td>{row.discipline}</td>
-                                  <td>{row.validation_reason || row.validation_status}</td>
-                                  <td>{row.failed_field_reason || row.failed_field_name}</td>
-                                  <td>{formatDateTime(row.validated_date)}</td>
-                                </tr>
-                              ))}
-                              {(!namingCompliance.recent_invalid || namingCompliance.recent_invalid.length === 0) && (
-                                <tr>
-                                  <td colSpan={6}>
-                                    <Typography variant="body2" color="text.secondary">
-                                      No invalid files recently.
-                                    </Typography>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </>
-              )}
-
-              <Grid item xs={12} md={12} lg={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography color="text.secondary" gutterBottom variant="h6">
-                      Backlog Age (open issues)
-                    </Typography>
-                    <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        {numberFormatter(backlogAgeTotal)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        open issues tracked
-                      </Typography>
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      Avg age: {numberFormatter(warehouseMetrics.backlog_age?.avg_age_days, { maximumFractionDigits: 1 })} days
-                    </Typography>
-                    <Box sx={{ mt: 2 }}>
-                      <StackedBar
-                        segments={[
-                          { value: warehouseMetrics.backlog_age?.bucket_0_7 || 0, color: '#2e7d32' },
-                          { value: warehouseMetrics.backlog_age?.bucket_8_30 || 0, color: '#66bb6a' },
-                          { value: warehouseMetrics.backlog_age?.bucket_31_90 || 0, color: '#ffa000' },
-                          { value: warehouseMetrics.backlog_age?.bucket_90_plus || 0, color: '#c62828' },
-                        ]}
-                      />
-                      <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                        <Chip size="small" label={`0-7d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_0_7)}`} />
-                        <Chip size="small" label={`8-30d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_8_30)}`} />
-                        <Chip size="small" label={`31-90d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_31_90)}`} />
-                        <Chip size="small" label={`90d+: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_90_plus)}`} />
-                      </Stack>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-
-            {revitHealthMetrics && (
-              <>
-                <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-                  Model Health
-                </Typography>
-                <Grid container spacing={3} sx={{ mb: 3 }}>
-                  <Grid item xs={12} md={6} lg={3}>
-                    <StatCard
-                      title="Avg Health Score"
-                      value={
-                        revitHealthMetrics.summary.avg_health_score != null
-                          ? `${Math.round(revitHealthMetrics.summary.avg_health_score)}%`
-                          : '--'
-                      }
-                      helper={`Files: ${numberFormatter(revitHealthMetrics.summary.total_files)}`}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6} lg={3}>
-                    <StatCard
-                      title="Good / Critical Files"
-                      value={`${numberFormatter(revitHealthMetrics.summary.good_files)} / ${numberFormatter(
-                        revitHealthMetrics.summary.critical_files,
-                      )}`}
-                      helper={`Link issues: ${numberFormatter(revitHealthMetrics.summary.files_with_link_issues)}`}
-                      color="info.main"
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6} lg={3}>
-                    <StatCard
-                      title="Warnings"
-                      value={numberFormatter(revitHealthMetrics.summary.total_warnings)}
-                      helper={`Critical: ${numberFormatter(revitHealthMetrics.summary.total_critical_warnings)}`}
-                      color="warning.main"
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6} lg={3}>
-                    <Card sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography color="text.secondary" gutterBottom variant="h6">
-                          Health Trend (avg score)
-                        </Typography>
-                        <Sparkline points={healthTrendPoints} color="#2e7d32" />
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Latest check: {formatDateTime(revitHealthMetrics.summary.latest_check_date)}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+        <TabPanel value={dashboardTab} index={0}>
+          {hasWarehouseMetrics && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Health Overview
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Open Issues"
+                    value={numberFormatter(warehouseMetrics.project_health?.open_issues)}
+                    color="primary.main"
+                    helper="Current month (warehouse)"
+                    onClick={() => navigateProjectsWithFilters({ status: 'Active' })}
+                  />
                 </Grid>
-              </>
-            )}
-
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Workload & Risk
-            </Typography>
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6} lg={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Box>
-                        <Typography color="text.secondary" gutterBottom variant="h6">
-                          Issue Trend (last 60d)
-                        </Typography>
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                            {numberFormatter(latestIssueTrend?.last.open_issues)} open
-                          </Typography>
-                          <Typography component="span" variant="h6" color="text.secondary">
-                            / {numberFormatter(latestIssueTrend?.last.closed_issues)} closed
-                          </Typography>
-                        </Stack>
-                      </Box>
-                      <Button size="small" onClick={() => navigate('/analytics')}>View in Analytics</Button>
-                    </Stack>
-                    <Sparkline
-                      points={(warehouseMetrics.issue_trends || []).map((row) => row.open_issues || 0)}
-                      color="#1976d2"
-                    />
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Date: {latestIssueTrend?.last.date ?? '--'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Change vs prior: {numberFormatter(
-                        (latestIssueTrend?.last.open_issues ?? 0) - (latestIssueTrend?.previous?.open_issues ?? 0)
-                      )}{' '}
-                      open /{' '}
-                      {numberFormatter(
-                        (latestIssueTrend?.last.closed_issues ?? 0) - (latestIssueTrend?.previous?.closed_issues ?? 0)
-                      )}{' '}
-                      closed
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Avg resolution days: {numberFormatter(latestIssueTrend?.last.avg_resolution_days, {
-                        maximumFractionDigits: 1,
-                      })}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Backlog days: {numberFormatter(latestIssueTrend?.last.avg_backlog_days, { maximumFractionDigits: 1 })}
-                      {' '}| Urgency: {numberFormatter(latestIssueTrend?.last.avg_urgency, { maximumFractionDigits: 1 })}
-                      {' '}| Sentiment: {numberFormatter(latestIssueTrend?.last.avg_sentiment, { maximumFractionDigits: 1 })}
-                    </Typography>
-                  </CardContent>
-                </Card>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="High Priority"
+                    value={numberFormatter(warehouseMetrics.project_health?.high_priority_issues)}
+                    color="error.main"
+                    helper="Issues flagged critical"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Overdue Reviews"
+                    value={numberFormatter(warehouseMetrics.project_health?.overdue_reviews)}
+                    color="warning.main"
+                    helper="Review cycles past due"
+                    onClick={() => navigateProjectsWithFilters({ status: 'Active' })}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Services In Progress"
+                    value={numberFormatter(warehouseMetrics.project_health?.services_in_progress)}
+                    color="info.main"
+                    helper="Active services this month"
+                    onClick={() => navigate('/projects')}
+                  />
+                </Grid>
               </Grid>
 
-              <Grid item xs={12} md={6} lg={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Typography color="text.secondary" gutterBottom variant="h6">
-                        Review Performance
-                      </Typography>
-                      <Button size="small" onClick={() => navigateProjectsWithFilters({ status: 'Active' })}>
-                        See projects
-                      </Button>
-                    </Stack>
-                    <Stack spacing={1} sx={{ mb: 1 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        {numberFormatter(warehouseMetrics.review_performance?.completed_reviews)} completed
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        On-time rate: {onTimeRatePct != null ? `${onTimeRatePct}%` : '--'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Overdue: {numberFormatter(warehouseMetrics.review_performance?.overdue_reviews)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Avg plan vs actual: {numberFormatter(
-                          warehouseMetrics.review_performance?.avg_planned_vs_actual_days,
-                          { maximumFractionDigits: 1 }
-                        )}{' '}
-                        days
-                      </Typography>
-                    </Stack>
-                    <StackedBar
-                      segments={[
-                        { value: warehouseMetrics.review_performance?.completed_reviews || 0, color: '#2e7d32' },
-                        { value: warehouseMetrics.review_performance?.overdue_reviews || 0, color: '#ed6c02' },
-                        {
-                          value:
-                            (warehouseMetrics.review_performance?.total_reviews || 0) -
-                            (warehouseMetrics.review_performance?.completed_reviews || 0),
-                          color: '#90a4ae',
-                        },
-                      ]}
-                    />
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {stackedHistory && (
-                <Grid item xs={12} lg={4}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Workload & Risk
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={4}>
                   <Card sx={{ height: '100%' }}>
                     <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6">Historical Issues (weekly)</Typography>
-                        <Stack direction="row" spacing={1}>
-                          <Chip size="small" label="Closed" sx={{ bgcolor: '#e0e0e0', color: '#424242' }} />
-                          <Chip size="small" label="Completed" sx={{ bgcolor: '#4caf50', color: '#fff' }} />
-                          <Chip size="small" label="In progress" sx={{ bgcolor: '#5c6bc0', color: '#fff' }} />
-                          <Chip size="small" label="Open" sx={{ bgcolor: '#f57c00', color: '#fff' }} />
-                        </Stack>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Typography color="text.secondary" gutterBottom variant="h6">
+                          Review Performance
+                        </Typography>
+                        <Button size="small" onClick={() => navigateProjectsWithFilters({ status: 'Active' })}>
+                          See projects
+                        </Button>
                       </Stack>
-                      <Box sx={{ mt: 2, overflowX: 'auto' }}>
-                        <svg width={stackedHistory.width} height={stackedHistory.height}>
-                          {stackedHistory.gridLines.map((g) => {
-                            const y = stackedHistory.padding + (1 - g / stackedHistory.maxY) * (stackedHistory.height - stackedHistory.padding * 2);
+                      <Stack spacing={1} sx={{ mb: 1 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                          {numberFormatter(warehouseMetrics.review_performance?.completed_reviews)} completed
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          On-time rate: {onTimeRatePct != null ? `${onTimeRatePct}%` : '--'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Overdue: {numberFormatter(warehouseMetrics.review_performance?.overdue_reviews)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Avg plan vs actual: {numberFormatter(
+                            warehouseMetrics.review_performance?.avg_planned_vs_actual_days,
+                            { maximumFractionDigits: 1 }
+                          )}{' '}
+                          days
+                        </Typography>
+                      </Stack>
+                      <StackedBar
+                        segments={[
+                          { value: warehouseMetrics.review_performance?.completed_reviews || 0, color: '#2e7d32' },
+                          { value: warehouseMetrics.review_performance?.overdue_reviews || 0, color: '#ed6c02' },
+                          {
+                            value:
+                              (warehouseMetrics.review_performance?.total_reviews || 0) -
+                              (warehouseMetrics.review_performance?.completed_reviews || 0),
+                            color: '#90a4ae',
+                          },
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Financials & Delivery
+              </Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={8}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Services & Financials
+                      </Typography>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+                        <RadialGauge
+                          value={warehouseMetrics.service_financials?.avg_progress_pct ?? 0}
+                          color="#0288d1"
+                        />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                            ${numberFormatter(warehouseMetrics.service_financials?.earned_value, {
+                              maximumFractionDigits: 0,
+                            })}{' '}
+                            <Typography component="span" variant="subtitle1" color="text.secondary">
+                              earned value
+                            </Typography>
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Claimed to date: ${numberFormatter(warehouseMetrics.service_financials?.claimed_to_date, {
+                              maximumFractionDigits: 0,
+                            })}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Variance fee: ${numberFormatter(warehouseMetrics.service_financials?.variance_fee, {
+                              maximumFractionDigits: 0,
+                            })}
+                          </Typography>
+                          <Button sx={{ mt: 1 }} size="small" onClick={() => navigate('/projects')}>
+                            Go to services
+                          </Button>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Drill-down
+                      </Typography>
+                      <Stack spacing={1}>
+                        <Button variant="outlined" size="small" onClick={() => navigate('/data-imports')}>
+                          Data Imports health
+                        </Button>
+                        <Button variant="outlined" size="small" onClick={() => navigate('/projects')}>
+                          View Services Board
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </>
+          )}
+
+          {timelineProjects.length > 0 && (
+            <>
+              <Typography variant="h5" gutterBottom sx={{ mt: 4, fontWeight: 700 }}>
+                Project Timeline
+              </Typography>
+              <DashboardTimelineChart
+                projects={deferredProjects}
+                isLoading={isTimelineLoading || isFiltering}
+                hasActiveFilters={hasActiveFilters}
+              />
+            </>
+          )}
+        </TabPanel>
+
+        <TabPanel value={dashboardTab} index={1}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+            Issues
+          </Typography>
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6} lg={3}>
+              <StatCard
+                title="Active"
+                value={numberFormatter(issuesKpis?.active_issues)}
+                color="primary.main"
+                helper="Open across selected projects"
+              />
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <StatCard
+                title="Total"
+                value={numberFormatter(issuesKpis?.total_issues)}
+                color="info.main"
+                helper="Latest snapshot total"
+              />
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <StatCard
+                title=">30d"
+                value={numberFormatter(issuesKpis?.over_30_days)}
+                color="warning.main"
+                helper="Backlog aging beyond 30 days"
+              />
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <StatCard
+                title="Closed Since Review"
+                value={numberFormatter(issuesKpis?.closed_since_review)}
+                color="success.main"
+                helper="Closed after last review cycle"
+              />
+            </Grid>
+          </Grid>
+
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6} lg={4}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      Status Mix
+                    </Typography>
+                    {statusData.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            dataKey="value"
+                            nameKey="label"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={2}
+                          >
+                            {statusData.map((entry, idx) => (
+                              <Cell key={entry.label} fill={getSliceColor(idx)} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend verticalAlign="bottom" height={48} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No status data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      Priority Mix
+                    </Typography>
+                    {priorityData.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart>
+                          <Pie data={priorityData} dataKey="value" nameKey="label" outerRadius={100} paddingAngle={2}>
+                            {priorityData.map((entry, idx) => (
+                              <Cell key={entry.label} fill={getSliceColor(idx)} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend verticalAlign="bottom" height={48} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No priority data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} lg={4}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      Discipline Split
+                    </Typography>
+                    {disciplineData.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={disciplineData} layout="vertical" margin={{ left: 24 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" allowDecimals={false} />
+                          <YAxis type="category" dataKey="label" width={90} />
+                          <Tooltip />
+                          <Bar dataKey="value">
+                            {disciplineData.map((entry, idx) => (
+                              <Cell key={entry.label} fill={getSliceColor(idx)} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No discipline data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      Zone Coverage
+                    </Typography>
+                    {zoneTreemapData.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <Treemap
+                          data={zoneTreemapData}
+                          dataKey="size"
+                          nameKey="name"
+                          stroke="#ffffff"
+                          fill="#90caf9"
+                          content={({ x, y, width, height, index, name, value }) => {
+                            const fill = getSliceColor(index);
                             return (
-                              <g key={g}>
-                                <line
-                                  x1={0}
-                                  x2={stackedHistory.width}
-                                  y1={y}
-                                  y2={y}
-                                  stroke="#cfd8dc"
-                                  strokeDasharray="4 6"
-                                  strokeWidth={1}
-                                />
-                                <text x={4} y={y - 4} fontSize="10" fill="#78909c">
-                                  {g}
-                                </text>
+                              <g>
+                                <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#ffffff" />
+                                {width > 80 && height > 24 ? (
+                                  <text x={x + 6} y={y + 18} fill="#ffffff" fontSize={12}>
+                                    {name}
+                                  </text>
+                                ) : null}
+                                {width > 80 && height > 40 ? (
+                                  <text x={x + 6} y={y + 36} fill="#ffffff" fontSize={12}>
+                                    {value}
+                                  </text>
+                                ) : null}
                               </g>
                             );
-                          })}
+                          }}
+                        />
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No zone data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6} lg={8}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      90 Day Trend
+                    </Typography>
+                    {trendData.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart data={trendData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(value) => (value ? new Date(value).toLocaleDateString() : '')}
+                          />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="open" stroke="#f57c00" strokeWidth={2} />
+                          <Line type="monotone" dataKey="closed" stroke="#2e7d32" strokeWidth={2} />
+                          <Line type="monotone" dataKey="total" stroke="#1976d2" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No trend data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
 
-                          {stackedHistory.series.map((series) => (
-                            <g key={series.status}>
-                              <path d={series.path} fill={series.color} opacity={0.25} />
-                              <polyline
-                                fill="none"
-                                stroke={series.color}
-                                strokeWidth={3}
-                                points={series.points.map((p) => `${p.x},${p.y}`).join(' ')}
-                              />
-                              {series.points.map((p, idx) => (
-                                <text
-                                  key={idx}
-                                  x={p.x}
-                                  y={p.y - 6}
-                                  fontSize="10"
-                                  textAnchor="middle"
-                                  fill="#424242"
-                                >
-                                  {p.value}
-                                </text>
-                              ))}
-                            </g>
-                          ))}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Issue Drill-down
+                  </Typography>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ flexWrap: 'wrap', flex: 1 }}>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="issues-status-label">Status</InputLabel>
+                      <Select
+                        labelId="issues-status-label"
+                        value={issueStatus}
+                        label="Status"
+                        onChange={(event) => setIssueStatus(event.target.value)}
+                      >
+                        {issueStatusOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {renderOptionLabel(option)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="issues-priority-label">Priority</InputLabel>
+                      <Select
+                        labelId="issues-priority-label"
+                        value={issuePriority}
+                        label="Priority"
+                        onChange={(event) => setIssuePriority(event.target.value)}
+                      >
+                        {issuePriorityOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {renderOptionLabel(option)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="issues-discipline-label">Discipline</InputLabel>
+                      <Select
+                        labelId="issues-discipline-label"
+                        value={issueDiscipline}
+                        label="Discipline"
+                        onChange={(event) => setIssueDiscipline(event.target.value)}
+                      >
+                        {issueDisciplineOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {renderOptionLabel(option)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="issues-zone-label">Zone</InputLabel>
+                      <Select
+                        labelId="issues-zone-label"
+                        value={issueZone}
+                        label="Zone"
+                        onChange={(event) => setIssueZone(event.target.value)}
+                      >
+                        {issueZoneOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {renderOptionLabel(option)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setIssueStatus('all');
+                        setIssuePriority('all');
+                        setIssueDiscipline('all');
+                        setIssueZone('all');
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </Stack>
+                </Stack>
+                <Divider sx={{ my: 2 }} />
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>ID</TableCell>
+                        <TableCell>Clash / Priority</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Title</TableCell>
+                        <TableCell>Latest Comment</TableCell>
+                        <TableCell>Company</TableCell>
+                        <TableCell>Location / Zone</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(issuesTable?.rows || []).map((row) => {
+                        const locationBits = [row.location_root, row.location_building, row.location_level]
+                          .filter(Boolean)
+                          .join(' / ');
+                        return (
+                          <TableRow key={`${row.issue_id}-${row.source || 'issue'}`}>
+                            <TableCell>{row.issue_id}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{row.clash_level || '--'}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {row.priority || '--'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{row.status || '--'}</TableCell>
+                            <TableCell>{row.title || '--'}</TableCell>
+                            <TableCell sx={{ maxWidth: 320 }}>
+                              <Typography variant="body2" noWrap>
+                                {row.latest_comment || '--'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{row.company || '--'}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{row.zone || '--'}</Typography>
+                              {locationBits ? (
+                                <Typography variant="caption" color="text.secondary">
+                                  {locationBits}
+                                </Typography>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {!isIssuesTableLoading && (issuesTable?.rows || []).length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7}>
+                            <Typography variant="body2" color="text.secondary">
+                              No issues match the current filters.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {isIssuesTableLoading && (
+                        <TableRow>
+                          <TableCell colSpan={7}>
+                            <Typography variant="body2" color="text.secondary">
+                              Loading issues...
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination
+                  component="div"
+                  count={issuesTable?.total_count ?? 0}
+                  page={Math.max(issuePage - 1, 0)}
+                  onPageChange={(_, page) => setIssuePage(page + 1)}
+                  rowsPerPage={issuePageSize}
+                  onRowsPerPageChange={(event) => {
+                    const next = parseInt(event.target.value, 10);
+                    setIssuePageSize(Number.isNaN(next) ? 25 : next);
+                    setIssuePage(1);
+                  }}
+                  rowsPerPageOptions={[10, 25, 50]}
+                />
+              </CardContent>
+            </Card>
+        </TabPanel>
 
-                          {stackedHistory.series[0].points.map((p, idx) => (
-                            <g key={idx}>
-                              <text
-                                x={p.x}
-                                y={stackedHistory.height - 12}
-                                fontSize="10"
-                                textAnchor="middle"
-                                fill="#616161"
-                                transform={`rotate(25 ${p.x} ${stackedHistory.height - 12})`}
-                              >
-                                {stackedHistory.weeks[idx]}
-                              </text>
-                            </g>
-                          ))}
-                        </svg>
+        <TabPanel value={dashboardTab} index={2}>
+          {hasWarehouseMetrics && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Model Ops Signals
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={4}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Typography color="text.secondary" gutterBottom variant="h6">
+                          Model Readiness
+                        </Typography>
+                      </Stack>
+                      <Stack spacing={1} sx={{ mb: 2 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                          {controlCoveragePct != null ? `${controlCoveragePct}%` : '--'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Projects with active control models
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          With control models: {numberFormatter(warehouseMetrics.control_models?.projects_with_control_models)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Missing: {numberFormatter(warehouseMetrics.control_models?.projects_missing)}
+                        </Typography>
+                      </Stack>
+                      <StackedBar
+                        segments={[
+                          { value: warehouseMetrics.control_models?.projects_with_control_models || 0, color: '#2e7d32' },
+                          { value: warehouseMetrics.control_models?.projects_missing || 0, color: '#c62828' },
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={6} lg={4}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Data Freshness
+                      </Typography>
+                      <Stack spacing={1}>
+                        <Typography variant="body2" color="text.secondary">
+                          Revizto last run: {formatDateTime(warehouseMetrics.data_freshness?.revizto_last_run)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Projects extracted: {numberFormatter(warehouseMetrics.data_freshness?.revizto_projects_extracted)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          ACC import: {formatDateTime(warehouseMetrics.data_freshness?.acc_last_import)}
+                        </Typography>
+                        {warehouseMetrics.data_freshness?.acc_last_import_project_id ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Project ID: {warehouseMetrics.data_freshness.acc_last_import_project_id}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                      <Button sx={{ mt: 2 }} size="small" onClick={() => navigate('/data-imports')}>
+                        Check imports
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={12} lg={4}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Backlog Age (open issues)
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                          {numberFormatter(backlogAgeTotal)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          open issues tracked
+                        </Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        Avg age: {numberFormatter(warehouseMetrics.backlog_age?.avg_age_days, { maximumFractionDigits: 1 })} days
+                      </Typography>
+                      <Box sx={{ mt: 2 }}>
+                        <StackedBar
+                          segments={[
+                            { value: warehouseMetrics.backlog_age?.bucket_0_7 || 0, color: '#2e7d32' },
+                            { value: warehouseMetrics.backlog_age?.bucket_8_30 || 0, color: '#66bb6a' },
+                            { value: warehouseMetrics.backlog_age?.bucket_31_90 || 0, color: '#ffa000' },
+                            { value: warehouseMetrics.backlog_age?.bucket_90_plus || 0, color: '#c62828' },
+                          ]}
+                        />
+                        <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                          <Chip size="small" label={`0-7d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_0_7)}`} />
+                          <Chip size="small" label={`8-30d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_8_30)}`} />
+                          <Chip size="small" label={`31-90d: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_31_90)}`} />
+                          <Chip size="small" label={`90d+: ${numberFormatter(warehouseMetrics.backlog_age?.bucket_90_plus)}`} />
+                        </Stack>
                       </Box>
                     </CardContent>
                   </Card>
                 </Grid>
-              )}
-            </Grid>
+              </Grid>
+            </>
+          )}
 
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Financials & Delivery
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={8}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography color="text.secondary" gutterBottom variant="h6">
-                      Services & Financials
-                    </Typography>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
-                      <RadialGauge
-                        value={warehouseMetrics.service_financials?.avg_progress_pct ?? 0}
-                        color="#0288d1"
-                      />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                          ${numberFormatter(warehouseMetrics.service_financials?.earned_value, {
-                            maximumFractionDigits: 0,
-                          })}{' '}
-                          <Typography component="span" variant="subtitle1" color="text.secondary">
-                            earned value
+          {namingCompliance && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                File Naming Compliance
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Compliance"
+                    value={namingCompliancePct != null ? `${namingCompliancePct}%` : '--'}
+                    helper={`Valid: ${numberFormatter(namingCompliance.summary.valid_files)} / ${numberFormatter(
+                      namingCompliance.summary.total_files,
+                    )}`}
+                    color="success.main"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Invalid Files"
+                    value={numberFormatter(namingCompliance.summary.invalid_files)}
+                    helper={`Last validated: ${formatDateTime(namingCompliance.summary.latest_validated)}`}
+                    color="error.main"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6} lg={6}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        By Discipline
+                      </Typography>
+                      <Stack spacing={1}>
+                        {(namingCompliance.by_discipline || []).map((d) => (
+                          <Stack key={d.discipline} direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography variant="body2">{d.discipline}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {numberFormatter(d.valid_files)}/{numberFormatter(d.total_files)}{' '}
+                              {d.valid_pct != null ? `(${d.valid_pct}%)` : ''}
+                            </Typography>
+                          </Stack>
+                        ))}
+                        {(!namingCompliance.by_discipline || namingCompliance.by_discipline.length === 0) && (
+                          <Typography variant="body2" color="text.secondary">
+                            No discipline data available.
                           </Typography>
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Claimed to date: ${numberFormatter(warehouseMetrics.service_financials?.claimed_to_date, {
-                            maximumFractionDigits: 0,
-                          })}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Variance fee: ${numberFormatter(warehouseMetrics.service_financials?.variance_fee, {
-                            maximumFractionDigits: 0,
-                          })}
-                        </Typography>
-                        <Button sx={{ mt: 1 }} size="small" onClick={() => navigate('/projects')}>
-                          Go to services
-                        </Button>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography color="text.secondary" gutterBottom variant="h6">
-                      Drill-down
-                    </Typography>
-                    <Stack spacing={1}>
-                      <Button variant="outlined" size="small" onClick={() => navigate('/analytics')}>
-                        Open Analytics
-                      </Button>
-                      <Button variant="outlined" size="small" onClick={() => navigate('/data-imports')}>
-                        Data Imports health
-                      </Button>
-                      <Button variant="outlined" size="small" onClick={() => navigate('/projects')}>
-                        View Services Board
-                      </Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </>
-        )}
+                        )}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-        {timelineProjects.length > 0 && (
-          <>
-            <Typography variant="h5" gutterBottom sx={{ mt: 4, fontWeight: 700 }}>
-              Project Timeline
-            </Typography>
-            <DashboardTimelineChart
-              projects={deferredProjects}
-              isLoading={isTimelineLoading || isFiltering}
-              hasActiveFilters={hasActiveFilters}
-            />
-          </>
-        )}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Recent Invalid Files
+                      </Typography>
+                      <Box sx={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th align="left">File</th>
+                              <th align="left">Project</th>
+                              <th align="left">Discipline</th>
+                              <th align="left">Reason</th>
+                              <th align="left">Failed Field</th>
+                              <th align="left">Validated</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(namingCompliance.recent_invalid || []).map((row, idx) => (
+                              <tr key={idx}>
+                                <td>{row.file_name}</td>
+                                <td>{row.project_name}</td>
+                                <td>{row.discipline}</td>
+                                <td>{row.validation_reason || row.validation_status}</td>
+                                <td>{row.failed_field_reason || row.failed_field_name}</td>
+                                <td>{formatDateTime(row.validated_date)}</td>
+                              </tr>
+                            ))}
+                            {(!namingCompliance.recent_invalid || namingCompliance.recent_invalid.length === 0) && (
+                              <tr>
+                                <td colSpan={6}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    No invalid files recently.
+                                  </Typography>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </>
+          )}
+
+          {revitHealthMetrics && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Model Health
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Avg Health Score"
+                    value={
+                      revitHealthMetrics.summary.avg_health_score != null
+                        ? `${Math.round(revitHealthMetrics.summary.avg_health_score)}%`
+                        : '--'
+                    }
+                    helper={`Files: ${numberFormatter(revitHealthMetrics.summary.total_files)}`}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Good / Critical Files"
+                    value={`${numberFormatter(revitHealthMetrics.summary.good_files)} / ${numberFormatter(
+                      revitHealthMetrics.summary.critical_files,
+                    )}`}
+                    helper={`Link issues: ${numberFormatter(revitHealthMetrics.summary.files_with_link_issues)}`}
+                    color="info.main"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Warnings"
+                    value={numberFormatter(revitHealthMetrics.summary.total_warnings)}
+                    helper={`Critical: ${numberFormatter(revitHealthMetrics.summary.total_critical_warnings)}`}
+                    color="warning.main"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom variant="h6">
+                        Health Trend (avg score)
+                      </Typography>
+                      <Sparkline points={healthTrendPoints} color="#2e7d32" />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Latest check: {formatDateTime(revitHealthMetrics.summary.latest_check_date)}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </>
+          )}
+        </TabPanel>
+
       </Box>
     </Profiler>
   );

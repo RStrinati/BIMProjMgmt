@@ -90,6 +90,10 @@ SELECT
     pt.project_type_name,
     ic.level1_name AS discipline,
     ic.level2_name AS primary_category,
+    i.priority_normalized AS normalized_priority,
+    i.location_root AS zone_root,
+    i.location_building AS zone_building,
+    i.location_level AS zone_level,
     SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
     SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
     AVG(s.backlog_age_days) AS avg_backlog_days,
@@ -105,7 +109,8 @@ LEFT JOIN dim.client c ON s.client_sk = c.client_sk
 LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
 LEFT JOIN brg.issue_category bic ON s.issue_sk = bic.issue_sk AND bic.category_role = 'discipline'
 LEFT JOIN dim.issue_category ic ON bic.issue_category_sk = ic.issue_category_sk
-GROUP BY s.snapshot_date_sk, d.[date], p.project_name, ac.alias_names, ac.alias_count, c.client_name, pt.project_type_name, ic.level1_name, ic.level2_name;
+GROUP BY s.snapshot_date_sk, d.[date], p.project_name, ac.alias_names, ac.alias_count, c.client_name, pt.project_type_name,
+         ic.level1_name, ic.level2_name, i.priority_normalized, i.location_root, i.location_building, i.location_level;
 GO
 
 /* REVIEW PERFORMANCE MART */

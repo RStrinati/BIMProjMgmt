@@ -818,3 +818,53 @@ class ProjectBookmarks:
     NOTES = "notes"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+# ===================== Dynamo Batch Automation =====================
+class DynamoScripts:
+    TABLE = "DynamoScripts"
+    SCRIPT_ID = "script_id"
+    SCRIPT_NAME = "script_name"
+    SCRIPT_PATH = "script_path"
+    DESCRIPTION = "description"
+    CATEGORY = "category"
+    OUTPUT_FOLDER = "output_folder"
+    IS_ACTIVE = "is_active"
+    CREATED_DATE = "created_date"
+    MODIFIED_DATE = "modified_date"
+
+
+class DynamoBatchJobs:
+    TABLE = "DynamoBatchJobs"
+    JOB_ID = "job_id"
+    JOB_NAME = "job_name"
+    SCRIPT_ID = "script_id"
+    PROJECT_ID = "project_id"
+    CREATED_BY = "created_by"
+    STATUS = "status"
+    CREATED_DATE = "created_date"
+    START_TIME = "start_time"
+    END_TIME = "end_time"
+    TOTAL_FILES = "total_files"
+    PROCESSED_FILES = "processed_files"
+    SUCCESS_COUNT = "success_count"
+    ERROR_COUNT = "error_count"
+    TASK_FILE_PATH = "task_file_path"
+    OUTPUT_FOLDER = "output_folder"
+    LOG_FILE_PATH = "log_file_path"
+    ERROR_MESSAGE = "error_message"
+    CONFIGURATION = "configuration"
+
+
+class DynamoBatchJobFiles:
+    TABLE = "DynamoBatchJobFiles"
+    JOB_FILE_ID = "job_file_id"
+    JOB_ID = "job_id"
+    FILE_PATH = "file_path"
+    FILE_NAME = "file_name"
+    STATUS = "status"
+    START_TIME = "start_time"
+    END_TIME = "end_time"
+    ERROR_MESSAGE = "error_message"
+    OUTPUT_FILE_PATH = "output_file_path"
+    REVIT_VERSION = "revit_version"
