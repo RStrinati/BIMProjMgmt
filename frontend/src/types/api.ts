@@ -147,6 +147,15 @@ export interface WarehouseDashboardMetrics {
     acc_last_import?: string | null;
     acc_last_import_project_id?: number | null;
   };
+  data_quality?: {
+    last_run_id?: number | null;
+    last_run_status?: string | null;
+    last_run_completed_at?: string | null;
+    checks_total?: number;
+    checks_failed?: number;
+    checks_failed_high?: number;
+    checks_failed_medium?: number;
+  };
   error?: string;
 }
 
@@ -223,6 +232,7 @@ export interface NamingComplianceMetrics {
   recent_invalid: Array<{
     file_name: string;
     project_name: string | null;
+    discipline_code?: string | null;
     discipline: string | null;
     validation_status: string | null;
     validation_reason: string | null;
@@ -287,6 +297,56 @@ export interface DashboardIssuesTable {
   page_size: number;
   total_count: number;
   rows: DashboardIssuesTableRow[];
+}
+
+export interface CoordinateAlignmentControlPointRow {
+  pm_project_id: number | null;
+  project_name: string | null;
+  control_file_name: string | null;
+  control_zone_code: string | null;
+  control_is_primary: boolean | null;
+  control_pbp_eastwest?: number | null;
+  control_pbp_northsouth?: number | null;
+  control_pbp_elevation?: number | null;
+  control_pbp_angle_true_north?: number | null;
+  control_survey_eastwest?: number | null;
+  control_survey_northsouth?: number | null;
+  control_survey_elevation?: number | null;
+  control_survey_angle_true_north?: number | null;
+}
+
+export interface CoordinateAlignmentModelPointRow {
+  pm_project_id: number | null;
+  project_name: string | null;
+  model_file_name: string | null;
+  discipline: string | null;
+  model_zone_code: string | null;
+  control_file_name: string | null;
+  control_zone_code: string | null;
+  control_is_primary: boolean | null;
+  pbp_eastwest?: number | null;
+  pbp_northsouth?: number | null;
+  pbp_elevation?: number | null;
+  pbp_angle_true_north?: number | null;
+  pbp_compliant?: boolean | null;
+  pbp_compliance_status?: string | null;
+  survey_eastwest?: number | null;
+  survey_northsouth?: number | null;
+  survey_elevation?: number | null;
+  survey_angle_true_north?: number | null;
+  survey_compliant?: boolean | null;
+  survey_compliance_status?: string | null;
+}
+
+export interface CoordinateAlignmentDashboard {
+  control_base_points: CoordinateAlignmentControlPointRow[];
+  control_survey_points: CoordinateAlignmentControlPointRow[];
+  model_base_points: CoordinateAlignmentModelPointRow[];
+  model_survey_points: CoordinateAlignmentModelPointRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  error?: string;
 }
 
 export interface TaskItem {

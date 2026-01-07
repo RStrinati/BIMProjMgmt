@@ -78,6 +78,7 @@ from database import (  # noqa: E402
     get_service_templates,
     get_users_list,
     get_control_points_dashboard,
+    get_coordinate_alignment_dashboard,
     get_model_register,
     get_naming_compliance_table,
     get_revizto_issues_detail,
@@ -114,6 +115,13 @@ from database import (  # noqa: E402
     reassign_user_work,
     get_user_workload_summary,
     get_project_lead_user_id,
+    get_revizto_project_mappings,
+    upsert_revizto_project_mapping,
+    deactivate_revizto_project_mapping,
+    get_issue_attribute_mappings,
+    create_issue_attribute_mapping,
+    update_issue_attribute_mapping,
+    deactivate_issue_attribute_mapping,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -700,6 +708,81 @@ def _get_alias_usage_stats_by_project():
         return {}
     finally:
         manager.close_connection()
+
+
+# --- Mapping Admin APIs ---
+
+@app.route('/api/mappings/revizto-projects', methods=['GET'])
+def api_get_revizto_project_mappings():
+    """List Revizto -> PM project mappings."""
+    active_only = request.args.get('active_only', 'true').lower() != 'false'
+    mappings = get_revizto_project_mappings(active_only=active_only)
+    return jsonify(mappings)
+
+
+@app.route('/api/mappings/revizto-projects', methods=['POST'])
+def api_upsert_revizto_project_mapping():
+    """Create or update a Revizto project mapping."""
+    data = request.get_json() or {}
+    revizto_project_uuid = (data.get('revizto_project_uuid') or '').strip()
+    pm_project_id = data.get('pm_project_id')
+    project_name_override = (data.get('project_name_override') or '').strip() or None
+    if not revizto_project_uuid:
+        return jsonify({'error': 'revizto_project_uuid is required'}), 400
+    success = upsert_revizto_project_mapping(revizto_project_uuid, pm_project_id, project_name_override)
+    if not success:
+        return jsonify({'error': 'Failed to save mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/revizto-projects/<path:revizto_project_uuid>', methods=['DELETE'])
+def api_delete_revizto_project_mapping(revizto_project_uuid: str):
+    """Deactivate a Revizto project mapping."""
+    success = deactivate_revizto_project_mapping(revizto_project_uuid)
+    if not success:
+        return jsonify({'error': 'Failed to deactivate mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/issue-attributes', methods=['GET'])
+def api_get_issue_attribute_mappings():
+    """List issue attribute mappings."""
+    active_only = request.args.get('active_only', 'true').lower() != 'false'
+    mappings = get_issue_attribute_mappings(active_only=active_only)
+    return jsonify(mappings)
+
+
+@app.route('/api/mappings/issue-attributes', methods=['POST'])
+def api_create_issue_attribute_mapping():
+    """Create an issue attribute mapping."""
+    data = request.get_json() or {}
+    required = ['source_system', 'raw_attribute_name', 'mapped_field_name']
+    missing = [field for field in required if not data.get(field)]
+    if missing:
+        return jsonify({'error': f"Missing fields: {', '.join(missing)}"}), 400
+    map_id = create_issue_attribute_mapping(data)
+    if map_id is None:
+        return jsonify({'error': 'Failed to create mapping'}), 500
+    return jsonify({'map_id': map_id}), 201
+
+
+@app.route('/api/mappings/issue-attributes/<int:map_id>', methods=['PUT', 'PATCH'])
+def api_update_issue_attribute_mapping(map_id: int):
+    """Update an issue attribute mapping."""
+    data = request.get_json() or {}
+    success = update_issue_attribute_mapping(map_id, data)
+    if not success:
+        return jsonify({'error': 'Failed to update mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/issue-attributes/<int:map_id>', methods=['DELETE'])
+def api_delete_issue_attribute_mapping(map_id: int):
+    """Deactivate an issue attribute mapping."""
+    success = deactivate_issue_attribute_mapping(map_id)
+    if not success:
+        return jsonify({'error': 'Failed to deactivate mapping'}), 500
+    return jsonify({'success': True})
 
 
 def _fetch_project_alias_rows():
@@ -2433,6 +2516,30 @@ def api_dashboard_control_points():
         return jsonify({'error': 'Failed to fetch control points', 'details': str(e)}), 500
 
 
+@app.route('/api/dashboard/coordinate-alignment', methods=['GET'])
+def api_dashboard_coordinate_alignment():
+    """Coordinate alignment tables for control/model base and survey points."""
+    try:
+        project_ids = _parse_id_list("project_ids")
+        discipline = request.args.get("discipline")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "model_file_name")
+        sort_dir = request.args.get("sort_dir", "asc")
+        data = get_coordinate_alignment_dashboard(
+            project_ids=project_ids or None,
+            discipline=discipline or None,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("Error fetching coordinate alignment dashboard")
+        return jsonify({'error': 'Failed to fetch coordinate alignment', 'details': str(e)}), 500
+
+
 @app.route('/api/dashboard/model-register', methods=['GET'])
 def api_dashboard_model_register():
     """Model register (Revit-derived) paginated."""
@@ -3155,6 +3262,109 @@ def get_aps_sync_projects(hub_id):
     return jsonify(payload)
 
 
+@app.route('/api/aps-sync/hubs/<path:hub_id>/projects/<path:project_id>/details', methods=['GET'])
+def get_aps_sync_project_details(hub_id, project_id):
+    """Get detailed project information including folders and files summary."""
+    status_code, payload = _call_aps_service(f"my-project-details/{hub_id}/{project_id}")
+    
+    # Fall back to app-token if user token fails
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service(f"project-details/{hub_id}/{project_id}")
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": f"Failed to fetch project details for {project_id}",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+    
+    return jsonify(payload), status_code
+
+
+@app.route('/api/aps-sync/hubs/<path:hub_id>/projects/<path:project_id>/folders', methods=['GET'])
+def get_aps_sync_project_folders(hub_id, project_id):
+    """Get project folder structure and model files."""
+    status_code, payload = _call_aps_service(f"my-project-files/{hub_id}/{project_id}")
+    
+    # Fall back to app-token if user token fails
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service(f"project-files/{hub_id}/{project_id}")
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": f"Failed to fetch project folders for {project_id}",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+    
+    return jsonify(payload), status_code
+
+
+@app.route('/api/aps-sync/hubs/<path:hub_id>/projects/<path:project_id>/issues', methods=['GET'])
+def get_aps_sync_project_issues(hub_id, project_id):
+    """Get project issues with filtering and pagination."""
+    # Build query parameters
+    params = {}
+    if request.args.get('status'):
+        params['status'] = request.args.get('status')
+    if request.args.get('priority'):
+        params['priority'] = request.args.get('priority')
+    if request.args.get('assigned_to'):
+        params['assigned_to'] = request.args.get('assigned_to')
+    if request.args.get('page'):
+        params['page'] = request.args.get('page')
+    if request.args.get('limit'):
+        params['limit'] = request.args.get('limit')
+    
+    status_code, payload = _call_aps_service(
+        f"my-project-issues/{hub_id}/{project_id}",
+        params=params
+    )
+    
+    # Fall back to app-token if user token fails
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service(
+            f"project-issues/{hub_id}/{project_id}",
+            params=params
+        )
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": f"Failed to fetch project issues for {project_id}",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+    
+    return jsonify(payload), status_code
+
+
+@app.route('/api/aps-sync/hubs/<path:hub_id>/projects/<path:project_id>/users', methods=['GET'])
+def get_aps_sync_project_users(hub_id, project_id):
+    """Get project users and team members."""
+    status_code, payload = _call_aps_service(f"my-project-users/{hub_id}/{project_id}")
+    
+    # Fall back to app-token if user token fails
+    if status_code >= 400 or (isinstance(payload, dict) and payload.get('error')):
+        fallback_status, fallback_payload = _call_aps_service(f"project-users/{hub_id}/{project_id}")
+        if fallback_status < 400 and isinstance(fallback_payload, dict):
+            payload = {**fallback_payload, "fallback_used": True}
+            status_code = fallback_status
+        else:
+            return jsonify({
+                "error": f"Failed to fetch project users for {project_id}",
+                "details": payload,
+                "upstream_status": status_code,
+            }), status_code
+    
+    return jsonify(payload), status_code
+
+
 # --- ACC Issues Display (Query acc_data_schema) ---
 
 @app.route('/api/projects/<int:project_id>/acc-issues', methods=['GET'])
@@ -3585,6 +3795,107 @@ def get_dynamo_scripts():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/dynamo/scripts/import-folder', methods=['POST'])
+def import_dynamo_scripts_from_folder():
+    """Register Dynamo scripts from a local folder"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        recursive = body.get('recursive', True)
+        if isinstance(recursive, str):
+            recursive = recursive.strip().lower() in {'1', 'true', 'yes', 'y'}
+        category = body.get('category')
+        output_folder = body.get('output_folder')
+
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
+
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'Folder does not exist: {folder_path}'}), 400
+
+        if not os.path.isdir(folder_path):
+            return jsonify({'error': f'Path is not a folder: {folder_path}'}), 400
+
+        dyn_files = []
+        if recursive:
+            for root, _, files in os.walk(folder_path):
+                for name in files:
+                    if name.lower().endswith('.dyn'):
+                        dyn_files.append(os.path.join(root, name))
+        else:
+            for name in os.listdir(folder_path):
+                if name.lower().endswith('.dyn'):
+                    dyn_files.append(os.path.join(folder_path, name))
+
+        if not dyn_files:
+            return jsonify({'error': 'No Dynamo .dyn files found in the selected folder'}), 400
+
+        service = DynamoBatchService()
+        scripts = service.register_scripts_from_folder(
+            folder_path,
+            recursive=bool(recursive),
+            category=category,
+            output_folder=output_folder,
+        )
+
+        if not scripts:
+            return jsonify({'error': 'Failed to register Dynamo scripts'}), 500
+
+        return jsonify({
+            'success': True,
+            'folder_path': folder_path,
+            'count': len(scripts),
+            'scripts': scripts,
+        })
+    except Exception as e:
+        logging.exception("Error importing Dynamo scripts from folder")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dynamo/scripts/import-files', methods=['POST'])
+def import_dynamo_scripts_from_files():
+    """Register Dynamo scripts from explicit file paths"""
+    try:
+        from services.dynamo_batch_service import DynamoBatchService
+
+        body = request.get_json() or {}
+        file_paths = body.get('file_paths') or []
+        category = body.get('category')
+        output_folder = body.get('output_folder')
+
+        if not isinstance(file_paths, list) or not file_paths:
+            return jsonify({'error': 'file_paths must be a non-empty array'}), 400
+
+        dyn_files = [
+            path for path in file_paths
+            if isinstance(path, str) and path.lower().endswith('.dyn') and os.path.isfile(path)
+        ]
+
+        if not dyn_files:
+            return jsonify({'error': 'No valid .dyn files provided'}), 400
+
+        service = DynamoBatchService()
+        scripts = service.register_scripts_from_paths(
+            dyn_files,
+            category=category,
+            output_folder=output_folder,
+        )
+
+        if not scripts:
+            return jsonify({'error': 'Failed to register Dynamo scripts'}), 500
+
+        return jsonify({
+            'success': True,
+            'count': len(scripts),
+            'scripts': scripts,
+        })
+    except Exception as e:
+        logging.exception("Error importing Dynamo scripts from files")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/dynamo/jobs', methods=['GET'])
 def get_dynamo_jobs():
     """Get Dynamo batch jobs"""
@@ -3709,14 +4020,18 @@ def get_project_revit_files(project_id):
         
         # Get project folders
         folders = get_project_folders(project_id)
-        
-        if not folders or not folders.get('folder_path'):
+        folder_path = None
+
+        if isinstance(folders, dict):
+            folder_path = folders.get('folder_path')
+        elif isinstance(folders, (list, tuple)) and folders:
+            folder_path = folders[0]
+
+        if not folder_path:
             return jsonify({
                 'success': False,
                 'error': 'No folder path configured for this project'
             }), 404
-        
-        folder_path = folders['folder_path']
         
         if not os.path.exists(folder_path):
             return jsonify({

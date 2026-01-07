@@ -24,9 +24,13 @@ import {
   Delete as DeleteIcon,
   Folder as FolderIcon,
   CalendarToday as CalendarIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import { projectsApi } from '@/api/projects';
 import { usersApi } from '@/api/users';
+import { issuesApi } from '@/api';
 import type { Project, User } from '@/types/api';
 import { ProjectServicesTab } from '@/components/ProjectServicesTab';
 import { profilerLog } from '@/utils/perfLogger';
@@ -35,6 +39,15 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+}
+
+interface ProjectIssuesOverview {
+  summary?: {
+    total_issues?: number;
+    acc_issues?: { total?: number; open?: number; closed?: number };
+    revizto_issues?: { total?: number; open?: number; closed?: number };
+    overall?: { open?: number; closed?: number };
+  };
 }
 
 function TabPanel(props: TabPanelProps) {
@@ -103,6 +116,16 @@ const ProjectDetailPage: React.FC = () => {
   const { data: users } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => usersApi.getAll(),
+  });
+
+  const {
+    data: issuesOverview,
+    isLoading: issuesLoading,
+    error: issuesError,
+  } = useQuery<ProjectIssuesOverview>({
+    queryKey: ['project', id, 'issues-overview'],
+    queryFn: () => issuesApi.getProjectOverview(Number(id)),
+    enabled: !!id,
   });
 
   const projectLeadName = useMemo(() => {
@@ -355,6 +378,7 @@ const ProjectDetailPage: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="Services" />
               <Tab label="Details" />
+              <Tab label="Dashboard" />
               <Tab label="Reviews" />
               <Tab label="Tasks" />
               <Tab label="Files" />
@@ -491,20 +515,132 @@ const ProjectDetailPage: React.FC = () => {
               </Grid>
             </TabPanel>
 
-            {/* Reviews Tab */}
+            {/* Dashboard Tab */}
             <TabPanel value={tabValue} index={2}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Issues Overview
+                  </Typography>
+
+                  {issuesLoading && (
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <CircularProgress size={24} />
+                      <Typography variant="body2" color="text.secondary">
+                        Loading project issues...
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {!issuesLoading && issuesError && (
+                    <Alert severity="error">
+                      Failed to load issues overview. {issuesError instanceof Error ? issuesError.message : ''}
+                    </Alert>
+                  )}
+
+                  {!issuesLoading && !issuesError && (
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={3}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography color="text.secondary" variant="subtitle2" gutterBottom>
+                            Total Issues
+                          </Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                            {issuesOverview?.summary?.total_issues ?? 0}
+                          </Typography>
+                          <TrendingUpIcon sx={{ fontSize: 28, opacity: 0.3, mt: 1 }} />
+                        </Box>
+                      </Grid>
+
+                      <Grid item xs={12} md={3}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography color="text.secondary" variant="subtitle2" gutterBottom>
+                            ACC Issues
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                            {issuesOverview?.summary?.acc_issues?.total ?? 0}
+                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 1 }}>
+                            <Chip
+                              label={`Open: ${issuesOverview?.summary?.acc_issues?.open ?? 0}`}
+                              color="error"
+                              size="small"
+                            />
+                            <Chip
+                              label={`Closed: ${issuesOverview?.summary?.acc_issues?.closed ?? 0}`}
+                              color="success"
+                              size="small"
+                            />
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      <Grid item xs={12} md={3}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography color="text.secondary" variant="subtitle2" gutterBottom>
+                            Revizto Issues
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                            {issuesOverview?.summary?.revizto_issues?.total ?? 0}
+                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 1 }}>
+                            <Chip
+                              label={`Open: ${issuesOverview?.summary?.revizto_issues?.open ?? 0}`}
+                              color="error"
+                              size="small"
+                            />
+                            <Chip
+                              label={`Closed: ${issuesOverview?.summary?.revizto_issues?.closed ?? 0}`}
+                              color="success"
+                              size="small"
+                            />
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      <Grid item xs={12} md={3}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography color="text.secondary" variant="subtitle2" gutterBottom>
+                            Overall Status
+                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
+                            <Box>
+                              <ErrorIcon color="error" />
+                              <Typography variant="body2">Open</Typography>
+                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                {issuesOverview?.summary?.overall?.open ?? 0}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <CheckCircleIcon color="success" />
+                              <Typography variant="body2">Closed</Typography>
+                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                {issuesOverview?.summary?.overall?.closed ?? 0}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  )}
+                </CardContent>
+              </Card>
+            </TabPanel>
+
+            {/* Reviews Tab */}
+            <TabPanel value={tabValue} index={3}>
               <Alert severity="info">
                 Reviews are now managed within the Services tab. Please go to the Services tab and select a service to view and manage its reviews.
               </Alert>
             </TabPanel>
 
             {/* Tasks Tab */}
-            <TabPanel value={tabValue} index={3}>
+            <TabPanel value={tabValue} index={4}>
               <Alert severity="info">Tasks functionality coming soon</Alert>
             </TabPanel>
 
             {/* Files Tab */}
-            <TabPanel value={tabValue} index={4}>
+            <TabPanel value={tabValue} index={5}>
               <Alert severity="info">File management coming soon</Alert>
             </TabPanel>
           </Paper>

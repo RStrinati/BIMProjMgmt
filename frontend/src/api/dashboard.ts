@@ -6,6 +6,7 @@ import type {
   DashboardIssuesKpis,
   DashboardIssuesCharts,
   DashboardIssuesTable,
+  CoordinateAlignmentDashboard,
 } from '@/types/api';
 
 export const dashboardApi = {
@@ -21,6 +22,7 @@ export const dashboardApi = {
 
     const response = await apiClient.get<WarehouseDashboardMetrics>('/dashboard/warehouse-metrics', {
       params: Object.keys(params).length ? params : undefined,
+      timeout: 30000,
     });
     return response.data;
   },
@@ -100,6 +102,29 @@ export const dashboardApi = {
     if (options?.discipline) params.discipline = options.discipline;
     const response = await apiClient.get<NamingComplianceMetrics>('/dashboard/naming-compliance', {
       params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
+  getCoordinateAlignment: async (options?: {
+    projectIds?: number[];
+    discipline?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<CoordinateAlignmentDashboard> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+
+    const response = await apiClient.get<CoordinateAlignmentDashboard>('/dashboard/coordinate-alignment', {
+      params: Object.keys(params).length ? params : undefined,
+      timeout: 30000,
     });
     return response.data;
   },

@@ -37,6 +37,7 @@ import {
   HelpOutline as HelpIcon,
   Event as ScheduleIcon,
 } from '@mui/icons-material';
+import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { dynamoBatchApi, DynamoScript, JobConfiguration } from '@/api/dynamoBatch';
 import { fileBrowserApi } from '@/api/fileBrowser';
@@ -95,11 +96,23 @@ export const DynamoBatchRunner: React.FC<DynamoBatchRunnerProps> = ({
     enabled: Number.isFinite(projectId),
   });
 
+  const mergeRevitFiles = (incoming: string[]) => {
+    if (incoming.length === 0) return;
+    setRevitFiles((prev) => {
+      const seen = new Set(prev);
+      const additions = incoming.filter((file) => !seen.has(file));
+      if (additions.length === 0) {
+        return prev;
+      }
+      return [...prev, ...additions];
+    });
+  };
+
   useEffect(() => {
-    if (projectRevitFiles.length > 0 && revitFiles.length === 0) {
-      setRevitFiles(projectRevitFiles.map((file) => file.file_path));
+    if (projectRevitFiles.length > 0) {
+      mergeRevitFiles(projectRevitFiles.map((file) => file.file_path));
     }
-  }, [projectRevitFiles, revitFiles.length]);
+  }, [projectRevitFiles]);
 
   const scriptOptions = useMemo(
     () => availableScripts.filter((script) => script.is_active),
@@ -163,27 +176,130 @@ export const DynamoBatchRunner: React.FC<DynamoBatchRunnerProps> = ({
     setSelectedRevitFiles(newSelection);
   };
 
-  const handleAddDynamoScript = () => {
+  const handleAddDynamoScript = async () => {
     clearAlerts();
 
-    if (availableScriptId === '') {
-      setError('Select a Dynamo script to add.');
+    if (availableScriptId !== '') {
+      const script = availableScripts.find((s) => s.script_id === availableScriptId);
+      if (!script) {
+        setError('Selected script not found.');
+        return;
+      }
+
+      const alreadyQueued = dynamoScripts.some((s) => s.script_id === script.script_id);
+      if (alreadyQueued) {
+        setError('That script is already in the queue.');
+        return;
+      }
+
+      setDynamoScripts((prev) => [...prev, script]);
       return;
     }
 
-    const script = availableScripts.find((s) => s.script_id === availableScriptId);
-    if (!script) {
-      setError('Selected script not found.');
-      return;
-    }
+    try {
+      const result = await fileBrowserApi.selectFile({
+        title: 'Select Dynamo Script',
+        file_types: [['Dynamo Script', '*.dyn']],
+      });
 
-    const alreadyQueued = dynamoScripts.some((s) => s.script_id === script.script_id);
-    if (alreadyQueued) {
-      setError('That script is already in the queue.');
-      return;
-    }
+      if (!result.success || !result.file_path) {
+        if (result.message && result.message !== 'No file selected') {
+          setError(result.message);
+        }
+        return;
+      }
 
-    setDynamoScripts((prev) => [...prev, script]);
+      const importResult = await dynamoBatchApi.importScriptsFromFiles({
+        file_paths: [result.file_path],
+      });
+
+      if (!importResult.success) {
+        setError(importResult.error || 'Failed to import Dynamo script.');
+        return;
+      }
+
+      const imported = importResult.scripts ?? [];
+      if (imported.length === 0) {
+        setError('No Dynamo scripts were imported.');
+        return;
+      }
+
+      const existing = new Set(dynamoScripts.map((script) => script.script_id));
+      const additions = imported.filter((script) => !existing.has(script.script_id));
+
+      setDynamoScripts((prev) => {
+        if (additions.length === 0) {
+          return prev;
+        }
+        const prevIds = new Set(prev.map((script) => script.script_id));
+        const uniqueAdditions = additions.filter((script) => !prevIds.has(script.script_id));
+        return uniqueAdditions.length > 0 ? [...prev, ...uniqueAdditions] : prev;
+      });
+
+      setSuccess(`Added ${additions.length} script(s).`);
+      refetchScripts();
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error || err.message
+        : err instanceof Error
+          ? err.message
+          : 'Failed to import Dynamo script.';
+      setError(message);
+    }
+  };
+
+  const handleAddScriptsFromFolder = async () => {
+    clearAlerts();
+    try {
+      const result = await fileBrowserApi.selectFolder({
+        title: 'Select Dynamo Scripts Folder',
+      });
+
+      if (!result.success || !result.folder_path) {
+        if (result.message && result.message !== 'No folder selected') {
+          setError(result.message);
+        }
+        return;
+      }
+
+      const importResult = await dynamoBatchApi.importScriptsFromFolder({
+        folder_path: result.folder_path,
+        recursive: true,
+      });
+
+      if (!importResult.success) {
+        setError(importResult.error || 'Failed to import Dynamo scripts.');
+        return;
+      }
+
+      const imported = importResult.scripts ?? [];
+      if (imported.length === 0) {
+        setError('No Dynamo scripts found in that folder.');
+        return;
+      }
+
+      const existing = new Set(dynamoScripts.map((script) => script.script_id));
+      const additions = imported.filter((script) => !existing.has(script.script_id));
+
+      setDynamoScripts((prev) => {
+        if (additions.length === 0) {
+          return prev;
+        }
+        const prevIds = new Set(prev.map((script) => script.script_id));
+        const uniqueAdditions = additions.filter((script) => !prevIds.has(script.script_id));
+        return uniqueAdditions.length > 0 ? [...prev, ...uniqueAdditions] : prev;
+      });
+
+      setSuccess(`Added ${additions.length} script(s) from folder.`);
+      refetchScripts();
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error || err.message
+        : err instanceof Error
+          ? err.message
+          : 'Failed to import Dynamo scripts.';
+      setError(message);
+    }
   };
 
   const handleClearAllDynamoScripts = () => {
@@ -374,7 +490,7 @@ export const DynamoBatchRunner: React.FC<DynamoBatchRunnerProps> = ({
             startIcon={<FolderIcon />}
             onClick={() => refetchRevitFiles()}
           >
-            Refresh
+            Add from Folder
           </Button>
           <Button
             size="small"
@@ -515,6 +631,14 @@ export const DynamoBatchRunner: React.FC<DynamoBatchRunnerProps> = ({
           </FormControl>
           <Button size="small" variant="outlined" onClick={() => refetchScripts()}>
             Refresh Library
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FolderIcon />}
+            onClick={handleAddScriptsFromFolder}
+          >
+            Add from Folder
           </Button>
           <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={handleAddDynamoScript}>
             Add

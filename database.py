@@ -2199,6 +2199,199 @@ def get_control_models(project_id) -> List[Dict[str, Any]]:
         return []
 
 
+def get_revizto_project_mappings(active_only: bool = True) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filter_sql = "WHERE rpm.is_active = 1" if active_only else ""
+            cursor.execute(
+                f"""
+                SELECT rpm.revizto_project_uuid, rpm.pm_project_id, rpm.project_name_override,
+                       rpm.is_active, rpm.created_at, rpm.updated_at,
+                       p.{S.Projects.NAME} AS pm_project_name
+                FROM ProjectManagement.dbo.revizto_project_map rpm
+                LEFT JOIN ProjectManagement.dbo.{S.Projects.TABLE} p
+                  ON p.{S.Projects.ID} = rpm.pm_project_id
+                {filter_sql}
+                ORDER BY rpm.revizto_project_uuid
+                """
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "revizto_project_uuid": row[0],
+                    "pm_project_id": row[1],
+                    "project_name_override": row[2],
+                    "is_active": bool(row[3]) if row[3] is not None else False,
+                    "created_at": row[4],
+                    "updated_at": row[5],
+                    "pm_project_name": row[6],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error fetching revizto project mappings: %s", exc)
+        return []
+
+
+def upsert_revizto_project_mapping(
+    revizto_project_uuid: str,
+    pm_project_id: Optional[int],
+    project_name_override: Optional[str] = None,
+) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                MERGE ProjectManagement.dbo.revizto_project_map AS target
+                USING (SELECT ? AS revizto_project_uuid) AS source
+                   ON target.revizto_project_uuid = source.revizto_project_uuid
+                WHEN MATCHED THEN
+                    UPDATE SET pm_project_id = ?, project_name_override = ?, is_active = 1, updated_at = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN
+                    INSERT (revizto_project_uuid, pm_project_id, project_name_override, is_active)
+                    VALUES (?, ?, ?, 1);
+                """,
+                (revizto_project_uuid, pm_project_id, project_name_override, revizto_project_uuid, pm_project_id, project_name_override),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error upserting revizto mapping: %s", exc)
+        return False
+
+
+def deactivate_revizto_project_mapping(revizto_project_uuid: str) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.revizto_project_map
+                SET is_active = 0, updated_at = SYSUTCDATETIME()
+                WHERE revizto_project_uuid = ?
+                """,
+                (revizto_project_uuid,),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error deactivating revizto mapping: %s", exc)
+        return False
+
+
+def get_issue_attribute_mappings(active_only: bool = True) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filter_sql = "WHERE m.is_active = 1" if active_only else ""
+            cursor.execute(
+                f"""
+                SELECT m.map_id, m.project_id, m.source_system, m.raw_attribute_name,
+                       m.mapped_field_name, m.data_type, m.priority, m.is_active,
+                       m.created_at, m.updated_at
+                FROM ProjectManagement.dbo.issue_attribute_map m
+                {filter_sql}
+                ORDER BY m.source_system, m.project_id, m.raw_attribute_name
+                """
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "map_id": row[0],
+                    "project_id": row[1],
+                    "source_system": row[2],
+                    "raw_attribute_name": row[3],
+                    "mapped_field_name": row[4],
+                    "data_type": row[5],
+                    "priority": row[6],
+                    "is_active": bool(row[7]) if row[7] is not None else False,
+                    "created_at": row[8],
+                    "updated_at": row[9],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error fetching issue attribute mappings: %s", exc)
+        return []
+
+
+def create_issue_attribute_mapping(payload: Dict[str, Any]) -> Optional[int]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ProjectManagement.dbo.issue_attribute_map
+                    (project_id, source_system, raw_attribute_name, mapped_field_name, data_type, priority, is_active)
+                OUTPUT INSERTED.map_id
+                VALUES (?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_attribute_name"),
+                    payload.get("mapped_field_name"),
+                    payload.get("data_type"),
+                    payload.get("priority", 100),
+                ),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row[0] if row else None
+    except Exception as exc:
+        logger.error("Error creating issue attribute mapping: %s", exc)
+        return None
+
+
+def update_issue_attribute_mapping(map_id: int, payload: Dict[str, Any]) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_attribute_map
+                SET project_id = ?, source_system = ?, raw_attribute_name = ?,
+                    mapped_field_name = ?, data_type = ?, priority = ?, updated_at = SYSUTCDATETIME()
+                WHERE map_id = ?
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_attribute_name"),
+                    payload.get("mapped_field_name"),
+                    payload.get("data_type"),
+                    payload.get("priority", 100),
+                    map_id,
+                ),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error updating issue attribute mapping: %s", exc)
+        return False
+
+
+def deactivate_issue_attribute_mapping(map_id: int) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_attribute_map
+                SET is_active = 0, updated_at = SYSUTCDATETIME()
+                WHERE map_id = ?
+                """,
+                (map_id,),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error deactivating issue attribute mapping: %s", exc)
+        return False
+
+
 def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
     """Persist the control models (and metadata) assigned to a project."""
     normalized: List[Dict[str, Any]] = []
@@ -5052,6 +5245,51 @@ def get_warehouse_dashboard_metrics(
             except Exception as acc_exc:
                 logger.warning("Failed to fetch ACC import freshness: %s", acc_exc)
 
+            data_quality = {
+                "last_run_id": None,
+                "last_run_status": None,
+                "last_run_completed_at": None,
+                "checks_total": 0,
+                "checks_failed": 0,
+                "checks_failed_high": 0,
+                "checks_failed_medium": 0,
+            }
+            try:
+                cursor.execute(
+                    """
+                    SELECT TOP 1 run_id, status, completed_at
+                    FROM ctl.etl_run
+                    WHERE pipeline_name = 'warehouse_full_load'
+                    ORDER BY run_id DESC
+                    """
+                )
+                run_row = cursor.fetchone()
+                if run_row:
+                    run_id = run_row[0]
+                    data_quality["last_run_id"] = run_id
+                    data_quality["last_run_status"] = run_row[1]
+                    data_quality["last_run_completed_at"] = _serialize_datetime(run_row[2]) if run_row[2] else None
+                    cursor.execute(
+                        """
+                        SELECT
+                            COUNT(*) AS total,
+                            SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS failed,
+                            SUM(CASE WHEN passed = 0 AND severity = 'high' THEN 1 ELSE 0 END) AS failed_high,
+                            SUM(CASE WHEN passed = 0 AND severity = 'medium' THEN 1 ELSE 0 END) AS failed_medium
+                        FROM ctl.data_quality_result
+                        WHERE run_id = ?
+                        """,
+                        (run_id,),
+                    )
+                    dq_row = cursor.fetchone()
+                    if dq_row:
+                        data_quality["checks_total"] = int(dq_row[0] or 0)
+                        data_quality["checks_failed"] = int(dq_row[1] or 0)
+                        data_quality["checks_failed_high"] = int(dq_row[2] or 0)
+                        data_quality["checks_failed_medium"] = int(dq_row[3] or 0)
+            except Exception as dq_exc:
+                logger.warning("Failed to fetch data quality summary: %s", dq_exc)
+
             return {
                 "project_health": project_health,
                 "issue_trends": issue_trends,
@@ -5060,6 +5298,7 @@ def get_warehouse_dashboard_metrics(
                 "backlog_age": backlog_age,
                 "control_models": ctrl_models,
                 "data_freshness": data_freshness,
+                "data_quality": data_quality,
             }
     except Exception as e:
         logger.error(f"Error fetching warehouse dashboard metrics: {e}")
@@ -5455,7 +5694,10 @@ def get_dashboard_issues_table(
 
             if project_ids:
                 placeholders = ", ".join("?" for _ in project_ids)
-                where_clauses.append(f"p.project_bk IN ({placeholders})")
+                where_clauses.append(
+                    f"(p.project_bk IN ({placeholders}) OR (i.source_system = 'ACC' AND ve.pm_project_id IN ({placeholders})))"
+                )
+                params.extend(project_ids)
                 params.extend(project_ids)
 
             if status:
@@ -5913,6 +6155,7 @@ def get_naming_compliance_dashboard_metrics(
                 SELECT TOP 10
                     strRvtFileName,
                     project_name,
+                    discipline_code,
                     discipline_full_name,
                     validation_status,
                     validation_reason,
@@ -5931,13 +6174,14 @@ def get_naming_compliance_dashboard_metrics(
                     {
                         "file_name": rec[0],
                         "project_name": rec[1],
-                        "discipline": rec[2],
-                        "validation_status": rec[3],
-                        "validation_reason": rec[4],
-                        "failed_field_name": rec[5],
-                        "failed_field_value": rec[6],
-                        "failed_field_reason": rec[7],
-                        "validated_date": rec[8].isoformat() if rec[8] else None,
+                        "discipline_code": rec[2],
+                        "discipline": rec[3],
+                        "validation_status": rec[4],
+                        "validation_reason": rec[5],
+                        "failed_field_name": rec[6],
+                        "failed_field_value": rec[7],
+                        "failed_field_reason": rec[8],
+                        "validated_date": rec[9].isoformat() if rec[9] else None,
                     }
                 )
 
@@ -5982,7 +6226,7 @@ def get_naming_compliance_dashboard_metrics(
             }
     except Exception as exc:
         logger.error("Error fetching naming compliance metrics: %s", exc)
-        return {"summary": {}, "by_discipline": [], "recent_invalid": [], "error": str(exc)}
+        raise
 
 
 def revalidate_revit_naming(
@@ -6077,15 +6321,23 @@ def get_naming_compliance_table(
     params: List[Any] = []
     if project_ids:
         placeholders = ", ".join("?" for _ in project_ids)
-        where_clauses.append(f"pm_project_id IN ({placeholders})")
+        where_clauses.append(f"project_key IN ({placeholders})")
         params.extend(project_ids)
     if discipline:
-        where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+        where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
         params.append(discipline)
 
     where_sql = ""
     if where_clauses:
         where_sql = "WHERE " + " AND ".join(where_clauses)
+    control_where_clauses = ["control_file_name IS NOT NULL"]
+    control_params: List[Any] = []
+    if project_ids:
+        control_where_clauses.append(f"project_key IN ({placeholders})")
+        control_params.extend(project_ids)
+    control_where_sql = ""
+    if control_where_clauses:
+        control_where_sql = "WHERE " + " AND ".join(control_where_clauses)
 
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
@@ -6166,14 +6418,22 @@ def get_control_points_dashboard(
     params: List[Any] = []
     if project_ids:
         placeholders = ", ".join("?" for _ in project_ids)
-        where_clauses.append(f"pm_project_id IN ({placeholders})")
+        where_clauses.append(f"project_key IN ({placeholders})")
         params.extend(project_ids)
     if discipline:
-        where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+        where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
         params.append(discipline)
     where_sql = ""
     if where_clauses:
         where_sql = "WHERE " + " AND ".join(where_clauses)
+    control_where_clauses = ["control_file_name IS NOT NULL"]
+    control_params: List[Any] = []
+    if project_ids:
+        control_where_clauses.append(f"project_key IN ({placeholders})")
+        control_params.extend(project_ids)
+    control_where_sql = ""
+    if control_where_clauses:
+        control_where_sql = "WHERE " + " AND ".join(control_where_clauses)
 
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
@@ -6272,6 +6532,339 @@ def get_control_points_dashboard(
             "page": page,
             "page_size": page_size,
             "project_summary": [],
+            "error": str(exc),
+        }
+
+
+def get_coordinate_alignment_dashboard(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "model_file_name",
+    sort_dir: str = "asc",
+) -> Dict[str, Any]:
+    """
+    Return coordinate alignment tables for control and model base/survey points.
+    """
+    sort_map = {
+        "model_file_name": "model_file_name",
+        "control_file_name": "control_file_name",
+        "discipline": "discipline",
+    }
+    sort_column = sort_map.get(sort_by, "model_file_name")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"project_key IN ({placeholders})")
+        params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
+        params.append(discipline)
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+    control_where_clauses = ["control_file_name IS NOT NULL"]
+    control_params: List[Any] = []
+    if project_ids:
+        control_where_clauses.append(f"project_key IN ({placeholders})")
+        control_params.extend(project_ids)
+    control_where_sql = ""
+    if control_where_clauses:
+        control_where_sql = "WHERE " + " AND ".join(control_where_clauses)
+
+    try:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
+            cursor = conn.cursor()
+
+            total = -1
+
+            cursor.execute(
+                f"""
+                WITH LatestModels AS (
+                    SELECT
+                        alignment_id,
+                        project_key AS pm_project_id,
+                        project_name,
+                        LTRIM(RTRIM(model_file_name)) AS model_file_name,
+                        discipline_full_name AS discipline,
+                        model_zone_code,
+                        control_file_name,
+                        control_zone_code,
+                        control_is_primary,
+                        pbp_eastwest,
+                        pbp_northsouth,
+                        pbp_elevation,
+                        pbp_angle_true_north,
+                        survey_eastwest,
+                        survey_northsouth,
+                        survey_elevation,
+                        survey_angle_true_north,
+                        pbp_compliant,
+                        survey_compliant,
+                        snapshot_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY project_key, LTRIM(RTRIM(model_file_name))
+                            ORDER BY snapshot_date DESC, alignment_id DESC
+                        ) AS rn
+                    FROM fact.coordinate_alignment_daily
+                    {where_sql}
+                )
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    model_file_name,
+                    discipline,
+                    model_zone_code,
+                    control_file_name,
+                    control_zone_code,
+                    control_is_primary,
+                    pbp_eastwest,
+                    pbp_northsouth,
+                    pbp_elevation,
+                    pbp_angle_true_north,
+                    pbp_compliant
+                FROM LatestModels
+                WHERE rn = 1
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            model_base_points = []
+            for row in cursor.fetchall():
+                model_base_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "discipline": row[3],
+                        "model_zone_code": row[4],
+                        "control_file_name": row[5],
+                        "control_zone_code": row[6],
+                        "control_is_primary": bool(row[7]) if row[7] is not None else None,
+                        "pbp_eastwest": row[8],
+                        "pbp_northsouth": row[9],
+                        "pbp_elevation": row[10],
+                        "pbp_angle_true_north": row[11],
+                        "pbp_compliant": bool(row[12]) if row[12] is not None else None,
+                        "pbp_compliance_status": "Compliant" if row[12] else "Non-Compliant" if row[12] is False else "No control configured",
+                    }
+                )
+
+            cursor.execute(
+                f"""
+                WITH LatestModels AS (
+                    SELECT
+                        alignment_id,
+                        project_key AS pm_project_id,
+                        project_name,
+                        LTRIM(RTRIM(model_file_name)) AS model_file_name,
+                        discipline_full_name AS discipline,
+                        model_zone_code,
+                        control_file_name,
+                        control_zone_code,
+                        control_is_primary,
+                        survey_eastwest,
+                        survey_northsouth,
+                        survey_elevation,
+                        survey_angle_true_north,
+                        survey_compliant,
+                        snapshot_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY project_key, LTRIM(RTRIM(model_file_name))
+                            ORDER BY snapshot_date DESC, alignment_id DESC
+                        ) AS rn
+                    FROM fact.coordinate_alignment_daily
+                    {where_sql}
+                )
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    model_file_name,
+                    discipline,
+                    model_zone_code,
+                    control_file_name,
+                    control_zone_code,
+                    control_is_primary,
+                    survey_eastwest,
+                    survey_northsouth,
+                    survey_elevation,
+                    survey_angle_true_north,
+                    survey_compliant
+                FROM LatestModels
+                WHERE rn = 1
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            model_survey_points = []
+            for row in cursor.fetchall():
+                model_survey_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "discipline": row[3],
+                        "model_zone_code": row[4],
+                        "control_file_name": row[5],
+                        "control_zone_code": row[6],
+                        "control_is_primary": bool(row[7]) if row[7] is not None else None,
+                        "survey_eastwest": row[8],
+                        "survey_northsouth": row[9],
+                        "survey_elevation": row[10],
+                        "survey_angle_true_north": row[11],
+                        "survey_compliant": bool(row[12]) if row[12] is not None else None,
+                        "survey_compliance_status": "Compliant" if row[12] else "Non-Compliant" if row[12] is False else "No control configured",
+                    }
+                )
+
+            cursor.execute(
+                f"""
+                WITH LatestControls AS (
+                    SELECT
+                        alignment_id,
+                        project_key AS pm_project_id,
+                        project_name,
+                        LTRIM(RTRIM(control_file_name)) AS control_file_name,
+                        control_zone_code,
+                        control_is_primary,
+                        control_pbp_eastwest,
+                        control_pbp_northsouth,
+                        control_pbp_elevation,
+                        control_pbp_angle_true_north,
+                        control_survey_eastwest,
+                        control_survey_northsouth,
+                        control_survey_elevation,
+                        control_survey_angle_true_north,
+                        snapshot_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY project_key, LTRIM(RTRIM(control_file_name))
+                            ORDER BY
+                                snapshot_date DESC,
+                                CASE
+                                    WHEN control_zone_code IS NULL OR LTRIM(RTRIM(control_zone_code)) IN ('', '--')
+                                    THEN 1 ELSE 0 END,
+                                alignment_id DESC
+                        ) AS rn
+                    FROM fact.coordinate_alignment_daily
+                    {control_where_sql}
+                )
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    control_file_name,
+                    control_zone_code,
+                    control_is_primary,
+                    control_pbp_eastwest,
+                    control_pbp_northsouth,
+                    control_pbp_elevation,
+                    control_pbp_angle_true_north
+                FROM LatestControls
+                WHERE rn = 1
+                ORDER BY project_name, control_file_name
+                """,
+                tuple(control_params),
+            )
+            control_base_points = []
+            for row in cursor.fetchall():
+                control_base_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "control_file_name": row[2],
+                        "control_zone_code": row[3],
+                        "control_is_primary": bool(row[4]) if row[4] is not None else None,
+                        "control_pbp_eastwest": row[5],
+                        "control_pbp_northsouth": row[6],
+                        "control_pbp_elevation": row[7],
+                        "control_pbp_angle_true_north": row[8],
+                    }
+                )
+
+            cursor.execute(
+                f"""
+                WITH LatestControls AS (
+                    SELECT
+                        alignment_id,
+                        project_key AS pm_project_id,
+                        project_name,
+                        LTRIM(RTRIM(control_file_name)) AS control_file_name,
+                        control_zone_code,
+                        control_is_primary,
+                        control_survey_eastwest,
+                        control_survey_northsouth,
+                        control_survey_elevation,
+                        control_survey_angle_true_north,
+                        snapshot_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY project_key, LTRIM(RTRIM(control_file_name))
+                            ORDER BY
+                                snapshot_date DESC,
+                                CASE
+                                    WHEN control_zone_code IS NULL OR LTRIM(RTRIM(control_zone_code)) IN ('', '--')
+                                    THEN 1 ELSE 0 END,
+                                alignment_id DESC
+                        ) AS rn
+                    FROM fact.coordinate_alignment_daily
+                    {control_where_sql}
+                )
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    control_file_name,
+                    control_zone_code,
+                    control_is_primary,
+                    control_survey_eastwest,
+                    control_survey_northsouth,
+                    control_survey_elevation,
+                    control_survey_angle_true_north
+                FROM LatestControls
+                WHERE rn = 1
+                ORDER BY project_name, control_file_name
+                """,
+                tuple(control_params),
+            )
+            control_survey_points = []
+            for row in cursor.fetchall():
+                control_survey_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "control_file_name": row[2],
+                        "control_zone_code": row[3],
+                        "control_is_primary": bool(row[4]) if row[4] is not None else None,
+                        "control_survey_eastwest": row[5],
+                        "control_survey_northsouth": row[6],
+                        "control_survey_elevation": row[7],
+                        "control_survey_angle_true_north": row[8],
+                    }
+                )
+
+            return {
+                "model_base_points": model_base_points,
+                "model_survey_points": model_survey_points,
+                "control_base_points": control_base_points,
+                "control_survey_points": control_survey_points,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+            }
+    except Exception as exc:
+        logger.error("Error fetching coordinate alignment dashboard: %s", exc)
+        return {
+            "model_base_points": [],
+            "model_survey_points": [],
+            "control_base_points": [],
+            "control_survey_points": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
             "error": str(exc),
         }
 

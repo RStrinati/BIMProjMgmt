@@ -212,3 +212,47 @@ LEFT JOIN dim.project_type pt ON f.project_type_sk = pt.project_type_sk
 LEFT JOIN dim.date d_planned ON f.planned_date_sk = d_planned.date_sk
 LEFT JOIN dim.date d_actual ON f.actual_date_sk = d_actual.date_sk;
 GO
+
+/* ISSUE ATTRIBUTES MART */
+IF OBJECT_ID('mart.v_issue_attributes', 'V') IS NOT NULL
+    DROP VIEW mart.v_issue_attributes;
+GO
+
+CREATE VIEW mart.v_issue_attributes
+AS
+WITH latest_attr AS (
+    SELECT
+        source_system,
+        issue_id,
+        attribute_name,
+        attribute_value,
+        attribute_type,
+        attribute_created_at,
+        mapped_field_name,
+        map_priority,
+        source_load_ts,
+        ROW_NUMBER() OVER (
+            PARTITION BY source_system, issue_id, attribute_name
+            ORDER BY source_load_ts DESC
+        ) AS rn
+    FROM stg.issue_attributes
+)
+SELECT
+    i.issue_sk,
+    i.issue_bk,
+    i.source_system,
+    i.project_sk,
+    a.attribute_name,
+    a.attribute_value,
+    a.attribute_type,
+    a.attribute_created_at,
+    a.mapped_field_name,
+    a.map_priority,
+    a.source_load_ts
+FROM latest_attr a
+JOIN dim.issue i
+  ON i.issue_bk = a.issue_id
+ AND i.source_system = a.source_system
+ AND i.current_flag = 1
+WHERE a.rn = 1;
+GO

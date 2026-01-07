@@ -21,7 +21,10 @@ BEGIN
         issue_id             NVARCHAR(255) NOT NULL,
         project_name         NVARCHAR(510) NULL,
         project_id_raw       NVARCHAR(255) NULL,
+        source_issue_id      NVARCHAR(255) NULL,
+        source_project_id    NVARCHAR(255) NULL,
         status               NVARCHAR(50)  NULL,
+        status_normalized    NVARCHAR(50)  NULL,
         priority             NVARCHAR(50)  NULL,
         priority_normalized  NVARCHAR(50)  NULL,
         title                NVARCHAR(500) NULL,
@@ -39,6 +42,12 @@ BEGIN
         location_root        NVARCHAR(255) NULL,
         location_building    NVARCHAR(255) NULL,
         location_level       NVARCHAR(255) NULL,
+        phase                NVARCHAR(255) NULL,
+        building_level       NVARCHAR(255) NULL,
+        clash_level          NVARCHAR(255) NULL,
+        custom_attributes_json NVARCHAR(MAX) NULL,
+        is_deleted           BIT           NULL,
+        project_mapped       BIT           NULL,
         source_load_ts       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         record_hash          BINARY(32)    NULL,
         record_source        NVARCHAR(50)  NOT NULL,
@@ -218,6 +227,27 @@ BEGIN
         source_load_ts   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         record_hash      BINARY(32)    NULL,
         CONSTRAINT pk_stg_project_aliases PRIMARY KEY (pm_project_id, alias_name, source_load_ts)
+    );
+END
+GO
+
+/* ISSUE ATTRIBUTES (custom fields per project) */
+IF OBJECT_ID('stg.issue_attributes', 'U') IS NULL
+BEGIN
+    CREATE TABLE stg.issue_attributes (
+        source_system       NVARCHAR(32)  NOT NULL,
+        issue_id            NVARCHAR(255) NOT NULL,
+        project_id_raw      NVARCHAR(255) NULL,
+        attribute_name      NVARCHAR(255) NOT NULL,
+        attribute_value     NVARCHAR(MAX) NULL,
+        attribute_type      NVARCHAR(50)  NULL,
+        attribute_created_at DATETIME2    NULL,
+        mapped_field_name   NVARCHAR(100) NULL,
+        map_priority        INT           NULL,
+        record_source       NVARCHAR(50)  NOT NULL,
+        source_load_ts      DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        record_hash         BINARY(32)    NULL,
+        CONSTRAINT pk_stg_issue_attributes PRIMARY KEY (source_system, issue_id, attribute_name, source_load_ts)
     );
 END
 GO

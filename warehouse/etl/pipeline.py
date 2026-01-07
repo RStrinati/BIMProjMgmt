@@ -14,7 +14,8 @@ import contextlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Dict, Iterable, List, Optional, Sequence
+import json
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pyodbc  # type: ignore
 
@@ -147,10 +148,20 @@ class WarehousePipeline:
                 SELECT
                     pm.source,
                     CAST(pm.issue_id AS NVARCHAR(255)) AS issue_id,
+                    CAST(pm.source_issue_id AS NVARCHAR(255)) AS source_issue_id,
                     pm.project_name,
                     CAST(pm.project_id AS NVARCHAR(255)) AS project_id_raw,
+                    CAST(pm.source_project_id AS NVARCHAR(255)) AS source_project_id,
                     pm.status,
+                    pm.status_normalized,
                     pm.priority,
+                    pm.source_updated_at,
+                    pm.phase,
+                    pm.building_level,
+                    pm.clash_level,
+                    pm.custom_attributes_json,
+                    pm.is_deleted,
+                    pm.project_mapped,
                     ve.Priority AS acc_priority,
                     ve.Discipline AS acc_discipline,
                     ve.location_name AS acc_location_name,
@@ -177,6 +188,7 @@ class WarehousePipeline:
                 FROM vw_ProjectManagement_AllIssues pm
                 LEFT JOIN acc_data_schema.dbo.vw_issues_expanded ve
                     ON CAST(ve.display_id AS NVARCHAR(255)) = pm.issue_id
+                   AND CAST(ve.project_id AS NVARCHAR(255)) = pm.project_id
                    AND pm.source = 'ACC'
                 LEFT JOIN ReviztoData.dbo.vw_ReviztoProjectIssues_Deconstructed rv
                     ON CAST(rv.issue_number AS NVARCHAR(255)) = pm.issue_id
@@ -205,16 +217,26 @@ class WarehousePipeline:
                              CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
                 ) loc_map
                 WHERE
-                    (pm.created_at IS NOT NULL AND pm.created_at > ?)
-                    OR (pm.closed_at IS NOT NULL AND pm.closed_at > ?)
+                    pm.source_updated_at IS NOT NULL
+                    AND pm.source_updated_at > ?
             )
             SELECT
                 source,
                 issue_id,
+                source_issue_id,
                 project_name,
                 project_id_raw,
+                source_project_id,
                 status,
+                status_normalized,
                 priority,
+                source_updated_at,
+                phase,
+                building_level,
+                clash_level,
+                custom_attributes_json,
+                is_deleted,
+                project_mapped,
                 acc_priority,
                 acc_discipline,
                 acc_location_name,
@@ -236,29 +258,35 @@ class WarehousePipeline:
             WHERE rn = 1
         """
 
-        rows = self._fetch_source_rows(select_query, watermark, watermark)
+        rows = self._fetch_source_rows(select_query, watermark)
         if not rows:
             logger.info("No new issue rows to load.")
             return 0
 
         insert_sql = """
             INSERT INTO stg.issues (
-                source_system, issue_id, project_name, project_id_raw, status, priority,
+                source_system, issue_id, source_issue_id, project_name, project_id_raw, source_project_id,
+                status, status_normalized, priority,
                 priority_normalized, title, description, assignee, author, created_at, closed_at,
                 last_activity_date, due_date, discipline, category_primary,
                 category_secondary, location_raw, location_root, location_building, location_level,
+                phase, building_level, clash_level, custom_attributes_json,
+                is_deleted, project_mapped,
                 record_source, source_load_ts
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
         """
         record_source = "ProjectManagement"
         insert_rows = [
             (
                 row.source,
                 row.issue_id,
+                row.source_issue_id,
                 row.project_name,
                 row.project_id_raw,
+                row.source_project_id,
                 row.status,
+                row.status_normalized,
                 row.priority,
                 row.mapped_priority or self._normalize_priority(row.acc_priority or row.priority),
                 row.title,
@@ -284,6 +312,12 @@ class WarehousePipeline:
                 or getattr(row, "building_name", None),
                 getattr(row, "mapped_location_level", None)
                 or getattr(row, "level_name", None),
+                getattr(row, "phase", None),
+                getattr(row, "building_level", None),
+                getattr(row, "clash_level", None),
+                getattr(row, "custom_attributes_json", None),
+                getattr(row, "is_deleted", None),
+                getattr(row, "project_mapped", None),
                 record_source,
             )
             for row in rows
@@ -291,10 +325,7 @@ class WarehousePipeline:
 
         self._bulk_insert(insert_sql, insert_rows)
 
-        latest = max(
-            [value for row in rows for value in (row.created_at, row.closed_at) if value is not None],
-            default=watermark,
-        )
+        latest = max((row.source_updated_at for row in rows if row.source_updated_at is not None), default=watermark)
         self._set_watermark(process, source_object, latest, len(rows))
         logger.info("Loaded %s issue rows into staging.", len(rows))
         return len(rows)
@@ -373,6 +404,152 @@ class WarehousePipeline:
         self._set_watermark(process, source_object, latest, len(rows))
         logger.info("Loaded %s processed issues.", len(rows))
         return len(rows)
+
+    def _load_attribute_map(self) -> Dict[Tuple[str, Optional[str], str], Tuple[str, int]]:
+        """Load active attribute mappings keyed by (source_system, project_id, raw_name)."""
+        query = """
+            SELECT project_id, source_system, raw_attribute_name, mapped_field_name, priority
+            FROM dbo.issue_attribute_map
+            WHERE is_active = 1
+        """
+        mapping: Dict[Tuple[str, Optional[str], str], Tuple[str, int]] = {}
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            for row in cursor.fetchall():
+                project_id = str(row[0]).strip() if row[0] is not None else None
+                source = str(row[1]).strip()
+                raw_name = str(row[2]).strip().lower()
+                mapped_name = str(row[3]).strip()
+                priority = int(row[4] or 100)
+                key = (source, project_id, raw_name)
+                existing = mapping.get(key)
+                if existing is None or priority < existing[1]:
+                    mapping[key] = (mapped_name, priority)
+        return mapping
+
+    @staticmethod
+    def _parse_custom_attributes(value: Optional[object]) -> List[Dict[str, Optional[str]]]:
+        if value is None:
+            return []
+        text = str(value).strip()
+        if not text:
+            return []
+        try:
+            payload = json.loads(text)
+        except (TypeError, json.JSONDecodeError):
+            return []
+        if not isinstance(payload, list):
+            return []
+        parsed: List[Dict[str, Optional[str]]] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            value = item.get("value")
+            parsed.append(
+                {
+                    "name": str(name).strip() if name is not None else None,
+                    "type": str(item.get("type")).strip() if item.get("type") is not None else None,
+                    "value": str(value) if value is not None else None,
+                    "created_at": item.get("created_at"),
+                }
+            )
+        return [row for row in parsed if row.get("name")]
+
+    def load_staging_issue_attributes(self) -> int:
+        """Load custom issue attributes into staging with optional mapping."""
+        process = "stg_issue_attributes"
+        source_object = "vw_ProjectManagement_AllIssues"
+        watermark = self._get_watermark(process, source_object)
+        logger.info("Loading issue attributes (watermark=%s)", watermark.isoformat())
+
+        select_query = """
+            SELECT
+                source,
+                issue_id,
+                project_id,
+                custom_attributes_json,
+                source_updated_at
+            FROM vw_ProjectManagement_AllIssues
+            WHERE source = 'ACC'
+              AND custom_attributes_json IS NOT NULL
+              AND source_updated_at > ?
+        """
+
+        rows = self._fetch_source_rows(select_query, watermark)
+        if not rows:
+            logger.info("No new issue attribute rows to stage.")
+            return 0
+
+        mapping = self._load_attribute_map()
+        insert_sql = """
+            INSERT INTO stg.issue_attributes (
+                source_system, issue_id, project_id_raw, attribute_name, attribute_value,
+                attribute_type, attribute_created_at, mapped_field_name, map_priority,
+                record_source, source_load_ts
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
+        """
+        record_source = "ProjectManagement"
+        insert_rows = []
+        latest = watermark
+        deduped: Dict[Tuple[str, str, str], tuple] = {}
+
+        for row in rows:
+            source = row.source
+            issue_id = self._safe_str(row.issue_id, 255)
+            if not issue_id:
+                continue
+            project_id_raw = row.project_id
+            source_updated_at = row.source_updated_at or watermark
+            latest = max(latest, source_updated_at)
+            attrs = self._parse_custom_attributes(row.custom_attributes_json)
+            for attr in attrs:
+                raw_name = self._safe_str(attr["name"], 255)
+                if not raw_name:
+                    continue
+                key = (source, str(project_id_raw).strip() if project_id_raw is not None else None, raw_name.lower())
+                mapped = mapping.get(key)
+                if mapped is None:
+                    mapped = mapping.get((source, None, raw_name.lower()))
+                mapped_field_name = mapped[0] if mapped else None
+                map_priority = mapped[1] if mapped else None
+                attr_value = attr.get("value")
+                if isinstance(attr_value, str) and attr_value.strip() == "":
+                    attr_value = None
+                attr_type = self._safe_str(attr.get("type"), 50)
+                attr_created_at = self._safe_datetime(attr.get("created_at"))
+                row_key = (source, issue_id, raw_name)
+                payload = (
+                    source,
+                    issue_id,
+                    project_id_raw,
+                    raw_name,
+                    attr_value,
+                    attr_type,
+                    attr_created_at,
+                    self._safe_str(mapped_field_name, 100),
+                    map_priority,
+                    record_source,
+                )
+                existing = deduped.get(row_key)
+                if existing is None:
+                    deduped[row_key] = payload
+                else:
+                    existing_created = existing[6]
+                    if attr_created_at and (existing_created is None or attr_created_at >= existing_created):
+                        deduped[row_key] = payload
+
+        insert_rows = list(deduped.values())
+        if not insert_rows:
+            logger.info("No parsed issue attributes to insert.")
+            return 0
+
+        self._bulk_insert(insert_sql, insert_rows)
+        self._set_watermark(process, source_object, latest, len(insert_rows))
+        logger.info("Loaded %s issue attribute rows into staging.", len(insert_rows))
+        return len(insert_rows)
 
     def load_staging_projects(self) -> int:
         process = "stg_projects"
@@ -745,6 +922,43 @@ class WarehousePipeline:
                 expected_result=lambda rows: rows[0][0] == 0,
                 failure_message=lambda rows: f"{rows[0][0]} review cycles have actual date before planned date",
             ),
+            DataQualityCheck(
+                name="issues_unmapped_projects",
+                severity="high",
+                query="""
+                    SELECT COUNT(*) AS unmapped_count
+                    FROM dim.issue i
+                    WHERE i.current_flag = 1
+                      AND ISNULL(i.project_mapped, 0) = 0
+                """,
+                expected_result=lambda rows: rows[0][0] == 0,
+                failure_message=lambda rows: f"{rows[0][0]} issues lack project mapping",
+            ),
+            DataQualityCheck(
+                name="acc_priority_null_rate",
+                severity="medium",
+                query="""
+                    SELECT
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN i.priority_normalized IS NULL THEN 1 ELSE 0 END) AS nulls
+                    FROM dim.issue i
+                    WHERE i.current_flag = 1
+                      AND i.source_system = 'ACC'
+                """,
+                expected_result=lambda rows: (rows[0][0] or 0) == 0 or (rows[0][1] / rows[0][0]) <= 0.2,
+                failure_message=lambda rows: f"ACC priority null rate {(rows[0][1] / rows[0][0]) * 100:.1f}% exceeds 20%",
+            ),
+            DataQualityCheck(
+                name="issue_snapshot_freshness",
+                severity="high",
+                query="""
+                    SELECT MAX(d.[date]) AS latest_snapshot_date
+                    FROM fact.issue_snapshot s
+                    JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                """,
+                expected_result=lambda rows: rows[0][0] is not None,
+                failure_message=lambda rows: "No issue snapshots available",
+            ),
         ]
         checks = checks or default_checks
 
@@ -839,13 +1053,13 @@ class WarehousePipeline:
             try:
                 cursor.fast_executemany = True
                 cursor.executemany(insert_sql, batch)
-            except (pyodbc.ProgrammingError, pyodbc.DataError) as exc:
+            except (pyodbc.ProgrammingError, pyodbc.DataError, pyodbc.Error) as exc:
                 logger.warning("Bulk insert fallback due to %s: %s", type(exc).__name__, exc)
                 cursor.fast_executemany = False
                 for idx, row in enumerate(batch):
                     try:
                         cursor.execute(insert_sql, row)
-                    except (pyodbc.ProgrammingError, pyodbc.DataError) as row_exc:
+                    except (pyodbc.ProgrammingError, pyodbc.DataError, pyodbc.Error) as row_exc:
                         logger.error(
                             "Failed to insert row %s into staging: %s | values=%s",
                             idx,
@@ -910,6 +1124,7 @@ class WarehousePipeline:
             staged_counts = {
                 "issues": self.load_staging_issues(),
                 "processed_issues": self.load_staging_processed_issues(),
+                "issue_attributes": self.load_staging_issue_attributes(),
                 "projects": self.load_staging_projects(),
                 "services": self.load_staging_services(),
                 "service_reviews": self.load_staging_service_reviews(),

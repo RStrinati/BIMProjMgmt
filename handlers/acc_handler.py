@@ -39,6 +39,22 @@ def get_table_columns(cursor, table_name):
     """, schema, tbl)
     return [row[0] for row in cursor.fetchall()]
 
+def get_column_metadata(cursor, table_name):
+    """Return dict of column metadata keyed by column name."""
+    schema, tbl = table_name.split('.', 1)
+    cursor.execute("""
+        SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+    """, schema, tbl)
+    meta = {}
+    for row in cursor.fetchall():
+        meta[row[0]] = {
+            "is_nullable": row[1] == "YES",
+            "has_default": row[2] is not None,
+        }
+    return meta
+
 def get_primary_keys(cursor, table_name):
     schema, tbl = table_name.split('.', 1)
     cursor.execute("""
@@ -164,15 +180,30 @@ def import_csv_to_sql(cursor, conn, file_path, table_name, truncate=True):
     try:
         df = pd.read_csv(file_path, dtype=str).fillna("")
         db_cols = get_table_columns(cursor, table_name)
-        if sorted(df.columns) != sorted(db_cols):
-            missing_in_csv = set(db_cols) - set(df.columns)
-            extra_in_csv = set(df.columns) - set(db_cols)
+        col_meta = get_column_metadata(cursor, table_name)
+        missing_in_csv = set(db_cols) - set(df.columns)
+        extra_in_csv = set(df.columns) - set(db_cols)
+        if extra_in_csv:
             log(f"[ERROR] Column mismatch in {table_name}")
-            log(f"Missing in CSV: {missing_in_csv}")
             log(f"Extra in CSV: {extra_in_csv}")
             raise ValueError(f"Column mismatch in {table_name}")
+        if missing_in_csv:
+            required_missing = [
+                col for col in missing_in_csv
+                if col_meta.get(col, {}).get("is_nullable") is False
+                and col_meta.get(col, {}).get("has_default") is False
+            ]
+            if required_missing:
+                log(f"[ERROR] Column mismatch in {table_name}")
+                log(f"Missing required in CSV: {required_missing}")
+                raise ValueError(f"Column mismatch in {table_name}")
+            log(f"[INFO] CSV missing optional/defaulted columns in {table_name}: {sorted(missing_in_csv)}")
 
         pk_cols = get_primary_keys(cursor, table_name)
+        missing_pk_cols = [col for col in pk_cols if col not in df.columns]
+        if missing_pk_cols:
+            log(f"[ERROR] CSV missing primary key columns for {table_name}: {missing_pk_cols}")
+            raise ValueError(f"Missing PK columns in {table_name}")
         null_pks = df[pk_cols].isnull().any(axis=1).sum()
         if null_pks > 0:
             log(f"[WARN] {null_pks} rows have NULLs in primary key columns for {table_name}")
@@ -192,10 +223,6 @@ def import_csv_to_sql(cursor, conn, file_path, table_name, truncate=True):
         params = []
         for index, row in df.iterrows():
             try:
-                if 'status' in row and row['status'].strip().lower() == 'deleted':
-                    skipped_rows += 1
-                    continue
-
                 converted_row = []
                 for col in df.columns:
                     val = convert_to_sql_compatible(row[col], col)

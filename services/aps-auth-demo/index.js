@@ -1540,6 +1540,7 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
     const { hubId, projectId } = req.params;
 
     try {
+        console.log(`\n📂 === FETCHING FILES FOR PROJECT: ${projectId} (App Token - 2-legged) ===`);
         // Get top folders first
         const foldersResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}/topFolders`, {
             headers: { 'Authorization': `Bearer ${client_credentials_token}` }
@@ -1553,7 +1554,8 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
         // Get files from each folder
         for (const folder of folders) {
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
+                // Use /items/{id} endpoint instead of /folders/{id}/contents
+                const folderContents = await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodeURIComponent(folder.id)}/children`, {
                     headers: { 'Authorization': `Bearer ${client_credentials_token}` }
                 });
                 
@@ -1867,23 +1869,37 @@ app.get('/my-project-files/:hubId/:projectId', async (req, res) => {
 
     try {
         logEvent('api', { endpoint: '/my-project-files', hubId, projectId, tokenType: 'User Token (3-legged)' });
+        console.log(`\n📂 === FETCHING FILES FOR PROJECT: ${projectId} (User Token) ===`);
 
         const foldersResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}/topFolders`, {
             headers: { 'Authorization': `Bearer ${access_token}` }
         });
 
         const folders = foldersResponse.data.data;
+        console.log(`📁 Found ${folders.length} top-level folders:`, folders.map(f => ({ name: f.attributes.displayName, id: f.id, type: f.type })));
         let allFiles = [];
         let modelFiles = [];
         let lastUpdate = null;
 
-        for (const folder of folders) {
+        // Helper function to recursively read folder contents
+        async function readFolderRecursively(folderId, folderName, depth = 0) {
+            if (depth > 5) {
+                console.log(`⚠️ Max depth reached for ${folderName}`);
+                return; // Prevent infinite recursion
+            }
+            
+            console.log(`🔍 Reading folder: ${folderName} (depth: ${depth})`);
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
+                // Use /items/{id} endpoint instead of /folders/{id}/contents
+                const folderContents = await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodeURIComponent(folderId)}/children`, {
                     headers: { 'Authorization': `Bearer ${access_token}` }
                 });
 
-                const files = folderContents.data.data
+                const items = folderContents.data.data;
+                console.log(`  ✓ Folder ${folderName}: ${items.length} items`);
+
+                // Process files
+                const files = items
                     .filter(item => item.type === 'items')
                     .map(item => ({
                         id: item.id,
@@ -1893,15 +1909,17 @@ app.get('/my-project-files/:hubId/:projectId', async (req, res) => {
                         created: item.attributes.createTime,
                         modified: item.attributes.lastModifiedTime,
                         version: item.attributes.versionNumber,
-                        folder: folder.attributes.displayName
+                        folder: folderName
                     }));
 
+                console.log(`  📄 Found ${files.length} files in ${folderName}`);
                 allFiles = allFiles.concat(files);
 
                 const models = files.filter(file => 
                     file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm'].includes(file.extension.toLowerCase())
                 );
                 modelFiles = modelFiles.concat(models);
+                console.log(`  🏗️ Found ${models.length} model files in ${folderName}`);
 
                 files.forEach(file => {
                     if (!lastUpdate || new Date(file.modified) > new Date(lastUpdate)) {
@@ -1909,10 +1927,32 @@ app.get('/my-project-files/:hubId/:projectId', async (req, res) => {
                     }
                 });
 
+                // Process subfolders
+                const subfolders = items.filter(item => item.type === 'folders');
+                console.log(`  📂 Found ${subfolders.length} subfolders in ${folderName}`);
+                for (const subfolder of subfolders) {
+                    const subfolderName = `${folderName}/${subfolder.attributes.displayName}`;
+                    await readFolderRecursively(subfolder.id, subfolderName, depth + 1);
+                }
+
             } catch (err) {
-                console.log(`Could not access folder ${folder.attributes.displayName}:`, err.response?.status);
+                console.log(`❌ Could not access folder ${folderName} (ID: ${folderId}):`, {
+                    status: err.response?.status,
+                    statusText: err.response?.statusText,
+                    error: err.response?.data?.developerMessage || err.response?.data || err.message,
+                    folderId: folderId,
+                    projectId: projectId,
+                    url: `https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folderId}/contents`
+                });
             }
         }
+
+        // Read all top-level folders and their subfolders
+        console.log(`🚀 Starting recursive folder scan...`);
+        for (const folder of folders) {
+            await readFolderRecursively(folder.id, folder.attributes.displayName);
+        }
+        console.log(`✅ Scan complete! Total files: ${allFiles.length}, Model files: ${modelFiles.length}`);
 
         res.json({
             success: true,

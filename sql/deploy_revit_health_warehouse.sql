@@ -105,10 +105,14 @@ VALUES
 ('sql/tables/dim_revit_file.sql', 'sql\tables\dim_revit_file.sql', 'Dimension table created: dim.revit_file'),
 ('sql/tables/stg_revit_health_snapshots.sql', 'sql\tables\stg_revit_health_snapshots.sql', 'Staging table created: stg.revit_health_snapshots'),
 ('sql/tables/fact_revit_health_daily.sql', 'sql\tables\fact_revit_health_daily.sql', 'Fact table created: fact.revit_health_daily'),
+('sql/tables/fact_coordinate_alignment_daily.sql', 'sql\tables\fact_coordinate_alignment_daily.sql', 'Fact table created: fact.coordinate_alignment_daily'),
 ('sql/procedures/usp_load_stg_revit_health.sql', 'sql\procedures\usp_load_stg_revit_health.sql', 'Procedure created: warehouse.usp_load_stg_revit_health'),
 ('sql/procedures/usp_load_fact_revit_health_daily.sql', 'sql\procedures\usp_load_fact_revit_health_daily.sql', 'Procedure created: warehouse.usp_load_fact_revit_health_daily (alignment views optional; see log)'),
+('sql/procedures/usp_load_fact_coordinate_alignment_daily.sql', 'sql\procedures\usp_load_fact_coordinate_alignment_daily.sql', 'Procedure created: warehouse.usp_load_fact_coordinate_alignment_daily'),
 ('sql/views/mart_v_project_health_summary.sql', 'sql\views\mart_v_project_health_summary.sql', 'View created: mart.v_project_health_summary'),
-('sql/views/mart_v_health_trends_monthly.sql', 'sql\views\mart_v_health_trends_monthly.sql', 'View created: mart.v_health_trends_monthly');
+('sql/views/mart_v_health_trends_monthly.sql', 'sql\views\mart_v_health_trends_monthly.sql', 'View created: mart.v_health_trends_monthly'),
+('sql/views/mart_v_coordinate_alignment_models.sql', 'sql\views\mart_v_coordinate_alignment_models.sql', 'View created: mart.v_coordinate_alignment_models'),
+('sql/views/mart_v_coordinate_alignment_controls.sql', 'sql\views\mart_v_coordinate_alignment_controls.sql', 'View created: mart.v_coordinate_alignment_controls');
 
 DECLARE @i INT = 1, @max INT = (SELECT COUNT(*) FROM @files);
 WHILE @i <= @max
@@ -158,6 +162,10 @@ IF OBJECT_ID('fact.revit_health_daily', 'U') IS NOT NULL
     PRINT '  [OK] fact.revit_health_daily exists';
 ELSE BEGIN PRINT '  ERROR: fact.revit_health_daily not found'; SET @error_count += 1; END
 
+IF OBJECT_ID('fact.coordinate_alignment_daily', 'U') IS NOT NULL
+    PRINT '  [OK] fact.coordinate_alignment_daily exists';
+ELSE BEGIN PRINT '  ERROR: fact.coordinate_alignment_daily not found'; SET @error_count += 1; END
+
 IF OBJECT_ID('warehouse.usp_load_stg_revit_health', 'P') IS NOT NULL
     PRINT '  [OK] warehouse.usp_load_stg_revit_health exists';
 ELSE BEGIN PRINT '  ERROR: warehouse.usp_load_stg_revit_health not found'; SET @error_count += 1; END
@@ -165,6 +173,10 @@ ELSE BEGIN PRINT '  ERROR: warehouse.usp_load_stg_revit_health not found'; SET @
 IF OBJECT_ID('warehouse.usp_load_fact_revit_health_daily', 'P') IS NOT NULL
     PRINT '  [OK] warehouse.usp_load_fact_revit_health_daily exists';
 ELSE BEGIN PRINT '  ERROR: warehouse.usp_load_fact_revit_health_daily not found'; SET @error_count += 1; END
+
+IF OBJECT_ID('warehouse.usp_load_fact_coordinate_alignment_daily', 'P') IS NOT NULL
+    PRINT '  [OK] warehouse.usp_load_fact_coordinate_alignment_daily exists';
+ELSE BEGIN PRINT '  ERROR: warehouse.usp_load_fact_coordinate_alignment_daily not found'; SET @error_count += 1; END
 
 IF OBJECT_ID('mart.v_project_health_summary', 'V') IS NOT NULL
     PRINT '  [OK] mart.v_project_health_summary exists';

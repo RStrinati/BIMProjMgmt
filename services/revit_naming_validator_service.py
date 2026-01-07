@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database_pool import get_db_connection
 from config import Config
+from services.naming_convention_service import naming_convention_service
 from constants import schema as S
 from typing import Dict, List, Tuple, Optional
 import re
@@ -49,8 +50,91 @@ class RevitNamingValidator:
     
     def __init__(self):
         self.db_name = Config.REVIT_HEALTH_DB
+        self._project_convention_cache: Dict[int, Optional[str]] = {}
     
-    def validate_file_naming(self, file_name: str) -> Tuple[str, str, Optional[str], Optional[str]]:
+    def _get_project_convention_code(self, project_id: Optional[int]) -> Optional[str]:
+        if project_id is None:
+            return None
+        if project_id in self._project_convention_cache:
+            return self._project_convention_cache[project_id]
+        try:
+            with get_db_connection(Config.PROJECT_MGMT_DB) as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        """
+                        SELECT naming_convention
+                        FROM ProjectManagement.dbo.vw_projects_full
+                        WHERE project_id = ?
+                        """,
+                        (project_id,),
+                    )
+                except Exception:
+                    cursor.execute(
+                        """
+                        SELECT naming_convention
+                        FROM ProjectManagement.dbo.projects
+                        WHERE project_id = ?
+                        """,
+                        (project_id,),
+                    )
+                row = cursor.fetchone()
+                code = row[0] if row and row[0] else None
+                self._project_convention_cache[project_id] = code
+                return code
+        except Exception as exc:
+            logger.warning("Failed to resolve naming convention for project %s: %s", project_id, exc)
+            self._project_convention_cache[project_id] = None
+            return None
+
+    def _validate_against_schema(self, file_name: str, schema: Dict) -> Tuple[str, str, Optional[str], Optional[str]]:
+        base_name = os.path.basename(file_name or "")
+        base_no_ext, _ = os.path.splitext(base_name)
+        regex_pattern = schema.get("regex_pattern")
+        delimiter = schema.get("delimiter", "-")
+
+        if regex_pattern:
+            if not re.match(regex_pattern, base_no_ext):
+                return "Invalid", f"Does not match naming convention {schema.get('institution', 'schema')}", None, None
+
+        discipline_code = None
+        discipline_name = None
+        fields = schema.get("fields", [])
+        discipline_field = next(
+            (f for f in fields if "discipline" in str(f.get("name", "")).lower()),
+            None,
+        )
+        if discipline_field:
+            position = discipline_field.get("position")
+            if isinstance(position, int):
+                parts = base_no_ext.split(delimiter)
+                if position < len(parts):
+                    discipline_code = parts[position].strip()
+                    mapped_values = discipline_field.get("mapped_values") or {}
+                    discipline_name = mapped_values.get(discipline_code)
+                    allowed_values = discipline_field.get("allowed_values")
+                    if allowed_values and discipline_code not in allowed_values:
+                        return (
+                            "Warning",
+                            f"Discipline code {discipline_code} not in allowed values",
+                            discipline_code,
+                            discipline_name,
+                        )
+                    if discipline_code and not discipline_name and mapped_values:
+                        return (
+                            "Warning",
+                            f"Unknown discipline code: {discipline_code}",
+                            discipline_code,
+                            None,
+                        )
+
+        return "Valid", f"Naming convention {schema.get('institution', 'schema')}", discipline_code, discipline_name
+
+    def validate_file_naming(
+        self,
+        file_name: str,
+        naming_convention_code: Optional[str] = None,
+    ) -> Tuple[str, str, Optional[str], Optional[str]]:
         """
         Validate file naming convention
         
@@ -62,6 +146,11 @@ class RevitNamingValidator:
         """
         if not file_name:
             return 'Invalid', 'Empty file name', None, None
+
+        if naming_convention_code:
+            schema = naming_convention_service.get_convention_schema(naming_convention_code)
+            if schema:
+                return self._validate_against_schema(file_name, schema)
         
         # Remove path if present
         base_name = os.path.basename(file_name)
@@ -120,7 +209,7 @@ class RevitNamingValidator:
                 
                 # Get file name
                 cursor.execute("""
-                    SELECT strRvtFileName
+                    SELECT strRvtFileName, pm_project_id
                     FROM dbo.tblRvtProjHealth
                     WHERE nId = ?
                 """, (health_check_id,))
@@ -131,9 +220,14 @@ class RevitNamingValidator:
                     return False
                 
                 file_name = row[0]
-                
+                project_id = row[1]
+                convention_code = self._get_project_convention_code(project_id)
+
                 # Validate naming
-                status, reason, disc_code, disc_name = self.validate_file_naming(file_name)
+                status, reason, disc_code, disc_name = self.validate_file_naming(
+                    file_name,
+                    naming_convention_code=convention_code,
+                )
                 
                 # Update record
                 cursor.execute("""
@@ -168,17 +262,21 @@ class RevitNamingValidator:
                 
                 # Get unvalidated records
                 cursor.execute("""
-                    SELECT nId, strRvtFileName
+                    SELECT nId, strRvtFileName, pm_project_id
                     FROM dbo.tblRvtProjHealth
                     WHERE validation_status IS NULL
                       AND nDeletedOn IS NULL
                 """)
-                
+
                 records = cursor.fetchall()
                 validated_count = 0
-                
-                for record_id, file_name in records:
-                    status, reason, disc_code, disc_name = self.validate_file_naming(file_name)
+
+                for record_id, file_name, project_id in records:
+                    convention_code = self._get_project_convention_code(project_id)
+                    status, reason, disc_code, disc_name = self.validate_file_naming(
+                        file_name,
+                        naming_convention_code=convention_code,
+                    )
                     
                     cursor.execute("""
                         UPDATE dbo.tblRvtProjHealth

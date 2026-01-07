@@ -481,7 +481,10 @@ BEGIN
             ) AS rn,
             i.project_name,
             i.project_id_raw,
+            i.source_issue_id,
+            i.source_project_id,
             i.status,
+            i.status_normalized,
             i.priority,
             i.priority_normalized,
             i.title,
@@ -493,14 +496,23 @@ BEGIN
             i.location_root,
             i.location_building,
             i.location_level,
+            i.phase,
+            i.building_level,
+            i.clash_level,
+            i.custom_attributes_json,
+            i.is_deleted,
+            i.project_mapped,
             COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk) AS project_sk,
             ac.issue_category_sk AS primary_category_sk,
             dc.issue_category_sk AS discipline_category_sk,
             HASHBYTES('SHA2_256',
                 CONCAT_WS('|',
                     ISNULL(i.project_id_raw, ''),
+                    ISNULL(i.source_issue_id, ''),
+                    ISNULL(i.source_project_id, ''),
                     ISNULL(CONVERT(NVARCHAR(20), COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk)), ''),
                     ISNULL(i.status, ''),
+                    ISNULL(i.status_normalized, ''),
                     ISNULL(i.priority, ''),
                     ISNULL(i.priority_normalized, ''),
                     ISNULL(i.title, ''),
@@ -513,7 +525,13 @@ BEGIN
                     ISNULL(i.location_raw, ''),
                     ISNULL(i.location_root, ''),
                     ISNULL(i.location_building, ''),
-                    ISNULL(i.location_level, '')
+                    ISNULL(i.location_level, ''),
+                    ISNULL(i.phase, ''),
+                    ISNULL(i.building_level, ''),
+                    ISNULL(i.clash_level, ''),
+                    ISNULL(i.custom_attributes_json, ''),
+                    ISNULL(CONVERT(NVARCHAR(5), i.is_deleted), ''),
+                    ISNULL(CONVERT(NVARCHAR(5), i.project_mapped), '')
                 )
             ) AS row_hash
      FROM stg.issues i
@@ -558,6 +576,9 @@ BEGIN
         assignee_sk, author_sk, created_date_sk, closed_date_sk,
         discipline_category_sk, primary_category_sk, secondary_category_sk,
         location_raw, location_root, location_building, location_level,
+        phase, building_level, clash_level, custom_attributes_json,
+        source_issue_id, source_project_id, status_normalized,
+        is_deleted, project_mapped,
         current_flag, effective_start, effective_end, record_hash, record_source
     )
     SELECT
@@ -579,6 +600,15 @@ BEGIN
         src.location_root,
         src.location_building,
         src.location_level,
+        src.phase,
+        src.building_level,
+        src.clash_level,
+        src.custom_attributes_json,
+        src.source_issue_id,
+        src.source_project_id,
+        src.status_normalized,
+        src.is_deleted,
+        src.project_mapped,
         1,
         SYSUTCDATETIME(),
         NULL,
@@ -813,6 +843,7 @@ BEGIN
            ON proc_issue.issue_id = issue.issue_bk
           AND proc_issue.source_system = issue.source_system
     WHERE issue.current_flag = 1
+      AND ISNULL(issue.is_deleted, 0) = 0
       AND existing.issue_snapshot_sk IS NULL;
 END
 GO
@@ -884,6 +915,7 @@ BEGIN
            ON existing.issue_sk = i.issue_sk
           AND existing.snapshot_date_sk = d.date_sk
     WHERE i.current_flag = 1
+      AND ISNULL(i.is_deleted, 0) = 0
       AND (i.created_date_sk IS NULL OR i.created_date_sk <= d.date_sk)
       AND existing.issue_snapshot_sk IS NULL;
 END
@@ -916,6 +948,7 @@ BEGIN
         'warehouse.usp_load_fact_issue_activity'
     FROM dim.issue issue
     WHERE issue.current_flag = 1
+      AND ISNULL(issue.is_deleted, 0) = 0
       AND issue.closed_date_sk = CONVERT(INT, FORMAT(@Today, 'yyyyMMdd'))
       AND NOT EXISTS (
             SELECT 1

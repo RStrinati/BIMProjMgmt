@@ -89,6 +89,164 @@ class DynamoBatchService:
             return scripts
         finally:
             conn.close()
+
+    def _collect_dyn_files(self, folder_path: str, recursive: bool) -> List[str]:
+        if not folder_path or not os.path.isdir(folder_path):
+            return []
+
+        dyn_files: List[str] = []
+        if recursive:
+            for root, _, files in os.walk(folder_path):
+                for name in files:
+                    if name.lower().endswith(".dyn"):
+                        dyn_files.append(os.path.join(root, name))
+        else:
+            for name in os.listdir(folder_path):
+                if name.lower().endswith(".dyn"):
+                    dyn_files.append(os.path.join(folder_path, name))
+        return dyn_files
+
+    def register_scripts_from_paths(
+        self,
+        script_paths: List[str],
+        category: str = None,
+        output_folder: str = None,
+    ) -> List[Dict]:
+        if not script_paths:
+            return []
+
+        conn = connect_to_db()
+        if not conn:
+            return []
+
+        scripts: List[Dict] = []
+        now = datetime.utcnow()
+
+        try:
+            cursor = conn.cursor()
+            for script_path in script_paths:
+                if not script_path or not script_path.lower().endswith(".dyn"):
+                    continue
+                if not os.path.isfile(script_path):
+                    continue
+
+                script_name = os.path.splitext(os.path.basename(script_path))[0]
+
+                cursor.execute(
+                    f"""
+                    SELECT {S.DynamoScripts.SCRIPT_ID},
+                           {S.DynamoScripts.SCRIPT_NAME},
+                           {S.DynamoScripts.CATEGORY},
+                           {S.DynamoScripts.OUTPUT_FOLDER},
+                           {S.DynamoScripts.IS_ACTIVE}
+                    FROM {S.DynamoScripts.TABLE}
+                    WHERE {S.DynamoScripts.SCRIPT_PATH} = ?
+                    """,
+                    (script_path,),
+                )
+                existing = cursor.fetchone()
+
+                if existing:
+                    script_id = existing[0]
+                    update_fields = [
+                        f"{S.DynamoScripts.SCRIPT_NAME} = ?",
+                        f"{S.DynamoScripts.IS_ACTIVE} = ?",
+                        f"{S.DynamoScripts.MODIFIED_DATE} = ?",
+                    ]
+                    params = [script_name, True, now]
+
+                    if category is not None:
+                        update_fields.append(f"{S.DynamoScripts.CATEGORY} = ?")
+                        params.append(category)
+                    if output_folder is not None:
+                        update_fields.append(f"{S.DynamoScripts.OUTPUT_FOLDER} = ?")
+                        params.append(output_folder)
+
+                    params.append(script_id)
+                    cursor.execute(
+                        f"""
+                        UPDATE {S.DynamoScripts.TABLE}
+                        SET {', '.join(update_fields)}
+                        WHERE {S.DynamoScripts.SCRIPT_ID} = ?
+                        """,
+                        params,
+                    )
+
+                    scripts.append({
+                        'script_id': script_id,
+                        'script_name': script_name,
+                        'script_path': script_path,
+                        'category': category if category is not None else existing[2],
+                        'output_folder': output_folder if output_folder is not None else existing[3],
+                        'is_active': True,
+                    })
+                else:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO {S.DynamoScripts.TABLE} (
+                            {S.DynamoScripts.SCRIPT_NAME},
+                            {S.DynamoScripts.SCRIPT_PATH},
+                            {S.DynamoScripts.DESCRIPTION},
+                            {S.DynamoScripts.CATEGORY},
+                            {S.DynamoScripts.OUTPUT_FOLDER},
+                            {S.DynamoScripts.IS_ACTIVE},
+                            {S.DynamoScripts.CREATED_DATE},
+                            {S.DynamoScripts.MODIFIED_DATE}
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            script_name,
+                            script_path,
+                            None,
+                            category,
+                            output_folder,
+                            True,
+                            now,
+                            now,
+                        ),
+                    )
+
+                    script_id = cursor.execute("SELECT SCOPE_IDENTITY()").fetchone()[0]
+                    scripts.append({
+                        'script_id': int(script_id),
+                        'script_name': script_name,
+                        'script_path': script_path,
+                        'category': category,
+                        'output_folder': output_folder,
+                        'is_active': True,
+                    })
+
+            conn.commit()
+            return scripts
+        except Exception as exc:
+            logger.error(f"Error registering Dynamo scripts: {exc}")
+            conn.rollback()
+            return []
+        finally:
+            conn.close()
+
+    def register_scripts_from_folder(
+        self,
+        folder_path: str,
+        recursive: bool = True,
+        category: str = None,
+        output_folder: str = None,
+    ) -> List[Dict]:
+        """
+        Register Dynamo scripts from a folder into the script library.
+
+        Args:
+            folder_path: Folder containing .dyn scripts
+            recursive: Walk subfolders when True
+            category: Optional category to apply to new scripts
+            output_folder: Optional output folder to apply to new scripts
+
+        Returns:
+            List of registered script dictionaries
+        """
+        dyn_files = self._collect_dyn_files(folder_path, recursive)
+        return self.register_scripts_from_paths(dyn_files, category=category, output_folder=output_folder)
     
     def create_job(self, job_name: str, script_id: int, file_paths: List[str],
                    project_id: int = None, created_by: int = None,

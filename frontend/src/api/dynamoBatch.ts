@@ -67,6 +67,27 @@ export interface CreateJobRequest {
   configuration?: JobConfiguration;
 }
 
+export interface ImportScriptsRequest {
+  folder_path: string;
+  recursive?: boolean;
+  category?: string;
+  output_folder?: string;
+}
+
+export interface ImportScriptsResult {
+  success: boolean;
+  folder_path?: string;
+  count?: number;
+  scripts?: DynamoScript[];
+  error?: string;
+}
+
+export interface ImportScriptsFilesRequest {
+  file_paths: string[];
+  category?: string;
+  output_folder?: string;
+}
+
 export const dynamoBatchApi = {
   /**
    * Get available Dynamo scripts
@@ -142,5 +163,27 @@ export const dynamoBatchApi = {
       `${API_BASE_URL}/projects/${projectId}/revit-files`
     );
     return response.data.files;
+  },
+
+  /**
+   * Register Dynamo scripts from a folder
+   */
+  importScriptsFromFolder: async (request: ImportScriptsRequest): Promise<ImportScriptsResult> => {
+    const response = await axios.post<ImportScriptsResult>(
+      `${API_BASE_URL}/dynamo/scripts/import-folder`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Register Dynamo scripts from file paths
+   */
+  importScriptsFromFiles: async (request: ImportScriptsFilesRequest): Promise<ImportScriptsResult> => {
+    const response = await axios.post<ImportScriptsResult>(
+      `${API_BASE_URL}/dynamo/scripts/import-files`,
+      request
+    );
+    return response.data;
   },
 };
