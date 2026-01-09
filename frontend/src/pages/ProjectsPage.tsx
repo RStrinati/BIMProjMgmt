@@ -172,6 +172,12 @@ export function ProjectsPage() {
     );
   };
 
+  const normalizeFilterValue = (value?: string | null) => (value ?? '').trim().toLowerCase();
+  const normalizedStatusFilters = statusFilters.map(normalizeFilterValue);
+  const normalizedTypeFilters = typeFilters.map(normalizeFilterValue);
+  const normalizedManagerFilters = managerFilters.map(normalizeFilterValue);
+  const normalizedClientFilters = clientFilters.map(normalizeFilterValue);
+
   // Filter projects based on search and chips
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -192,15 +198,14 @@ export function ProjectsPage() {
       }
     }
 
-    const status = (project.status || '').toString();
-    const type = (project.project_type || '').toString();
-    const manager = (project.project_manager || '').toString();
-    const client = (project.client_name || '').toString();
-
-    if (statusFilters.length && !statusFilters.includes(status)) return false;
-    if (typeFilters.length && !typeFilters.includes(type)) return false;
-    if (managerFilters.length && !managerFilters.includes(manager)) return false;
-    if (clientFilters.length && !clientFilters.includes(client)) return false;
+    const status = normalizeFilterValue(project.status?.toString());
+    const type = normalizeFilterValue(project.project_type?.toString());
+    const manager = normalizeFilterValue(project.project_manager?.toString());
+    const client = normalizeFilterValue(project.client_name?.toString());
+    if (normalizedStatusFilters.length && !normalizedStatusFilters.includes(status)) return false;
+    if (normalizedTypeFilters.length && !normalizedTypeFilters.includes(type)) return false;
+    if (normalizedManagerFilters.length && !normalizedManagerFilters.includes(manager)) return false;
+    if (normalizedClientFilters.length && !normalizedClientFilters.includes(client)) return false;
 
     return true;
   });

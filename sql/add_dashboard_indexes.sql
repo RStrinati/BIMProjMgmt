@@ -39,6 +39,42 @@ GO
 
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
+    WHERE name = 'ix_fact_issue_snapshot_trends' AND object_id = OBJECT_ID('fact.issue_snapshot')
+)
+CREATE NONCLUSTERED INDEX ix_fact_issue_snapshot_trends
+    ON fact.issue_snapshot (snapshot_date_sk, project_sk, client_sk, project_type_sk)
+    INCLUDE (is_open, is_closed, backlog_age_days, resolution_days, urgency_score, sentiment_score);
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = 'ix_dim_project_bk' AND object_id = OBJECT_ID('dim.project')
+)
+CREATE NONCLUSTERED INDEX ix_dim_project_bk
+    ON dim.project (project_bk)
+    INCLUDE (project_sk, current_flag);
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = 'ix_dim_client_bk' AND object_id = OBJECT_ID('dim.client')
+)
+CREATE NONCLUSTERED INDEX ix_dim_client_bk
+    ON dim.client (client_bk)
+    INCLUDE (client_sk);
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = 'ix_dim_project_type_bk' AND object_id = OBJECT_ID('dim.project_type')
+)
+CREATE NONCLUSTERED INDEX ix_dim_project_type_bk
+    ON dim.project_type (project_type_bk)
+    INCLUDE (project_type_sk);
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
     WHERE name = 'ix_ctl_data_quality_run' AND object_id = OBJECT_ID('ctl.data_quality_result')
 )
 CREATE NONCLUSTERED INDEX ix_ctl_data_quality_run

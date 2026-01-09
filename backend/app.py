@@ -5,15 +5,18 @@ import os
 import re
 import sys
 import subprocess
+from typing import Any, Optional
 from pathlib import Path
 from datetime import date, datetime
 from decimal import Decimal
+from logging.handlers import RotatingFileHandler
+from time import perf_counter
 
 # Add parent directory to path FIRST so we can import config and database
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 
@@ -62,6 +65,8 @@ from database import (  # noqa: E402
     get_dashboard_issues_table,
     get_revit_health_dashboard_summary,
     get_naming_compliance_dashboard_metrics,
+    get_grid_alignment_dashboard,
+    get_level_alignment_dashboard,
     revalidate_revit_naming,
     get_client_by_id,
     get_clients_detailed,
@@ -154,6 +159,35 @@ def _parse_id_list(param_name: str) -> list[int]:
         except ValueError:
             continue
     return ids
+
+
+def _parse_dashboard_filters() -> dict:
+    """Parse common dashboard filter params with consistent keys."""
+    return {
+        "project_ids": _parse_id_list("project_ids") or None,
+        "client_ids": _parse_id_list("client_ids") or None,
+        "type_ids": _parse_id_list("type_ids") or None,
+        "discipline": request.args.get("discipline") or None,
+        "status": request.args.get("status") or None,
+        "priority": request.args.get("priority") or None,
+        "zone": request.args.get("zone") or None,
+        "location": request.args.get("location") or None,
+        "manager": request.args.get("manager") or None,
+    }
+
+
+def _with_dashboard_meta(payload: Any, filters: dict, as_of: Optional[str] = None) -> Any:
+    """Attach filters/as_of metadata to dashboard responses without altering items."""
+    if isinstance(payload, dict):
+        result = dict(payload)
+    else:
+        result = {"items": payload}
+    result["filters"] = filters
+    if as_of is not None:
+        result["as_of"] = as_of
+    elif isinstance(payload, dict) and payload.get("as_of"):
+        result["as_of"] = payload.get("as_of")
+    return result
 
 def _find_revizto_exporter():
     """Locate the Revizto exporter executable and return (path, searched_paths)."""
@@ -251,10 +285,130 @@ class CustomJSONProvider(DefaultJSONProvider):
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "service_templates.json"
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+_APP_LOG_FILE = LOG_DIR / "app.log"
+_WAREHOUSE_LOG_FILE = LOG_DIR / "warehouse.log"
+_FRONTEND_LOG_FILE = LOG_DIR / "frontend.log"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.json = CustomJSONProvider(app)
 
+_formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+_root_logger = logging.getLogger()
+_root_logger.setLevel(logging.INFO)
+if not any(
+    isinstance(handler, RotatingFileHandler)
+    and getattr(handler, "baseFilename", "") == str(_APP_LOG_FILE)
+    for handler in _root_logger.handlers
+):
+    _file_handler = RotatingFileHandler(
+        str(_APP_LOG_FILE),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    _file_handler.setFormatter(_formatter)
+    _file_handler.setLevel(logging.INFO)
+    _root_logger.addHandler(_file_handler)
+
 CONTROL_MODEL_TARGETS = ('naming', 'coordinates', 'levels')
+
+
+class _WarehouseMetricsFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except Exception:
+            return False
+        return message.startswith("warehouse metrics:")
+
+
+_warehouse_logger = logging.getLogger("database")
+if not getattr(_warehouse_logger, "_warehouse_handler_added", False):
+    _warehouse_handler = logging.StreamHandler()
+    _warehouse_handler.setLevel(logging.INFO)
+    _warehouse_handler.addFilter(_WarehouseMetricsFilter())
+    _warehouse_logger.addHandler(_warehouse_handler)
+    _warehouse_file_handler = RotatingFileHandler(
+        str(_WAREHOUSE_LOG_FILE),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    _warehouse_file_handler.setLevel(logging.INFO)
+    _warehouse_file_handler.setFormatter(_formatter)
+    _warehouse_file_handler.addFilter(_WarehouseMetricsFilter())
+    _warehouse_logger.addHandler(_warehouse_file_handler)
+    _warehouse_logger.setLevel(logging.INFO)
+    _warehouse_logger.propagate = False
+    _warehouse_logger._warehouse_handler_added = True
+
+_frontend_logger = logging.getLogger("frontend")
+if not getattr(_frontend_logger, "_frontend_handler_added", False):
+    _frontend_handler = RotatingFileHandler(
+        str(_FRONTEND_LOG_FILE),
+        maxBytes=5 * 1024 * 1024,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    _frontend_handler.setLevel(logging.DEBUG)
+    _frontend_handler.setFormatter(_formatter)
+    _frontend_logger.addHandler(_frontend_handler)
+    _frontend_logger.setLevel(logging.DEBUG)
+    _frontend_logger.propagate = False
+    _frontend_logger._frontend_handler_added = True
+
+
+@app.before_request
+def _log_request_start() -> None:
+    g._request_start = perf_counter()
+    logging.info("request start %s %s", request.method, request.full_path)
+
+
+@app.after_request
+def _log_request_end(response):
+    start = getattr(g, "_request_start", None)
+    if start is not None:
+        duration_ms = (perf_counter() - start) * 1000
+        logging.info(
+            "request end %s %s status=%s duration_ms=%.2f",
+            request.method,
+            request.full_path,
+            response.status_code,
+            duration_ms,
+        )
+    else:
+        logging.info(
+            "request end %s %s status=%s",
+            request.method,
+            request.full_path,
+            response.status_code,
+        )
+    return response
+
+@app.route('/api/logs/frontend', methods=['POST'])
+def api_log_frontend_event():
+    """Store structured frontend telemetry so it can be inspected later."""
+    payload = request.get_json(silent=True)
+    if not payload:
+        return "", 204
+
+    level = payload.get("level", "info").lower()
+    message = payload.get("message", "frontend log")
+    context = payload.get("context")
+
+    log_level = logging.INFO
+    if level == "debug":
+        log_level = logging.DEBUG
+    elif level == "warning":
+        log_level = logging.WARNING
+    elif level == "error":
+        log_level = logging.ERROR
+    elif level == "critical":
+        log_level = logging.CRITICAL
+
+    _frontend_logger.log(log_level, message, extra={"context": context})
+    return "", 204
 
 
 def _serialize_datetime(value):
@@ -2347,7 +2501,8 @@ def api_dashboard_stats():
             'completed_tasks': 0,  # This would require task counting logic
         }
         
-        return jsonify(stats)
+        filters = _parse_dashboard_filters()
+        return jsonify(_with_dashboard_meta(stats, filters))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2356,15 +2511,13 @@ def api_dashboard_stats():
 def api_dashboard_warehouse_metrics():
     """Expose curated warehouse metrics for the dashboard."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        client_ids = _parse_id_list("client_ids")
-        type_ids = _parse_id_list("type_ids")
+        filters = _parse_dashboard_filters()
         metrics = get_warehouse_dashboard_metrics(
-            project_ids=project_ids or None,
-            client_ids=client_ids or None,
-            project_type_ids=type_ids or None,
+            project_ids=filters["project_ids"],
+            client_ids=filters["client_ids"],
+            project_type_ids=filters["type_ids"],
         )
-        return jsonify(metrics)
+        return jsonify(_with_dashboard_meta(metrics, filters))
     except Exception as e:
         logging.exception("Error fetching warehouse dashboard metrics")
         return jsonify({'error': 'Failed to fetch warehouse metrics', 'details': str(e)}), 500
@@ -2374,9 +2527,15 @@ def api_dashboard_warehouse_metrics():
 def api_dashboard_issues_history():
     """Return historical issue counts by status (weekly) with optional project filter."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        history = get_warehouse_issues_history(project_ids=project_ids or None)
-        return jsonify(history)
+        filters = _parse_dashboard_filters()
+        history = get_warehouse_issues_history(
+            project_ids=filters["project_ids"],
+            status=filters["status"],
+            priority=filters["priority"],
+            discipline=filters["discipline"],
+            zone=filters["zone"],
+        )
+        return jsonify(_with_dashboard_meta(history, filters))
     except Exception as e:
         logging.exception("Error fetching issues history")
         return jsonify({'error': 'Failed to fetch issues history', 'details': str(e)}), 500
@@ -2386,9 +2545,15 @@ def api_dashboard_issues_history():
 def api_dashboard_issues_kpis():
     """Return KPI totals for the Issues dashboard section."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        data = get_dashboard_issues_kpis(project_ids=project_ids or None)
-        return jsonify(data)
+        filters = _parse_dashboard_filters()
+        data = get_dashboard_issues_kpis(
+            project_ids=filters["project_ids"],
+            status=filters["status"],
+            priority=filters["priority"],
+            discipline=filters["discipline"],
+            zone=filters["zone"],
+        )
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching issues KPIs")
         return jsonify({'error': 'Failed to fetch issues KPIs', 'details': str(e)}), 500
@@ -2398,9 +2563,15 @@ def api_dashboard_issues_kpis():
 def api_dashboard_issues_charts():
     """Return chart-ready groupings for the Issues dashboard section."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        data = get_dashboard_issues_charts(project_ids=project_ids or None)
-        return jsonify(data)
+        filters = _parse_dashboard_filters()
+        data = get_dashboard_issues_charts(
+            project_ids=filters["project_ids"],
+            status=filters["status"],
+            priority=filters["priority"],
+            discipline=filters["discipline"],
+            zone=filters["zone"],
+        )
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching issues charts")
         return jsonify({'error': 'Failed to fetch issues charts', 'details': str(e)}), 500
@@ -2410,27 +2581,23 @@ def api_dashboard_issues_charts():
 def api_dashboard_issues_table():
     """Return paginated issues rows for dashboard drill-down."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        status = request.args.get("status")
-        priority = request.args.get("priority")
-        discipline = request.args.get("discipline")
-        zone = request.args.get("zone")
+        filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "created_at")
         sort_dir = request.args.get("sort_dir", "desc")
         data = get_dashboard_issues_table(
-            project_ids=project_ids or None,
-            status=status or None,
-            priority=priority or None,
-            discipline=discipline or None,
-            zone=zone or None,
+            project_ids=filters["project_ids"],
+            status=filters["status"],
+            priority=filters["priority"],
+            discipline=filters["discipline"],
+            zone=filters["zone"],
             page=page,
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching issues table")
         return jsonify({'error': 'Failed to fetch issues table', 'details': str(e)}), 500
@@ -2440,13 +2607,12 @@ def api_dashboard_issues_table():
 def api_dashboard_revit_health():
     """Return aggregated Revit model health metrics for the dashboard."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         metrics = get_revit_health_dashboard_summary(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
         )
-        return jsonify(metrics)
+        return jsonify(_with_dashboard_meta(metrics, filters))
     except Exception as e:
         logging.exception("Error fetching Revit health dashboard metrics")
         return jsonify({'error': 'Failed to fetch Revit health metrics', 'details': str(e)}), 500
@@ -2456,13 +2622,12 @@ def api_dashboard_revit_health():
 def api_dashboard_naming_compliance():
     """Return file naming compliance metrics for the dashboard."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         metrics = get_naming_compliance_dashboard_metrics(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
         )
-        return jsonify(metrics)
+        return jsonify(_with_dashboard_meta(metrics, filters))
     except Exception as e:
         logging.exception("Error fetching naming compliance metrics")
         return jsonify({'error': 'Failed to fetch naming compliance', 'details': str(e)}), 500
@@ -2472,21 +2637,20 @@ def api_dashboard_naming_compliance():
 def api_dashboard_naming_compliance_table():
     """Paginated naming compliance rows."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "validated_date")
         sort_dir = request.args.get("sort_dir", "desc")
         data = get_naming_compliance_table(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
             page=page,
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching naming compliance table")
         return jsonify({'error': 'Failed to fetch naming compliance table', 'details': str(e)}), 500
@@ -2496,21 +2660,20 @@ def api_dashboard_naming_compliance_table():
 def api_dashboard_control_points():
     """Control/Survey point compliance rows + project summary."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "validated_date")
         sort_dir = request.args.get("sort_dir", "desc")
         data = get_control_points_dashboard(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
             page=page,
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching control points dashboard")
         return jsonify({'error': 'Failed to fetch control points', 'details': str(e)}), 500
@@ -2520,45 +2683,91 @@ def api_dashboard_control_points():
 def api_dashboard_coordinate_alignment():
     """Coordinate alignment tables for control/model base and survey points."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "model_file_name")
         sort_dir = request.args.get("sort_dir", "asc")
         data = get_coordinate_alignment_dashboard(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
             page=page,
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching coordinate alignment dashboard")
         return jsonify({'error': 'Failed to fetch coordinate alignment', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/health/grids', methods=['GET'])
+def api_dashboard_health_grids():
+    """Grid alignment rows based on control model baseline."""
+    try:
+        filters = _parse_dashboard_filters()
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "project_name")
+        sort_dir = request.args.get("sort_dir", "asc")
+        data = get_grid_alignment_dashboard(
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(_with_dashboard_meta(data, filters))
+    except Exception as e:
+        logging.exception("Error fetching grid alignment dashboard")
+        return jsonify({'error': 'Failed to fetch grid alignment', 'details': str(e)}), 500
+
+
+@app.route('/api/dashboard/health/levels', methods=['GET'])
+def api_dashboard_health_levels():
+    """Level alignment rows based on control model baseline."""
+    try:
+        filters = _parse_dashboard_filters()
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 50))
+        sort_by = request.args.get("sort_by", "project_name")
+        sort_dir = request.args.get("sort_dir", "asc")
+        tolerance_mm = float(request.args.get("tolerance_mm", 5.0))
+        data = get_level_alignment_dashboard(
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
+            tolerance_mm=tolerance_mm,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        return jsonify(_with_dashboard_meta(data, filters))
+    except Exception as e:
+        logging.exception("Error fetching level alignment dashboard")
+        return jsonify({'error': 'Failed to fetch level alignment', 'details': str(e)}), 500
 
 
 @app.route('/api/dashboard/model-register', methods=['GET'])
 def api_dashboard_model_register():
     """Model register (Revit-derived) paginated."""
     try:
-        project_ids = _parse_id_list("project_ids")
-        discipline = request.args.get("discipline")
+        filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "last_seen_at")
         sort_dir = request.args.get("sort_dir", "desc")
         data = get_model_register(
-            project_ids=project_ids or None,
-            discipline=discipline or None,
+            project_ids=filters["project_ids"],
+            discipline=filters["discipline"],
             page=page,
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching model register")
         return jsonify({'error': 'Failed to fetch model register', 'details': str(e)}), 500
@@ -2568,6 +2777,7 @@ def api_dashboard_model_register():
 def api_dashboard_issues_detail():
     """Revizto issues detail with latest comment."""
     try:
+        filters = _parse_dashboard_filters()
         project_uuid = request.args.get("project_uuid")
         status = request.args.get("status")
         priority = request.args.get("priority")
@@ -2586,7 +2796,7 @@ def api_dashboard_issues_detail():
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
-        return jsonify(data)
+        return jsonify(_with_dashboard_meta(data, filters))
     except Exception as e:
         logging.exception("Error fetching issues detail")
         return jsonify({'error': 'Failed to fetch issues detail', 'details': str(e)}), 500
@@ -4508,13 +4718,21 @@ def api_get_dashboard_timeline():
     """Get aggregated project timeline data for the dashboard."""
     try:
         from database import get_dashboard_timeline
+        filters = _parse_dashboard_filters()
         months = request.args.get('months', type=int)
-        timeline_data = get_dashboard_timeline(months=months)
-        return jsonify(timeline_data)
+        timeline_data = get_dashboard_timeline(
+            months=months,
+            project_ids=filters["project_ids"],
+            client_ids=filters["client_ids"],
+            type_ids=filters["type_ids"],
+            manager=filters["manager"],
+        )
+        return jsonify(_with_dashboard_meta(timeline_data, filters))
     except Exception as e:
         logging.exception("Error fetching dashboard timeline data")
         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    threaded = os.getenv("FLASK_THREADED", "1") == "1"
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=threaded)

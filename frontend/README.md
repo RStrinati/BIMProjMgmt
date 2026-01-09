@@ -98,6 +98,7 @@ server: {
 ```
 
 All API calls are made through the centralized API client in `src/api/`.
+If `VITE_API_BASE_URL` is set (see `.env.local`), it overrides the proxy and uses the absolute URL.
 
 ## 🎨 Theme Customization
 

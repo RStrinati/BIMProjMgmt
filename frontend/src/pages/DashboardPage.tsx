@@ -33,8 +33,9 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
+  LabelList,
+  Area,
+  AreaChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -56,6 +57,8 @@ import type {
   DashboardIssuesCharts,
   DashboardIssuesTable,
   CoordinateAlignmentDashboard,
+  GridAlignmentDashboard,
+  LevelAlignmentDashboard,
 } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
 import { useNavigate } from 'react-router-dom';
@@ -63,6 +66,15 @@ import { chartColorSchemes } from '@/components/dashboards/themes';
 
 const EMPTY_PROJECTS: DashboardTimelineProject[] = [];
 const TIMELINE_WINDOW_MONTHS = 12;
+const DASHBOARD_STALE_MS = 10 * 60 * 1000;
+const DASHBOARD_GC_MS = 60 * 60 * 1000;
+const DASHBOARD_QUERY_DEFAULTS = {
+  staleTime: DASHBOARD_STALE_MS,
+  gcTime: DASHBOARD_GC_MS,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+  refetchOnMount: false,
+};
 
 type SavedView = {
   name: string;
@@ -209,16 +221,6 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const {
-    data: timelineData,
-    isLoading: isTimelineLoading,
-    refetch: refetchTimeline,
-    dataUpdatedAt: timelineUpdatedAt,
-  } = useQuery({
-    queryKey: ['dashboard', 'timeline', TIMELINE_WINDOW_MONTHS],
-    queryFn: () => projectsApi.getTimeline({ months: TIMELINE_WINDOW_MONTHS }),
-  });
-
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
     try {
       const stored = localStorage.getItem('dashboard_saved_views');
@@ -234,6 +236,26 @@ export function DashboardPage() {
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [isFiltering, startFiltering] = useTransition();
   const [dashboardTab, setDashboardTab] = useState(0);
+  const [healthTab, setHealthTab] = useState(0);
+
+  const {
+    data: timelineData,
+    isLoading: isTimelineLoading,
+    isError: isTimelineError,
+    error: timelineError,
+    refetch: refetchTimeline,
+    dataUpdatedAt: timelineUpdatedAt,
+  } = useQuery({
+    queryKey: ['dashboard', 'timeline', TIMELINE_WINDOW_MONTHS, selectedProjects, selectedManager],
+    queryFn: () =>
+      projectsApi.getTimeline({
+        months: TIMELINE_WINDOW_MONTHS,
+        projectIds: selectedProjects.length ? selectedProjects : undefined,
+        manager: selectedManager !== 'all' ? selectedManager : undefined,
+      }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
+  });
 
   const timelineProjects = timelineData?.projects ?? EMPTY_PROJECTS;
 
@@ -280,6 +302,11 @@ export function DashboardPage() {
   const [issuePageSize, setIssuePageSize] = useState(25);
   const [coordPage, setCoordPage] = useState(1);
   const [coordPageSize, setCoordPageSize] = useState(25);
+  const [gridPage, setGridPage] = useState(1);
+  const [gridPageSize, setGridPageSize] = useState(25);
+  const [levelPage, setLevelPage] = useState(1);
+  const [levelPageSize, setLevelPageSize] = useState(25);
+  const [levelToleranceMm, setLevelToleranceMm] = useState(5);
 
   const filteredProjects = useMemo(() => {
     if (!timelineProjects.length) {
@@ -314,6 +341,14 @@ export function DashboardPage() {
     return filteredProjectIds;
   }, [filteredProjectIds, selectedProjects]);
 
+  const deferredProjectIds = useDeferredValue(targetProjectIds);
+  const deferredIssueFilters = useDeferredValue({
+    status: issueStatus,
+    priority: issuePriority,
+    discipline: issueDiscipline,
+    zone: issueZone,
+  });
+
   const deferredProjects = useDeferredValue(filteredProjects);
   const hasActiveFilters =
     selectedManager !== 'all' ||
@@ -333,6 +368,11 @@ export function DashboardPage() {
   useEffect(() => {
     setCoordPage(1);
   }, [targetProjectIds, selectedDiscipline]);
+
+  useEffect(() => {
+    setGridPage(1);
+    setLevelPage(1);
+  }, [targetProjectIds, selectedDiscipline, levelToleranceMm]);
 
   const handleSaveView = () => {
     const trimmed = viewName.trim();
@@ -385,28 +425,63 @@ export function DashboardPage() {
     refetch: refetchWarehouse,
     dataUpdatedAt: warehouseUpdatedAt,
   } = useQuery<WarehouseDashboardMetrics>({
-    queryKey: ['dashboard', 'warehouse-metrics', targetProjectIds],
+    queryKey: ['dashboard', 'warehouse-metrics', deferredProjectIds],
     queryFn: () =>
       dashboardApi.getWarehouseMetrics({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
       }),
     enabled: dashboardTab === 0,
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const { data: issuesKpis, refetch: refetchIssuesKpis } = useQuery<DashboardIssuesKpis>({
-    queryKey: ['dashboard', 'issues-kpis', targetProjectIds],
+    queryKey: [
+      'dashboard',
+      'issues-kpis',
+      deferredProjectIds,
+      deferredIssueFilters.status,
+      deferredIssueFilters.priority,
+      deferredIssueFilters.discipline,
+      deferredIssueFilters.zone,
+    ],
     queryFn: () =>
       dashboardApi.getIssuesKpis({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
+        status: deferredIssueFilters.status !== 'all' ? deferredIssueFilters.status : undefined,
+        priority: deferredIssueFilters.priority !== 'all' ? deferredIssueFilters.priority : undefined,
+        discipline: deferredIssueFilters.discipline !== 'all' ? deferredIssueFilters.discipline : undefined,
+        zone: deferredIssueFilters.zone !== 'all' ? deferredIssueFilters.zone : undefined,
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
-  const { data: issuesCharts, refetch: refetchIssuesCharts } = useQuery<DashboardIssuesCharts>({
-    queryKey: ['dashboard', 'issues-charts', targetProjectIds],
+  const {
+    data: issuesCharts,
+    isError: isIssuesChartsError,
+    error: issuesChartsError,
+    refetch: refetchIssuesCharts,
+  } = useQuery<DashboardIssuesCharts>({
+    queryKey: [
+      'dashboard',
+      'issues-charts',
+      deferredProjectIds,
+      deferredIssueFilters.status,
+      deferredIssueFilters.priority,
+      deferredIssueFilters.discipline,
+      deferredIssueFilters.zone,
+    ],
     queryFn: () =>
       dashboardApi.getIssuesCharts({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
+        status: deferredIssueFilters.status !== 'all' ? deferredIssueFilters.status : undefined,
+        priority: deferredIssueFilters.priority !== 'all' ? deferredIssueFilters.priority : undefined,
+        discipline: deferredIssueFilters.discipline !== 'all' ? deferredIssueFilters.discipline : undefined,
+        zone: deferredIssueFilters.zone !== 'all' ? deferredIssueFilters.zone : undefined,
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const {
@@ -417,42 +492,48 @@ export function DashboardPage() {
     queryKey: [
       'dashboard',
       'issues-table',
-      targetProjectIds,
-      issueStatus,
-      issuePriority,
-      issueDiscipline,
-      issueZone,
+      deferredProjectIds,
+      deferredIssueFilters.status,
+      deferredIssueFilters.priority,
+      deferredIssueFilters.discipline,
+      deferredIssueFilters.zone,
       issuePage,
       issuePageSize,
     ],
     queryFn: () =>
       dashboardApi.getIssuesTable({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
-        status: issueStatus !== 'all' ? issueStatus : undefined,
-        priority: issuePriority !== 'all' ? issuePriority : undefined,
-        discipline: issueDiscipline !== 'all' ? issueDiscipline : undefined,
-        zone: issueZone !== 'all' ? issueZone : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
+        status: deferredIssueFilters.status !== 'all' ? deferredIssueFilters.status : undefined,
+        priority: deferredIssueFilters.priority !== 'all' ? deferredIssueFilters.priority : undefined,
+        discipline: deferredIssueFilters.discipline !== 'all' ? deferredIssueFilters.discipline : undefined,
+        zone: deferredIssueFilters.zone !== 'all' ? deferredIssueFilters.zone : undefined,
         page: issuePage,
         pageSize: issuePageSize,
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const { data: revitHealthMetrics } = useQuery<RevitHealthDashboardMetrics>({
-    queryKey: ['dashboard', 'revit-health', targetProjectIds, selectedDiscipline],
+    queryKey: ['dashboard', 'revit-health', deferredProjectIds, selectedDiscipline],
     queryFn: () =>
       dashboardApi.getRevitHealthMetrics({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
         discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const { data: namingCompliance, refetch: refetchNamingCompliance } = useQuery<NamingComplianceMetrics>({
-    queryKey: ['dashboard', 'naming-compliance', targetProjectIds, selectedDiscipline],
+    queryKey: ['dashboard', 'naming-compliance', deferredProjectIds, selectedDiscipline],
     queryFn: () =>
       dashboardApi.getNamingCompliance({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
         discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const namingRevalidateMutation = useMutation({
@@ -477,26 +558,77 @@ export function DashboardPage() {
     queryKey: [
       'dashboard',
       'coordinate-alignment',
-      targetProjectIds,
+      deferredProjectIds,
       selectedDiscipline,
       coordPage,
       coordPageSize,
     ],
     queryFn: () =>
       dashboardApi.getCoordinateAlignment({
-        projectIds: targetProjectIds.length ? targetProjectIds : undefined,
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
         discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
         page: coordPage,
         pageSize: coordPageSize,
         sortBy: 'model_file_name',
         sortDir: 'asc',
       }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
+  });
+
+  const { data: gridAlignment, isLoading: isGridAlignmentLoading } = useQuery<GridAlignmentDashboard>({
+    queryKey: [
+      'dashboard',
+      'grid-alignment',
+      deferredProjectIds,
+      selectedDiscipline,
+      gridPage,
+      gridPageSize,
+    ],
+    queryFn: () =>
+      dashboardApi.getGridAlignment({
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
+        discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
+        page: gridPage,
+        pageSize: gridPageSize,
+        sortBy: 'project_name',
+        sortDir: 'asc',
+      }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
+  });
+
+  const { data: levelAlignment, isLoading: isLevelAlignmentLoading } = useQuery<LevelAlignmentDashboard>({
+    queryKey: [
+      'dashboard',
+      'level-alignment',
+      deferredProjectIds,
+      selectedDiscipline,
+      levelToleranceMm,
+      levelPage,
+      levelPageSize,
+    ],
+    queryFn: () =>
+      dashboardApi.getLevelAlignment({
+        projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
+        discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
+        toleranceMm: levelToleranceMm,
+        page: levelPage,
+        pageSize: levelPageSize,
+        sortBy: 'project_name',
+        sortDir: 'asc',
+      }),
+    ...DASHBOARD_QUERY_DEFAULTS,
+    keepPreviousData: true,
   });
 
   const warehouseMetricsErrorMessage =
     warehouseMetrics?.error ||
     (warehouseMetricsError instanceof Error ? warehouseMetricsError.message : undefined) ||
     (isWarehouseMetricsError ? 'Failed to load warehouse metrics.' : undefined);
+  const issuesChartsErrorMessage =
+    (issuesChartsError instanceof Error ? issuesChartsError.message : undefined) ||
+    (isIssuesChartsError ? 'Failed to load issue chart data.' : undefined);
   const hasWarehouseMetrics =
     !isWarehouseMetricsLoading && !isWarehouseMetricsError && !warehouseMetricsErrorMessage && Boolean(warehouseMetrics);
 
@@ -859,6 +991,22 @@ export function DashboardPage() {
         </Tabs>
 
         <TabPanel value={dashboardTab} index={0}>
+          {!hasWarehouseMetrics && !isWarehouseMetricsLoading && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                mb: 3,
+                borderRadius: 2,
+                border: (theme) => `1px solid ${theme.palette.divider}`,
+                background: (theme) => theme.palette.background.paper,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Warehouse metrics are unavailable. Timeline data may still load below.
+              </Typography>
+            </Paper>
+          )}
           {hasWarehouseMetrics && (
             <>
               <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
@@ -1074,24 +1222,41 @@ export function DashboardPage() {
             </>
           )}
 
-          {timelineProjects.length > 0 && (
-            <>
-              <Typography variant="h5" gutterBottom sx={{ mt: 4, fontWeight: 700 }}>
-                Project Timeline
-              </Typography>
-              <DashboardTimelineChart
-                projects={deferredProjects}
-                isLoading={isTimelineLoading || isFiltering}
-                hasActiveFilters={hasActiveFilters}
-              />
-            </>
+          <Typography variant="h5" gutterBottom sx={{ mt: 4, fontWeight: 700 }}>
+            Project Timeline
+          </Typography>
+          {isTimelineError && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Timeline data unavailable: {timelineError instanceof Error ? timelineError.message : 'Request failed.'}
+            </Typography>
           )}
+          <DashboardTimelineChart
+            projects={deferredProjects}
+            isLoading={isTimelineLoading || isFiltering}
+            hasActiveFilters={hasActiveFilters}
+          />
         </TabPanel>
 
         <TabPanel value={dashboardTab} index={1}>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
             Issues
           </Typography>
+          {issuesChartsErrorMessage && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                mb: 3,
+                borderRadius: 2,
+                border: (theme) => `1px solid ${theme.palette.divider}`,
+                background: (theme) => theme.palette.background.paper,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Issue charts are unavailable: {issuesChartsErrorMessage}
+              </Typography>
+            </Paper>
+          )}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6} lg={3}>
               <StatCard
@@ -1261,23 +1426,31 @@ export function DashboardPage() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography color="text.secondary" gutterBottom variant="h6">
-                      90 Day Trend
+                      90 Day Trend (Monthly)
                     </Typography>
                     {trendData.length ? (
                       <ResponsiveContainer width="100%" height={260}>
-                        <LineChart data={trendData}>
+                        <AreaChart data={trendData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(value) => (value ? new Date(value).toLocaleDateString() : '')}
+                            tickFormatter={(value) =>
+                              value ? new Date(value).toLocaleString(undefined, { month: 'short', year: '2-digit' }) : ''
+                            }
                           />
                           <YAxis allowDecimals={false} />
                           <Tooltip />
                           <Legend />
-                          <Line type="monotone" dataKey="open" stroke="#f57c00" strokeWidth={2} />
-                          <Line type="monotone" dataKey="closed" stroke="#2e7d32" strokeWidth={2} />
-                          <Line type="monotone" dataKey="total" stroke="#1976d2" strokeWidth={2} />
-                        </LineChart>
+                          <Area type="monotone" dataKey="total" stroke="#757575" fill="#bdbdbd" fillOpacity={0.45}>
+                            <LabelList dataKey="total" position="top" fontSize={10} />
+                          </Area>
+                          <Area type="monotone" dataKey="open" stroke="#f57c00" fill="#f57c00" fillOpacity={0.35}>
+                            <LabelList dataKey="open" position="top" fontSize={10} />
+                          </Area>
+                          <Area type="monotone" dataKey="closed" stroke="#2e7d32" fill="#2e7d32" fillOpacity={0.35}>
+                            <LabelList dataKey="closed" position="top" fontSize={10} />
+                          </Area>
+                        </AreaChart>
                       </ResponsiveContainer>
                     ) : (
                       <Typography variant="body2" color="text.secondary">
@@ -1455,8 +1628,20 @@ export function DashboardPage() {
         </TabPanel>
 
         <TabPanel value={dashboardTab} index={2}>
+          <Tabs
+            value={healthTab}
+            onChange={(_, value) => setHealthTab(value)}
+            sx={{ mb: 3 }}
+            variant="scrollable"
+            allowScrollButtonsMobile
+          >
+            <Tab label="File Naming" />
+            <Tab label="Coordinates" />
+            <Tab label="Grids" />
+            <Tab label="Levels" />
+          </Tabs>
 
-          {namingCompliance && (
+          {healthTab === 0 && namingCompliance && (
             <>
               <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
                 File Naming Compliance
@@ -1571,22 +1756,24 @@ export function DashboardPage() {
             </>
           )}
 
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-            Coordinate Alignment
-          </Typography>
-          {isCoordinateAlignmentLoading && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Loading coordinate alignment data...
-            </Typography>
-          )}
-          {!isCoordinateAlignmentLoading && (coordinateAlignment?.error || isCoordinateAlignmentError) && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Coordinate alignment data unavailable:{' '}
-              {coordinateAlignment?.error ||
-                (coordinateAlignmentError instanceof Error ? coordinateAlignmentError.message : 'Request failed')}
-            </Typography>
-          )}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
+          {healthTab === 1 && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Coordinate Alignment
+              </Typography>
+              {isCoordinateAlignmentLoading && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Loading coordinate alignment data...
+                </Typography>
+              )}
+              {!isCoordinateAlignmentLoading && (coordinateAlignment?.error || isCoordinateAlignmentError) && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Coordinate alignment data unavailable:{' '}
+                  {coordinateAlignment?.error ||
+                    (coordinateAlignmentError instanceof Error ? coordinateAlignmentError.message : 'Request failed')}
+                </Typography>
+              )}
+              <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
@@ -1795,7 +1982,234 @@ export function DashboardPage() {
                 </CardContent>
               </Card>
             </Grid>
-          </Grid>
+              </Grid>
+            </>
+          )}
+
+          {healthTab === 2 && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Grid Alignment
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Aligned"
+                    value={numberFormatter(revitHealthMetrics?.sections?.grids?.aligned)}
+                    helper={`Total: ${numberFormatter(revitHealthMetrics?.sections?.grids?.total)}`}
+                    color="success.main"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Slight Deviation"
+                    value={numberFormatter(revitHealthMetrics?.sections?.grids?.slight_deviation)}
+                    helper={`Not aligned: ${numberFormatter(revitHealthMetrics?.sections?.grids?.not_aligned)}`}
+                    color="warning.main"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Additional Grids"
+                    value={numberFormatter(revitHealthMetrics?.sections?.grids?.additional_grids)}
+                    helper={`Missing: ${numberFormatter(revitHealthMetrics?.sections?.grids?.missing_grids)}`}
+                    color="info.main"
+                  />
+                </Grid>
+              </Grid>
+              {isGridAlignmentLoading && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Loading grid alignment data...
+                </Typography>
+              )}
+              {gridAlignment?.error && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Grid alignment data unavailable: {gridAlignment.error}
+                </Typography>
+              )}
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom variant="h6">
+                    Grid Alignment Details
+                  </Typography>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Project</TableCell>
+                          <TableCell>Model File</TableCell>
+                          <TableCell>Control File</TableCell>
+                          <TableCell>Grid</TableCell>
+                          <TableCell>Discipline</TableCell>
+                          <TableCell align="right">Angle (deg)</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Alignment</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(gridAlignment?.items || []).map((row, idx) => (
+                          <TableRow key={`${row.pm_project_id ?? 'p'}-${row.model_file_name}-${row.grid_name}-${idx}`}>
+                            <TableCell>{row.project_name || row.source_project_name || '--'}</TableCell>
+                            <TableCell>{row.model_file_name || '--'}</TableCell>
+                            <TableCell>{row.control_file_name || '--'}</TableCell>
+                            <TableCell>{row.grid_name || '--'}</TableCell>
+                            <TableCell>{row.discipline_full_name || '--'}</TableCell>
+                            <TableCell align="right">
+                              {row.angle_degrees != null ? row.angle_degrees.toFixed(2) : '--'}
+                            </TableCell>
+                            <TableCell>{row.status_flag || '--'}</TableCell>
+                            <TableCell>{row.alignment_status || '--'}</TableCell>
+                          </TableRow>
+                        ))}
+                        {!isGridAlignmentLoading && (gridAlignment?.items || []).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={8}>
+                              <Typography variant="body2" color="text.secondary">
+                                No grid alignment rows available.
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <TablePagination
+                    component="div"
+                    count={gridAlignment?.total ?? 0}
+                    page={Math.max(gridPage - 1, 0)}
+                    onPageChange={(_, page) => setGridPage(page + 1)}
+                    rowsPerPage={gridPageSize}
+                    onRowsPerPageChange={(event) => {
+                      const next = parseInt(event.target.value, 10);
+                      setGridPageSize(Number.isNaN(next) ? 25 : next);
+                      setGridPage(1);
+                    }}
+                    rowsPerPageOptions={[10, 25, 50]}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {healthTab === 3 && (
+            <>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Level Alignment
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+                <TextField
+                  label="Tolerance (mm)"
+                  type="number"
+                  size="small"
+                  value={levelToleranceMm}
+                  onChange={(event) => {
+                    const next = parseFloat(event.target.value);
+                    setLevelToleranceMm(Number.isNaN(next) ? 5 : Math.max(next, 0));
+                  }}
+                  inputProps={{ min: 0, step: 0.5 }}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                  Alignments within tolerance are flagged as not exact.
+                </Typography>
+              </Stack>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Aligned"
+                    value={numberFormatter(revitHealthMetrics?.sections?.levels?.aligned)}
+                    helper={`Total: ${numberFormatter(revitHealthMetrics?.sections?.levels?.total)}`}
+                    color="success.main"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <StatCard
+                    title="Not Aligned"
+                    value={numberFormatter(revitHealthMetrics?.sections?.levels?.not_aligned)}
+                    color="warning.main"
+                  />
+                </Grid>
+              </Grid>
+              {isLevelAlignmentLoading && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Loading level alignment data...
+                </Typography>
+              )}
+              {levelAlignment?.error && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Level alignment data unavailable: {levelAlignment.error}
+                </Typography>
+              )}
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom variant="h6">
+                    Level Alignment Details
+                  </Typography>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Project</TableCell>
+                          <TableCell>Model File</TableCell>
+                          <TableCell>Control File</TableCell>
+                          <TableCell>Level</TableCell>
+                          <TableCell align="right">Model Elev (mm)</TableCell>
+                          <TableCell>Control Level</TableCell>
+                          <TableCell align="right">Control Elev (mm)</TableCell>
+                          <TableCell align="right">Diff (mm)</TableCell>
+                          <TableCell>Alignment</TableCell>
+                          <TableCell>Note</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(levelAlignment?.items || []).map((row, idx) => (
+                          <TableRow key={`${row.pm_project_id ?? 'p'}-${row.model_file_name}-${row.model_level_name}-${idx}`}>
+                            <TableCell>{row.project_name || row.source_project_name || '--'}</TableCell>
+                            <TableCell>{row.model_file_name || '--'}</TableCell>
+                            <TableCell>{row.control_file_name || '--'}</TableCell>
+                            <TableCell>{row.model_level_name || '--'}</TableCell>
+                            <TableCell align="right">
+                              {row.model_elevation_mm != null ? row.model_elevation_mm.toFixed(1) : '--'}
+                            </TableCell>
+                            <TableCell>{row.control_level_name || '--'}</TableCell>
+                            <TableCell align="right">
+                              {row.control_elevation_mm != null ? row.control_elevation_mm.toFixed(1) : '--'}
+                            </TableCell>
+                            <TableCell align="right">
+                              {row.elevation_diff_mm != null ? row.elevation_diff_mm.toFixed(1) : '--'}
+                            </TableCell>
+                            <TableCell>{row.alignment_status || '--'}</TableCell>
+                            <TableCell>{row.alignment_note || '--'}</TableCell>
+                          </TableRow>
+                        ))}
+                        {!isLevelAlignmentLoading && (levelAlignment?.items || []).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={10}>
+                              <Typography variant="body2" color="text.secondary">
+                                No level alignment rows available.
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <TablePagination
+                    component="div"
+                    count={levelAlignment?.total ?? 0}
+                    page={Math.max(levelPage - 1, 0)}
+                    onPageChange={(_, page) => setLevelPage(page + 1)}
+                    rowsPerPage={levelPageSize}
+                    onRowsPerPageChange={(event) => {
+                      const next = parseInt(event.target.value, 10);
+                      setLevelPageSize(Number.isNaN(next) ? 25 : next);
+                      setLevelPage(1);
+                    }}
+                    rowsPerPageOptions={[10, 25, 50]}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
 
           {revitHealthMetrics && (
             <>

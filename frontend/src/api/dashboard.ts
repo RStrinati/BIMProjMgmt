@@ -7,6 +7,9 @@ import type {
   DashboardIssuesCharts,
   DashboardIssuesTable,
   CoordinateAlignmentDashboard,
+  IssuesHistoryResponse,
+  GridAlignmentDashboard,
+  LevelAlignmentDashboard,
 } from '@/types/api';
 
 export const dashboardApi = {
@@ -27,33 +30,60 @@ export const dashboardApi = {
     return response.data;
   },
 
-  getIssuesHistory: async (options?: { projectIds?: number[] }) => {
+  getIssuesHistory: async (options?: {
+    projectIds?: number[];
+    status?: string;
+    priority?: string;
+    discipline?: string;
+    zone?: string;
+  }): Promise<IssuesHistoryResponse> => {
     const params: Record<string, string> = {};
     if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.status) params.status = options.status;
+    if (options?.priority) params.priority = options.priority;
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.zone) params.zone = options.zone;
     const response = await apiClient.get('/dashboard/issues-history', {
       params: Object.keys(params).length ? params : undefined,
     });
-    return response.data as {
-      week_start: string | null;
-      status: string;
-      count: number;
-    }[];
+    return response.data;
   },
 
-  getIssuesKpis: async (options?: { projectIds?: number[] }): Promise<DashboardIssuesKpis> => {
+  getIssuesKpis: async (options?: {
+    projectIds?: number[];
+    status?: string;
+    priority?: string;
+    discipline?: string;
+    zone?: string;
+  }): Promise<DashboardIssuesKpis> => {
     const params: Record<string, string> = {};
     if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.status) params.status = options.status;
+    if (options?.priority) params.priority = options.priority;
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.zone) params.zone = options.zone;
     const response = await apiClient.get<DashboardIssuesKpis>('/dashboard/issues-kpis', {
       params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
   },
 
-  getIssuesCharts: async (options?: { projectIds?: number[] }): Promise<DashboardIssuesCharts> => {
+  getIssuesCharts: async (options?: {
+    projectIds?: number[];
+    status?: string;
+    priority?: string;
+    discipline?: string;
+    zone?: string;
+  }): Promise<DashboardIssuesCharts> => {
     const params: Record<string, string> = {};
     if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.status) params.status = options.status;
+    if (options?.priority) params.priority = options.priority;
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.zone) params.zone = options.zone;
     const response = await apiClient.get<DashboardIssuesCharts>('/dashboard/issues-charts', {
       params: Object.keys(params).length ? params : undefined,
+      timeout: 30000,
     });
     return response.data;
   },
@@ -123,6 +153,54 @@ export const dashboardApi = {
     if (options?.sortDir) params.sort_dir = options.sortDir;
 
     const response = await apiClient.get<CoordinateAlignmentDashboard>('/dashboard/coordinate-alignment', {
+      params: Object.keys(params).length ? params : undefined,
+      timeout: 30000,
+    });
+    return response.data;
+  },
+
+  getGridAlignment: async (options?: {
+    projectIds?: number[];
+    discipline?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<GridAlignmentDashboard> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+
+    const response = await apiClient.get<GridAlignmentDashboard>('/dashboard/health/grids', {
+      params: Object.keys(params).length ? params : undefined,
+      timeout: 30000,
+    });
+    return response.data;
+  },
+
+  getLevelAlignment: async (options?: {
+    projectIds?: number[];
+    discipline?: string;
+    toleranceMm?: number;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<LevelAlignmentDashboard> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.toleranceMm != null) params.tolerance_mm = String(options.toleranceMm);
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+
+    const response = await apiClient.get<LevelAlignmentDashboard>('/dashboard/health/levels', {
       params: Object.keys(params).length ? params : undefined,
       timeout: 30000,
     });

@@ -62,9 +62,21 @@ export const projectsApi = {
   },
 
   // Get timeline data for dashboard
-  getTimeline: async (options?: { months?: number }): Promise<DashboardTimelineResponse> => {
+  getTimeline: async (options?: {
+    months?: number;
+    projectIds?: number[];
+    clientIds?: number[];
+    typeIds?: number[];
+    manager?: string;
+  }): Promise<DashboardTimelineResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.months != null) params.months = String(options.months);
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.clientIds?.length) params.client_ids = options.clientIds.join(',');
+    if (options?.typeIds?.length) params.type_ids = options.typeIds.join(',');
+    if (options?.manager) params.manager = options.manager;
     const response = await apiClient.get<DashboardTimelineResponse>('/dashboard/timeline', {
-      params: options,
+      params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
   },

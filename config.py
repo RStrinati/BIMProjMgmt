@@ -12,7 +12,8 @@ except ModuleNotFoundError:
 class Config:
     # SQL Server DB config
     DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
-    DB_SERVER = os.getenv("DB_SERVER", r"np:\\.\pipe\MSSQL$SQLEXPRESS\sql\query")
+    # Default to local SQLEXPRESS via shared memory; override with DB_SERVER as needed.
+    DB_SERVER = os.getenv("DB_SERVER", r".\SQLEXPRESS")
     DB_USER = os.getenv("DB_USER", "admin02")
     DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
 

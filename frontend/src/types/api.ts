@@ -72,6 +72,18 @@ export interface DashboardTimelineReviewItem {
   service_name?: string | null;
 }
 
+export interface DashboardFilters {
+  project_ids?: number[] | null;
+  client_ids?: number[] | null;
+  type_ids?: number[] | null;
+  discipline?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  zone?: string | null;
+  location?: string | null;
+  manager?: string | null;
+}
+
 export interface DashboardTimelineProject {
   project_id: number;
   project_name: string;
@@ -91,6 +103,8 @@ export interface DashboardTimelineResponse {
     min: string;
     max: string;
   } | null;
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface WarehouseDashboardMetrics {
@@ -157,6 +171,8 @@ export interface WarehouseDashboardMetrics {
     checks_failed_medium?: number;
   };
   error?: string;
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface RevitHealthDashboardMetrics {
@@ -212,6 +228,33 @@ export interface RevitHealthDashboardMetrics {
     export_datetime: string | null;
   }>;
   error?: string;
+  filters?: DashboardFilters;
+  as_of?: string | null;
+  sections?: {
+    file_naming?: NamingComplianceMetrics;
+    coordinates?: {
+      total: number;
+      compliant: number;
+      non_compliant: number;
+      missing_control: number;
+      as_of?: string | null;
+    };
+    grids?: {
+      total: number;
+      aligned: number;
+      slight_deviation: number;
+      not_aligned: number;
+      additional_grids: number;
+      missing_grids: number;
+      as_of?: string | null;
+    };
+    levels?: {
+      total: number;
+      aligned: number;
+      not_aligned: number;
+      as_of?: string | null;
+    };
+  };
 }
 
 export interface NamingComplianceMetrics {
@@ -242,6 +285,8 @@ export interface NamingComplianceMetrics {
     validated_date: string | null;
   }>;
   error?: string;
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface IssueHistoryPoint {
@@ -250,11 +295,19 @@ export interface IssueHistoryPoint {
   count: number;
 }
 
+export interface IssuesHistoryResponse {
+  items: IssueHistoryPoint[];
+  filters?: DashboardFilters;
+  as_of?: string | null;
+}
+
 export interface DashboardIssuesKpis {
   total_issues: number;
   active_issues: number;
   over_30_days: number;
   closed_since_review: number;
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface DashboardIssueChartSlice {
@@ -273,6 +326,8 @@ export interface DashboardIssuesCharts {
     closed: number;
     total: number;
   }>;
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface DashboardIssuesTableRow {
@@ -297,6 +352,8 @@ export interface DashboardIssuesTable {
   page_size: number;
   total_count: number;
   rows: DashboardIssuesTableRow[];
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface CoordinateAlignmentControlPointRow {
@@ -346,6 +403,61 @@ export interface CoordinateAlignmentDashboard {
   total: number;
   page: number;
   page_size: number;
+  error?: string;
+  filters?: DashboardFilters;
+  as_of?: string | null;
+}
+
+export interface GridAlignmentRow {
+  pm_project_id: number | null;
+  project_name: string | null;
+  source_project_name: string | null;
+  model_file_name: string | null;
+  control_file_name: string | null;
+  grid_name: string | null;
+  discipline_full_name: string | null;
+  model_exported_date: string | null;
+  control_exported_date: string | null;
+  angle_degrees: number | null;
+  alignment_status: string | null;
+  status_flag: string | null;
+  description: string | null;
+}
+
+export interface GridAlignmentDashboard {
+  items: GridAlignmentRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  as_of?: string | null;
+  filters?: DashboardFilters;
+  error?: string;
+}
+
+export interface LevelAlignmentRow {
+  pm_project_id: number | null;
+  project_name: string | null;
+  source_project_name: string | null;
+  discipline_full_name: string | null;
+  model_file_name: string | null;
+  control_file_name: string | null;
+  model_level_name: string | null;
+  model_elevation_mm: number | null;
+  control_level_name: string | null;
+  control_elevation_mm: number | null;
+  elevation_diff_mm: number | null;
+  alignment_status: string | null;
+  alignment_note: string | null;
+}
+
+export interface LevelAlignmentDashboard {
+  items: LevelAlignmentRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  tolerance_mm: number;
+  as_of?: string | null;
+  filters?: DashboardFilters;
   error?: string;
 }
 

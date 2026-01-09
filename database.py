@@ -3,7 +3,7 @@ def create_service_template(template_name, description, service_type, parameters
     try:
         if parameters is not None and not isinstance(parameters, str):
             parameters = json.dumps(parameters)
-        with get_db_connection() as conn:
+        with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"""
@@ -1288,9 +1288,13 @@ import json
 import pyodbc
 import os
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta, date, time
 from typing import Any, Dict, List, Optional, Tuple
+from time import time, perf_counter
+import threading
+from dataclasses import dataclass, field
 
 from config import Config
 import logging
@@ -1298,6 +1302,81 @@ from constants import schema as S
 from database_pool import get_db_connection, connect_to_db  # Import both for gradual migration
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _WarehouseMetricsCacheEntry:
+    data: Optional[Dict[str, Any]] = None
+    expires_at: float = 0.0
+    last_updated: float = 0.0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+_WAREHOUSE_METRICS_CACHE: Dict[tuple, _WarehouseMetricsCacheEntry] = {}
+_WAREHOUSE_METRICS_CACHE_LOCK = threading.Lock()
+_WAREHOUSE_METRICS_CACHE_TTL_SECONDS = 300
+_WAREHOUSE_METRICS_CACHE_MAX_ENTRIES = int(os.getenv("WAREHOUSE_METRICS_CACHE_MAX_ENTRIES", "64"))
+_WAREHOUSE_ISSUE_TRENDS_DAYS = int(os.getenv("WAREHOUSE_ISSUE_TRENDS_DAYS", "60"))
+_WAREHOUSE_METRICS_LOG_TIMINGS = os.getenv("WAREHOUSE_METRICS_LOG_TIMINGS", "1") == "1"
+_WAREHOUSE_METRICS_AUX_TIMEOUT = int(os.getenv("WAREHOUSE_METRICS_AUX_TIMEOUT", "5"))
+_WAREHOUSE_METRICS_AUX_BUDGET = float(os.getenv("WAREHOUSE_METRICS_AUX_BUDGET", "5"))
+_WAREHOUSE_METRICS_QUERY_TIMEOUT = int(os.getenv("WAREHOUSE_METRICS_QUERY_TIMEOUT", "10"))
+_DASHBOARD_QUERY_TIMEOUT = int(os.getenv("DASHBOARD_QUERY_TIMEOUT", "10"))
+_table_exists_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
+
+
+def _set_cursor_timeout(cursor, seconds: int) -> None:
+    """Best-effort timeout setter for pyodbc cursors."""
+    try:
+        cursor.timeout = max(int(seconds), 1)
+    except Exception:
+        return
+
+
+def _normalize_id_tuple(values: Optional[List[int]]) -> tuple:
+    if not values:
+        return ()
+    normalized = set()
+    for value in values:
+        if value is None:
+            continue
+        try:
+            normalized.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return tuple(sorted(normalized))
+
+
+def _warehouse_metrics_cache_key(
+    project_ids: Optional[List[int]],
+    client_ids: Optional[List[int]],
+    project_type_ids: Optional[List[int]],
+) -> tuple:
+    return (
+        _normalize_id_tuple(project_ids),
+        _normalize_id_tuple(client_ids),
+        _normalize_id_tuple(project_type_ids),
+    )
+
+
+def _get_or_create_cache_entry(cache_key: tuple) -> _WarehouseMetricsCacheEntry:
+    with _WAREHOUSE_METRICS_CACHE_LOCK:
+        entry = _WAREHOUSE_METRICS_CACHE.get(cache_key)
+        if entry is None:
+            entry = _WarehouseMetricsCacheEntry()
+            _WAREHOUSE_METRICS_CACHE[cache_key] = entry
+            _evict_cache_if_needed_locked()
+        return entry
+
+
+def _evict_cache_if_needed_locked() -> None:
+    if len(_WAREHOUSE_METRICS_CACHE) <= _WAREHOUSE_METRICS_CACHE_MAX_ENTRIES:
+        return
+    oldest_key = min(
+        _WAREHOUSE_METRICS_CACHE,
+        key=lambda key: _WAREHOUSE_METRICS_CACHE[key].last_updated or 0,
+    )
+    del _WAREHOUSE_METRICS_CACHE[oldest_key]
 
 _table_column_cache: Dict[Tuple[str, str, Optional[str]], bool] = {}
 _control_model_metadata_supported: Optional[bool] = None
@@ -1493,6 +1572,34 @@ def table_has_column(table_name: str, column_name: str, db_name: str | None = No
         logger.error(f"Error checking column {table_name}.{column_name}: {e}")
 
     _table_column_cache[key] = exists
+    return exists
+
+
+def table_exists(table_name: str, schema: str = "dbo", db_name: str | None = None) -> bool:
+    """Check whether a table exists in the given schema."""
+    key = (schema.lower(), table_name.lower(), db_name.lower() if isinstance(db_name, str) else db_name)
+    if key in _table_exists_cache:
+        return _table_exists_cache[key]
+
+    exists = False
+    try:
+        with get_db_connection(db_name) as conn:
+            if conn is None:
+                return False
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+                """,
+                (schema, table_name),
+            )
+            exists = cursor.fetchone() is not None
+    except Exception as e:
+        logger.error("Error checking table %s.%s: %s", schema, table_name, e)
+
+    _table_exists_cache[key] = exists
     return exists
 
 def insert_project(project_name, folder_path, ifc_folder_path=None):
@@ -4698,7 +4805,13 @@ def get_project_review_statistics(project_ids: Optional[List[int]] = None):
         return {}
 
 
-def get_dashboard_timeline(months: Optional[int] = None):
+def get_dashboard_timeline(
+    months: Optional[int] = None,
+    project_ids: Optional[List[int]] = None,
+    client_ids: Optional[List[int]] = None,
+    type_ids: Optional[List[int]] = None,
+    manager: Optional[str] = None,
+):
     """Aggregate project timelines and review schedule data for dashboard visualisations."""
     try:
         with get_db_connection() as conn:
@@ -4706,11 +4819,11 @@ def get_dashboard_timeline(months: Optional[int] = None):
 
             months_filter = months if months and months > 0 else None
             params: List[Any] = []
-            date_filter_sql = ""
+            where_clauses: List[str] = []
 
             if months_filter:
-                date_filter_sql = f"""
-                WHERE 
+                where_clauses.append(
+                    f"""
                     (
                         (p.{S.Projects.START_DATE} IS NOT NULL AND p.{S.Projects.START_DATE} >= DATEADD(month, ?, CAST(GETDATE() AS date)))
                         OR
@@ -4720,9 +4833,29 @@ def get_dashboard_timeline(months: Optional[int] = None):
                         OR
                         (p.{S.Projects.START_DATE} IS NULL AND p.{S.Projects.END_DATE} IS NULL)
                     )
-                """
+                    """
+                )
                 # negative months to look back
                 params.extend([-months_filter, -months_filter])
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"p.{S.Projects.ID} IN ({placeholders})")
+                params.extend(project_ids)
+            if client_ids:
+                placeholders = ", ".join("?" for _ in client_ids)
+                where_clauses.append(f"p.{S.Projects.CLIENT_ID} IN ({placeholders})")
+                params.extend(client_ids)
+            if type_ids:
+                placeholders = ", ".join("?" for _ in type_ids)
+                where_clauses.append(f"p.{S.Projects.TYPE_ID} IN ({placeholders})")
+                params.extend(type_ids)
+            if manager:
+                where_clauses.append(f"LOWER(ISNULL(p.{S.Projects.PROJECT_MANAGER},'')) = LOWER(?)")
+                params.append(manager)
+
+            where_sql = ""
+            if where_clauses:
+                where_sql = "WHERE " + " AND ".join(where_clauses)
 
             cursor.execute(
                 f"""
@@ -4741,7 +4874,7 @@ def get_dashboard_timeline(months: Optional[int] = None):
                     ON p.{S.Projects.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
                 LEFT JOIN {S.ProjectTypes.TABLE} pt
                     ON p.{S.Projects.TYPE_ID} = pt.{S.ProjectTypes.TYPE_ID}
-                {date_filter_sql}
+                {where_sql}
                 ORDER BY p.{S.Projects.NAME}
                 """
             , tuple(params))
@@ -4863,6 +4996,7 @@ def get_dashboard_timeline(months: Optional[int] = None):
             return {
                 "projects": list(project_map.values()),
                 "date_range": date_range,
+                "as_of": date_range["max"] if date_range else None,
             }
 
     except Exception as e:
@@ -4967,7 +5101,7 @@ def _format_task_notes_row(row: tuple) -> Dict[str, Any]:
         }
 
 
-def get_warehouse_dashboard_metrics(
+def _calculate_warehouse_dashboard_metrics(
     project_ids: Optional[List[int]] = None,
     client_ids: Optional[List[int]] = None,
     project_type_ids: Optional[List[int]] = None,
@@ -4982,6 +5116,9 @@ def get_warehouse_dashboard_metrics(
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
+            timer_base = perf_counter()
+            _set_cursor_timeout(cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
 
             def _in_clause(column: str, values: Optional[List[int]]) -> tuple[str, List[int]]:
                 if not values:
@@ -4994,217 +5131,432 @@ def get_warehouse_dashboard_metrics(
             type_filter_sql, type_params = _in_clause("pt.project_type_bk", project_type_ids)
             filter_params = proj_params + client_params + type_params
 
-            # Project health (current month snapshot across projects)
-            cursor.execute(
-                f"""
-                WITH latest_month AS (
-                    SELECT MAX(month_date_sk) AS month_date_sk FROM fact.project_kpi_monthly
-                )
-                SELECT
-                    COUNT(DISTINCT p.project_sk) AS projects,
-                    SUM(ISNULL(k.open_issues, 0)) AS open_issues,
-                    SUM(ISNULL(k.high_priority_issues, 0)) AS high_priority_issues,
-                    AVG(NULLIF(k.avg_resolution_days, 0)) AS avg_resolution_days,
-                    SUM(ISNULL(k.review_count, 0)) AS review_count,
-                    SUM(ISNULL(k.completed_reviews, 0)) AS completed_reviews,
-                    SUM(ISNULL(k.overdue_reviews, 0)) AS overdue_reviews,
-                    SUM(ISNULL(k.services_in_progress, 0)) AS services_in_progress,
-                    SUM(ISNULL(k.services_completed, 0)) AS services_completed,
-                    SUM(ISNULL(k.earned_value, 0)) AS earned_value,
-                    SUM(ISNULL(k.claimed_to_date, 0)) AS claimed_to_date,
-                    SUM(ISNULL(k.variance_fee, 0)) AS variance_fee
-                FROM dim.project p WITH (NOLOCK)
-                CROSS JOIN latest_month lm
-                LEFT JOIN fact.project_kpi_monthly k
-                    ON k.project_sk = p.project_sk
-                   AND (lm.month_date_sk IS NULL OR k.month_date_sk = lm.month_date_sk)
-                LEFT JOIN dim.client c ON c.client_sk = COALESCE(k.client_sk, p.client_sk)
-                LEFT JOIN dim.project_type pt ON pt.project_type_sk = COALESCE(k.project_type_sk, p.project_type_sk)
-                WHERE p.current_flag = 1
-                {proj_filter_sql}
-                {client_filter_sql}
-                {type_filter_sql}
-                """
-            , tuple(filter_params))
-            ph_row = cursor.fetchone()
-            project_health = {
-                "projects": ph_row[0] or 0 if ph_row else 0,
-                "open_issues": ph_row[1] or 0 if ph_row else 0,
-                "high_priority_issues": ph_row[2] or 0 if ph_row else 0,
-                "avg_resolution_days": float(ph_row[3]) if ph_row and ph_row[3] is not None else None,
-                "review_count": ph_row[4] or 0 if ph_row else 0,
-                "completed_reviews": ph_row[5] or 0 if ph_row else 0,
-                "overdue_reviews": ph_row[6] or 0 if ph_row else 0,
-                "services_in_progress": ph_row[7] or 0 if ph_row else 0,
-                "services_completed": ph_row[8] or 0 if ph_row else 0,
-                "earned_value": float(ph_row[9]) if ph_row and ph_row[9] is not None else 0.0,
-                "claimed_to_date": float(ph_row[10]) if ph_row and ph_row[10] is not None else 0.0,
-                "variance_fee": float(ph_row[11]) if ph_row and ph_row[11] is not None else 0.0,
-            }
+            cursor.execute("SELECT MAX(month_date_sk) FROM fact.project_kpi_monthly")
+            latest_kpi_month_sk = cursor.fetchone()[0]
+            cursor.execute("SELECT MAX(month_date_sk) FROM fact.service_monthly")
+            latest_service_month_sk = cursor.fetchone()[0]
+            cursor.execute("SELECT MAX(snapshot_date_sk) FROM fact.issue_snapshot")
+            latest_issue_snapshot_sk = cursor.fetchone()[0]
 
-            # Issue trends (last 60 days)
-            cursor.execute(
-                f"""
-                SELECT
-                    CAST(d.[date] AS date) AS snapshot_date,
-                    SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
-                    SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
-                    AVG(NULLIF(s.backlog_age_days, 0)) AS avg_backlog_days,
-                    AVG(NULLIF(s.resolution_days, 0)) AS avg_resolution_days,
-                    AVG(NULLIF(s.urgency_score, 0)) AS avg_urgency,
-                    AVG(NULLIF(s.sentiment_score, 0)) AS avg_sentiment
-                FROM fact.issue_snapshot s WITH (NOLOCK)
-                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                LEFT JOIN dim.client c ON s.client_sk = c.client_sk
-                LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
-                WHERE d.[date] >= DATEADD(day, -60, CAST(GETDATE() AS date))
-                  AND (p.current_flag = 1 OR p.current_flag IS NULL)
-                {proj_filter_sql}
-                {client_filter_sql}
-                {type_filter_sql}
-                GROUP BY CAST(d.[date] AS date)
-                ORDER BY CAST(d.[date] AS date)
-                """
-            , tuple(filter_params))
-            issue_trends = [
-                {
-                    "date": (row[0].isoformat() if isinstance(row[0], (datetime, date)) else str(row[0]))
-                    if row[0] is not None
-                    else None,
-                    "open_issues": int(row[1] or 0),
-                    "closed_issues": int(row[2] or 0),
-                    "avg_backlog_days": float(row[3]) if row[3] is not None else None,
-                    "avg_resolution_days": float(row[4]) if row[4] is not None else None,
-                    "avg_urgency": float(row[5]) if row[5] is not None else None,
-                    "avg_sentiment": float(row[6]) if row[6] is not None else None,
+            issue_trends_daily_available = table_exists("issue_trends_daily", "mart", Config.WAREHOUSE_DB)
+            timer_base = perf_counter()
+
+            def _fetch_project_health():
+                query_start = perf_counter()
+                ph_row = None
+                try:
+                    with get_db_connection(Config.WAREHOUSE_DB) as project_conn:
+                        project_cursor = project_conn.cursor()
+                        _set_cursor_timeout(project_cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
+                        project_cursor.execute(
+                            f"""
+                            SELECT
+                                COUNT(DISTINCT p.project_sk) AS projects,
+                                SUM(ISNULL(k.open_issues, 0)) AS open_issues,
+                                SUM(ISNULL(k.high_priority_issues, 0)) AS high_priority_issues,
+                                AVG(NULLIF(k.avg_resolution_days, 0)) AS avg_resolution_days,
+                                SUM(ISNULL(k.review_count, 0)) AS review_count,
+                                SUM(ISNULL(k.completed_reviews, 0)) AS completed_reviews,
+                                SUM(ISNULL(k.overdue_reviews, 0)) AS overdue_reviews,
+                                SUM(ISNULL(k.services_in_progress, 0)) AS services_in_progress,
+                                SUM(ISNULL(k.services_completed, 0)) AS services_completed,
+                                SUM(ISNULL(k.earned_value, 0)) AS earned_value,
+                                SUM(ISNULL(k.claimed_to_date, 0)) AS claimed_to_date,
+                                SUM(ISNULL(k.variance_fee, 0)) AS variance_fee
+                            FROM dim.project p WITH (NOLOCK)
+                            LEFT JOIN fact.project_kpi_monthly k
+                                ON k.project_sk = p.project_sk
+                               AND (? IS NULL OR k.month_date_sk = ?)
+                            LEFT JOIN dim.client c ON c.client_sk = COALESCE(k.client_sk, p.client_sk)
+                            LEFT JOIN dim.project_type pt ON pt.project_type_sk = COALESCE(k.project_type_sk, p.project_type_sk)
+                            WHERE p.current_flag = 1
+                            {proj_filter_sql}
+                            {client_filter_sql}
+                            {type_filter_sql}
+                            """,
+                            tuple([latest_kpi_month_sk, latest_kpi_month_sk] + filter_params),
+                        )
+                        ph_row = project_cursor.fetchone()
+                except Exception as exc:
+                    logger.warning("Failed to load project health quickly: %s", exc)
+                    return {
+                        "projects": 0,
+                        "open_issues": 0,
+                        "high_priority_issues": 0,
+                        "avg_resolution_days": None,
+                        "review_count": 0,
+                        "completed_reviews": 0,
+                        "overdue_reviews": 0,
+                        "services_in_progress": 0,
+                        "services_completed": 0,
+                        "earned_value": 0.0,
+                        "claimed_to_date": 0.0,
+                        "variance_fee": 0.0,
+                    }
+                finally:
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: project_health query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                return {
+                    "projects": ph_row[0] or 0 if ph_row else 0,
+                    "open_issues": ph_row[1] or 0 if ph_row else 0,
+                    "high_priority_issues": ph_row[2] or 0 if ph_row else 0,
+                    "avg_resolution_days": float(ph_row[3]) if ph_row and ph_row[3] is not None else None,
+                    "review_count": ph_row[4] or 0 if ph_row else 0,
+                    "completed_reviews": ph_row[5] or 0 if ph_row else 0,
+                    "overdue_reviews": ph_row[6] or 0 if ph_row else 0,
+                    "services_in_progress": ph_row[7] or 0 if ph_row else 0,
+                    "services_completed": ph_row[8] or 0 if ph_row else 0,
+                    "earned_value": float(ph_row[9]) if ph_row and ph_row[9] is not None else 0.0,
+                    "claimed_to_date": float(ph_row[10]) if ph_row and ph_row[10] is not None else 0.0,
+                    "variance_fee": float(ph_row[11]) if ph_row and ph_row[11] is not None else 0.0,
                 }
-                for row in cursor.fetchall()
-            ]
 
-            # Review performance
-            cursor.execute(
-                f"""
-                SELECT
-                    COUNT(1) AS total_reviews,
-                    SUM(CASE WHEN ISNULL(f.is_completed, 0) = 1 THEN 1 ELSE 0 END) AS completed_reviews,
-                    SUM(CASE WHEN ISNULL(f.is_overdue, 0) = 1 THEN 1 ELSE 0 END) AS overdue_reviews,
-                    AVG(CAST(f.planned_vs_actual_days AS FLOAT)) AS avg_planned_vs_actual_days
-                FROM fact.review_cycle f WITH (NOLOCK)
-                JOIN dim.service s ON f.service_sk = s.service_sk
-                JOIN dim.project p ON f.project_sk = p.project_sk
-                LEFT JOIN dim.client c ON f.client_sk = c.client_sk
-                LEFT JOIN dim.project_type pt ON f.project_type_sk = pt.project_type_sk
-                WHERE p.current_flag = 1
-                {proj_filter_sql}
-                {client_filter_sql}
-                {type_filter_sql}
-                """
-            , tuple(filter_params))
-            rv_row = cursor.fetchone()
-            completed_reviews = rv_row[1] or 0 if rv_row else 0
-            overdue_reviews = rv_row[2] or 0 if rv_row else 0
-            on_time_completed = max(completed_reviews - overdue_reviews, 0)
-            on_time_rate = (
-                round(on_time_completed / completed_reviews, 4) if completed_reviews > 0 else None
-            )
-            review_performance = {
-                "total_reviews": rv_row[0] or 0 if rv_row else 0,
-                "completed_reviews": completed_reviews,
-                "overdue_reviews": overdue_reviews,
-                "avg_planned_vs_actual_days": float(rv_row[3]) if rv_row and rv_row[3] is not None else None,
-                "on_time_rate": on_time_rate,
-            }
+            def _fetch_issue_trends():
+                query_start = perf_counter()
+                try:
+                    with get_db_connection(Config.WAREHOUSE_DB) as trends_conn:
+                        trends_cursor = trends_conn.cursor()
+                        _set_cursor_timeout(trends_cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
+                        if issue_trends_daily_available:
+                            if not project_ids and not client_ids and not project_type_ids:
+                                trends_cursor.execute(
+                                    """
+                                    SELECT
+                                        t.snapshot_date,
+                                        SUM(t.open_issues) AS open_issues,
+                                        SUM(t.closed_issues) AS closed_issues,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.backlog_age_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.backlog_age_total, 0)) / SUM(t.backlog_age_count)
+                                            ELSE NULL
+                                        END AS avg_backlog_days,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.resolution_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.resolution_total, 0)) / SUM(t.resolution_count)
+                                            ELSE NULL
+                                        END AS avg_resolution_days,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.urgency_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.urgency_total, 0)) / SUM(t.urgency_count)
+                                            ELSE NULL
+                                        END AS avg_urgency,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.sentiment_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.sentiment_total, 0)) / SUM(t.sentiment_count)
+                                            ELSE NULL
+                                        END AS avg_sentiment
+                                    FROM mart.issue_trends_daily t
+                                    WHERE t.snapshot_date >= DATEADD(day, -?, CAST(GETDATE() AS date))
+                                    GROUP BY t.snapshot_date
+                                    ORDER BY t.snapshot_date
+                                    """,
+                                    tuple([_WAREHOUSE_ISSUE_TRENDS_DAYS]),
+                                )
+                            else:
+                                trends_cursor.execute(
+                                    f"""
+                                    SELECT
+                                        t.snapshot_date,
+                                        SUM(t.open_issues) AS open_issues,
+                                        SUM(t.closed_issues) AS closed_issues,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.backlog_age_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.backlog_age_total, 0)) / SUM(t.backlog_age_count)
+                                            ELSE NULL
+                                        END AS avg_backlog_days,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.resolution_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.resolution_total, 0)) / SUM(t.resolution_count)
+                                            ELSE NULL
+                                        END AS avg_resolution_days,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.urgency_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.urgency_total, 0)) / SUM(t.urgency_count)
+                                            ELSE NULL
+                                        END AS avg_urgency,
+                                        CASE
+                                            WHEN SUM(ISNULL(t.sentiment_count, 0)) > 0
+                                            THEN SUM(ISNULL(t.sentiment_total, 0)) / SUM(t.sentiment_count)
+                                            ELSE NULL
+                                        END AS avg_sentiment
+                                    FROM mart.issue_trends_daily t
+                                    LEFT JOIN dim.project p ON t.project_sk = p.project_sk
+                                    LEFT JOIN dim.client c ON t.client_sk = c.client_sk
+                                    LEFT JOIN dim.project_type pt ON t.project_type_sk = pt.project_type_sk
+                                    WHERE t.snapshot_date >= DATEADD(day, -?, CAST(GETDATE() AS date))
+                                      AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                                    {proj_filter_sql}
+                                    {client_filter_sql}
+                                    {type_filter_sql}
+                                    GROUP BY t.snapshot_date
+                                    ORDER BY t.snapshot_date
+                                    """,
+                                    tuple([_WAREHOUSE_ISSUE_TRENDS_DAYS] + filter_params),
+                                )
+                        else:
+                            trends_cursor.execute(
+                                f"""
+                                SELECT
+                                    CAST(d.[date] AS date) AS snapshot_date,
+                                    SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
+                                    SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
+                                    AVG(NULLIF(s.backlog_age_days, 0)) AS avg_backlog_days,
+                                    AVG(NULLIF(s.resolution_days, 0)) AS avg_resolution_days,
+                                    AVG(NULLIF(s.urgency_score, 0)) AS avg_urgency,
+                                    AVG(NULLIF(s.sentiment_score, 0)) AS avg_sentiment
+                                FROM fact.issue_snapshot s WITH (NOLOCK)
+                                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                                LEFT JOIN dim.client c ON s.client_sk = c.client_sk
+                                LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
+                                WHERE d.[date] >= DATEADD(day, -?, CAST(GETDATE() AS date))
+                                  AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                                {proj_filter_sql}
+                                {client_filter_sql}
+                                {type_filter_sql}
+                                GROUP BY CAST(d.[date] AS date)
+                                ORDER BY CAST(d.[date] AS date)
+                                """,
+                                tuple([_WAREHOUSE_ISSUE_TRENDS_DAYS] + filter_params),
+                            )
+                        rows = trends_cursor.fetchall()
+                except Exception as exc:
+                    logger.warning("Failed to load issue trends quickly: %s", exc)
+                    return []
+                finally:
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: issue_trends query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                return [
+                    {
+                        "date": (row[0].isoformat() if isinstance(row[0], (datetime, date)) else str(row[0]))
+                        if row[0] is not None
+                        else None,
+                        "open_issues": int(row[1] or 0),
+                        "closed_issues": int(row[2] or 0),
+                        "avg_backlog_days": float(row[3]) if row[3] is not None else None,
+                        "avg_resolution_days": float(row[4]) if row[4] is not None else None,
+                        "avg_urgency": float(row[5]) if row[5] is not None else None,
+                        "avg_sentiment": float(row[6]) if row[6] is not None else None,
+                    }
+                    for row in rows
+                ]
 
-            # Service / financial signals (latest month)
-            cursor.execute(
-                f"""
-                WITH latest_month AS (
-                    SELECT MAX(month_date_sk) AS month_date_sk FROM fact.service_monthly
+            def _fetch_review_performance():
+                query_start = perf_counter()
+                try:
+                    with get_db_connection(Config.WAREHOUSE_DB) as reviews_conn:
+                        reviews_cursor = reviews_conn.cursor()
+                        _set_cursor_timeout(reviews_cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
+                        reviews_cursor.execute(
+                            f"""
+                            SELECT
+                                COUNT(1) AS total_reviews,
+                                SUM(CASE WHEN ISNULL(f.is_completed, 0) = 1 THEN 1 ELSE 0 END) AS completed_reviews,
+                                SUM(CASE WHEN ISNULL(f.is_overdue, 0) = 1 THEN 1 ELSE 0 END) AS overdue_reviews,
+                                AVG(CAST(f.planned_vs_actual_days AS FLOAT)) AS avg_planned_vs_actual_days
+                            FROM fact.review_cycle f WITH (NOLOCK)
+                            JOIN dim.service s ON f.service_sk = s.service_sk
+                            JOIN dim.project p ON f.project_sk = p.project_sk
+                            LEFT JOIN dim.client c ON f.client_sk = c.client_sk
+                            LEFT JOIN dim.project_type pt ON f.project_type_sk = pt.project_type_sk
+                            WHERE p.current_flag = 1
+                            {proj_filter_sql}
+                            {client_filter_sql}
+                            {type_filter_sql}
+                            """,
+                            tuple(filter_params),
+                        )
+                        rv_row = reviews_cursor.fetchone()
+                except Exception as exc:
+                    logger.warning("Failed to load review performance quickly: %s", exc)
+                    return {
+                        "total_reviews": 0,
+                        "completed_reviews": 0,
+                        "overdue_reviews": 0,
+                        "avg_planned_vs_actual_days": None,
+                        "on_time_rate": None,
+                    }
+                finally:
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: review_performance query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                completed_reviews = rv_row[1] or 0 if rv_row else 0
+                overdue_reviews = rv_row[2] or 0 if rv_row else 0
+                total_reviews = rv_row[0] or 0 if rv_row else 0
+                on_time_completed = max(completed_reviews - overdue_reviews, 0)
+                on_time_rate = (
+                    round(on_time_completed / completed_reviews, 4) if completed_reviews > 0 else None
                 )
-                SELECT
-                    SUM(ISNULL(sm.earned_value, 0)) AS earned_value,
-                    SUM(ISNULL(sm.claimed_to_date, 0)) AS claimed_to_date,
-                    SUM(ISNULL(sm.variance_fee, 0)) AS variance_fee,
-                    AVG(NULLIF(sm.progress_pct, 0)) AS avg_progress_pct
-                FROM fact.service_monthly sm WITH (NOLOCK)
-                CROSS JOIN latest_month lm
-                JOIN dim.project p ON sm.project_sk = p.project_sk
-                LEFT JOIN dim.client c ON sm.client_sk = c.client_sk
-                LEFT JOIN dim.project_type pt ON sm.project_type_sk = pt.project_type_sk
-                WHERE (lm.month_date_sk IS NULL OR sm.month_date_sk = lm.month_date_sk)
-                  AND (p.current_flag = 1 OR p.current_flag IS NULL)
-                {proj_filter_sql}
-                {client_filter_sql}
-                {type_filter_sql}
-                """
-            , tuple(filter_params))
-            sf_row = cursor.fetchone()
-            service_financials = {
-                "earned_value": float(sf_row[0]) if sf_row and sf_row[0] is not None else 0.0,
-                "claimed_to_date": float(sf_row[1]) if sf_row and sf_row[1] is not None else 0.0,
-                "variance_fee": float(sf_row[2]) if sf_row and sf_row[2] is not None else 0.0,
-                "avg_progress_pct": float(sf_row[3]) if sf_row and sf_row[3] is not None else None,
-            }
+                return {
+                    "total_reviews": total_reviews,
+                    "completed_reviews": completed_reviews,
+                    "overdue_reviews": overdue_reviews,
+                    "avg_planned_vs_actual_days": float(rv_row[3]) if rv_row and rv_row[3] is not None else None,
+                    "on_time_rate": on_time_rate,
+                }
 
-            # Backlog age distribution using latest snapshot
-            cursor.execute(
-                f"""
-                WITH latest_snapshot AS (
-                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk FROM fact.issue_snapshot
-                )
-                SELECT
-                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 0 AND 7 THEN 1 ELSE 0 END) AS bucket_0_7,
-                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 8 AND 30 THEN 1 ELSE 0 END) AS bucket_8_30,
-                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 31 AND 90 THEN 1 ELSE 0 END) AS bucket_31_90,
-                    SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) > 90 THEN 1 ELSE 0 END) AS bucket_90_plus,
-                    AVG(NULLIF(s.backlog_age_days, 0)) AS avg_age_days
-                FROM fact.issue_snapshot s WITH (NOLOCK)
-                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                LEFT JOIN dim.client c ON s.client_sk = c.client_sk
-                LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
-                WHERE (p.current_flag = 1 OR p.current_flag IS NULL)
-                {proj_filter_sql}
-                {client_filter_sql}
-                {type_filter_sql}
-                """
-            , tuple(filter_params))
-            backlog_row = cursor.fetchone() or [0, 0, 0, 0, None]
-            backlog_age = {
-                "bucket_0_7": int(backlog_row[0] or 0),
-                "bucket_8_30": int(backlog_row[1] or 0),
-                "bucket_31_90": int(backlog_row[2] or 0),
-                "bucket_90_plus": int(backlog_row[3] or 0),
-                "avg_age_days": float(backlog_row[4]) if backlog_row[4] is not None else None,
-            }
+            def _fetch_service_financials():
+                query_start = perf_counter()
+                try:
+                    with get_db_connection(Config.WAREHOUSE_DB) as service_conn:
+                        service_cursor = service_conn.cursor()
+                        _set_cursor_timeout(service_cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
+                        service_cursor.execute(
+                            f"""
+                            SELECT
+                                SUM(ISNULL(sm.earned_value, 0)) AS earned_value,
+                                SUM(ISNULL(sm.claimed_to_date, 0)) AS claimed_to_date,
+                                SUM(ISNULL(sm.variance_fee, 0)) AS variance_fee,
+                                AVG(NULLIF(sm.progress_pct, 0)) AS avg_progress_pct
+                            FROM fact.service_monthly sm WITH (NOLOCK)
+                            JOIN dim.project p ON sm.project_sk = p.project_sk
+                            LEFT JOIN dim.client c ON sm.client_sk = c.client_sk
+                            LEFT JOIN dim.project_type pt ON sm.project_type_sk = pt.project_type_sk
+                            WHERE (? IS NULL OR sm.month_date_sk = ?)
+                              AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                            {proj_filter_sql}
+                            {client_filter_sql}
+                            {type_filter_sql}
+                            """,
+                            tuple([latest_service_month_sk, latest_service_month_sk] + filter_params),
+                        )
+                        sf_row = service_cursor.fetchone()
+                except Exception as exc:
+                    logger.warning("Failed to load service financials quickly: %s", exc)
+                    return {
+                        "earned_value": 0.0,
+                        "claimed_to_date": 0.0,
+                        "variance_fee": 0.0,
+                        "avg_progress_pct": None,
+                    }
+                finally:
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: service_financials query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                return {
+                    "earned_value": float(sf_row[0]) if sf_row and sf_row[0] is not None else 0.0,
+                    "claimed_to_date": float(sf_row[1]) if sf_row and sf_row[1] is not None else 0.0,
+                    "variance_fee": float(sf_row[2]) if sf_row and sf_row[2] is not None else 0.0,
+                    "avg_progress_pct": float(sf_row[3]) if sf_row and sf_row[3] is not None else None,
+                }
 
-            # Model readiness (control model coverage) from project DB
+            def _fetch_backlog_age():
+                query_start = perf_counter()
+                try:
+                    with get_db_connection(Config.WAREHOUSE_DB) as backlog_conn:
+                        backlog_cursor = backlog_conn.cursor()
+                        _set_cursor_timeout(backlog_cursor, _WAREHOUSE_METRICS_QUERY_TIMEOUT)
+                        backlog_cursor.execute(
+                            f"""
+                            SELECT
+                                SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 0 AND 7 THEN 1 ELSE 0 END) AS bucket_0_7,
+                                SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 8 AND 30 THEN 1 ELSE 0 END) AS bucket_8_30,
+                                SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) BETWEEN 31 AND 90 THEN 1 ELSE 0 END) AS bucket_31_90,
+                                SUM(CASE WHEN ISNULL(s.is_open, 0) = 1 AND ISNULL(s.backlog_age_days, 0) > 90 THEN 1 ELSE 0 END) AS bucket_90_plus,
+                                AVG(NULLIF(s.backlog_age_days, 0)) AS avg_age_days
+                            FROM fact.issue_snapshot s WITH (NOLOCK)
+                            LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                            LEFT JOIN dim.client c ON s.client_sk = c.client_sk
+                            LEFT JOIN dim.project_type pt ON s.project_type_sk = pt.project_type_sk
+                            WHERE (? IS NULL OR s.snapshot_date_sk = ?)
+                              AND (p.current_flag = 1 OR p.current_flag IS NULL)
+                            {proj_filter_sql}
+                            {client_filter_sql}
+                            {type_filter_sql}
+                            """,
+                            tuple([latest_issue_snapshot_sk, latest_issue_snapshot_sk] + filter_params),
+                        )
+                        backlog_row = backlog_cursor.fetchone()
+                except Exception as exc:
+                    logger.warning("Failed to load backlog age quickly: %s", exc)
+                    return {
+                        "bucket_0_7": 0,
+                        "bucket_8_30": 0,
+                        "bucket_31_90": 0,
+                        "bucket_90_plus": 0,
+                        "avg_age_days": None,
+                    }
+                finally:
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: backlog_age query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                backlog_row = backlog_row or [0, 0, 0, 0, None]
+                return {
+                    "bucket_0_7": int(backlog_row[0] or 0),
+                    "bucket_8_30": int(backlog_row[1] or 0),
+                    "bucket_31_90": int(backlog_row[2] or 0),
+                    "bucket_90_plus": int(backlog_row[3] or 0),
+                    "avg_age_days": float(backlog_row[4]) if backlog_row[4] is not None else None,
+                }
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {
+                    "project_health": executor.submit(_fetch_project_health),
+                    "issue_trends": executor.submit(_fetch_issue_trends),
+                    "review_performance": executor.submit(_fetch_review_performance),
+                    "service_financials": executor.submit(_fetch_service_financials),
+                    "backlog_age": executor.submit(_fetch_backlog_age),
+                }
+                project_health = futures["project_health"].result()
+                issue_trends = futures["issue_trends"].result()
+                review_performance = futures["review_performance"].result()
+                service_financials = futures["service_financials"].result()
+                backlog_age = futures["backlog_age"].result()
+
+            aux_elapsed = perf_counter() - timer_base
+# Model readiness (control model coverage) from project DB
             ctrl_models = {"projects_with_control_models": 0, "projects_missing_control_models": 0}
-            try:
-                with get_db_connection() as pm_conn:
-                    pm_cursor = pm_conn.cursor()
-                    ctrl_params: List[Any] = []
-                    ctrl_filter_sql = ""
-                    if project_ids:
-                        placeholders = ", ".join("?" for _ in project_ids)
-                        ctrl_filter_sql = f" AND project_id IN ({placeholders})"
-                        ctrl_params.extend(project_ids)
-                    pm_cursor.execute(
-                        f"""
-                        SELECT COUNT(DISTINCT project_id)
-                        FROM ProjectManagement.dbo.tblControlModels
-                        WHERE ISNULL(is_active, 0) = 1
-                        {ctrl_filter_sql}
-                        """
-                    , tuple(ctrl_params))
-                    active_count = pm_cursor.fetchone()
-                    active_value = int(active_count[0] or 0) if active_count else 0
-                    total_projects = int(project_health.get("projects") or 0)
-                    ctrl_models["projects_with_control_models"] = active_value
-                    ctrl_models["projects_missing_control_models"] = max(total_projects - active_value, 0)
-            except Exception as ctrl_exc:
-                logger.warning("Failed to compute control model readiness: %s", ctrl_exc)
+            aux_elapsed = perf_counter() - timer_base
+            if aux_elapsed <= _WAREHOUSE_METRICS_AUX_BUDGET:
+                try:
+                    query_start = perf_counter()
+                    with get_db_connection() as pm_conn:
+                        pm_cursor = pm_conn.cursor()
+                        _set_cursor_timeout(pm_cursor, _WAREHOUSE_METRICS_AUX_TIMEOUT)
+                        ctrl_params: List[Any] = []
+                        ctrl_filter_sql = ""
+                        if project_ids:
+                            placeholders = ", ".join("?" for _ in project_ids)
+                            ctrl_filter_sql = f" AND project_id IN ({placeholders})"
+                            ctrl_params.extend(project_ids)
+                        pm_cursor.execute(
+                            f"""
+                            SELECT COUNT(DISTINCT project_id)
+                            FROM ProjectManagement.dbo.tblControlModels
+                            WHERE ISNULL(is_active, 0) = 1
+                            {ctrl_filter_sql}
+                            """
+                        , tuple(ctrl_params))
+                        active_count = pm_cursor.fetchone()
+                        active_value = int(active_count[0] or 0) if active_count else 0
+                        total_projects = int(project_health.get("projects") or 0)
+                        ctrl_models["projects_with_control_models"] = active_value
+                        ctrl_models["projects_missing_control_models"] = max(total_projects - active_value, 0)
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: control_models query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                except Exception as ctrl_exc:
+                    logger.warning("Failed to compute control model readiness: %s", ctrl_exc)
+            elif _WAREHOUSE_METRICS_LOG_TIMINGS:
+                logger.info(
+                    "warehouse metrics: skipping aux sections (elapsed %.2fs > budget %.2fs)",
+                    aux_elapsed,
+                    _WAREHOUSE_METRICS_AUX_BUDGET,
+                )
 
             # Data freshness from latest Revizto and ACC imports
             data_freshness = {
@@ -5213,37 +5565,52 @@ def get_warehouse_dashboard_metrics(
                 "acc_last_import": None,
                 "acc_last_import_project_id": None,
             }
-            try:
-                last_run = get_last_revizto_extraction_run()
-                if last_run:
-                    data_freshness["revizto_last_run"] = _serialize_datetime(last_run.get("end_time") or last_run.get("start_time"))
-                    data_freshness["revizto_projects_extracted"] = last_run.get("projects_extracted")
-            except Exception as rev_exc:
-                logger.warning("Failed to fetch last Revizto run: %s", rev_exc)
+            if aux_elapsed <= _WAREHOUSE_METRICS_AUX_BUDGET:
+                try:
+                    query_start = perf_counter()
+                    last_run = get_last_revizto_extraction_run()
+                    if last_run:
+                        data_freshness["revizto_last_run"] = _serialize_datetime(last_run.get("end_time") or last_run.get("start_time"))
+                        data_freshness["revizto_projects_extracted"] = last_run.get("projects_extracted")
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: revizto_freshness query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                except Exception as rev_exc:
+                    logger.warning("Failed to fetch last Revizto run: %s", rev_exc)
 
-            try:
-                with get_db_connection() as pm_conn:
-                    pm_cursor = pm_conn.cursor()
-                    acc_params: List[Any] = []
-                    acc_filter_sql = ""
-                    if project_ids:
-                        placeholders = ", ".join("?" for _ in project_ids)
-                        acc_filter_sql = f" WHERE project_id IN ({placeholders})"
-                        acc_params.extend(project_ids)
-                    pm_cursor.execute(
-                        f"""
-                        SELECT TOP 1 project_id, import_date
-                        FROM {S.ACCImportLogs.TABLE}
-                        {acc_filter_sql}
-                        ORDER BY import_date DESC
-                        """
-                    , tuple(acc_params))
-                    acc_row = pm_cursor.fetchone()
-                    if acc_row:
-                        data_freshness["acc_last_import_project_id"] = acc_row[0]
-                        data_freshness["acc_last_import"] = _serialize_datetime(acc_row[1])
-            except Exception as acc_exc:
-                logger.warning("Failed to fetch ACC import freshness: %s", acc_exc)
+            if aux_elapsed <= _WAREHOUSE_METRICS_AUX_BUDGET:
+                try:
+                    query_start = perf_counter()
+                    with get_db_connection() as pm_conn:
+                        pm_cursor = pm_conn.cursor()
+                        pm_cursor.timeout = max(_WAREHOUSE_METRICS_AUX_TIMEOUT, 1)
+                        acc_params: List[Any] = []
+                        acc_filter_sql = ""
+                        if project_ids:
+                            placeholders = ", ".join("?" for _ in project_ids)
+                            acc_filter_sql = f" WHERE project_id IN ({placeholders})"
+                            acc_params.extend(project_ids)
+                        pm_cursor.execute(
+                            f"""
+                            SELECT TOP 1 project_id, import_date
+                            FROM {S.ACCImportLogs.TABLE}
+                            {acc_filter_sql}
+                            ORDER BY import_date DESC
+                            """
+                        , tuple(acc_params))
+                        acc_row = pm_cursor.fetchone()
+                        if acc_row:
+                            data_freshness["acc_last_import_project_id"] = acc_row[0]
+                            data_freshness["acc_last_import"] = _serialize_datetime(acc_row[1])
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: acc_freshness query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                except Exception as acc_exc:
+                    logger.warning("Failed to fetch ACC import freshness: %s", acc_exc)
 
             data_quality = {
                 "last_run_id": None,
@@ -5254,43 +5621,53 @@ def get_warehouse_dashboard_metrics(
                 "checks_failed_high": 0,
                 "checks_failed_medium": 0,
             }
-            try:
-                cursor.execute(
-                    """
-                    SELECT TOP 1 run_id, status, completed_at
-                    FROM ctl.etl_run
-                    WHERE pipeline_name = 'warehouse_full_load'
-                    ORDER BY run_id DESC
-                    """
-                )
-                run_row = cursor.fetchone()
-                if run_row:
-                    run_id = run_row[0]
-                    data_quality["last_run_id"] = run_id
-                    data_quality["last_run_status"] = run_row[1]
-                    data_quality["last_run_completed_at"] = _serialize_datetime(run_row[2]) if run_row[2] else None
+            if aux_elapsed <= _WAREHOUSE_METRICS_AUX_BUDGET:
+                try:
+                    query_start = perf_counter()
+                    prev_timeout = getattr(cursor, "timeout", 0)
+                    _set_cursor_timeout(cursor, _WAREHOUSE_METRICS_AUX_TIMEOUT)
                     cursor.execute(
                         """
-                        SELECT
-                            COUNT(*) AS total,
-                            SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS failed,
-                            SUM(CASE WHEN passed = 0 AND severity = 'high' THEN 1 ELSE 0 END) AS failed_high,
-                            SUM(CASE WHEN passed = 0 AND severity = 'medium' THEN 1 ELSE 0 END) AS failed_medium
-                        FROM ctl.data_quality_result
-                        WHERE run_id = ?
-                        """,
-                        (run_id,),
+                        SELECT TOP 1 run_id, status, completed_at
+                        FROM ctl.etl_run
+                        WHERE pipeline_name = 'warehouse_full_load'
+                        ORDER BY run_id DESC
+                        """
                     )
-                    dq_row = cursor.fetchone()
-                    if dq_row:
-                        data_quality["checks_total"] = int(dq_row[0] or 0)
-                        data_quality["checks_failed"] = int(dq_row[1] or 0)
-                        data_quality["checks_failed_high"] = int(dq_row[2] or 0)
-                        data_quality["checks_failed_medium"] = int(dq_row[3] or 0)
-            except Exception as dq_exc:
-                logger.warning("Failed to fetch data quality summary: %s", dq_exc)
+                    run_row = cursor.fetchone()
+                    if run_row:
+                        run_id = run_row[0]
+                        data_quality["last_run_id"] = run_id
+                        data_quality["last_run_status"] = run_row[1]
+                        data_quality["last_run_completed_at"] = _serialize_datetime(run_row[2]) if run_row[2] else None
+                        cursor.execute(
+                            """
+                            SELECT
+                                COUNT(*) AS total,
+                                SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS failed,
+                                SUM(CASE WHEN passed = 0 AND severity = 'high' THEN 1 ELSE 0 END) AS failed_high,
+                                SUM(CASE WHEN passed = 0 AND severity = 'medium' THEN 1 ELSE 0 END) AS failed_medium
+                            FROM ctl.data_quality_result
+                            WHERE run_id = ?
+                            """,
+                            (run_id,),
+                        )
+                        dq_row = cursor.fetchone()
+                        if dq_row:
+                            data_quality["checks_total"] = int(dq_row[0] or 0)
+                            data_quality["checks_failed"] = int(dq_row[1] or 0)
+                            data_quality["checks_failed_high"] = int(dq_row[2] or 0)
+                            data_quality["checks_failed_medium"] = int(dq_row[3] or 0)
+                    cursor.timeout = prev_timeout
+                    if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                        logger.info(
+                            "warehouse metrics: data_quality query %.2fs",
+                            perf_counter() - query_start,
+                        )
+                except Exception as dq_exc:
+                    logger.warning("Failed to fetch data quality summary: %s", dq_exc)
 
-            return {
+            result = {
                 "project_health": project_health,
                 "issue_trends": issue_trends,
                 "review_performance": review_performance,
@@ -5299,7 +5676,14 @@ def get_warehouse_dashboard_metrics(
                 "control_models": ctrl_models,
                 "data_freshness": data_freshness,
                 "data_quality": data_quality,
+                "as_of": _get_latest_issue_snapshot_date(cursor),
             }
+            if _WAREHOUSE_METRICS_LOG_TIMINGS:
+                logger.info(
+                    "warehouse metrics: total %.2fs",
+                    perf_counter() - timer_base,
+                )
+            return result
     except Exception as e:
         logger.error(f"Error fetching warehouse dashboard metrics: {e}")
         return {
@@ -5311,9 +5695,46 @@ def get_warehouse_dashboard_metrics(
         }
 
 
+def get_warehouse_dashboard_metrics(
+    project_ids: Optional[List[int]] = None,
+    client_ids: Optional[List[int]] = None,
+    project_type_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    cache_key = _warehouse_metrics_cache_key(project_ids, client_ids, project_type_ids)
+    entry = _get_or_create_cache_entry(cache_key)
+    now = time()
+
+    if entry.data and entry.expires_at > now:
+        return entry.data
+
+    if not entry.lock.acquire(blocking=False):
+        if entry.data:
+            return entry.data
+        entry.lock.acquire()
+        try:
+            return entry.data
+        finally:
+            entry.lock.release()
+
+    try:
+        result = _calculate_warehouse_dashboard_metrics(project_ids, client_ids, project_type_ids)
+        entry.data = result
+        entry.expires_at = time() + _WAREHOUSE_METRICS_CACHE_TTL_SECONDS
+        entry.last_updated = time()
+        return result
+    finally:
+        entry.lock.release()
+        with _WAREHOUSE_METRICS_CACHE_LOCK:
+            _evict_cache_if_needed_locked()
+
+
 def get_warehouse_issues_history(
     project_ids: Optional[List[int]] = None,
-) -> List[Dict[str, Any]]:
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    discipline: Optional[str] = None,
+    zone: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Return weekly issue status counts using latest snapshot per issue/week.
 
@@ -5324,19 +5745,48 @@ def get_warehouse_issues_history(
             cursor = conn.cursor()
 
             params: List[Any] = []
-            proj_filter_sql = ""
+            where_clauses = ["i.current_flag = 1"]
+            discipline_case = (
+                "COALESCE("
+                "dp.discipline, "
+                "CASE WHEN i.source_system = 'Revizto' THEN u.display_name END"
+                ")"
+            )
             if project_ids:
                 placeholders = ", ".join("?" for _ in project_ids)
-                proj_filter_sql = (
-                    f" AND (p.project_bk IN ({placeholders}) "
+                where_clauses.append(
+                    f"(p.project_bk IN ({placeholders}) "
                     f"OR p.project_sk IN (SELECT project_sk FROM dim.project WHERE project_bk IN ({placeholders})))"
                 )
                 params.extend(project_ids)
                 params.extend(project_ids)
+            if status:
+                where_clauses.append("LOWER(ISNULL(s.status,'')) LIKE ?")
+                params.append(f"%{status.lower()}%")
+            if priority:
+                where_clauses.append("LOWER(ISNULL(i.priority_normalized,'')) = LOWER(?)")
+                params.append(priority)
+            if discipline:
+                where_clauses.append(f"LOWER(ISNULL({discipline_case},'')) = LOWER(?)")
+                params.append(discipline)
+            if zone:
+                where_clauses.append("LOWER(ISNULL(i.location_root,'')) = LOWER(?)")
+                params.append(zone)
+            where_sql = ""
+            if where_clauses:
+                where_sql = " AND " + " AND ".join(where_clauses)
 
             cursor.execute(
                 f"""
-                WITH classified AS (
+                WITH discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                classified AS (
                     SELECT
                         d.week_start_date AS week_start,
                         s.issue_sk,
@@ -5353,10 +5803,14 @@ def get_warehouse_issues_history(
                             ORDER BY s.snapshot_date_sk DESC
                         ) AS rn
                     FROM fact.issue_snapshot s WITH (NOLOCK)
+                    JOIN dim.issue i ON s.issue_sk = i.issue_sk
                     JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
                     LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                    LEFT JOIN discipline_pick dp ON s.issue_sk = dp.issue_sk
+                    LEFT JOIN dim.[user] u
+                        ON i.assignee_sk = u.user_sk AND u.current_flag = 1
                     WHERE 1 = 1
-                    {proj_filter_sql}
+                    {where_sql}
                 ),
                 weekly_latest AS (
                     SELECT
@@ -5378,7 +5832,7 @@ def get_warehouse_issues_history(
             , tuple(params))
 
             rows = cursor.fetchall()
-            return [
+            items = [
                 {
                     "week_start": row[0].isoformat() if row[0] else None,
                     "status": row[1] or "unknown",
@@ -5386,25 +5840,98 @@ def get_warehouse_issues_history(
                 }
                 for row in rows
             ]
+            return {
+                "items": items,
+                "as_of": _get_latest_issue_snapshot_date(cursor),
+            }
     except Exception as e:
         logger.error(f"Error fetching warehouse issues history: {e}")
-        return []
+        return {"items": [], "as_of": None}
+
+
+def _get_latest_issue_snapshot_date(cursor) -> Optional[str]:
+    """Return the latest issue snapshot date as ISO string."""
+    cursor.execute(
+        """
+        SELECT MAX(d.[date])
+        FROM fact.issue_snapshot s
+        JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+        """
+    )
+    row = cursor.fetchone()
+    return row[0].isoformat() if row and row[0] else None
+
+
+def _get_revit_health_as_of(cursor, project_ids: Optional[List[int]] = None) -> Optional[str]:
+    """Return the latest Revit health export date for the selected projects."""
+    params: List[Any] = []
+    where_sql = ""
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_sql = f"WHERE pm_project_id IN ({placeholders})"
+        params.extend(project_ids)
+    cursor.execute(
+        f"""
+        SELECT MAX(ConvertedExportedDate)
+        FROM dbo.tblRvtProjHealth
+        {where_sql}
+        """,
+        tuple(params),
+    )
+    row = cursor.fetchone()
+    return row[0].isoformat() if row and row[0] else None
 
 
 def get_dashboard_issues_kpis(
     project_ids: Optional[List[int]] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    discipline: Optional[str] = None,
+    zone: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return KPI counts for the Issues dashboard section."""
+    status_case = (
+        "CASE "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%open%' THEN 'Open' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%progress%' THEN 'In progress' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%complete%' THEN 'Completed' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%close%' THEN 'Closed' "
+        "ELSE 'Other' "
+        "END"
+    )
+    discipline_case = (
+        "COALESCE("
+        "dp.discipline, "
+        "CASE WHEN i.source_system = 'Revizto' THEN u.display_name END"
+        ")"
+    )
+
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
 
             params: List[Any] = []
-            proj_filter_sql = ""
+            where_clauses = ["i.current_flag = 1", "(p.current_flag = 1 OR p.project_sk IS NULL)"]
             if project_ids:
                 placeholders = ", ".join("?" for _ in project_ids)
-                proj_filter_sql = f" AND p.project_bk IN ({placeholders})"
+                where_clauses.append(
+                    f"(p.project_bk IN ({placeholders}) OR (i.source_system = 'ACC' AND ve.pm_project_id IN ({placeholders})))"
+                )
                 params.extend(project_ids)
+                params.extend(project_ids)
+            if status:
+                where_clauses.append(f"LOWER({status_case}) = LOWER(?)")
+                params.append(status)
+            if priority:
+                where_clauses.append("LOWER(ISNULL(i.priority_normalized,'')) = LOWER(?)")
+                params.append(priority)
+            if discipline:
+                where_clauses.append(f"LOWER(ISNULL({discipline_case},'')) = LOWER(?)")
+                params.append(discipline)
+            if zone:
+                where_clauses.append("LOWER(ISNULL(i.location_root,'')) = LOWER(?)")
+                params.append(zone)
+            where_sql = "WHERE " + " AND ".join(where_clauses)
 
             cursor.execute(
                 f"""
@@ -5413,18 +5940,48 @@ def get_dashboard_issues_kpis(
                     FROM fact.issue_snapshot
                 ),
                 latest_issues AS (
-                    SELECT s.issue_sk, s.project_sk, s.is_open, s.backlog_age_days
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.is_open,
+                        s.backlog_age_days,
+                        s.status,
+                        s.snapshot_date_sk
                     FROM fact.issue_snapshot s
                     JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
                     COUNT(DISTINCT li.issue_sk) AS total_issues,
                     SUM(CASE WHEN li.is_open = 1 THEN 1 ELSE 0 END) AS active_issues,
                     SUM(CASE WHEN li.backlog_age_days > 30 THEN 1 ELSE 0 END) AS over_30_days
                 FROM latest_issues li
+                JOIN dim.issue i ON li.issue_sk = i.issue_sk
                 LEFT JOIN dim.project p ON li.project_sk = p.project_sk
-                WHERE (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql}
                 """,
                 tuple(params),
             )
@@ -5445,21 +6002,59 @@ def get_dashboard_issues_kpis(
                     JOIN dim.service svc ON rc.service_sk = svc.service_sk
                     WHERE rc.current_flag = 1
                     GROUP BY svc.project_sk
+                ),
+                latest_snapshot AS (
+                    SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
+                    FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
-                    COUNT(1) AS closed_since_review
+                    COUNT(DISTINCT i.issue_sk) AS closed_since_review
                 FROM dim.issue i
+                JOIN latest_issues li ON i.issue_sk = li.issue_sk
                 JOIN dim.project p ON i.project_sk = p.project_sk
                 JOIN review_anchor ra ON ra.project_sk = p.project_sk
-                WHERE i.current_flag = 1
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql}
                   AND i.closed_date_sk IS NOT NULL
                   AND i.closed_date_sk >= ra.last_review_date_sk
-                {proj_filter_sql}
                 """,
                 tuple(params),
             )
             row = cursor.fetchone()
             totals["closed_since_review"] = int(row[0] or 0) if row else 0
+            totals["as_of"] = _get_latest_issue_snapshot_date(cursor)
             return totals
     except Exception as e:
         logger.error("Error fetching issues KPIs: %s", e)
@@ -5473,46 +6068,269 @@ def get_dashboard_issues_kpis(
 
 def get_dashboard_issues_charts(
     project_ids: Optional[List[int]] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    discipline: Optional[str] = None,
+    zone: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return chart-ready groupings for the Issues dashboard."""
+    status_case_latest = (
+        "CASE "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%open%' THEN 'Open' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%progress%' THEN 'In progress' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%complete%' THEN 'Completed' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%close%' THEN 'Closed' "
+        "ELSE 'Other' "
+        "END"
+    )
+    status_case_trend = (
+        "CASE "
+        "WHEN LOWER(ISNULL(COALESCE(s.status, i.status), '')) LIKE '%open%' THEN 'Open' "
+        "WHEN LOWER(ISNULL(COALESCE(s.status, i.status), '')) LIKE '%progress%' THEN 'In progress' "
+        "WHEN LOWER(ISNULL(COALESCE(s.status, i.status), '')) LIKE '%complete%' THEN 'Completed' "
+        "WHEN LOWER(ISNULL(COALESCE(s.status, i.status), '')) LIKE '%close%' THEN 'Closed' "
+        "ELSE 'Other' "
+        "END"
+    )
+    discipline_case = (
+        "COALESCE("
+        "dp.discipline, "
+        "CASE WHEN i.source_system = 'Revizto' THEN u.display_name END"
+        ")"
+    )
+
     try:
+        if table_exists("issue_charts_daily", "mart", Config.WAREHOUSE_DB):
+            with get_db_connection(Config.WAREHOUSE_DB) as conn:
+                cursor = conn.cursor()
+                _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
+                cursor.execute("SELECT MAX(snapshot_date) FROM mart.issue_charts_daily")
+                latest_row = cursor.fetchone()
+                latest_date = latest_row[0] if latest_row else None
+
+                if not latest_date:
+                    return {"status": [], "priority": [], "discipline": [], "zone": [], "trend_90d": []}
+
+                where_clauses = ["snapshot_date = ?"]
+                params: List[Any] = [latest_date]
+                if project_ids:
+                    placeholders = ", ".join("?" for _ in project_ids)
+                    where_clauses.append(f"project_bk IN ({placeholders})")
+                    params.extend(project_ids)
+                if status:
+                    where_clauses.append("LOWER(status_group) = LOWER(?)")
+                    params.append(status)
+                if priority:
+                    where_clauses.append("LOWER(priority_group) = LOWER(?)")
+                    params.append(priority)
+                if discipline:
+                    where_clauses.append("LOWER(discipline_group) = LOWER(?)")
+                    params.append(discipline)
+                if zone:
+                    where_clauses.append("LOWER(zone_root) = LOWER(?)")
+                    params.append(zone)
+
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+
+                cursor.execute(
+                    f"""
+                    SELECT status_group, SUM(total_issues) AS issue_count
+                    FROM mart.issue_charts_daily
+                    {where_sql}
+                    GROUP BY status_group
+                    ORDER BY issue_count DESC
+                    """,
+                    tuple(params),
+                )
+                status_rows = cursor.fetchall()
+
+                cursor.execute(
+                    f"""
+                    SELECT priority_group, SUM(total_issues) AS issue_count
+                    FROM mart.issue_charts_daily
+                    {where_sql}
+                    GROUP BY priority_group
+                    ORDER BY issue_count DESC
+                    """,
+                    tuple(params),
+                )
+                priority_rows = cursor.fetchall()
+
+                cursor.execute(
+                    f"""
+                    SELECT discipline_group, SUM(total_issues) AS issue_count
+                    FROM mart.issue_charts_daily
+                    {where_sql}
+                    GROUP BY discipline_group
+                    ORDER BY issue_count DESC
+                    """,
+                    tuple(params),
+                )
+                discipline_rows = cursor.fetchall()
+
+                cursor.execute(
+                    f"""
+                    SELECT zone_root, SUM(total_issues) AS issue_count
+                    FROM mart.issue_charts_daily
+                    {where_sql}
+                    GROUP BY zone_root
+                    ORDER BY issue_count DESC
+                    """,
+                    tuple(params),
+                )
+                zone_rows = cursor.fetchall()
+
+                trend_where_clauses = ["snapshot_date >= DATEADD(day, -90, ?)"]
+                trend_params: List[Any] = [latest_date]
+                if project_ids:
+                    placeholders = ", ".join("?" for _ in project_ids)
+                    trend_where_clauses.append(f"project_bk IN ({placeholders})")
+                    trend_params.extend(project_ids)
+                if status:
+                    trend_where_clauses.append("LOWER(status_group) = LOWER(?)")
+                    trend_params.append(status)
+                if priority:
+                    trend_where_clauses.append("LOWER(priority_group) = LOWER(?)")
+                    trend_params.append(priority)
+                if discipline:
+                    trend_where_clauses.append("LOWER(discipline_group) = LOWER(?)")
+                    trend_params.append(discipline)
+                if zone:
+                    trend_where_clauses.append("LOWER(zone_root) = LOWER(?)")
+                    trend_params.append(zone)
+
+                trend_where_sql = "WHERE " + " AND ".join(trend_where_clauses)
+                cursor.execute(
+                    f"""
+                    WITH trend_base AS (
+                        SELECT
+                            snapshot_date,
+                            SUM(open_issues) AS open_issues,
+                            SUM(closed_issues) AS closed_issues,
+                            SUM(total_issues) AS total_issues
+                        FROM mart.issue_charts_daily
+                        {trend_where_sql}
+                        GROUP BY snapshot_date
+                    ),
+                    month_latest AS (
+                        SELECT
+                            DATEFROMPARTS(YEAR(snapshot_date), MONTH(snapshot_date), 1) AS month_start,
+                            MAX(snapshot_date) AS max_snapshot_date
+                        FROM trend_base
+                        GROUP BY DATEFROMPARTS(YEAR(snapshot_date), MONTH(snapshot_date), 1)
+                    )
+                    SELECT
+                        ml.month_start,
+                        tb.open_issues,
+                        tb.closed_issues,
+                        tb.total_issues
+                    FROM trend_base tb
+                    JOIN month_latest ml
+                        ON tb.snapshot_date = ml.max_snapshot_date
+                    ORDER BY ml.month_start
+                    """,
+                    tuple(trend_params),
+                )
+                trend_rows = cursor.fetchall()
+
+                return {
+                    "status": [{"label": row[0], "value": int(row[1] or 0)} for row in status_rows],
+                    "priority": [{"label": row[0], "value": int(row[1] or 0)} for row in priority_rows],
+                    "discipline": [{"label": row[0], "value": int(row[1] or 0)} for row in discipline_rows],
+                    "zone": [{"label": row[0], "value": int(row[1] or 0)} for row in zone_rows],
+                    "trend_90d": [
+                        {
+                            "date": row[0].isoformat() if row[0] else None,
+                            "open": int(row[1] or 0),
+                            "closed": int(row[2] or 0),
+                            "total": int(row[3] or 0),
+                        }
+                        for row in trend_rows
+                    ],
+                    "as_of": latest_date.isoformat() if latest_date else None,
+                }
+
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
             params: List[Any] = []
-            proj_filter_sql = ""
+            where_clauses_latest = ["i.current_flag = 1", "(p.current_flag = 1 OR p.project_sk IS NULL)"]
+            where_clauses_trend = ["i.current_flag = 1", "(p.current_flag = 1 OR p.project_sk IS NULL)"]
             if project_ids:
                 placeholders = ", ".join("?" for _ in project_ids)
-                proj_filter_sql = f" AND p.project_bk IN ({placeholders})"
+                project_filter = (
+                    f"(p.project_bk IN ({placeholders}) OR (i.source_system = 'ACC' AND ve.pm_project_id IN ({placeholders})))"
+                )
+                where_clauses_latest.append(project_filter)
+                where_clauses_trend.append(project_filter)
                 params.extend(project_ids)
+                params.extend(project_ids)
+            if status:
+                where_clauses_latest.append(f"LOWER({status_case_latest}) = LOWER(?)")
+                where_clauses_trend.append(f"LOWER({status_case_trend}) = LOWER(?)")
+                params.append(status)
+            if priority:
+                where_clauses_latest.append("LOWER(ISNULL(i.priority_normalized,'')) = LOWER(?)")
+                where_clauses_trend.append("LOWER(ISNULL(i.priority_normalized,'')) = LOWER(?)")
+                params.append(priority)
+            if discipline:
+                where_clauses_latest.append(f"LOWER(ISNULL({discipline_case},'')) = LOWER(?)")
+                where_clauses_trend.append(f"LOWER(ISNULL({discipline_case},'')) = LOWER(?)")
+                params.append(discipline)
+            if zone:
+                where_clauses_latest.append("LOWER(ISNULL(i.location_root,'')) = LOWER(?)")
+                where_clauses_trend.append("LOWER(ISNULL(i.location_root,'')) = LOWER(?)")
+                params.append(zone)
+            where_sql_latest = "WHERE " + " AND ".join(where_clauses_latest)
+            where_sql_trend = "WHERE " + " AND ".join(where_clauses_trend)
 
             cursor.execute(
                 f"""
                 WITH latest_snapshot AS (
                     SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
                     FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
-                    CASE
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%open%' THEN 'Open'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%progress%' THEN 'In progress'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%complete%' THEN 'Completed'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%close%' THEN 'Closed'
-                        ELSE 'Other'
-                    END AS status_group,
-                    COUNT(1) AS issue_count
-                FROM fact.issue_snapshot s
-                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                WHERE (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
-                GROUP BY
-                    CASE
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%open%' THEN 'Open'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%progress%' THEN 'In progress'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%complete%' THEN 'Completed'
-                        WHEN LOWER(ISNULL(s.status, '')) LIKE '%close%' THEN 'Closed'
-                        ELSE 'Other'
-                    END
+                    {status_case_latest} AS status_group,
+                    COUNT(DISTINCT li.issue_sk) AS issue_count
+                FROM latest_issues li
+                JOIN dim.issue i ON li.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON li.project_sk = p.project_sk
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql_latest}
+                GROUP BY {status_case_latest}
                 ORDER BY issue_count DESC
                 """,
                 tuple(params),
@@ -5524,17 +6342,47 @@ def get_dashboard_issues_charts(
                 WITH latest_snapshot AS (
                     SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
                     FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
                     COALESCE(i.priority_normalized, 'Unassigned') AS priority_group,
-                    COUNT(1) AS issue_count
-                FROM fact.issue_snapshot s
-                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
-                JOIN dim.issue i ON s.issue_sk = i.issue_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                WHERE i.current_flag = 1
-                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
+                    COUNT(DISTINCT li.issue_sk) AS issue_count
+                FROM latest_issues li
+                JOIN dim.issue i ON li.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON li.project_sk = p.project_sk
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql_latest}
                 GROUP BY COALESCE(i.priority_normalized, 'Unassigned')
                 ORDER BY issue_count DESC
                 """,
@@ -5547,29 +6395,54 @@ def get_dashboard_issues_charts(
                 WITH latest_snapshot AS (
                     SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
                     FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
                     COALESCE(
-                        ic.level1_name,
+                        dp.discipline,
                         CASE WHEN i.source_system = 'Revizto' THEN u.display_name END,
                         'Unassigned'
                     ) AS discipline,
-                    COUNT(DISTINCT s.issue_sk) AS issue_count
-                FROM fact.issue_snapshot s
-                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
-                JOIN dim.issue i ON s.issue_sk = i.issue_sk
-                LEFT JOIN brg.issue_category bic
-                    ON s.issue_sk = bic.issue_sk AND bic.category_role = 'discipline'
-                LEFT JOIN dim.issue_category ic ON bic.issue_category_sk = ic.issue_category_sk
-                LEFT JOIN dim.[user] u
-                    ON i.assignee_sk = u.user_sk AND u.current_flag = 1
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                WHERE i.current_flag = 1
-                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
+                    COUNT(DISTINCT li.issue_sk) AS issue_count
+                FROM latest_issues li
+                JOIN dim.issue i ON li.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON li.project_sk = p.project_sk
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql_latest}
                 GROUP BY
                     COALESCE(
-                        ic.level1_name,
+                        dp.discipline,
                         CASE WHEN i.source_system = 'Revizto' THEN u.display_name END,
                         'Unassigned'
                     )
@@ -5584,17 +6457,47 @@ def get_dashboard_issues_charts(
                 WITH latest_snapshot AS (
                     SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
                     FROM fact.issue_snapshot
+                ),
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
+                    FROM fact.issue_snapshot s
+                    JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 )
                 SELECT
                     COALESCE(i.location_root, 'Unassigned') AS zone_root,
-                    COUNT(1) AS issue_count
-                FROM fact.issue_snapshot s
-                JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
-                JOIN dim.issue i ON s.issue_sk = i.issue_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                WHERE i.current_flag = 1
-                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
+                    COUNT(DISTINCT li.issue_sk) AS issue_count
+                FROM latest_issues li
+                JOIN dim.issue i ON li.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON li.project_sk = p.project_sk
+                LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN acc_issues ve
+                    ON i.source_system = 'ACC'
+                   AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                   AND ve.rn = 1
+                {where_sql_latest}
                 GROUP BY COALESCE(i.location_root, 'Unassigned')
                 ORDER BY issue_count DESC
                 """,
@@ -5608,21 +6511,62 @@ def get_dashboard_issues_charts(
                     SELECT MAX(d.[date]) AS max_date
                     FROM fact.issue_snapshot s
                     JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.display_id,
+                        ve.pm_project_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
+                )
+                WITH trend_base AS (
+                    SELECT
+                        CAST(d.[date] AS date) AS snapshot_date,
+                        SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
+                        SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
+                        COUNT(DISTINCT s.issue_sk) AS total_issues
+                    FROM fact.issue_snapshot s
+                    JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                    JOIN dim.issue i ON s.issue_sk = i.issue_sk
+                    LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                    LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
+                    LEFT JOIN dim.[user] u ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                    LEFT JOIN acc_issues ve
+                        ON i.source_system = 'ACC'
+                       AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                       AND ve.rn = 1
+                    CROSS JOIN latest_day ld
+                    {where_sql_trend}
+                      AND d.[date] >= DATEADD(day, -90, ld.max_date)
+                    GROUP BY CAST(d.[date] AS date)
+                ),
+                month_latest AS (
+                    SELECT
+                        DATEFROMPARTS(YEAR(snapshot_date), MONTH(snapshot_date), 1) AS month_start,
+                        MAX(snapshot_date) AS max_snapshot_date
+                    FROM trend_base
+                    GROUP BY DATEFROMPARTS(YEAR(snapshot_date), MONTH(snapshot_date), 1)
                 )
                 SELECT
-                    CAST(d.[date] AS date) AS snapshot_date,
-                    SUM(CASE WHEN s.is_open = 1 THEN 1 ELSE 0 END) AS open_issues,
-                    SUM(CASE WHEN s.is_closed = 1 THEN 1 ELSE 0 END) AS closed_issues,
-                    COUNT(1) AS total_issues
-                FROM fact.issue_snapshot s
-                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
-                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
-                CROSS JOIN latest_day ld
-                WHERE d.[date] >= DATEADD(day, -90, ld.max_date)
-                  AND (p.current_flag = 1 OR p.project_sk IS NULL)
-                {proj_filter_sql}
-                GROUP BY CAST(d.[date] AS date)
-                ORDER BY CAST(d.[date] AS date)
+                    ml.month_start,
+                    tb.open_issues,
+                    tb.closed_issues,
+                    tb.total_issues
+                FROM trend_base tb
+                JOIN month_latest ml
+                    ON tb.snapshot_date = ml.max_snapshot_date
+                ORDER BY ml.month_start
                 """,
                 tuple(params),
             )
@@ -5642,6 +6586,7 @@ def get_dashboard_issues_charts(
                     }
                     for row in trend_rows
                 ],
+                "as_of": _get_latest_issue_snapshot_date(cursor),
             }
     except Exception as e:
         logger.error("Error fetching issues charts: %s", e)
@@ -5672,16 +6617,16 @@ def get_dashboard_issues_table(
     offset = max(page - 1, 0) * page_size
     status_case = (
         "CASE "
-        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%open%' THEN 'Open' "
-        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%progress%' THEN 'In progress' "
-        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%complete%' THEN 'Completed' "
-        "WHEN LOWER(ISNULL(ls.status, '')) LIKE '%close%' THEN 'Closed' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%open%' THEN 'Open' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%progress%' THEN 'In progress' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%complete%' THEN 'Completed' "
+        "WHEN LOWER(ISNULL(COALESCE(li.status, i.status), '')) LIKE '%close%' THEN 'Closed' "
         "ELSE 'Other' "
         "END"
     )
     discipline_case = (
         "COALESCE("
-        "ic.level1_name, "
+        "dp.discipline, "
         "CASE WHEN i.source_system = 'Revizto' THEN u.display_name END"
         ")"
     )
@@ -5689,8 +6634,9 @@ def get_dashboard_issues_table(
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
             params: List[Any] = []
-            where_clauses = ["i.current_flag = 1"]
+            where_clauses = ["i.current_flag = 1", "(p.current_flag = 1 OR p.project_sk IS NULL)"]
 
             if project_ids:
                 placeholders = ", ".join("?" for _ in project_ids)
@@ -5724,10 +6670,31 @@ def get_dashboard_issues_table(
                     SELECT MAX(snapshot_date_sk) AS snapshot_date_sk
                     FROM fact.issue_snapshot
                 ),
-                latest_status AS (
-                    SELECT s.issue_sk, s.status
+                latest_issues AS (
+                    SELECT
+                        s.issue_sk,
+                        s.project_sk,
+                        s.status,
+                        s.snapshot_date_sk
                     FROM fact.issue_snapshot s
                     JOIN latest_snapshot ls ON s.snapshot_date_sk = ls.snapshot_date_sk
+                ),
+                discipline_pick AS (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ),
+                acc_issues AS (
+                    SELECT
+                        ve.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ve.display_id
+                            ORDER BY ve.created_at DESC, ve.issue_id DESC
+                        ) AS rn
+                    FROM acc_data_schema.dbo.vw_issues_expanded ve
                 ),
                 enriched AS (
                     SELECT
@@ -5735,13 +6702,14 @@ def get_dashboard_issues_table(
                         i.issue_bk AS issue_id,
                         i.source_system,
                         p.project_name,
-                        COALESCE(ls.status, i.status) AS status,
+                        COALESCE(li.status, i.status) AS status,
                         COALESCE(i.priority_normalized, i.priority) AS priority,
                         i.title,
                         ve.Clash_Level AS clash_level,
                         ve.latest_comment AS latest_comment,
                         ve.Company AS company,
-                        ic.level1_name AS discipline,
+                        COALESCE(dp.discipline, CASE WHEN i.source_system = 'Revizto' THEN u.display_name END)
+                            AS discipline,
                         COALESCE(i.location_root, i.location_raw, 'Unassigned') AS zone,
                         i.location_root,
                         i.location_building,
@@ -5752,24 +6720,33 @@ def get_dashboard_issues_table(
                             ELSE NULL
                         END AS created_at
                     FROM dim.issue i
-                    LEFT JOIN latest_status ls ON ls.issue_sk = i.issue_sk
+                    JOIN latest_issues li ON li.issue_sk = i.issue_sk
                     LEFT JOIN dim.project p ON i.project_sk = p.project_sk
-                    LEFT JOIN brg.issue_category bic
-                        ON i.issue_sk = bic.issue_sk AND bic.category_role = 'discipline'
-                    LEFT JOIN dim.issue_category ic ON bic.issue_category_sk = ic.issue_category_sk
+                    LEFT JOIN discipline_pick dp ON i.issue_sk = dp.issue_sk
                     LEFT JOIN dim.[user] u
                         ON i.assignee_sk = u.user_sk AND u.current_flag = 1
-                    LEFT JOIN acc_data_schema.dbo.vw_issues_expanded ve
+                    LEFT JOIN acc_issues ve
                         ON i.source_system = 'ACC'
                        AND CAST(ve.display_id AS NVARCHAR(255)) = i.issue_bk
+                       AND ve.rn = 1
                     WHERE {where_sql}
+                ),
+                deduped AS (
+                    SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY issue_sk
+                            ORDER BY created_at DESC, issue_id DESC
+                        ) AS issue_rn
+                    FROM enriched
                 ),
                 numbered AS (
                     SELECT
                         *,
                         COUNT(1) OVER() AS total_count,
                         ROW_NUMBER() OVER (ORDER BY {sort_col} {sort_direction}) AS rn
-                    FROM enriched
+                    FROM deduped
+                    WHERE issue_rn = 1
                 )
                 SELECT
                     issue_id,
@@ -5819,6 +6796,7 @@ def get_dashboard_issues_table(
                     }
                     for row in rows
                 ],
+                "as_of": _get_latest_issue_snapshot_date(cursor),
             }
     except Exception as e:
         logger.error("Error fetching issues table: %s", e)
@@ -6079,16 +7057,651 @@ def get_revit_health_dashboard_summary(
                 for row in cursor.fetchall()
             ]
 
+            sections = {}
+            as_of = _get_revit_health_as_of(cursor, project_ids)
+
+            try:
+                sections["file_naming"] = get_naming_compliance_dashboard_metrics(
+                    project_ids=project_ids,
+                    discipline=discipline,
+                )
+            except Exception as naming_exc:
+                logger.error("Error fetching naming compliance metrics for health dashboard: %s", naming_exc)
+                sections["file_naming"] = {"summary": {}, "by_discipline": [], "recent_invalid": [], "error": str(naming_exc)}
+
+            # Coordinates, grid, and level summaries live in RevitHealthCheckDB.
+            with get_db_connection(Config.REVIT_HEALTH_DB) as rh_conn:
+                rh_cursor = rh_conn.cursor()
+
+                # Coordinates compliance summary
+                coord_params: List[Any] = []
+                coord_where = []
+                coord_join = ""
+                coord_source = "dbo.vw_CoordinateAlignmentCheck c"
+                coord_has_pm_project = table_has_column(
+                    "vw_CoordinateAlignmentCheck",
+                    "pm_project_id",
+                    Config.REVIT_HEALTH_DB,
+                )
+                if project_ids:
+                    placeholders = ", ".join("?" for _ in project_ids)
+                    if coord_has_pm_project:
+                        coord_where.append(f"c.pm_project_id IN ({placeholders})")
+                    else:
+                        coord_join = (
+                            "LEFT JOIN ProjectManagement.dbo.projects p "
+                            "ON p.project_name = c.strExtractedProjectName"
+                        )
+                        coord_where.append(f"p.project_id IN ({placeholders})")
+                    coord_params.extend(project_ids)
+                if discipline:
+                    coord_where.append("LOWER(ISNULL(c.discipline_full_name,'')) = LOWER(?)")
+                    coord_params.append(discipline)
+                coord_where_sql = "WHERE " + " AND ".join(coord_where) if coord_where else ""
+                rh_cursor.execute(
+                    f"""
+                    SELECT
+                        COUNT(1) AS total,
+                        SUM(CASE WHEN c.Is_Compliant = 1 THEN 1 ELSE 0 END) AS compliant,
+                        SUM(CASE WHEN c.Is_Compliant = 0 THEN 1 ELSE 0 END) AS non_compliant,
+                        SUM(CASE WHEN c.ControlFileName IS NULL THEN 1 ELSE 0 END) AS missing_control
+                    FROM {coord_source}
+                    {coord_join}
+                    {coord_where_sql}
+                    """,
+                    tuple(coord_params),
+                )
+                coord_row = rh_cursor.fetchone() or [0, 0, 0, 0]
+                sections["coordinates"] = {
+                    "total": int(coord_row[0] or 0),
+                    "compliant": int(coord_row[1] or 0),
+                    "non_compliant": int(coord_row[2] or 0),
+                    "missing_control": int(coord_row[3] or 0),
+                    "as_of": as_of,
+                }
+
+                # Grid alignment summary
+                grid_params: List[Any] = []
+                grid_where = []
+                grid_model_zone_expr = _sql_zone_code_from_filename("g.strRvtFileName")
+                grid_control_zone_expr = _sql_zone_code_from_filename("g.ControlFileName")
+                if project_ids:
+                    placeholders = ", ".join("?" for _ in project_ids)
+                    grid_where.append(f"p.project_id IN ({placeholders})")
+                    grid_params.extend(project_ids)
+                if discipline:
+                    grid_where.append("LOWER(ISNULL(g.discipline_full_name,'')) = LOWER(?)")
+                    grid_params.append(discipline)
+                grid_where.append(
+                    f"ISNULL({grid_model_zone_expr}, '') = ISNULL({grid_control_zone_expr}, '')"
+                )
+                grid_where_sql = "WHERE " + " AND ".join(grid_where) if grid_where else ""
+                rh_cursor.execute(
+                    f"""
+                    SELECT
+                        COUNT(1) AS total,
+                        SUM(CASE WHEN g.AlignmentStatus = 'Aligned' THEN 1 ELSE 0 END) AS aligned,
+                        SUM(CASE WHEN g.AlignmentStatus = 'Slight Deviation' THEN 1 ELSE 0 END) AS slight_deviation,
+                        SUM(CASE WHEN g.AlignmentStatus = 'Not Aligned' THEN 1 ELSE 0 END) AS not_aligned,
+                        SUM(CASE WHEN g.AlignmentStatus = 'Additional Grid to Control Model' THEN 1 ELSE 0 END) AS additional_grids,
+                        SUM(CASE WHEN g.AlignmentStatus = 'Missing in Model' THEN 1 ELSE 0 END) AS missing_grids
+                    FROM dbo.qry_GridAlignmentCheck g
+                    LEFT JOIN ProjectManagement.dbo.projects p
+                        ON p.project_name = g.strExtractedProjectName
+                    {grid_where_sql}
+                    """,
+                    tuple(grid_params),
+                )
+                grid_row = rh_cursor.fetchone() or [0, 0, 0, 0, 0, 0]
+                sections["grids"] = {
+                    "total": int(grid_row[0] or 0),
+                    "aligned": int(grid_row[1] or 0),
+                    "slight_deviation": int(grid_row[2] or 0),
+                    "not_aligned": int(grid_row[3] or 0),
+                    "additional_grids": int(grid_row[4] or 0),
+                    "missing_grids": int(grid_row[5] or 0),
+                    "as_of": as_of,
+                }
+
+                # Level alignment summary
+                level_params: List[Any] = []
+                level_where = []
+                if project_ids:
+                    placeholders = ", ".join("?" for _ in project_ids)
+                    level_where.append(f"p.project_id IN ({placeholders})")
+                    level_params.extend(project_ids)
+                if discipline:
+                    level_where.append("LOWER(ISNULL(l.DisciplineFullName,'')) = LOWER(?)")
+                    level_params.append(discipline)
+                level_where_sql = "WHERE " + " AND ".join(level_where) if level_where else ""
+                rh_cursor.execute(
+                    f"""
+                    SELECT
+                        COUNT(1) AS total,
+                        SUM(CASE WHEN l.AlignmentStatus = 'Aligned' THEN 1 ELSE 0 END) AS aligned,
+                        SUM(CASE WHEN l.AlignmentStatus = 'Not Aligned' THEN 1 ELSE 0 END) AS not_aligned
+                    FROM dbo.qry_LevelAlignmentCheck l
+                    LEFT JOIN ProjectManagement.dbo.projects p
+                        ON p.project_name = l.ProjectName
+                    {level_where_sql}
+                    """,
+                    tuple(level_params),
+                )
+                level_row = rh_cursor.fetchone() or [0, 0, 0]
+                sections["levels"] = {
+                    "total": int(level_row[0] or 0),
+                    "aligned": int(level_row[1] or 0),
+                    "not_aligned": int(level_row[2] or 0),
+                    "as_of": as_of,
+                }
+
             return {
                 "summary": summary,
                 "trend": trend,
                 "categories": categories,
                 "by_discipline": by_discipline,
                 "top_files": top_files,
+                "as_of": summary.get("latest_check_date"),
+                "sections": sections,
             }
     except Exception as exc:
         logger.error("Error fetching Revit health dashboard summary: %s", exc)
         return {"summary": {}, "trend": [], "error": str(exc)}
+
+
+def _sql_zone_code_from_filename(column_sql: str) -> str:
+    """Return SQL expression to extract the zone code (3rd token) from a file name."""
+    cleaned = (
+        f"REPLACE(REPLACE(CASE WHEN RIGHT(LOWER(LTRIM(RTRIM({column_sql}))),4) = '.rvt' "
+        f"THEN LEFT(LTRIM(RTRIM({column_sql})), LEN(LTRIM(RTRIM({column_sql})))-4) "
+        f"ELSE LTRIM(RTRIM({column_sql})) END, '_','-'), ' ', '')"
+    )
+    return (
+        f"UPPER(NULLIF("
+        f"CASE WHEN CHARINDEX('-', {cleaned}) > 0 "
+        f"AND CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}) + 1) > 0 THEN "
+        f"SUBSTRING({cleaned}, "
+        f"CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}) + 1) + 1, "
+        f"CASE WHEN CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}) + 1) + 1) > 0 "
+        f"THEN CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}) + 1) + 1) "
+        f"- CHARINDEX('-', {cleaned}, CHARINDEX('-', {cleaned}) + 1) - 1 "
+        f"ELSE LEN({cleaned}) END) END, '' ))"
+    )
+
+
+def get_grid_alignment_dashboard(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "project_name",
+    sort_dir: str = "asc",
+) -> Dict[str, Any]:
+    """
+    Paginated grid alignment rows based on control model baseline.
+    """
+    sort_map = {
+        "project_name": "project_name",
+        "model_file_name": "model_file_name",
+        "grid_name": "grid_name",
+        "alignment_status": "alignment_status",
+        "angle_degrees": "angle_degrees",
+        "discipline": "discipline_full_name",
+    }
+    sort_column = sort_map.get(sort_by, "project_name")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"project_id IN ({placeholders})")
+        params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
+        params.append(discipline)
+    where_clauses.append("ISNULL(model_zone_code, '') = ISNULL(control_zone_code, '')")
+    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    model_zone_expr = _sql_zone_code_from_filename("g.strRvtFileName")
+    control_zone_expr = _sql_zone_code_from_filename("g.ControlFileName")
+
+    try:
+        with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
+            cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
+
+            cursor.execute(
+                f"""
+                WITH project_map AS (
+                    SELECT project_id, project_name
+                    FROM ProjectManagement.dbo.projects
+                    UNION ALL
+                    SELECT pm_project_id AS project_id, alias_name AS project_name
+                    FROM ProjectManagement.dbo.project_aliases
+                ),
+                mapped AS (
+                    SELECT
+                        pm.project_id,
+                        p.project_name AS canonical_project_name,
+                        g.strExtractedProjectName,
+                        g.strRvtFileName AS model_file_name,
+                        g.ControlFileName AS control_file_name,
+                        g.GridName AS grid_name,
+                        g.discipline_full_name,
+                        g.ModelExportedDate AS model_exported_date,
+                        g.ControlExportedDate AS control_exported_date,
+                        g.AngleDegrees AS angle_degrees,
+                        g.AlignmentStatus AS alignment_status,
+                        g.Status AS status_flag,
+                        g.Description AS description,
+                        {model_zone_expr} AS model_zone_code,
+                        {control_zone_expr} AS control_zone_code
+                    FROM dbo.qry_GridAlignmentCheck g
+                    LEFT JOIN project_map pm
+                        ON g.strExtractedProjectName = pm.project_name
+                    LEFT JOIN ProjectManagement.dbo.projects p
+                        ON pm.project_id = p.project_id
+                )
+                SELECT COUNT(1)
+                FROM mapped
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                WITH project_map AS (
+                    SELECT project_id, project_name
+                    FROM ProjectManagement.dbo.projects
+                    UNION ALL
+                    SELECT pm_project_id AS project_id, alias_name AS project_name
+                    FROM ProjectManagement.dbo.project_aliases
+                ),
+                mapped AS (
+                    SELECT
+                        pm.project_id,
+                        COALESCE(p.project_name, g.strExtractedProjectName) AS project_name,
+                        g.strExtractedProjectName AS source_project_name,
+                        g.strRvtFileName AS model_file_name,
+                        g.ControlFileName AS control_file_name,
+                        g.GridName AS grid_name,
+                        g.discipline_full_name,
+                        g.ModelExportedDate AS model_exported_date,
+                        g.ControlExportedDate AS control_exported_date,
+                        g.AngleDegrees AS angle_degrees,
+                        g.AlignmentStatus AS alignment_status,
+                        g.Status AS status_flag,
+                        g.Description AS description,
+                        {model_zone_expr} AS model_zone_code,
+                        {control_zone_expr} AS control_zone_code
+                    FROM dbo.qry_GridAlignmentCheck g
+                    LEFT JOIN project_map pm
+                        ON g.strExtractedProjectName = pm.project_name
+                    LEFT JOIN ProjectManagement.dbo.projects p
+                        ON pm.project_id = p.project_id
+                )
+                SELECT
+                    project_id,
+                    project_name,
+                    source_project_name,
+                    model_file_name,
+                    control_file_name,
+                    grid_name,
+                    discipline_full_name,
+                    model_exported_date,
+                    control_exported_date,
+                    angle_degrees,
+                    alignment_status,
+                    status_flag,
+                    description
+                FROM mapped
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "source_project_name": row[2],
+                        "model_file_name": row[3],
+                        "control_file_name": row[4],
+                        "grid_name": row[5],
+                        "discipline_full_name": row[6],
+                        "model_exported_date": row[7].isoformat() if row[7] else None,
+                        "control_exported_date": row[8].isoformat() if row[8] else None,
+                        "angle_degrees": float(row[9]) if row[9] is not None else None,
+                        "alignment_status": row[10],
+                        "status_flag": row[11],
+                        "description": row[12],
+                    }
+                )
+
+            return {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "as_of": _get_revit_health_as_of(cursor, project_ids),
+            }
+    except Exception as exc:
+        logger.error("Error fetching grid alignment dashboard: %s", exc)
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}
+
+
+def get_level_alignment_dashboard(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    tolerance_mm: float = 5.0,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "project_name",
+    sort_dir: str = "asc",
+) -> Dict[str, Any]:
+    """
+    Paginated level alignment rows based on control model baseline with tolerance.
+    """
+    sort_map = {
+        "project_name": "project_name",
+        "model_file_name": "model_file_name",
+        "model_level_name": "model_level_name",
+        "alignment_status": "alignment_status",
+        "elevation_diff_mm": "elevation_diff_mm",
+        "discipline": "discipline_full_name",
+    }
+    sort_column = sort_map.get(sort_by, "project_name")
+    sort_direction = "ASC" if sort_dir and sort_dir.lower() == "asc" else "DESC"
+    offset = max(page - 1, 0) * page_size
+
+    where_clauses = []
+    filter_params: List[Any] = []
+    if project_ids:
+        placeholders = ", ".join("?" for _ in project_ids)
+        where_clauses.append(f"project_id IN ({placeholders})")
+        filter_params.extend(project_ids)
+    if discipline:
+        where_clauses.append("LOWER(ISNULL(discipline_full_name,'')) = LOWER(?)")
+        filter_params.append(discipline)
+    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    model_zone_expr = _sql_zone_code_from_filename("l.strRvtFileName")
+    control_zone_expr = _sql_zone_code_from_filename("cm.control_file_name")
+    control_level_zone_expr = _sql_zone_code_from_filename("l.strRvtFileName")
+
+    try:
+        with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
+            cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
+
+            cursor.execute(
+                f"""
+                WITH project_map AS (
+                    SELECT project_id, project_name
+                    FROM ProjectManagement.dbo.projects
+                    UNION ALL
+                    SELECT pm_project_id AS project_id, alias_name AS project_name
+                    FROM ProjectManagement.dbo.project_aliases
+                ),
+                control_models AS (
+                    SELECT
+                        p.project_id,
+                        p.project_name,
+                        cm.control_file_name
+                    FROM ProjectManagement.dbo.tblControlModels cm
+                    JOIN ProjectManagement.dbo.projects p
+                        ON cm.project_id = p.project_id
+                ),
+                model_levels AS (
+                    SELECT
+                        l.nId,
+                        pm.project_id,
+                        p.project_name AS canonical_project_name,
+                        l.strExtractedProjectName AS source_project_name,
+                        l.discipline_full_name,
+                        l.strRvtFileName AS model_file_name,
+                        l.LevelName AS model_level_name,
+                        l.ActualElevationMM AS model_elevation_mm,
+                        cm.control_file_name,
+                        {model_zone_expr} AS model_zone_code,
+                        {control_zone_expr} AS control_zone_code
+                    FROM dbo.qry_Levels l
+                    JOIN project_map pm
+                        ON l.strExtractedProjectName = pm.project_name
+                    JOIN ProjectManagement.dbo.projects p
+                        ON pm.project_id = p.project_id
+                    JOIN control_models cm
+                        ON p.project_id = cm.project_id
+                    WHERE l.strRvtFileName <> cm.control_file_name
+                      AND ISNULL({model_zone_expr}, '') = ISNULL({control_zone_expr}, '')
+                ),
+                control_levels AS (
+                    SELECT
+                        pm.project_id,
+                        {control_level_zone_expr} AS control_zone_code,
+                        l.LevelName AS control_level_name,
+                        l.ActualElevationMM AS control_elevation_mm
+                    FROM dbo.qry_Levels l
+                    JOIN project_map pm
+                        ON l.strExtractedProjectName = pm.project_name
+                    JOIN control_models cm
+                        ON pm.project_id = cm.project_id
+                    WHERE l.strRvtFileName = cm.control_file_name
+                ),
+                matched AS (
+                    SELECT
+                        ml.project_id,
+                        ml.canonical_project_name,
+                        ml.source_project_name,
+                        ml.discipline_full_name,
+                        ml.model_file_name,
+                        ml.control_file_name,
+                        ml.model_level_name,
+                        ml.model_elevation_mm,
+                        cl.control_level_name,
+                        cl.control_elevation_mm,
+                        ABS(ml.model_elevation_mm - cl.control_elevation_mm) AS elevation_diff_mm,
+                        CASE
+                            WHEN cl.control_level_name IS NULL AND cl.control_elevation_mm IS NULL THEN 'Missing in Control'
+                            WHEN ml.model_level_name = cl.control_level_name
+                                 AND ml.model_elevation_mm = cl.control_elevation_mm THEN 'Aligned'
+                            WHEN ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ? THEN 'Aligned (Within tolerance)'
+                            ELSE 'Not Aligned'
+                        END AS alignment_status,
+                        CASE
+                            WHEN cl.control_level_name IS NULL AND cl.control_elevation_mm IS NULL THEN NULL
+                            WHEN ml.model_level_name = cl.control_level_name
+                                 AND ml.model_elevation_mm = cl.control_elevation_mm THEN NULL
+                            WHEN ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ? THEN 'Within tolerance (not exact)'
+                            ELSE NULL
+                        END AS alignment_note
+                    FROM model_levels ml
+                    OUTER APPLY (
+                        SELECT TOP 1
+                            cl.control_level_name,
+                            cl.control_elevation_mm
+                        FROM control_levels cl
+                        WHERE cl.project_id = ml.project_id
+                          AND cl.control_zone_code = ml.model_zone_code
+                          AND (
+                              ml.model_level_name = cl.control_level_name
+                              OR ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ?
+                          )
+                        ORDER BY
+                            CASE WHEN ml.model_level_name = cl.control_level_name THEN 0 ELSE 1 END,
+                            ABS(ml.model_elevation_mm - cl.control_elevation_mm)
+                    ) cl
+                )
+                SELECT COUNT(1)
+                FROM matched
+                {where_sql}
+                """,
+                tuple([tolerance_mm, tolerance_mm, tolerance_mm] + filter_params),
+            )
+            total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"""
+                WITH project_map AS (
+                    SELECT project_id, project_name
+                    FROM ProjectManagement.dbo.projects
+                    UNION ALL
+                    SELECT pm_project_id AS project_id, alias_name AS project_name
+                    FROM ProjectManagement.dbo.project_aliases
+                ),
+                control_models AS (
+                    SELECT
+                        p.project_id,
+                        p.project_name,
+                        cm.control_file_name
+                    FROM ProjectManagement.dbo.tblControlModels cm
+                    JOIN ProjectManagement.dbo.projects p
+                        ON cm.project_id = p.project_id
+                ),
+                model_levels AS (
+                    SELECT
+                        l.nId,
+                        pm.project_id,
+                        p.project_name AS canonical_project_name,
+                        l.strExtractedProjectName AS source_project_name,
+                        l.discipline_full_name,
+                        l.strRvtFileName AS model_file_name,
+                        l.LevelName AS model_level_name,
+                        l.ActualElevationMM AS model_elevation_mm,
+                        cm.control_file_name,
+                        {model_zone_expr} AS model_zone_code,
+                        {control_zone_expr} AS control_zone_code
+                    FROM dbo.qry_Levels l
+                    JOIN project_map pm
+                        ON l.strExtractedProjectName = pm.project_name
+                    JOIN ProjectManagement.dbo.projects p
+                        ON pm.project_id = p.project_id
+                    JOIN control_models cm
+                        ON p.project_id = cm.project_id
+                    WHERE l.strRvtFileName <> cm.control_file_name
+                      AND ISNULL({model_zone_expr}, '') = ISNULL({control_zone_expr}, '')
+                ),
+                control_levels AS (
+                    SELECT
+                        pm.project_id,
+                        {control_level_zone_expr} AS control_zone_code,
+                        l.LevelName AS control_level_name,
+                        l.ActualElevationMM AS control_elevation_mm
+                    FROM dbo.qry_Levels l
+                    JOIN project_map pm
+                        ON l.strExtractedProjectName = pm.project_name
+                    JOIN control_models cm
+                        ON pm.project_id = cm.project_id
+                    WHERE l.strRvtFileName = cm.control_file_name
+                ),
+                matched AS (
+                    SELECT
+                        ml.project_id,
+                        COALESCE(ml.canonical_project_name, ml.source_project_name) AS project_name,
+                        ml.source_project_name,
+                        ml.discipline_full_name,
+                        ml.model_file_name,
+                        ml.control_file_name,
+                        ml.model_level_name,
+                        ml.model_elevation_mm,
+                        cl.control_level_name,
+                        cl.control_elevation_mm,
+                        ABS(ml.model_elevation_mm - cl.control_elevation_mm) AS elevation_diff_mm,
+                        CASE
+                            WHEN cl.control_level_name IS NULL AND cl.control_elevation_mm IS NULL THEN 'Missing in Control'
+                            WHEN ml.model_level_name = cl.control_level_name
+                                 AND ml.model_elevation_mm = cl.control_elevation_mm THEN 'Aligned'
+                            WHEN ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ? THEN 'Aligned (Within tolerance)'
+                            ELSE 'Not Aligned'
+                        END AS alignment_status,
+                        CASE
+                            WHEN cl.control_level_name IS NULL AND cl.control_elevation_mm IS NULL THEN NULL
+                            WHEN ml.model_level_name = cl.control_level_name
+                                 AND ml.model_elevation_mm = cl.control_elevation_mm THEN NULL
+                            WHEN ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ? THEN 'Within tolerance (not exact)'
+                            ELSE NULL
+                        END AS alignment_note
+                    FROM model_levels ml
+                    OUTER APPLY (
+                        SELECT TOP 1
+                            cl.control_level_name,
+                            cl.control_elevation_mm
+                        FROM control_levels cl
+                        WHERE cl.project_id = ml.project_id
+                          AND cl.control_zone_code = ml.model_zone_code
+                          AND (
+                              ml.model_level_name = cl.control_level_name
+                              OR ABS(ml.model_elevation_mm - cl.control_elevation_mm) <= ?
+                          )
+                        ORDER BY
+                            CASE WHEN ml.model_level_name = cl.control_level_name THEN 0 ELSE 1 END,
+                            ABS(ml.model_elevation_mm - cl.control_elevation_mm)
+                    ) cl
+                )
+                SELECT
+                    project_id,
+                    project_name,
+                    source_project_name,
+                    discipline_full_name,
+                    model_file_name,
+                    control_file_name,
+                    model_level_name,
+                    model_elevation_mm,
+                    control_level_name,
+                    control_elevation_mm,
+                    elevation_diff_mm,
+                    alignment_status,
+                    alignment_note
+                FROM matched
+                {where_sql}
+                ORDER BY {sort_column} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple([tolerance_mm, tolerance_mm, tolerance_mm] + filter_params + [offset, page_size]),
+            )
+            items = []
+            for row in cursor.fetchall():
+                items.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "source_project_name": row[2],
+                        "discipline_full_name": row[3],
+                        "model_file_name": row[4],
+                        "control_file_name": row[5],
+                        "model_level_name": row[6],
+                        "model_elevation_mm": float(row[7]) if row[7] is not None else None,
+                        "control_level_name": row[8],
+                        "control_elevation_mm": float(row[9]) if row[9] is not None else None,
+                        "elevation_diff_mm": float(row[10]) if row[10] is not None else None,
+                        "alignment_status": row[11],
+                        "alignment_note": row[12],
+                    }
+                )
+
+            return {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "tolerance_mm": tolerance_mm,
+                "as_of": _get_revit_health_as_of(cursor, project_ids),
+            }
+    except Exception as exc:
+        logger.error("Error fetching level alignment dashboard: %s", exc)
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "tolerance_mm": tolerance_mm,
+            "error": str(exc),
+        }
 
 
 def get_naming_compliance_dashboard_metrics(
@@ -6104,6 +7717,7 @@ def get_naming_compliance_dashboard_metrics(
         from config import Config
         with get_db_connection(Config.REVIT_HEALTH_DB) as conn:
             cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
 
             # Latest validation per file (view already keeps latest per file via rn=1)
             where_clauses = []
@@ -6223,6 +7837,7 @@ def get_naming_compliance_dashboard_metrics(
                 },
                 "by_discipline": by_discipline,
                 "recent_invalid": recent_invalid,
+                "as_of": latest_validated,
             }
     except Exception as exc:
         logger.error("Error fetching naming compliance metrics: %s", exc)
@@ -6342,9 +7957,17 @@ def get_naming_compliance_table(
     try:
         with get_db_connection(Config.WAREHOUSE_DB) as conn:
             cursor = conn.cursor()
+            _set_cursor_timeout(cursor, _DASHBOARD_QUERY_TIMEOUT)
 
             cursor.execute(f"SELECT COUNT(*) FROM mart.v_naming_compliance_files {where_sql}", tuple(params))
             total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"SELECT MAX(validated_date) FROM mart.v_naming_compliance_files {where_sql}",
+                tuple(params),
+            )
+            as_of_row = cursor.fetchone()
+            as_of = as_of_row[0].isoformat() if as_of_row and as_of_row[0] else None
 
             cursor.execute(
                 f"""
@@ -6388,6 +8011,7 @@ def get_naming_compliance_table(
                 "total": total,
                 "page": page,
                 "page_size": page_size,
+                "as_of": as_of,
             }
     except Exception as exc:
         logger.error("Error fetching naming compliance table: %s", exc)
@@ -6441,6 +8065,13 @@ def get_control_points_dashboard(
 
             cursor.execute(f"SELECT COUNT(*) FROM mart.v_control_points_compliance {where_sql}", tuple(params))
             total = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                f"SELECT MAX(validated_date) FROM mart.v_control_points_compliance {where_sql}",
+                tuple(params),
+            )
+            as_of_row = cursor.fetchone()
+            as_of = as_of_row[0].isoformat() if as_of_row and as_of_row[0] else None
 
             cursor.execute(
                 f"""
@@ -6523,6 +8154,7 @@ def get_control_points_dashboard(
                 "page": page,
                 "page_size": page_size,
                 "project_summary": summary,
+                "as_of": as_of,
             }
     except Exception as exc:
         logger.error("Error fetching control points dashboard: %s", exc)
@@ -6582,6 +8214,13 @@ def get_coordinate_alignment_dashboard(
             cursor = conn.cursor()
 
             total = -1
+
+            cursor.execute(
+                f"SELECT MAX(snapshot_date) FROM fact.coordinate_alignment_daily {where_sql}",
+                tuple(params),
+            )
+            as_of_row = cursor.fetchone()
+            as_of = as_of_row[0].isoformat() if as_of_row and as_of_row[0] else None
 
             cursor.execute(
                 f"""
@@ -6854,6 +8493,7 @@ def get_coordinate_alignment_dashboard(
                 "total": total,
                 "page": page,
                 "page_size": page_size,
+                "as_of": as_of,
             }
     except Exception as exc:
         logger.error("Error fetching coordinate alignment dashboard: %s", exc)
@@ -6910,6 +8550,13 @@ def get_model_register(
             total = int(cursor.fetchone()[0] or 0)
 
             cursor.execute(
+                f"SELECT MAX(last_seen_at) FROM mart.v_model_register {where_sql}",
+                tuple(params),
+            )
+            as_of_row = cursor.fetchone()
+            as_of = as_of_row[0].isoformat() if as_of_row and as_of_row[0] else None
+
+            cursor.execute(
                 f"""
                 SELECT
                     pm_project_id,
@@ -6938,7 +8585,7 @@ def get_model_register(
                     }
                 )
 
-            return {"items": items, "total": total, "page": page, "page_size": page_size}
+            return {"items": items, "total": total, "page": page, "page_size": page_size, "as_of": as_of}
     except Exception as exc:
         logger.error("Error fetching model register: %s", exc)
         return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}
@@ -6993,6 +8640,13 @@ def get_revizto_issues_detail(
             total = int(cursor.fetchone()[0] or 0)
 
             cursor.execute(
+                f"SELECT MAX(updated_at) FROM mart.v_revizto_issues_detail {where_sql}",
+                tuple(params),
+            )
+            as_of_row = cursor.fetchone()
+            as_of = as_of_row[0].isoformat() if as_of_row and as_of_row[0] else None
+
+            cursor.execute(
                 f"""
                 SELECT
                     issueId,
@@ -7037,7 +8691,7 @@ def get_revizto_issues_detail(
                     }
                 )
 
-            return {"items": items, "total": total, "page": page, "page_size": page_size}
+            return {"items": items, "total": total, "page": page, "page_size": page_size, "as_of": as_of}
     except Exception as exc:
         logger.error("Error fetching Revizto issues detail: %s", exc)
         return {"items": [], "total": 0, "page": page, "page_size": page_size, "error": str(exc)}

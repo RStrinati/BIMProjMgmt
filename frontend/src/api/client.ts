@@ -1,14 +1,40 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { logNetworkTiming } from '@/utils/perfLogger';
 
+const envBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+const runtimeHost = typeof window !== 'undefined' ? window.location.hostname : '';
+const runtimeProtocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+const fallbackBaseUrl = runtimeHost ? `${runtimeProtocol}//${runtimeHost}:5000/api` : '/api';
+const overrideLocalhostEnv =
+  Boolean(envBaseUrl) &&
+  Boolean(runtimeHost) &&
+  !['localhost', '127.0.0.1'].includes(runtimeHost) &&
+  (envBaseUrl?.includes('localhost') || envBaseUrl?.includes('127.0.0.1'));
+const apiBaseUrl = overrideLocalhostEnv ? fallbackBaseUrl : envBaseUrl || '/api';
+
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
-  baseURL: '/api', // Proxied to http://localhost:5000/api by Vite
+  baseURL: apiBaseUrl, // Defaults to Vite proxy or explicit env override
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+const frontendLogUrl = `${apiBaseUrl.replace(/\/$/, '')}/logs/frontend`;
+const shouldLogUrl = (url?: string | null) => !!url && !url.includes('/logs/frontend');
+
+const logFrontendEvent = (event: Record<string, unknown>) => {
+  if (typeof window === 'undefined' || !frontendLogUrl || !shouldLogUrl(String(event?.url ?? ''))) {
+    return;
+  }
+  void fetch(frontendLogUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+    keepalive: true,
+  }).catch(() => undefined);
+};
 
 // Request interceptor
 apiClient.interceptors.request.use(
@@ -17,17 +43,18 @@ apiClient.interceptors.request.use(
     requestConfig.metadata = {
       startTime: typeof performance !== 'undefined' ? performance.now() : Date.now(),
     };
+    logFrontendEvent({
+      level: 'debug',
+      message: 'request:start',
+      context: {
+        method: requestConfig.method,
+        url: requestConfig.url,
+      },
+    });
 
-    // Add any auth tokens here if needed in the future
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor
@@ -47,6 +74,16 @@ apiClient.interceptors.response.use(
         status: response.status,
         durationMs: duration,
       });
+      logFrontendEvent({
+        level: 'info',
+        message: 'request:success',
+        context: {
+          method: response.config.method,
+          url: response.config.url,
+          status: response.status,
+          duration: duration.toFixed(1),
+        },
+      });
     }
 
     return response;
@@ -65,21 +102,29 @@ apiClient.interceptors.response.use(
         status: error.response?.status,
         durationMs: duration,
       });
+      logFrontendEvent({
+        level: 'error',
+        message: 'request:error',
+        context: {
+          method: errorConfig?.method,
+          url: errorConfig?.url,
+          status: error.response?.status,
+          duration: duration.toFixed(1),
+          message: error.message,
+        },
+      });
     }
 
-    // Handle common errors
     if (error.response) {
-      // Server responded with error status
       console.error('API Error:', error.response.status, error.response.data);
     } else if (error.request) {
-      // Request made but no response
       console.error('Network Error: No response from server');
     } else {
-      // Error in request setup
       console.error('Request Error:', error.message);
     }
     return Promise.reject(error);
-  }
+  },
 );
 
+export { frontendLogUrl };
 export default apiClient;
