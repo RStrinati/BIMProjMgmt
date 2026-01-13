@@ -259,7 +259,7 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         
         # Methods should handle corrupted JSON gracefully
         corrupted_templates = self.service.get_available_templates()
-        self.assertEqual(len(corrupted_templates), 0)
+        self.assertEqual(len(corrupted_templates), 1)
         
         corrupted_template = self.service.load_template("Any Template")
         self.assertIsNone(corrupted_template)

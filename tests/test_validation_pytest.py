@@ -62,7 +62,7 @@ class TestReviewValidationService:
             'service_name': 'Test Review Service',
             'phase': 'Design Phase',
             'unit_type': 'review',
-            'default_units': 5,
+            'unit_qty': 5,
             'unit_rate': 100.0,
             'bill_rule': 'per_unit_complete'
         }

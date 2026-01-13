@@ -15,12 +15,13 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pyodbc  # type: ignore
 
 from config import Config
 from database_pool import get_db_connection
+from constants import schema as S
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class DataQualityCheck:
     query: str
     expected_result: Callable[[Sequence[pyodbc.Row]], bool]
     failure_message: Callable[[Sequence[pyodbc.Row]], str]
+    params: Optional[Tuple[Any, ...]] = None
+    details_on_pass: bool = False
 
 
 class WarehousePipeline:
@@ -49,6 +52,9 @@ class WarehousePipeline:
         self.warehouse_db = warehouse_db
         self.pipeline_name = pipeline_name
         self._current_run_id: Optional[int] = None
+        self._issue_import_run_id: Optional[int] = None
+        self._issue_source_watermark: Optional[datetime] = None
+        self._issue_snapshot_date: Optional[datetime] = None
 
     # ------------------------------------------------------------------
     # Control helpers
@@ -83,6 +89,58 @@ class WarehousePipeline:
             )
             conn.commit()
         logger.info("Completed ETL run id=%s with status=%s", self._current_run_id, status)
+
+    def _start_issue_import_run(self, run_type: str = "warehouse_full_load") -> None:
+        """Start an issue import run for dashboard gating."""
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{S.IssueImportRuns.TABLE} (
+                    {S.IssueImportRuns.SOURCE_SYSTEM},
+                    {S.IssueImportRuns.RUN_TYPE},
+                    {S.IssueImportRuns.STATUS},
+                    {S.IssueImportRuns.NOTES}
+                )
+                OUTPUT INSERTED.{S.IssueImportRuns.IMPORT_RUN_ID}
+                VALUES (?, ?, ?, ?)
+                """,
+                ("combined", run_type, "running", self.pipeline_name),
+            )
+            self._issue_import_run_id = cursor.fetchone()[0]
+            conn.commit()
+        logger.info("Started issue import run id=%s", self._issue_import_run_id)
+
+    def _complete_issue_import_run(
+        self,
+        status: str,
+        message: Optional[str] = None,
+        row_count: Optional[int] = None,
+    ) -> None:
+        if self._issue_import_run_id is None:
+            return
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE dbo.{S.IssueImportRuns.TABLE}
+                SET {S.IssueImportRuns.STATUS} = ?,
+                    {S.IssueImportRuns.COMPLETED_AT} = SYSUTCDATETIME(),
+                    {S.IssueImportRuns.SOURCE_WATERMARK} = ?,
+                    {S.IssueImportRuns.ROW_COUNT} = ?,
+                    {S.IssueImportRuns.NOTES} = ?
+                WHERE {S.IssueImportRuns.IMPORT_RUN_ID} = ?
+                """,
+                (
+                    status,
+                    self._issue_source_watermark,
+                    row_count,
+                    message,
+                    self._issue_import_run_id,
+                ),
+            )
+            conn.commit()
+        logger.info("Completed issue import run id=%s status=%s", self._issue_import_run_id, status)
 
     def _get_watermark(self, process_name: str, source_object: str) -> datetime:
         with get_db_connection(self.warehouse_db) as conn:
@@ -274,7 +332,16 @@ class WarehousePipeline:
                 is_deleted, project_mapped,
                 record_source, source_load_ts
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
+            VALUES (
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?,
+                ?, SYSUTCDATETIME()
+            )
         """
         record_source = "ProjectManagement"
         insert_rows = [
@@ -327,6 +394,7 @@ class WarehousePipeline:
 
         latest = max((row.source_updated_at for row in rows if row.source_updated_at is not None), default=watermark)
         self._set_watermark(process, source_object, latest, len(rows))
+        self._issue_source_watermark = latest
         logger.info("Loaded %s issue rows into staging.", len(rows))
         return len(rows)
 
@@ -966,10 +1034,16 @@ class WarehousePipeline:
             cursor = conn.cursor()
             for check in checks:
                 logger.info("Running data quality check: %s", check.name)
-                cursor.execute(check.query)
+                if check.params:
+                    cursor.execute(check.query, check.params)
+                else:
+                    cursor.execute(check.query)
                 rows = cursor.fetchall()
                 passed = check.expected_result(rows)
-                details = None if passed else check.failure_message(rows)
+                if passed and check.details_on_pass:
+                    details = check.failure_message(rows)
+                else:
+                    details = None if passed else check.failure_message(rows)
                 cursor.execute(
                     """
                     INSERT INTO ctl.data_quality_result (run_id, check_name, severity, passed, details)
@@ -980,6 +1054,510 @@ class WarehousePipeline:
                 if not passed:
                     logger.warning("Data quality check failed (%s): %s", check.name, details)
             conn.commit()
+
+    def _load_issue_snapshots(self) -> int:
+        """Populate Issues_Snapshots from the latest warehouse snapshot."""
+        if self._issue_import_run_id is None:
+            logger.warning("No issue import run id available; skipping issue snapshots load.")
+            return 0
+
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT MAX(s.snapshot_date_sk)
+                FROM fact.issue_snapshot s
+                """
+            )
+            row = cursor.fetchone()
+            snapshot_date_sk = row[0] if row else None
+            if snapshot_date_sk is None:
+                logger.warning("No issue snapshots found in fact.issue_snapshot.")
+                return 0
+
+            cursor.execute(
+                """
+                SELECT [date]
+                FROM dim.date
+                WHERE date_sk = ?
+                """,
+                (snapshot_date_sk,),
+            )
+            snapshot_row = cursor.fetchone()
+            self._issue_snapshot_date = snapshot_row[0] if snapshot_row else None
+
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{S.IssuesSnapshots.TABLE} (
+                    {S.IssuesSnapshots.SNAPSHOT_DATE},
+                    {S.IssuesSnapshots.IMPORT_RUN_ID},
+                    {S.IssuesSnapshots.ISSUE_KEY},
+                    {S.IssuesSnapshots.ISSUE_KEY_HASH},
+                    {S.IssuesSnapshots.SOURCE_SYSTEM},
+                    {S.IssuesSnapshots.SOURCE_ISSUE_ID},
+                    {S.IssuesSnapshots.SOURCE_PROJECT_ID},
+                    {S.IssuesSnapshots.PROJECT_ID},
+                    {S.IssuesSnapshots.STATUS_NORMALIZED},
+                    {S.IssuesSnapshots.PRIORITY_NORMALIZED},
+                    {S.IssuesSnapshots.DISCIPLINE_NORMALIZED},
+                    {S.IssuesSnapshots.LOCATION_ROOT},
+                    {S.IssuesSnapshots.ASSIGNEE_USER_KEY},
+                    {S.IssuesSnapshots.IS_OPEN},
+                    {S.IssuesSnapshots.IS_CLOSED},
+                    {S.IssuesSnapshots.BACKLOG_AGE_DAYS},
+                    {S.IssuesSnapshots.RESOLUTION_DAYS},
+                    {S.IssuesSnapshots.CREATED_AT},
+                    {S.IssuesSnapshots.UPDATED_AT},
+                    {S.IssuesSnapshots.CLOSED_AT}
+                )
+                SELECT
+                    d.[date] AS snapshot_date,
+                    ? AS import_run_id,
+                    CONCAT(
+                        i.source_system,
+                        '|',
+                        COALESCE(NULLIF(i.source_project_id, ''), CAST(p.project_bk AS NVARCHAR(255)), 'unknown'),
+                        '|',
+                        COALESCE(NULLIF(i.source_issue_id, ''), i.issue_bk)
+                    ) AS issue_key,
+                    HASHBYTES(
+                        'SHA2_256',
+                        CONCAT(
+                            i.source_system,
+                            '|',
+                            COALESCE(NULLIF(i.source_project_id, ''), CAST(p.project_bk AS NVARCHAR(255)), 'unknown'),
+                            '|',
+                            COALESCE(NULLIF(i.source_issue_id, ''), i.issue_bk)
+                        )
+                    ) AS issue_key_hash,
+                    i.source_system,
+                    COALESCE(NULLIF(i.source_issue_id, ''), i.issue_bk) AS source_issue_id,
+                    COALESCE(NULLIF(i.source_project_id, ''), CAST(p.project_bk AS NVARCHAR(255)), 'unknown') AS source_project_id,
+                    CAST(p.project_bk AS NVARCHAR(100)) AS project_id,
+                    COALESCE(i.status_normalized, sm.{S.IssueStatusMap.NORMALIZED_STATUS}) AS status_normalized,
+                    i.priority_normalized,
+                    dp.discipline,
+                    i.location_root,
+                    u.user_bk AS assignee_user_key,
+                    s.is_open,
+                    s.is_closed,
+                    s.backlog_age_days,
+                    s.resolution_days,
+                    d_created.[date] AS created_at,
+                    NULL AS updated_at,
+                    d_closed.[date] AS closed_at
+                FROM fact.issue_snapshot s
+                JOIN dim.issue i ON s.issue_sk = i.issue_sk
+                LEFT JOIN dim.project p ON s.project_sk = p.project_sk
+                LEFT JOIN dbo.{S.IssueStatusMap.TABLE} sm
+                    ON sm.{S.IssueStatusMap.SOURCE_SYSTEM} = i.source_system
+                   AND sm.{S.IssueStatusMap.RAW_STATUS} = LOWER(LTRIM(RTRIM(i.status)))
+                   AND sm.{S.IssueStatusMap.IS_ACTIVE} = 1
+                LEFT JOIN dim.[user] u
+                    ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                LEFT JOIN (
+                    SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                    FROM brg.issue_category bic
+                    JOIN dim.issue_category ic
+                        ON bic.issue_category_sk = ic.issue_category_sk
+                    WHERE bic.category_role = 'discipline'
+                    GROUP BY bic.issue_sk
+                ) dp ON i.issue_sk = dp.issue_sk
+                JOIN dim.date d ON s.snapshot_date_sk = d.date_sk
+                LEFT JOIN dim.date d_created ON i.created_date_sk = d_created.date_sk
+                LEFT JOIN dim.date d_closed ON i.closed_date_sk = d_closed.date_sk
+                WHERE s.snapshot_date_sk = ?
+                  AND i.current_flag = 1
+                """,
+                (self._issue_import_run_id, snapshot_date_sk),
+            )
+            inserted = cursor.rowcount if cursor.rowcount is not None else 0
+            conn.commit()
+        logger.info("Inserted %s issue snapshot rows for run %s", inserted, self._issue_import_run_id)
+        return inserted
+
+    def _run_issue_quality_checks(self) -> bool:
+        """Run issue reliability checks and store results."""
+        if self._issue_import_run_id is None:
+            logger.warning("Cannot run issue quality checks without issue import run id.")
+            return False
+
+        checks = [
+            DataQualityCheck(
+                name="issue_key_uniqueness",
+                severity="high",
+                query=f"""
+                    SELECT COUNT(*) AS total_rows,
+                           COUNT(DISTINCT {S.IssuesSnapshots.ISSUE_KEY}) AS distinct_keys
+                    FROM dbo.{S.IssuesSnapshots.TABLE}
+                    WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                """,
+                params=(self._issue_import_run_id,),
+                expected_result=lambda rows: rows[0][0] == rows[0][1],
+                failure_message=lambda rows: f"{rows[0][0] - rows[0][1]} duplicate issue_key rows",
+            ),
+            DataQualityCheck(
+                name="issue_join_explosion_project",
+                severity="high",
+                query=f"""
+                    SELECT
+                        (SELECT COUNT(*)
+                         FROM dbo.{S.IssuesSnapshots.TABLE}
+                         WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS base_count,
+                        (SELECT COUNT(*)
+                         FROM dbo.{S.IssuesSnapshots.TABLE} s
+                         LEFT JOIN dim.project p
+                             ON TRY_CAST(s.{S.IssuesSnapshots.PROJECT_ID} AS INT) = p.project_bk
+                         WHERE s.{S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS joined_count
+                """,
+                params=(self._issue_import_run_id, self._issue_import_run_id),
+                expected_result=lambda rows: rows[0][0] == rows[0][1],
+                failure_message=lambda rows: f"Join explosion detected (base={rows[0][0]}, joined={rows[0][1]})",
+            ),
+            DataQualityCheck(
+                name="issue_project_orphans",
+                severity="high",
+                query=f"""
+                    SELECT COUNT(*) AS orphan_count
+                    FROM dbo.{S.IssuesSnapshots.TABLE} s
+                    LEFT JOIN dim.project p
+                        ON TRY_CAST(s.{S.IssuesSnapshots.PROJECT_ID} AS INT) = p.project_bk
+                    WHERE s.{S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                      AND s.{S.IssuesSnapshots.PROJECT_ID} IS NOT NULL
+                      AND p.project_sk IS NULL
+                """,
+                params=(self._issue_import_run_id,),
+                expected_result=lambda rows: rows[0][0] == 0,
+                failure_message=lambda rows: f"{rows[0][0]} issue rows missing project mapping",
+            ),
+            DataQualityCheck(
+                name="issue_status_normalized_coverage",
+                severity="high",
+                query=f"""
+                    SELECT COUNT(*) AS missing_status
+                    FROM dbo.{S.IssuesSnapshots.TABLE}
+                    WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                      AND ( {S.IssuesSnapshots.STATUS_NORMALIZED} IS NULL
+                            OR LTRIM(RTRIM({S.IssuesSnapshots.STATUS_NORMALIZED})) = '' )
+                """,
+                params=(self._issue_import_run_id,),
+                expected_result=lambda rows: rows[0][0] == 0,
+                failure_message=lambda rows: f"{rows[0][0]} issues missing normalized status",
+            ),
+            DataQualityCheck(
+                name="issue_time_sanity",
+                severity="medium",
+                query=f"""
+                    SELECT COUNT(*) AS invalid_dates
+                    FROM dbo.{S.IssuesSnapshots.TABLE}
+                    WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                      AND {S.IssuesSnapshots.CLOSED_AT} IS NOT NULL
+                      AND {S.IssuesSnapshots.CREATED_AT} IS NOT NULL
+                      AND {S.IssuesSnapshots.CLOSED_AT} < {S.IssuesSnapshots.CREATED_AT}
+                """,
+                params=(self._issue_import_run_id,),
+                expected_result=lambda rows: rows[0][0] == 0,
+                failure_message=lambda rows: f"{rows[0][0]} issues closed before created",
+            ),
+            DataQualityCheck(
+                name="issue_current_vs_snapshot_count",
+                severity="medium",
+                query=f"""
+                    SELECT
+                        (SELECT COUNT(*)
+                         FROM dbo.{S.IssuesCurrent.TABLE}) AS current_count,
+                        (SELECT COUNT(*)
+                         FROM dbo.{S.IssuesSnapshots.TABLE}
+                         WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS snapshot_count
+                """,
+                params=(self._issue_import_run_id,),
+                expected_result=lambda rows: rows[0][0] == rows[0][1],
+                failure_message=lambda rows: f"current={rows[0][0]} snapshot={rows[0][1]}",
+                details_on_pass=True,
+            ),
+            DataQualityCheck(
+                name="issue_status_changes",
+                severity="info",
+                query=f"""
+                    WITH current_run AS (
+                        SELECT ? AS run_id
+                    ),
+                    current_completed AS (
+                        SELECT completed_at
+                        FROM dbo.{S.IssueImportRuns.TABLE}
+                        WHERE {S.IssueImportRuns.IMPORT_RUN_ID} = ?
+                    ),
+                    prev_run AS (
+                        SELECT TOP 1 {S.IssueImportRuns.IMPORT_RUN_ID} AS run_id
+                        FROM dbo.{S.IssueImportRuns.TABLE}
+                        WHERE {S.IssueImportRuns.STATUS} = 'success'
+                          AND completed_at < (SELECT completed_at FROM current_completed)
+                        ORDER BY completed_at DESC
+                    ),
+                    current_snap AS (
+                        SELECT issue_key_hash, status_normalized
+                        FROM dbo.{S.IssuesSnapshots.TABLE}
+                        WHERE import_run_id = (SELECT run_id FROM current_run)
+                    ),
+                    prev_snap AS (
+                        SELECT issue_key_hash, status_normalized
+                        FROM dbo.{S.IssuesSnapshots.TABLE}
+                        WHERE import_run_id = (SELECT run_id FROM prev_run)
+                    )
+                    SELECT
+                        COALESCE((SELECT COUNT(*) FROM current_snap), 0) AS current_count,
+                        COALESCE((SELECT COUNT(*) FROM prev_snap), 0) AS prev_count,
+                        COALESCE((SELECT COUNT(*) FROM current_snap c JOIN prev_snap p ON c.issue_key_hash = p.issue_key_hash), 0) AS compared_count,
+                        COALESCE((
+                            SELECT COUNT(*)
+                            FROM current_snap c
+                            JOIN prev_snap p ON c.issue_key_hash = p.issue_key_hash
+                            WHERE ISNULL(c.status_normalized, '') <> ISNULL(p.status_normalized, '')
+                        ), 0) AS changed_count
+                """,
+                params=(self._issue_import_run_id, self._issue_import_run_id),
+                expected_result=lambda rows: True,
+                failure_message=lambda rows: (
+                    f"current={rows[0][0]} prev={rows[0][1]} compared={rows[0][2]} status_changed={rows[0][3]}"
+                ),
+                details_on_pass=True,
+            ),
+            DataQualityCheck(
+                name="issue_assignee_changes",
+                severity="info",
+                query=f"""
+                    WITH current_run AS (
+                        SELECT ? AS run_id
+                    ),
+                    current_completed AS (
+                        SELECT completed_at
+                        FROM dbo.{S.IssueImportRuns.TABLE}
+                        WHERE {S.IssueImportRuns.IMPORT_RUN_ID} = ?
+                    ),
+                    prev_run AS (
+                        SELECT TOP 1 {S.IssueImportRuns.IMPORT_RUN_ID} AS run_id
+                        FROM dbo.{S.IssueImportRuns.TABLE}
+                        WHERE {S.IssueImportRuns.STATUS} = 'success'
+                          AND completed_at < (SELECT completed_at FROM current_completed)
+                        ORDER BY completed_at DESC
+                    ),
+                    current_snap AS (
+                        SELECT issue_key_hash, assignee_user_key
+                        FROM dbo.{S.IssuesSnapshots.TABLE}
+                        WHERE import_run_id = (SELECT run_id FROM current_run)
+                    ),
+                    prev_snap AS (
+                        SELECT issue_key_hash, assignee_user_key
+                        FROM dbo.{S.IssuesSnapshots.TABLE}
+                        WHERE import_run_id = (SELECT run_id FROM prev_run)
+                    )
+                    SELECT
+                        COALESCE((SELECT COUNT(*) FROM current_snap), 0) AS current_count,
+                        COALESCE((SELECT COUNT(*) FROM prev_snap), 0) AS prev_count,
+                        COALESCE((SELECT COUNT(*) FROM current_snap c JOIN prev_snap p ON c.issue_key_hash = p.issue_key_hash), 0) AS compared_count,
+                        COALESCE((
+                            SELECT COUNT(*)
+                            FROM current_snap c
+                            JOIN prev_snap p ON c.issue_key_hash = p.issue_key_hash
+                            WHERE ISNULL(c.assignee_user_key, '') <> ISNULL(p.assignee_user_key, '')
+                        ), 0) AS changed_count
+                """,
+                params=(self._issue_import_run_id, self._issue_import_run_id),
+                expected_result=lambda rows: True,
+                failure_message=lambda rows: (
+                    f"current={rows[0][0]} prev={rows[0][1]} compared={rows[0][2]} assignee_changed={rows[0][3]}"
+                ),
+                details_on_pass=True,
+            ),
+        ]
+
+        all_passed = True
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            for check in checks:
+                logger.info("Running issue quality check: %s", check.name)
+                if check.params:
+                    cursor.execute(check.query, check.params)
+                else:
+                    cursor.execute(check.query)
+                rows = cursor.fetchall()
+                passed = check.expected_result(rows)
+                if passed and check.details_on_pass:
+                    details = check.failure_message(rows)
+                else:
+                    details = None if passed else check.failure_message(rows)
+                cursor.execute(
+                    f"""
+                    INSERT INTO dbo.{S.IssueDataQualityResults.TABLE} (
+                        {S.IssueDataQualityResults.IMPORT_RUN_ID},
+                        {S.IssueDataQualityResults.CHECK_NAME},
+                        {S.IssueDataQualityResults.SEVERITY},
+                        {S.IssueDataQualityResults.PASSED},
+                        {S.IssueDataQualityResults.DETAILS}
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self._issue_import_run_id,
+                        check.name,
+                        check.severity,
+                        int(passed),
+                        details,
+                    ),
+                )
+                if not passed:
+                    all_passed = False
+                    logger.warning("Issue quality check failed: %s (%s)", check.name, details)
+            conn.commit()
+        return all_passed
+
+    def _refresh_issues_current(self) -> int:
+        """Replace Issues_Current using the latest snapshot for the current run."""
+        if self._issue_import_run_id is None:
+            logger.warning("Cannot refresh Issues_Current without issue import run id.")
+            return 0
+
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT MAX({S.IssuesSnapshots.SNAPSHOT_DATE})
+                FROM dbo.{S.IssuesSnapshots.TABLE}
+                WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                """,
+                (self._issue_import_run_id,),
+            )
+            row = cursor.fetchone()
+            snapshot_date = row[0] if row else None
+            if snapshot_date is None:
+                logger.warning("No issue snapshots found for current run.")
+                return 0
+
+            cursor.execute(f"DELETE FROM dbo.{S.IssuesCurrent.TABLE}")
+
+            cursor.execute(
+                f"""
+                WITH snapshot_rows AS (
+                    SELECT
+                        s.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY s.{S.IssuesSnapshots.ISSUE_KEY_HASH}
+                            ORDER BY s.{S.IssuesSnapshots.SNAPSHOT_ID} DESC
+                        ) AS rn
+                    FROM dbo.{S.IssuesSnapshots.TABLE} s
+                    WHERE s.{S.IssuesSnapshots.IMPORT_RUN_ID} = ?
+                      AND s.{S.IssuesSnapshots.SNAPSHOT_DATE} = ?
+                ),
+                enriched AS (
+                    SELECT
+                        s.{S.IssuesSnapshots.ISSUE_KEY},
+                        s.{S.IssuesSnapshots.ISSUE_KEY_HASH},
+                        s.{S.IssuesSnapshots.SOURCE_SYSTEM},
+                        s.{S.IssuesSnapshots.SOURCE_ISSUE_ID},
+                        s.{S.IssuesSnapshots.SOURCE_PROJECT_ID},
+                        s.{S.IssuesSnapshots.PROJECT_ID},
+                        i.status AS status_raw,
+                        COALESCE(i.status_normalized, sm.{S.IssueStatusMap.NORMALIZED_STATUS}) AS status_normalized,
+                        i.priority AS priority_raw,
+                        i.priority_normalized,
+                        dp.discipline AS discipline_raw,
+                        dp.discipline AS discipline_normalized,
+                        u.user_bk AS assignee_user_key,
+                        s.{S.IssuesSnapshots.CREATED_AT} AS created_at,
+                        s.{S.IssuesSnapshots.UPDATED_AT} AS updated_at,
+                        s.{S.IssuesSnapshots.CLOSED_AT} AS closed_at,
+                        i.location_root,
+                        i.location_building,
+                        i.location_level,
+                        i.is_deleted,
+                        i.project_mapped,
+                        s.{S.IssuesSnapshots.IMPORT_RUN_ID} AS import_run_id,
+                        s.{S.IssuesSnapshots.SNAPSHOT_ID} AS snapshot_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY s.{S.IssuesSnapshots.ISSUE_KEY_HASH}
+                            ORDER BY i.issue_sk DESC
+                        ) AS issue_rn
+                    FROM snapshot_rows s
+                    JOIN dim.issue i
+                        ON i.source_system = s.{S.IssuesSnapshots.SOURCE_SYSTEM}
+                       AND COALESCE(NULLIF(i.source_issue_id, ''), i.issue_bk) = s.{S.IssuesSnapshots.SOURCE_ISSUE_ID}
+                       AND COALESCE(NULLIF(i.source_project_id, ''), s.{S.IssuesSnapshots.SOURCE_PROJECT_ID})
+                           = s.{S.IssuesSnapshots.SOURCE_PROJECT_ID}
+                    LEFT JOIN dbo.{S.IssueStatusMap.TABLE} sm
+                        ON sm.{S.IssueStatusMap.SOURCE_SYSTEM} = i.source_system
+                       AND sm.{S.IssueStatusMap.RAW_STATUS} = LOWER(LTRIM(RTRIM(i.status)))
+                       AND sm.{S.IssueStatusMap.IS_ACTIVE} = 1
+                    LEFT JOIN dim.[user] u
+                        ON i.assignee_sk = u.user_sk AND u.current_flag = 1
+                    LEFT JOIN (
+                        SELECT bic.issue_sk, MAX(ic.level1_name) AS discipline
+                        FROM brg.issue_category bic
+                        JOIN dim.issue_category ic
+                            ON bic.issue_category_sk = ic.issue_category_sk
+                        WHERE bic.category_role = 'discipline'
+                        GROUP BY bic.issue_sk
+                    ) dp ON i.issue_sk = dp.issue_sk
+                    WHERE s.rn = 1
+                      AND i.current_flag = 1
+                )
+                INSERT INTO dbo.{S.IssuesCurrent.TABLE} (
+                    {S.IssuesCurrent.ISSUE_KEY},
+                    {S.IssuesCurrent.ISSUE_KEY_HASH},
+                    {S.IssuesCurrent.SOURCE_SYSTEM},
+                    {S.IssuesCurrent.SOURCE_ISSUE_ID},
+                    {S.IssuesCurrent.SOURCE_PROJECT_ID},
+                    {S.IssuesCurrent.PROJECT_ID},
+                    {S.IssuesCurrent.STATUS_RAW},
+                    {S.IssuesCurrent.STATUS_NORMALIZED},
+                    {S.IssuesCurrent.PRIORITY_RAW},
+                    {S.IssuesCurrent.PRIORITY_NORMALIZED},
+                    {S.IssuesCurrent.DISCIPLINE_RAW},
+                    {S.IssuesCurrent.DISCIPLINE_NORMALIZED},
+                    {S.IssuesCurrent.ASSIGNEE_USER_KEY},
+                    {S.IssuesCurrent.CREATED_AT},
+                    {S.IssuesCurrent.UPDATED_AT},
+                    {S.IssuesCurrent.CLOSED_AT},
+                    {S.IssuesCurrent.LOCATION_ROOT},
+                    {S.IssuesCurrent.LOCATION_BUILDING},
+                    {S.IssuesCurrent.LOCATION_LEVEL},
+                    {S.IssuesCurrent.IS_DELETED},
+                    {S.IssuesCurrent.PROJECT_MAPPED},
+                    {S.IssuesCurrent.IMPORT_RUN_ID},
+                    {S.IssuesCurrent.SNAPSHOT_ID}
+                )
+                SELECT
+                    issue_key,
+                    issue_key_hash,
+                    source_system,
+                    source_issue_id,
+                    source_project_id,
+                    project_id,
+                    status_raw,
+                    status_normalized,
+                    priority_raw,
+                    priority_normalized,
+                    discipline_raw,
+                    discipline_normalized,
+                    assignee_user_key,
+                    created_at,
+                    updated_at,
+                    closed_at,
+                    location_root,
+                    location_building,
+                    location_level,
+                    is_deleted,
+                    project_mapped,
+                    import_run_id,
+                    snapshot_id
+                FROM enriched
+                WHERE issue_rn = 1
+                """,
+                (self._issue_import_run_id, snapshot_date),
+            )
+            inserted = cursor.rowcount if cursor.rowcount is not None else 0
+            conn.commit()
+        logger.info("Refreshed Issues_Current with %s rows", inserted)
+        return inserted
 
     # ------------------------------------------------------------------
     # Helpers
@@ -1120,6 +1698,7 @@ class WarehousePipeline:
     # ------------------------------------------------------------------
     def run(self) -> None:
         self._start_run()
+        self._start_issue_import_run(run_type=self.pipeline_name)
         try:
             staged_counts = {
                 "issues": self.load_staging_issues(),
@@ -1134,12 +1713,28 @@ class WarehousePipeline:
 
             self.load_dimensions()
             self.load_facts()
+            issue_snapshot_count = self._load_issue_snapshots()
+            issue_checks_passed = self._run_issue_quality_checks()
+            if issue_checks_passed:
+                self._refresh_issues_current()
+                self._complete_issue_import_run(
+                    status="success",
+                    row_count=issue_snapshot_count,
+                )
+            else:
+                self._complete_issue_import_run(
+                    status="failed",
+                    message="Issue quality checks failed",
+                    row_count=issue_snapshot_count,
+                )
+
             self.run_data_quality_checks()
 
             self._complete_run(status="success")
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.exception("Warehouse pipeline failed: %s", exc)
             self._complete_run(status="failed", message=str(exc))
+            self._complete_issue_import_run(status="failed", message=str(exc))
             raise
 
 

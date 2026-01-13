@@ -1,6 +1,7 @@
 import json
 import os
 
+import pytest
 import requests
 
 
@@ -8,7 +9,10 @@ def test_revizto_status_endpoint():
     """Smoke test: ensure Revizto exporter status endpoint responds successfully."""
     base_url = os.getenv("BIM_API_BASE_URL", "http://localhost:5000/api")
     url = f"{base_url}/revizto/status"
-    resp = requests.get(url, timeout=15)
+    try:
+        resp = requests.get(url, timeout=15)
+    except requests.RequestException as exc:
+        pytest.skip(f"Revizto status endpoint not reachable: {exc}")
 
     assert resp.status_code == 200, f"Unexpected status code {resp.status_code}: {resp.text}"
 

@@ -114,11 +114,11 @@ class ConnectionPool:
         except Empty:
             # Pool is empty, create new connection if under max_size
             with self._lock:
-                if self._created_connections < self.max_size:
-                    logger.info(f"Creating new connection for {self.database_name} (pool exhausted)")
-                    return self._create_connection()
-                else:
-                    raise Exception(f"Connection pool exhausted for {self.database_name} (max={self.max_size})")
+                can_create = self._created_connections < self.max_size
+            if can_create:
+                logger.info(f"Creating new connection for {self.database_name} (pool exhausted)")
+                return self._create_connection()
+            raise Exception(f"Connection pool exhausted for {self.database_name} (max={self.max_size})")
     
     def return_connection(self, conn: pyodbc.Connection):
         """

@@ -10,6 +10,7 @@ interface DashboardData {
   healthData: any[];
   reviewPhaseData: any[];
   issueData: any[];
+  issueHistory: any[];
   disciplineData: any[];
   qualityData: any[];
   loading: boolean;
@@ -76,6 +77,21 @@ const fetchIssueData = async (projectId: number): Promise<any[]> => {
 };
 
 /**
+ * Fetch weekly issue history by status
+ */
+const fetchIssueHistory = async (projectId: number): Promise<any[]> => {
+  try {
+    const response = await fetch(`/api/dashboard/issues-history?project_ids=${projectId}`);
+    if (!response.ok) throw new Error('Failed to fetch issues history');
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error('Error fetching issues history:', error);
+    throw error;
+  }
+};
+
+/**
  * Fetch discipline performance data
  */
 const fetchDisciplinePerformance = async (projectId: number): Promise<any[]> => {
@@ -127,6 +143,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
     healthData: [],
     reviewPhaseData: [],
     issueData: [],
+    issueHistory: [],
     disciplineData: [],
     qualityData: [],
     loading: true,
@@ -144,6 +161,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         healthData,
         reviewPhaseData,
         issueData,
+        issueHistory,
         disciplineData,
         qualityData,
       ] = await Promise.all([
@@ -151,6 +169,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         fetchHealthMetrics(projectId),
         fetchReviewPhaseData(projectId),
         fetchIssueData(projectId),
+        fetchIssueHistory(projectId),
         fetchDisciplinePerformance(projectId),
         fetchModelQuality(projectId),
       ]);
@@ -160,6 +179,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         healthData,
         reviewPhaseData,
         issueData,
+        issueHistory,
         disciplineData,
         qualityData,
         loading: false,
@@ -226,6 +246,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
           healthData={dashboardData.healthData}
           reviewPhaseData={dashboardData.reviewPhaseData}
           issueData={dashboardData.issueData}
+          issueHistory={dashboardData.issueHistory}
         />
       )}
 
@@ -254,6 +275,7 @@ export const useDashboardData = (projectId: number, autoRefresh = true) => {
     healthData: [],
     reviewPhaseData: [],
     issueData: [],
+    issueHistory: [],
     disciplineData: [],
     qualityData: [],
     loading: true,
@@ -270,6 +292,7 @@ export const useDashboardData = (projectId: number, autoRefresh = true) => {
         healthData,
         reviewPhaseData,
         issueData,
+        issueHistory,
         disciplineData,
         qualityData,
       ] = await Promise.all([
@@ -277,6 +300,7 @@ export const useDashboardData = (projectId: number, autoRefresh = true) => {
         fetchHealthMetrics(projectId),
         fetchReviewPhaseData(projectId),
         fetchIssueData(projectId),
+        fetchIssueHistory(projectId),
         fetchDisciplinePerformance(projectId),
         fetchModelQuality(projectId),
       ]);
@@ -286,6 +310,7 @@ export const useDashboardData = (projectId: number, autoRefresh = true) => {
         healthData,
         reviewPhaseData,
         issueData,
+        issueHistory,
         disciplineData,
         qualityData,
         loading: false,

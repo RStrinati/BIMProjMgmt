@@ -453,6 +453,7 @@ export function DashboardPage() {
         discipline: deferredIssueFilters.discipline !== 'all' ? deferredIssueFilters.discipline : undefined,
         zone: deferredIssueFilters.zone !== 'all' ? deferredIssueFilters.zone : undefined,
       }),
+    enabled: dashboardTab === 1,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -480,6 +481,7 @@ export function DashboardPage() {
         discipline: deferredIssueFilters.discipline !== 'all' ? deferredIssueFilters.discipline : undefined,
         zone: deferredIssueFilters.zone !== 'all' ? deferredIssueFilters.zone : undefined,
       }),
+    enabled: dashboardTab === 1,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -510,6 +512,7 @@ export function DashboardPage() {
         page: issuePage,
         pageSize: issuePageSize,
       }),
+    enabled: dashboardTab === 1,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -521,6 +524,7 @@ export function DashboardPage() {
         projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
         discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
       }),
+    enabled: dashboardTab === 2,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -532,6 +536,7 @@ export function DashboardPage() {
         projectIds: deferredProjectIds.length ? deferredProjectIds : undefined,
         discipline: selectedDiscipline !== 'all' ? selectedDiscipline : undefined,
       }),
+    enabled: dashboardTab === 2 && healthTab === 0,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -572,6 +577,7 @@ export function DashboardPage() {
         sortBy: 'model_file_name',
         sortDir: 'asc',
       }),
+    enabled: dashboardTab === 2 && healthTab === 1,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -594,6 +600,7 @@ export function DashboardPage() {
         sortBy: 'project_name',
         sortDir: 'asc',
       }),
+    enabled: dashboardTab === 2 && healthTab === 2,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -618,6 +625,7 @@ export function DashboardPage() {
         sortBy: 'project_name',
         sortDir: 'asc',
       }),
+    enabled: dashboardTab === 2 && healthTab === 3,
     ...DASHBOARD_QUERY_DEFAULTS,
     keepPreviousData: true,
   });
@@ -690,7 +698,50 @@ export function DashboardPage() {
   const priorityData = issuesCharts?.priority ?? [];
   const disciplineData = issuesCharts?.discipline ?? [];
   const zoneData = issuesCharts?.zone ?? [];
-  const trendData = issuesCharts?.trend_90d ?? [];
+  const trendDataWeekly = useMemo(() => {
+    const raw = issuesCharts?.trend_90d_weekly ?? issuesCharts?.trend_90d ?? [];
+    if (!raw.length) {
+      return raw;
+    }
+    const latest = raw.reduce<Date | null>((current, point) => {
+      if (!point.date) return current;
+      const parsed = new Date(point.date);
+      if (Number.isNaN(parsed.getTime())) return current;
+      if (!current || parsed > current) return parsed;
+      return current;
+    }, null);
+
+    if (!latest) {
+      return raw;
+    }
+
+    const weeksToShow = 13;
+    const normalized = [];
+    for (let offset = weeksToShow - 1; offset >= 0; offset -= 1) {
+      const weekDate = new Date(latest);
+      weekDate.setDate(weekDate.getDate() - offset * 7);
+      const weekKey = weekDate.toISOString().slice(0, 10);
+      const match = raw.find((point) => point.date?.slice(0, 10) === weekKey);
+      normalized.push({
+        date: weekKey,
+        open: match ? match.open : null,
+        closed: match ? match.closed : null,
+        total: match ? match.total : null,
+      });
+    }
+
+    return normalized;
+  }, [issuesCharts]);
+
+  const trendDataMonthly = useMemo(() => {
+    const raw = issuesCharts?.trend_all_time_monthly ?? [];
+    if (!raw.length) {
+      return raw;
+    }
+    return raw
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }, [issuesCharts]);
 
   const zoneTreemapData = useMemo(
     () =>
@@ -1426,17 +1477,22 @@ export function DashboardPage() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography color="text.secondary" gutterBottom variant="h6">
-                      90 Day Trend (Monthly)
+                      90 Day Trend (Weekly)
                     </Typography>
-                    {trendData.length ? (
+                    {trendDataWeekly.length ? (
                       <ResponsiveContainer width="100%" height={260}>
-                        <AreaChart data={trendData}>
+                        <AreaChart data={trendDataWeekly}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(value) =>
-                              value ? new Date(value).toLocaleString(undefined, { month: 'short', year: '2-digit' }) : ''
-                            }
+                            tickFormatter={(value) => {
+                              if (!value) return '';
+                              const parsed = new Date(value);
+                              if (Number.isNaN(parsed.getTime())) return '';
+                              const weekEnd = new Date(parsed);
+                              weekEnd.setDate(weekEnd.getDate() + 6);
+                              return weekEnd.toISOString().slice(0, 10);
+                            }}
                           />
                           <YAxis allowDecimals={false} />
                           <Tooltip />
@@ -1454,7 +1510,43 @@ export function DashboardPage() {
                       </ResponsiveContainer>
                     ) : (
                       <Typography variant="body2" color="text.secondary">
-                        No trend data available.
+                        No weekly trend data available.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom variant="h6">
+                      All-Time Trend (Monthly)
+                    </Typography>
+                    {trendDataMonthly.length ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <AreaChart data={trendDataMonthly}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(value) => (value ? String(value).slice(0, 7) : '')}
+                          />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Legend />
+                          <Area type="monotone" dataKey="total" stroke="#757575" fill="#bdbdbd" fillOpacity={0.45}>
+                            <LabelList dataKey="total" position="top" fontSize={10} />
+                          </Area>
+                          <Area type="monotone" dataKey="open" stroke="#f57c00" fill="#f57c00" fillOpacity={0.35}>
+                            <LabelList dataKey="open" position="top" fontSize={10} />
+                          </Area>
+                          <Area type="monotone" dataKey="closed" stroke="#2e7d32" fill="#2e7d32" fillOpacity={0.35}>
+                            <LabelList dataKey="closed" position="top" fontSize={10} />
+                          </Area>
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No monthly trend data available.
                       </Typography>
                     )}
                   </CardContent>

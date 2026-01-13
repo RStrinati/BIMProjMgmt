@@ -7,6 +7,9 @@ import sys
 import subprocess
 from typing import Any, Optional
 from pathlib import Path
+from dataclasses import dataclass, field
+import threading
+import time
 from datetime import date, datetime
 from decimal import Decimal
 from logging.handlers import RotatingFileHandler
@@ -63,6 +66,7 @@ from database import (  # noqa: E402
     get_dashboard_issues_kpis,
     get_dashboard_issues_charts,
     get_dashboard_issues_table,
+    get_issue_reliability_report,
     get_revit_health_dashboard_summary,
     get_naming_compliance_dashboard_metrics,
     get_grid_alignment_dashboard,
@@ -174,6 +178,73 @@ def _parse_dashboard_filters() -> dict:
         "location": request.args.get("location") or None,
         "manager": request.args.get("manager") or None,
     }
+
+
+@dataclass
+class _DashboardApiCacheEntry:
+    data: Optional[dict] = None
+    expires_at: float = 0.0
+    last_updated: float = 0.0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+_DASHBOARD_API_CACHE: dict[tuple, _DashboardApiCacheEntry] = {}
+_DASHBOARD_API_CACHE_LOCK = threading.Lock()
+_DASHBOARD_API_CACHE_TTL_SECONDS = int(os.getenv("DASHBOARD_API_CACHE_TTL_SECONDS", "60"))
+_DASHBOARD_API_CACHE_MAX_ENTRIES = int(os.getenv("DASHBOARD_API_CACHE_MAX_ENTRIES", "128"))
+
+
+def _dashboard_api_cache_key(endpoint: str) -> tuple:
+    query = request.query_string.decode("utf-8") if request.query_string else ""
+    return (endpoint, query)
+
+
+def _get_or_create_dashboard_api_cache_entry(cache_key: tuple) -> _DashboardApiCacheEntry:
+    with _DASHBOARD_API_CACHE_LOCK:
+        entry = _DASHBOARD_API_CACHE.get(cache_key)
+        if entry is None:
+            entry = _DashboardApiCacheEntry()
+            _DASHBOARD_API_CACHE[cache_key] = entry
+            _evict_dashboard_api_cache_if_needed_locked()
+        return entry
+
+
+def _evict_dashboard_api_cache_if_needed_locked() -> None:
+    if len(_DASHBOARD_API_CACHE) <= _DASHBOARD_API_CACHE_MAX_ENTRIES:
+        return
+    oldest_key = min(
+        _DASHBOARD_API_CACHE,
+        key=lambda key: _DASHBOARD_API_CACHE[key].last_updated or 0,
+    )
+    del _DASHBOARD_API_CACHE[oldest_key]
+
+
+def _dashboard_api_cached(endpoint: str, compute_fn):
+    cache_key = _dashboard_api_cache_key(endpoint)
+    entry = _get_or_create_dashboard_api_cache_entry(cache_key)
+    now = time.time()
+    if entry.data and entry.expires_at > now:
+        return entry.data
+
+    if not entry.lock.acquire(blocking=False):
+        if entry.data:
+            return entry.data
+        entry.lock.acquire()
+        try:
+            return entry.data
+        finally:
+            entry.lock.release()
+
+    try:
+        result = compute_fn()
+        entry.data = result
+        entry.expires_at = time.time() + _DASHBOARD_API_CACHE_TTL_SECONDS
+        entry.last_updated = time.time()
+        return result
+    finally:
+        entry.lock.release()
+        with _DASHBOARD_API_CACHE_LOCK:
+            _evict_dashboard_api_cache_if_needed_locked()
 
 
 def _with_dashboard_meta(payload: Any, filters: dict, as_of: Optional[str] = None) -> Any:
@@ -937,6 +1008,17 @@ def api_delete_issue_attribute_mapping(map_id: int):
     if not success:
         return jsonify({'error': 'Failed to deactivate mapping'}), 500
     return jsonify({'success': True})
+
+
+@app.route('/api/settings/issue-reliability', methods=['GET'])
+def api_issue_reliability_report():
+    """Return issue reliability diagnostics for the latest import run."""
+    try:
+        report = get_issue_reliability_report()
+        return jsonify(report)
+    except Exception as e:
+        logging.exception("Error fetching issue reliability report")
+        return jsonify({'error': str(e)}), 500
 
 
 def _fetch_project_alias_rows():
@@ -2546,14 +2628,18 @@ def api_dashboard_issues_kpis():
     """Return KPI totals for the Issues dashboard section."""
     try:
         filters = _parse_dashboard_filters()
-        data = get_dashboard_issues_kpis(
-            project_ids=filters["project_ids"],
-            status=filters["status"],
-            priority=filters["priority"],
-            discipline=filters["discipline"],
-            zone=filters["zone"],
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_dashboard_issues_kpis(
+                project_ids=filters["project_ids"],
+                status=filters["status"],
+                priority=filters["priority"],
+                discipline=filters["discipline"],
+                zone=filters["zone"],
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("issues-kpis", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching issues KPIs")
         return jsonify({'error': 'Failed to fetch issues KPIs', 'details': str(e)}), 500
@@ -2564,14 +2650,18 @@ def api_dashboard_issues_charts():
     """Return chart-ready groupings for the Issues dashboard section."""
     try:
         filters = _parse_dashboard_filters()
-        data = get_dashboard_issues_charts(
-            project_ids=filters["project_ids"],
-            status=filters["status"],
-            priority=filters["priority"],
-            discipline=filters["discipline"],
-            zone=filters["zone"],
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_dashboard_issues_charts(
+                project_ids=filters["project_ids"],
+                status=filters["status"],
+                priority=filters["priority"],
+                discipline=filters["discipline"],
+                zone=filters["zone"],
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("issues-charts", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching issues charts")
         return jsonify({'error': 'Failed to fetch issues charts', 'details': str(e)}), 500
@@ -2586,18 +2676,22 @@ def api_dashboard_issues_table():
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "created_at")
         sort_dir = request.args.get("sort_dir", "desc")
-        data = get_dashboard_issues_table(
-            project_ids=filters["project_ids"],
-            status=filters["status"],
-            priority=filters["priority"],
-            discipline=filters["discipline"],
-            zone=filters["zone"],
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_dashboard_issues_table(
+                project_ids=filters["project_ids"],
+                status=filters["status"],
+                priority=filters["priority"],
+                discipline=filters["discipline"],
+                zone=filters["zone"],
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("issues-table", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching issues table")
         return jsonify({'error': 'Failed to fetch issues table', 'details': str(e)}), 500
@@ -2608,11 +2702,15 @@ def api_dashboard_revit_health():
     """Return aggregated Revit model health metrics for the dashboard."""
     try:
         filters = _parse_dashboard_filters()
-        metrics = get_revit_health_dashboard_summary(
-            project_ids=filters["project_ids"],
-            discipline=filters["discipline"],
-        )
-        return jsonify(_with_dashboard_meta(metrics, filters))
+        def _compute():
+            metrics = get_revit_health_dashboard_summary(
+                project_ids=filters["project_ids"],
+                discipline=filters["discipline"],
+            )
+            return _with_dashboard_meta(metrics, filters)
+
+        payload = _dashboard_api_cached("revit-health", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching Revit health dashboard metrics")
         return jsonify({'error': 'Failed to fetch Revit health metrics', 'details': str(e)}), 500
@@ -2623,11 +2721,15 @@ def api_dashboard_naming_compliance():
     """Return file naming compliance metrics for the dashboard."""
     try:
         filters = _parse_dashboard_filters()
-        metrics = get_naming_compliance_dashboard_metrics(
-            project_ids=filters["project_ids"],
-            discipline=filters["discipline"],
-        )
-        return jsonify(_with_dashboard_meta(metrics, filters))
+        def _compute():
+            metrics = get_naming_compliance_dashboard_metrics(
+                project_ids=filters["project_ids"],
+                discipline=filters["discipline"],
+            )
+            return _with_dashboard_meta(metrics, filters)
+
+        payload = _dashboard_api_cached("naming-compliance", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching naming compliance metrics")
         return jsonify({'error': 'Failed to fetch naming compliance', 'details': str(e)}), 500
@@ -2688,15 +2790,19 @@ def api_dashboard_coordinate_alignment():
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "model_file_name")
         sort_dir = request.args.get("sort_dir", "asc")
-        data = get_coordinate_alignment_dashboard(
-            project_ids=filters["project_ids"],
-            discipline=filters["discipline"],
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_coordinate_alignment_dashboard(
+                project_ids=filters["project_ids"],
+                discipline=filters["discipline"],
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("coordinate-alignment", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching coordinate alignment dashboard")
         return jsonify({'error': 'Failed to fetch coordinate alignment', 'details': str(e)}), 500
@@ -2711,15 +2817,19 @@ def api_dashboard_health_grids():
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "project_name")
         sort_dir = request.args.get("sort_dir", "asc")
-        data = get_grid_alignment_dashboard(
-            project_ids=filters["project_ids"],
-            discipline=filters["discipline"],
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_grid_alignment_dashboard(
+                project_ids=filters["project_ids"],
+                discipline=filters["discipline"],
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("health-grids", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching grid alignment dashboard")
         return jsonify({'error': 'Failed to fetch grid alignment', 'details': str(e)}), 500
@@ -2735,16 +2845,20 @@ def api_dashboard_health_levels():
         sort_by = request.args.get("sort_by", "project_name")
         sort_dir = request.args.get("sort_dir", "asc")
         tolerance_mm = float(request.args.get("tolerance_mm", 5.0))
-        data = get_level_alignment_dashboard(
-            project_ids=filters["project_ids"],
-            discipline=filters["discipline"],
-            tolerance_mm=tolerance_mm,
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-        return jsonify(_with_dashboard_meta(data, filters))
+        def _compute():
+            data = get_level_alignment_dashboard(
+                project_ids=filters["project_ids"],
+                discipline=filters["discipline"],
+                tolerance_mm=tolerance_mm,
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+            )
+            return _with_dashboard_meta(data, filters)
+
+        payload = _dashboard_api_cached("health-levels", _compute)
+        return jsonify(payload)
     except Exception as e:
         logging.exception("Error fetching level alignment dashboard")
         return jsonify({'error': 'Failed to fetch level alignment', 'details': str(e)}), 500

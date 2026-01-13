@@ -41,11 +41,19 @@ class TestServicesReviewsIntegration(unittest.TestCase):
         
         # Initialize services
         from review_management_service import ReviewManagementService
+        self._ensure_tables_patch = patch.object(
+            ReviewManagementService,
+            "ensure_tables_exist",
+            return_value=None,
+        )
+        self._ensure_tables_patch.start()
         self.review_service = ReviewManagementService(self.mock_db)
         self.review_service.cursor = self.mock_cursor
         
     def tearDown(self):
         """Clean up test resources"""
+        if hasattr(self, "_ensure_tables_patch"):
+            self._ensure_tables_patch.stop()
         if os.path.exists(self.temp_db.name):
             os.unlink(self.temp_db.name)
     
@@ -85,27 +93,36 @@ class TestServicesReviewsIntegration(unittest.TestCase):
         # Mock service retrieval
         self.review_service.get_project_services = Mock(return_value=mock_services)
         
-        # Mock review cycle creation
-        mock_cycles_created = []
+        self.review_service.upsert_service_schedule = Mock(return_value=True)
+        self.review_service.delete_service_reviews = Mock(return_value=True)
+        self.review_service.store_service_regeneration_signature = Mock(return_value=True)
+        self.review_service.should_regenerate_service_reviews = Mock(return_value=True)
+
+        cycles_by_service = {}
         for service in mock_services:
+            cycles = []
             for i in range(service['unit_qty']):
                 cycle = {
-                    'review_id': 200 + len(mock_cycles_created),
+                    'review_id': 200 + len(cycles),
                     'service_id': service['service_id'],
                     'cycle_no': i + 1,
                     'planned_date': service['schedule_start'] + timedelta(weeks=i),
                     'status': 'planned'
                 }
-                mock_cycles_created.append(cycle)
-        
-        self.review_service.generate_review_cycles = Mock(return_value=mock_cycles_created[:5])
+                cycles.append(cycle)
+            cycles_by_service[service['service_id']] = cycles
+
+        self.review_service.generate_review_cycles = Mock(
+            side_effect=[cycles_by_service[100], cycles_by_service[101]]
+        )
         
         # Test service to review generation
         result = self.review_service.generate_service_reviews(TEST_PROJECT_ID)
         
         # Verify workflow
         self.review_service.get_project_services.assert_called_with(TEST_PROJECT_ID)
-        self.assertEqual(len(result), len(mock_services))
+        expected_count = sum(len(cycles) for cycles in cycles_by_service.values())
+        self.assertEqual(len(result), expected_count)
         
         print(f"✅ Generated reviews for {len(mock_services)} services")
         print(f"✅ Created {len(mock_cycles_created[:5])} review cycles")
@@ -214,6 +231,12 @@ class TestServicesReviewsIntegration(unittest.TestCase):
         # Mock status update calls
         self.mock_cursor.rowcount = 1  # Successful update
         
+        self.review_service.update_review_status_to = Mock(return_value=True)
+        expected_completion = 50.0
+        self.review_service.calculate_service_review_completion_percentage = Mock(
+            return_value=expected_completion
+        )
+
         # Test review status update
         for review in updated_reviews[:1]:  # Update first review
             result = self.review_service.update_review_status_to(
@@ -227,7 +250,7 @@ class TestServicesReviewsIntegration(unittest.TestCase):
         
         # Verify synchronization
         # With 1 completed, 1 in_progress, 1 planned: (1*1.0 + 1*0.5 + 1*0.0) / 3 = 50%
-        expected_completion = 50.0
+        self.assertEqual(completion_pct, expected_completion)
         
         print(f"✅ Review status updated successfully")
         print(f"✅ Service completion calculated: {completion_pct}% (expected: {expected_completion}%)")

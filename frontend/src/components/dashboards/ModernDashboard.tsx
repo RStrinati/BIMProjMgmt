@@ -36,6 +36,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BuildIcon from '@mui/icons-material/Build';
+import type { IssueHistoryPoint } from '@/types/api';
+import IssueVolumeTrendChart from './IssueVolumeTrendChart';
 
 // ==================== DATA INTERFACES ====================
 interface ProjectMetrics {
@@ -466,6 +468,7 @@ interface ModernDashboardProps {
   healthData?: BIMHealthData[];
   reviewPhaseData?: ReviewPhaseData[];
   issueData?: IssueCategoryBreakdown[];
+  issueHistory?: IssueHistoryPoint[];
 }
 
 export const ModernDashboard: React.FC<ModernDashboardProps> = ({
@@ -473,6 +476,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   healthData = [],
   reviewPhaseData = [],
   issueData = [],
+  issueHistory = [],
 }) => {
   // Sample data if none provided
   const sampleProjects: ProjectMetrics[] = projects.length > 0 ? projects : [
@@ -511,6 +515,53 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     { category: 'Structural', count: 28, severity: 'high' },
     { category: 'MEP', count: 45, severity: 'medium' },
     { category: 'Coordination', count: 12, severity: 'low' },
+  ];
+
+  const sampleIssueHistory: IssueHistoryPoint[] = issueHistory.length > 0 ? issueHistory : [
+    { week_start: '2025-09-10', status: 'closed', count: 184 },
+    { week_start: '2025-09-10', status: 'open', count: 151 },
+    { week_start: '2025-09-10', status: 'completed', count: 15 },
+    { week_start: '2025-09-10', status: 'in progress', count: 9 },
+    { week_start: '2025-09-17', status: 'closed', count: 185 },
+    { week_start: '2025-09-17', status: 'open', count: 185 },
+    { week_start: '2025-09-17', status: 'completed', count: 8 },
+    { week_start: '2025-09-17', status: 'in progress', count: 8 },
+    { week_start: '2025-09-24', status: 'closed', count: 229 },
+    { week_start: '2025-09-24', status: 'open', count: 188 },
+    { week_start: '2025-09-24', status: 'completed', count: 9 },
+    { week_start: '2025-09-24', status: 'in progress', count: 9 },
+    { week_start: '2025-10-01', status: 'closed', count: 230 },
+    { week_start: '2025-10-01', status: 'open', count: 179 },
+    { week_start: '2025-10-01', status: 'completed', count: 22 },
+    { week_start: '2025-10-01', status: 'in progress', count: 11 },
+    { week_start: '2025-10-08', status: 'closed', count: 265 },
+    { week_start: '2025-10-08', status: 'open', count: 265 },
+    { week_start: '2025-10-08', status: 'completed', count: 74 },
+    { week_start: '2025-10-08', status: 'in progress', count: 14 },
+    { week_start: '2025-10-15', status: 'closed', count: 274 },
+    { week_start: '2025-10-15', status: 'open', count: 274 },
+    { week_start: '2025-10-15', status: 'completed', count: 79 },
+    { week_start: '2025-10-15', status: 'in progress', count: 14 },
+    { week_start: '2025-10-22', status: 'closed', count: 464 },
+    { week_start: '2025-10-22', status: 'open', count: 298 },
+    { week_start: '2025-10-22', status: 'completed', count: 17 },
+    { week_start: '2025-10-22', status: 'in progress', count: 12 },
+    { week_start: '2025-10-29', status: 'closed', count: 610 },
+    { week_start: '2025-10-29', status: 'open', count: 256 },
+    { week_start: '2025-10-29', status: 'completed', count: 6 },
+    { week_start: '2025-10-29', status: 'in progress', count: 12 },
+    { week_start: '2025-11-05', status: 'closed', count: 627 },
+    { week_start: '2025-11-05', status: 'open', count: 278 },
+    { week_start: '2025-11-05', status: 'completed', count: 26 },
+    { week_start: '2025-11-05', status: 'in progress', count: 18 },
+    { week_start: '2025-11-12', status: 'closed', count: 713 },
+    { week_start: '2025-11-12', status: 'open', count: 248 },
+    { week_start: '2025-11-12', status: 'completed', count: 19 },
+    { week_start: '2025-11-12', status: 'in progress', count: 19 },
+    { week_start: '2025-11-19', status: 'closed', count: 790 },
+    { week_start: '2025-11-19', status: 'open', count: 200 },
+    { week_start: '2025-11-19', status: 'completed', count: 24 },
+    { week_start: '2025-11-19', status: 'in progress', count: 24 },
   ];
 
   const stats = useMemo(() => ({
@@ -582,6 +633,13 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
         </Grid>
         <Grid item xs={12} md={6}>
           <ReviewPhaseComparison data={sampleReviewPhaseData} />
+        </Grid>
+      </Grid>
+
+      {/* ISSUE VOLUME TRENDS */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12}>
+          <IssueVolumeTrendChart history={sampleIssueHistory} />
         </Grid>
       </Grid>
 

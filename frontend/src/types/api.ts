@@ -326,6 +326,18 @@ export interface DashboardIssuesCharts {
     closed: number;
     total: number;
   }>;
+  trend_90d_weekly: Array<{
+    date: string | null;
+    open: number;
+    closed: number;
+    total: number;
+  }>;
+  trend_all_time_monthly: Array<{
+    date: string | null;
+    open: number;
+    closed: number;
+    total: number;
+  }>;
   filters?: DashboardFilters;
   as_of?: string | null;
 }

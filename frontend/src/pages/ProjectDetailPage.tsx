@@ -31,6 +31,8 @@ import {
 import { projectsApi } from '@/api/projects';
 import { usersApi } from '@/api/users';
 import { issuesApi } from '@/api';
+import { projectServicesApi } from '@/api/services';
+import type { ProjectService, ProjectServicesListResponse } from '@/api/services';
 import type { Project, User } from '@/types/api';
 import { ProjectServicesTab } from '@/components/ProjectServicesTab';
 import { profilerLog } from '@/utils/perfLogger';
@@ -127,6 +129,40 @@ const ProjectDetailPage: React.FC = () => {
     queryFn: () => issuesApi.getProjectOverview(Number(id)),
     enabled: !!id,
   });
+
+  const { data: servicesPayload } = useQuery<ProjectServicesListResponse>({
+    queryKey: ['project', id, 'services-billing'],
+    queryFn: () => projectServicesApi.getAll(Number(id)),
+    enabled: !!id,
+  });
+
+  const servicesForBilling = useMemo<ProjectService[]>(() => {
+    if (!servicesPayload) {
+      return [];
+    }
+    if (Array.isArray(servicesPayload)) {
+      return servicesPayload;
+    }
+    const items = servicesPayload.items ?? servicesPayload.services ?? servicesPayload.results;
+    return Array.isArray(items) ? items : [];
+  }, [servicesPayload]);
+
+  const billingTotals = useMemo(() => {
+    if (!servicesForBilling.length) {
+      return null;
+    }
+    return servicesForBilling.reduce(
+      (acc, service) => {
+        const agreed = service.agreed_fee ?? 0;
+        const billed = service.billed_amount ?? service.claimed_to_date ?? 0;
+        return {
+          totalAgreed: acc.totalAgreed + agreed,
+          totalBilled: acc.totalBilled + billed,
+        };
+      },
+      { totalAgreed: 0, totalBilled: 0 },
+    );
+  }, [servicesForBilling]);
 
   const projectLeadName = useMemo(() => {
     if (!project || project.internal_lead === undefined || project.internal_lead === null) {
@@ -231,12 +267,16 @@ const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  const totalServiceAgreedRaw = Number(project.total_service_agreed_fee ?? project.agreed_fee ?? 0);
-  const totalServiceBilledRaw = Number(project.total_service_billed_amount ?? 0);
+  const totalServiceAgreedRaw = Number(
+    billingTotals?.totalAgreed ?? project.total_service_agreed_fee ?? project.agreed_fee ?? 0,
+  );
+  const totalServiceBilledRaw = Number(
+    billingTotals?.totalBilled ?? project.total_service_billed_amount ?? 0,
+  );
   const totalServiceAgreed = Number.isFinite(totalServiceAgreedRaw) ? Math.max(totalServiceAgreedRaw, 0) : 0;
   const totalServiceBilled = Number.isFinite(totalServiceBilledRaw) ? Math.max(totalServiceBilledRaw, 0) : 0;
   const serviceBilledPctRaw =
-    project.service_billed_pct !== undefined && project.service_billed_pct !== null
+    !billingTotals && project.service_billed_pct !== undefined && project.service_billed_pct !== null
       ? Number(project.service_billed_pct)
       : Number.NaN;
   let billedPercent =

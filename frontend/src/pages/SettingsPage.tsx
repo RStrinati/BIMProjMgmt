@@ -35,6 +35,7 @@ import ProjectAliasesTab from '../components/settings/ProjectAliasesTab';
 import NamingConventionsTab from '../components/settings/NamingConventionsTab';
 import UsersTab from '../components/settings/UsersTab';
 import IssueMappingsTab from '../components/settings/IssueMappingsTab';
+import IssueReliabilityTab from '../components/settings/IssueReliabilityTab';
 
 interface ProjectType {
   type_id: number;
@@ -89,6 +90,7 @@ export default function SettingsPage() {
           <Tab label="Issue Mappings" />
           <Tab label="Naming Conventions" />
           <Tab label="Users" />
+          <Tab label="Issue Reliability" />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -117,6 +119,10 @@ export default function SettingsPage() {
 
         <TabPanel value={tabValue} index={6}>
           <UsersTab />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={7}>
+          <IssueReliabilityTab />
         </TabPanel>
       </Paper>
     </Container>

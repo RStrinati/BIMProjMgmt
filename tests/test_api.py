@@ -12,7 +12,7 @@ for mod in ["pyodbc"]:
 
 
 def test_get_projects_endpoint(monkeypatch):
-    monkeypatch.setattr('backend.app.get_projects_full', lambda: [{'project_id': 1, 'project_name': 'A'}])
+    monkeypatch.setattr('backend.app.list_projects_full', lambda: [{'project_id': 1, 'project_name': 'A'}])
     client = app.test_client()
     resp = client.get('/api/projects')
     assert resp.status_code == 200
@@ -34,7 +34,10 @@ def test_patch_review_task(monkeypatch):
 
 
 def test_get_project_details(monkeypatch):
-    monkeypatch.setattr('backend.app.get_project_details', lambda pid: {'project_name': 'P', 'start_date': '2024-01-01', 'end_date': '2024-12-31', 'status': 'Active', 'priority': 'High'})
+    monkeypatch.setattr(
+        'backend.app.get_projects_full',
+        lambda: [{'project_id': 1, 'project_name': 'P', 'start_date': '2024-01-01', 'end_date': '2024-12-31', 'status': 'Active', 'priority': 'High'}],
+    )
     client = app.test_client()
     resp = client.get('/api/project/1')
     assert resp.status_code == 200
@@ -103,11 +106,11 @@ def test_update_project_details(monkeypatch):
 
 
 def test_create_project(monkeypatch):
-    monkeypatch.setattr('backend.app.insert_project', lambda n, f, i: True)
+    monkeypatch.setattr('backend.app.create_project', lambda payload: {'project_id': 10, **payload})
     client = app.test_client()
     resp = client.post('/api/project', json={'project_name': 'New'})
     assert resp.status_code == 201
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['project_id'] == 10
 
 
 def test_extract_files(monkeypatch):
@@ -223,10 +226,10 @@ def test_update_full_project(monkeypatch):
         called['args'] = (pid, data)
         return True
 
-    monkeypatch.setattr('backend.app.update_project_record', fake_update)
+    monkeypatch.setattr('backend.app.update_project', fake_update)
     client = app.test_client()
-    resp = client.put('/api/projects/5', json={'contract_value': 10})
+    resp = client.put('/api/projects/5', json={'project_name': 'Project Z'})
     assert resp.status_code == 200
-    assert called['args'] == (5, {'contract_value': 10})
+    assert called['args'] == (5, {'name': 'Project Z'})
 
 
