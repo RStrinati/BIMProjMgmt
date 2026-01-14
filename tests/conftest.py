@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from config import Config
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
@@ -57,3 +58,31 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         else:
             item.add_marker(pytest.mark.unit)
+
+
+def _set_env_default(key, value):
+    if os.getenv(key) is None and value is not None:
+        os.environ[key] = str(value)
+
+
+def pytest_configure():
+    # Ensure tests that read env vars directly get Config defaults unless overridden.
+    env_keys = (
+        "DB_DRIVER",
+        "DB_SERVER",
+        "DB_USER",
+        "DB_PASSWORD",
+        "PROJECT_MGMT_DB",
+        "WAREHOUSE_DB",
+        "ACC_DB",
+        "REVIT_HEALTH_DB",
+        "REVIZTO_DB",
+        "ACC_SERVICE_URL",
+        "REVIZTO_SERVICE_URL",
+        "APS_AUTH_SERVICE_URL",
+        "APS_AUTH_LOGIN_PATH",
+        "ACC_SERVICE_TOKEN",
+        "REVIZTO_SERVICE_TOKEN",
+    )
+    for key in env_keys:
+        _set_env_default(key, getattr(Config, key, None))
