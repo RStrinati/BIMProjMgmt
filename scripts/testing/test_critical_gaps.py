@@ -10,12 +10,12 @@ This script tests the 3 critical gap fixes:
 Run this AFTER applying SQL migrations 001 and 002.
 
 Usage:
-    python tests/test_critical_gaps.py
+    python scripts/testing/test_critical_gaps.py
     
     # Or test specific gaps:
-    python tests/test_critical_gaps.py --test cascade
-    python tests/test_critical_gaps.py --test dates
-    python tests/test_critical_gaps.py --test snapshots
+    python scripts/testing/test_critical_gaps.py --test cascade
+    python scripts/testing/test_critical_gaps.py --test dates
+    python scripts/testing/test_critical_gaps.py --test snapshots
 """
 
 import sys

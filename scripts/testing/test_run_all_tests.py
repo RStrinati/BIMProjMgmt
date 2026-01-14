@@ -32,7 +32,7 @@ def run_all_comprehensive_tests():
     print("📋 TEST SUITE 1: Review Status Update Fix")
     print("-" * 45)
     try:
-        from test_review_status_fix import test_status_update_logic, test_status_transition_validation
+        from tests.unit.reviews.test_review_status_fix import test_status_update_logic, test_status_transition_validation
         
         start_time = time.time()
         result1 = test_status_update_logic()
@@ -56,7 +56,7 @@ def run_all_comprehensive_tests():
     print("\n📊 TEST SUITE 2: Status Percentage and KPI Implementation")
     print("-" * 55)
     try:
-        from test_status_percentage_kpis import (
+        from tests.unit.status.test_status_percentage_kpis import (
             test_service_status_percentage_calculation,
             test_project_review_kpis,
             test_service_review_status_summary
@@ -85,7 +85,7 @@ def run_all_comprehensive_tests():
     print("\n🔗 TEST SUITE 3: Comprehensive Integration Testing")
     print("-" * 50)
     try:
-        from test_comprehensive_integration import run_comprehensive_tests
+        from tests.integration.test_comprehensive_integration import run_comprehensive_tests
         
         start_time = time.time()
         result = run_comprehensive_tests()

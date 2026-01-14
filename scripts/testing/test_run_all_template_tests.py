@@ -22,8 +22,8 @@ def run_all_template_tests():
     
     # Import test modules
     try:
-        from tests.test_template_core import TestTemplateManagementCore, TestTemplateIntegrationScenarios
-        from tests.test_service_templates import TestReviewManagementServiceTemplates, TestServiceTemplateIntegration
+        from tests.unit.templates.test_template_core import TestTemplateManagementCore, TestTemplateIntegrationScenarios
+        from tests.unit.services.test_service_templates import TestReviewManagementServiceTemplates, TestServiceTemplateIntegration
         
         print("✅ All test modules imported successfully")
     except ImportError as e:
