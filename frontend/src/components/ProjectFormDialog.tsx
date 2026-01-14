@@ -202,7 +202,7 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['project', project?.project_id.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['project', project?.project_id] });
       onClose();
     },
     onError: (err: any) => {

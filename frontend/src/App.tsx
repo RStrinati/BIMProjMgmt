@@ -10,6 +10,10 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import DataImportsPage from './pages/DataImportsPage';
 import SettingsPage from './pages/SettingsPage';
 import TasksNotesPage from './pages/TasksNotesPage';
+import { BidsListPage } from './pages/BidsListPage';
+import BidDetailPage from './pages/BidDetailPage';
+import ProjectWorkspacePageV2 from './pages/ProjectWorkspacePageV2';
+import { featureFlags } from './config/featureFlags';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -32,9 +36,14 @@ function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route
+                path="/projects/:id"
+                element={featureFlags.projectWorkspaceV2 ? <ProjectWorkspacePageV2 /> : <ProjectDetailPage />}
+              />
               <Route path="/projects/:id/data-imports" element={<DataImportsPage />} />
               <Route path="/data-imports" element={<DataImportsPage />} />
+              <Route path="/bids" element={<BidsListPage />} />
+              <Route path="/bids/:id" element={<BidDetailPage />} />
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
               <Route path="/tasks" element={<TasksNotesPage />} />
               <Route path="/settings" element={<SettingsPage />} />

@@ -109,10 +109,11 @@ const ProjectDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(1);
 
+  const projectId = Number(id);
   const { data: project, isLoading, error } = useQuery<Project>({
-    queryKey: ['project', id],
-    queryFn: () => projectsApi.getById(Number(id)),
-    enabled: !!id,
+    queryKey: ['project', projectId],
+    queryFn: () => projectsApi.getById(projectId),
+    enabled: Number.isFinite(projectId),
   });
 
   const { data: users } = useQuery<User[]>({
@@ -125,15 +126,15 @@ const ProjectDetailPage: React.FC = () => {
     isLoading: issuesLoading,
     error: issuesError,
   } = useQuery<ProjectIssuesOverview>({
-    queryKey: ['project', id, 'issues-overview'],
-    queryFn: () => issuesApi.getProjectOverview(Number(id)),
-    enabled: !!id,
+    queryKey: ['project', projectId, 'issues-overview'],
+    queryFn: () => issuesApi.getProjectOverview(projectId),
+    enabled: Number.isFinite(projectId),
   });
 
   const { data: servicesPayload } = useQuery<ProjectServicesListResponse>({
-    queryKey: ['project', id, 'services-billing'],
-    queryFn: () => projectServicesApi.getAll(Number(id)),
-    enabled: !!id,
+    queryKey: ['projectServices', projectId, { scope: 'billing' }],
+    queryFn: () => projectServicesApi.getAll(projectId),
+    enabled: Number.isFinite(projectId),
   });
 
   const servicesForBilling = useMemo<ProjectService[]>(() => {
@@ -198,9 +199,7 @@ const ProjectDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
-      if (id !== undefined) {
-        queryClient.removeQueries({ queryKey: ['project', id], exact: true });
-      }
+      queryClient.removeQueries({ queryKey: ['project', projectId], exact: true });
       navigate('/projects');
     },
   });
@@ -427,7 +426,7 @@ const ProjectDetailPage: React.FC = () => {
 
             {/* Services Tab */}
             <TabPanel value={tabValue} index={0}>
-              <ProjectServicesTab projectId={Number(id)} />
+              <ProjectServicesTab projectId={projectId} />
             </TabPanel>
 
             {/* Details Tab */}
@@ -729,7 +728,7 @@ const ProjectDetailPage: React.FC = () => {
                 <Button
                   variant="contained"
                   fullWidth
-                  onClick={() => navigate(`/projects/${id}/data-imports`)}
+                  onClick={() => navigate(`/projects/${projectId}/data-imports`)}
                 >
                   Data Imports
                 </Button>

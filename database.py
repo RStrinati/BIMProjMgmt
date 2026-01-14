@@ -7531,3 +7531,1240 @@ def toggle_task_item_completion(task_id: int, item_index: int) -> Optional[Dict[
         conn.commit()
 
     return get_task_notes_record(task_id)
+
+
+# ===================== Bid Management Functions =====================
+
+def get_bids(status: Optional[str] = None, project_id: Optional[int] = None, client_id: Optional[int] = None):
+    """Fetch bids with optional filters and joined names."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            where_clauses = []
+            params: List[Any] = []
+
+            if status:
+                where_clauses.append(f"b.{S.Bids.STATUS} = ?")
+                params.append(status)
+            if project_id is not None:
+                where_clauses.append(f"b.{S.Bids.PROJECT_ID} = ?")
+                params.append(project_id)
+            if client_id is not None:
+                where_clauses.append(f"b.{S.Bids.CLIENT_ID} = ?")
+                params.append(client_id)
+
+            where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+            cursor.execute(
+                f"""
+                SELECT
+                    b.{S.Bids.BID_ID},
+                    b.{S.Bids.PROJECT_ID},
+                    b.{S.Bids.CLIENT_ID},
+                    b.{S.Bids.BID_NAME},
+                    b.{S.Bids.BID_TYPE},
+                    b.{S.Bids.STATUS},
+                    b.{S.Bids.PROBABILITY},
+                    b.{S.Bids.OWNER_USER_ID},
+                    b.{S.Bids.CURRENCY_CODE},
+                    b.{S.Bids.STAGE_FRAMEWORK},
+                    b.{S.Bids.VALIDITY_DAYS},
+                    b.{S.Bids.GST_INCLUDED},
+                    b.{S.Bids.PI_NOTES},
+                    b.{S.Bids.CREATED_AT},
+                    b.{S.Bids.UPDATED_AT},
+                    c.{S.Clients.CLIENT_NAME},
+                    u.{S.Users.NAME},
+                    p.{S.Projects.NAME}
+                FROM {S.Bids.TABLE} b
+                LEFT JOIN {S.Clients.TABLE} c ON b.{S.Bids.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
+                LEFT JOIN {S.Users.TABLE} u ON b.{S.Bids.OWNER_USER_ID} = u.{S.Users.ID}
+                LEFT JOIN {S.Projects.TABLE} p ON b.{S.Bids.PROJECT_ID} = p.{S.Projects.ID}
+                {where_sql}
+                ORDER BY b.{S.Bids.UPDATED_AT} DESC, b.{S.Bids.BID_ID} DESC
+                """,
+                params,
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "bid_id": row[0],
+                    "project_id": row[1],
+                    "client_id": row[2],
+                    "bid_name": row[3],
+                    "bid_type": row[4],
+                    "status": row[5],
+                    "probability": row[6],
+                    "owner_user_id": row[7],
+                    "currency_code": row[8],
+                    "stage_framework": row[9],
+                    "validity_days": row[10],
+                    "gst_included": bool(row[11]) if row[11] is not None else None,
+                    "pi_notes": row[12],
+                    "created_at": row[13],
+                    "updated_at": row[14],
+                    "client_name": row[15],
+                    "owner_name": row[16],
+                    "project_name": row[17],
+                }
+                for row in rows
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching bids: {e}")
+        return []
+
+
+def get_bid(bid_id: int):
+    """Fetch a single bid by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    b.{S.Bids.BID_ID},
+                    b.{S.Bids.PROJECT_ID},
+                    b.{S.Bids.CLIENT_ID},
+                    b.{S.Bids.BID_NAME},
+                    b.{S.Bids.BID_TYPE},
+                    b.{S.Bids.STATUS},
+                    b.{S.Bids.PROBABILITY},
+                    b.{S.Bids.OWNER_USER_ID},
+                    b.{S.Bids.CURRENCY_CODE},
+                    b.{S.Bids.STAGE_FRAMEWORK},
+                    b.{S.Bids.VALIDITY_DAYS},
+                    b.{S.Bids.GST_INCLUDED},
+                    b.{S.Bids.PI_NOTES},
+                    b.{S.Bids.CREATED_AT},
+                    b.{S.Bids.UPDATED_AT},
+                    c.{S.Clients.CLIENT_NAME},
+                    u.{S.Users.NAME},
+                    p.{S.Projects.NAME}
+                FROM {S.Bids.TABLE} b
+                LEFT JOIN {S.Clients.TABLE} c ON b.{S.Bids.CLIENT_ID} = c.{S.Clients.CLIENT_ID}
+                LEFT JOIN {S.Users.TABLE} u ON b.{S.Bids.OWNER_USER_ID} = u.{S.Users.ID}
+                LEFT JOIN {S.Projects.TABLE} p ON b.{S.Bids.PROJECT_ID} = p.{S.Projects.ID}
+                WHERE b.{S.Bids.BID_ID} = ?
+                """,
+                (bid_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "bid_id": row[0],
+                "project_id": row[1],
+                "client_id": row[2],
+                "bid_name": row[3],
+                "bid_type": row[4],
+                "status": row[5],
+                "probability": row[6],
+                "owner_user_id": row[7],
+                "currency_code": row[8],
+                "stage_framework": row[9],
+                "validity_days": row[10],
+                "gst_included": bool(row[11]) if row[11] is not None else None,
+                "pi_notes": row[12],
+                "created_at": row[13],
+                "updated_at": row[14],
+                "client_name": row[15],
+                "owner_name": row[16],
+                "project_name": row[17],
+            }
+    except Exception as e:
+        logger.error(f"Error fetching bid {bid_id}: {e}")
+        return None
+
+
+def create_bid(payload: Dict[str, Any]):
+    """Create a bid and return the full record."""
+    columns = [
+        S.Bids.PROJECT_ID,
+        S.Bids.CLIENT_ID,
+        S.Bids.BID_NAME,
+        S.Bids.BID_TYPE,
+        S.Bids.STATUS,
+        S.Bids.PROBABILITY,
+        S.Bids.OWNER_USER_ID,
+        S.Bids.CURRENCY_CODE,
+        S.Bids.STAGE_FRAMEWORK,
+        S.Bids.VALIDITY_DAYS,
+        S.Bids.GST_INCLUDED,
+        S.Bids.PI_NOTES,
+    ]
+    values = [
+        payload.get(S.Bids.PROJECT_ID),
+        payload.get(S.Bids.CLIENT_ID),
+        payload.get(S.Bids.BID_NAME),
+        payload.get(S.Bids.BID_TYPE),
+        payload.get(S.Bids.STATUS),
+        payload.get(S.Bids.PROBABILITY),
+        payload.get(S.Bids.OWNER_USER_ID),
+        payload.get(S.Bids.CURRENCY_CODE),
+        payload.get(S.Bids.STAGE_FRAMEWORK),
+        payload.get(S.Bids.VALIDITY_DAYS),
+        int(bool(payload.get(S.Bids.GST_INCLUDED))) if payload.get(S.Bids.GST_INCLUDED) is not None else None,
+        payload.get(S.Bids.PI_NOTES),
+    ]
+
+    placeholders = ", ".join(["?"] * len(values))
+    column_sql = ", ".join(columns)
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.Bids.TABLE} ({column_sql})
+                OUTPUT INSERTED.{S.Bids.BID_ID}
+                VALUES ({placeholders});
+                """,
+                values,
+            )
+            bid_id = cursor.fetchone()[0]
+            conn.commit()
+            return get_bid(int(bid_id))
+    except Exception as e:
+        logger.error(f"Error creating bid: {e}")
+        return None
+
+
+def update_bid(bid_id: int, payload: Dict[str, Any]) -> bool:
+    """Update a bid."""
+    allowed_fields = [
+        S.Bids.PROJECT_ID,
+        S.Bids.CLIENT_ID,
+        S.Bids.BID_NAME,
+        S.Bids.BID_TYPE,
+        S.Bids.STATUS,
+        S.Bids.PROBABILITY,
+        S.Bids.OWNER_USER_ID,
+        S.Bids.CURRENCY_CODE,
+        S.Bids.STAGE_FRAMEWORK,
+        S.Bids.VALIDITY_DAYS,
+        S.Bids.GST_INCLUDED,
+        S.Bids.PI_NOTES,
+    ]
+    updates = []
+    params = []
+    for field in allowed_fields:
+        if field in payload:
+            value = payload.get(field)
+            if field == S.Bids.GST_INCLUDED and value is not None:
+                value = int(bool(value))
+            updates.append(f"{field} = ?")
+            params.append(value)
+
+    if not updates:
+        return False
+
+    updates.append(f"{S.Bids.UPDATED_AT} = SYSDATETIME()")
+    params.append(bid_id)
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.Bids.TABLE}
+                SET {', '.join(updates)}
+                WHERE {S.Bids.BID_ID} = ?;
+                """,
+                params,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating bid {bid_id}: {e}")
+        return False
+
+
+def archive_bid(bid_id: int) -> bool:
+    """Soft delete a bid by marking it archived."""
+    return update_bid(bid_id, {S.Bids.STATUS: "ARCHIVED"})
+
+
+def get_bid_sections(bid_id: int):
+    """Return sections for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.BidSections.BID_SECTION_ID},
+                       {S.BidSections.SECTION_KEY},
+                       {S.BidSections.CONTENT_JSON},
+                       {S.BidSections.SORT_ORDER}
+                FROM {S.BidSections.TABLE}
+                WHERE {S.BidSections.BID_ID} = ?
+                ORDER BY {S.BidSections.SORT_ORDER}, {S.BidSections.BID_SECTION_ID}
+                """,
+                (bid_id,),
+            )
+            return [
+                {
+                    "bid_section_id": row[0],
+                    "section_key": row[1],
+                    "content_json": row[2],
+                    "sort_order": row[3],
+                }
+                for row in cursor.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching bid sections for bid {bid_id}: {e}")
+        return []
+
+
+def replace_bid_sections(bid_id: int, sections: List[Dict[str, Any]]) -> bool:
+    """Replace bid sections with the provided list."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.BidSections.TABLE} WHERE {S.BidSections.BID_ID} = ?",
+                (bid_id,),
+            )
+            rows = []
+            for section in sections:
+                content = section.get("content_json")
+                if content is not None and not isinstance(content, str):
+                    content = json.dumps(content)
+                rows.append(
+                    (
+                        bid_id,
+                        section.get("section_key"),
+                        content,
+                        section.get("sort_order", 0),
+                    )
+                )
+            if rows:
+                cursor.executemany(
+                    f"""
+                    INSERT INTO {S.BidSections.TABLE} (
+                        {S.BidSections.BID_ID},
+                        {S.BidSections.SECTION_KEY},
+                        {S.BidSections.CONTENT_JSON},
+                        {S.BidSections.SORT_ORDER}
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error replacing bid sections for bid {bid_id}: {e}")
+        return False
+
+
+def get_bid_scope_items(bid_id: int):
+    """Return scope items for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.BidScopeItems.SCOPE_ITEM_ID},
+                       {S.BidScopeItems.SERVICE_CODE},
+                       {S.BidScopeItems.TITLE},
+                       {S.BidScopeItems.DESCRIPTION},
+                       {S.BidScopeItems.STAGE_NAME},
+                       {S.BidScopeItems.DELIVERABLES_JSON},
+                       {S.BidScopeItems.INCLUDED_QTY},
+                       {S.BidScopeItems.UNIT},
+                       {S.BidScopeItems.UNIT_RATE},
+                       {S.BidScopeItems.LUMP_SUM},
+                       {S.BidScopeItems.IS_OPTIONAL},
+                       {S.BidScopeItems.OPTION_GROUP},
+                       {S.BidScopeItems.SORT_ORDER}
+                FROM {S.BidScopeItems.TABLE}
+                WHERE {S.BidScopeItems.BID_ID} = ?
+                ORDER BY {S.BidScopeItems.SORT_ORDER}, {S.BidScopeItems.SCOPE_ITEM_ID}
+                """,
+                (bid_id,),
+            )
+            return [
+                {
+                    "scope_item_id": row[0],
+                    "service_code": row[1],
+                    "title": row[2],
+                    "description": row[3],
+                    "stage_name": row[4],
+                    "deliverables_json": row[5],
+                    "included_qty": row[6],
+                    "unit": row[7],
+                    "unit_rate": row[8],
+                    "lump_sum": row[9],
+                    "is_optional": bool(row[10]) if row[10] is not None else False,
+                    "option_group": row[11],
+                    "sort_order": row[12],
+                }
+                for row in cursor.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching bid scope items for bid {bid_id}: {e}")
+        return []
+
+
+def create_bid_scope_item(bid_id: int, payload: Dict[str, Any]):
+    """Create a scope item for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.BidScopeItems.TABLE} (
+                    {S.BidScopeItems.BID_ID},
+                    {S.BidScopeItems.SERVICE_CODE},
+                    {S.BidScopeItems.TITLE},
+                    {S.BidScopeItems.DESCRIPTION},
+                    {S.BidScopeItems.STAGE_NAME},
+                    {S.BidScopeItems.DELIVERABLES_JSON},
+                    {S.BidScopeItems.INCLUDED_QTY},
+                    {S.BidScopeItems.UNIT},
+                    {S.BidScopeItems.UNIT_RATE},
+                    {S.BidScopeItems.LUMP_SUM},
+                    {S.BidScopeItems.IS_OPTIONAL},
+                    {S.BidScopeItems.OPTION_GROUP},
+                    {S.BidScopeItems.SORT_ORDER}
+                )
+                OUTPUT INSERTED.{S.BidScopeItems.SCOPE_ITEM_ID}
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    bid_id,
+                    payload.get(S.BidScopeItems.SERVICE_CODE),
+                    payload.get(S.BidScopeItems.TITLE),
+                    payload.get(S.BidScopeItems.DESCRIPTION),
+                    payload.get(S.BidScopeItems.STAGE_NAME),
+                    payload.get(S.BidScopeItems.DELIVERABLES_JSON),
+                    payload.get(S.BidScopeItems.INCLUDED_QTY),
+                    payload.get(S.BidScopeItems.UNIT),
+                    payload.get(S.BidScopeItems.UNIT_RATE),
+                    payload.get(S.BidScopeItems.LUMP_SUM),
+                    int(bool(payload.get(S.BidScopeItems.IS_OPTIONAL))) if payload.get(S.BidScopeItems.IS_OPTIONAL) is not None else 0,
+                    payload.get(S.BidScopeItems.OPTION_GROUP),
+                    payload.get(S.BidScopeItems.SORT_ORDER, 0),
+                ),
+            )
+            scope_item_id = cursor.fetchone()[0]
+            conn.commit()
+            return scope_item_id
+    except Exception as e:
+        logger.error(f"Error creating bid scope item for bid {bid_id}: {e}")
+        return None
+
+
+def update_bid_scope_item(scope_item_id: int, payload: Dict[str, Any]) -> bool:
+    """Update a scope item."""
+    allowed_fields = [
+        S.BidScopeItems.SERVICE_CODE,
+        S.BidScopeItems.TITLE,
+        S.BidScopeItems.DESCRIPTION,
+        S.BidScopeItems.STAGE_NAME,
+        S.BidScopeItems.DELIVERABLES_JSON,
+        S.BidScopeItems.INCLUDED_QTY,
+        S.BidScopeItems.UNIT,
+        S.BidScopeItems.UNIT_RATE,
+        S.BidScopeItems.LUMP_SUM,
+        S.BidScopeItems.IS_OPTIONAL,
+        S.BidScopeItems.OPTION_GROUP,
+        S.BidScopeItems.SORT_ORDER,
+    ]
+    updates = []
+    params = []
+    for field in allowed_fields:
+        if field in payload:
+            value = payload.get(field)
+            if field == S.BidScopeItems.IS_OPTIONAL and value is not None:
+                value = int(bool(value))
+            updates.append(f"{field} = ?")
+            params.append(value)
+    if not updates:
+        return False
+    params.append(scope_item_id)
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.BidScopeItems.TABLE}
+                SET {', '.join(updates)}
+                WHERE {S.BidScopeItems.SCOPE_ITEM_ID} = ?;
+                """,
+                params,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating bid scope item {scope_item_id}: {e}")
+        return False
+
+
+def delete_bid_scope_item(scope_item_id: int) -> bool:
+    """Delete a scope item."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.BidScopeItems.TABLE} WHERE {S.BidScopeItems.SCOPE_ITEM_ID} = ?",
+                (scope_item_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error deleting bid scope item {scope_item_id}: {e}")
+        return False
+
+
+def get_bid_program_stages(bid_id: int):
+    """Return program stages for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.BidProgramStages.PROGRAM_STAGE_ID},
+                       {S.BidProgramStages.STAGE_NAME},
+                       {S.BidProgramStages.PLANNED_START},
+                       {S.BidProgramStages.PLANNED_END},
+                       {S.BidProgramStages.CADENCE},
+                       {S.BidProgramStages.CYCLES_PLANNED},
+                       {S.BidProgramStages.SORT_ORDER}
+                FROM {S.BidProgramStages.TABLE}
+                WHERE {S.BidProgramStages.BID_ID} = ?
+                ORDER BY {S.BidProgramStages.SORT_ORDER}, {S.BidProgramStages.PROGRAM_STAGE_ID}
+                """,
+                (bid_id,),
+            )
+            return [
+                {
+                    "program_stage_id": row[0],
+                    "stage_name": row[1],
+                    "planned_start": row[2],
+                    "planned_end": row[3],
+                    "cadence": row[4],
+                    "cycles_planned": row[5],
+                    "sort_order": row[6],
+                }
+                for row in cursor.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching bid program stages for bid {bid_id}: {e}")
+        return []
+
+
+def create_bid_program_stage(bid_id: int, payload: Dict[str, Any]):
+    """Create a program stage for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.BidProgramStages.TABLE} (
+                    {S.BidProgramStages.BID_ID},
+                    {S.BidProgramStages.STAGE_NAME},
+                    {S.BidProgramStages.PLANNED_START},
+                    {S.BidProgramStages.PLANNED_END},
+                    {S.BidProgramStages.CADENCE},
+                    {S.BidProgramStages.CYCLES_PLANNED},
+                    {S.BidProgramStages.SORT_ORDER}
+                )
+                OUTPUT INSERTED.{S.BidProgramStages.PROGRAM_STAGE_ID}
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    bid_id,
+                    payload.get(S.BidProgramStages.STAGE_NAME),
+                    payload.get(S.BidProgramStages.PLANNED_START),
+                    payload.get(S.BidProgramStages.PLANNED_END),
+                    payload.get(S.BidProgramStages.CADENCE),
+                    payload.get(S.BidProgramStages.CYCLES_PLANNED),
+                    payload.get(S.BidProgramStages.SORT_ORDER, 0),
+                ),
+            )
+            stage_id = cursor.fetchone()[0]
+            conn.commit()
+            return stage_id
+    except Exception as e:
+        logger.error(f"Error creating bid program stage for bid {bid_id}: {e}")
+        return None
+
+
+def update_bid_program_stage(program_stage_id: int, payload: Dict[str, Any]) -> bool:
+    """Update a program stage."""
+    allowed_fields = [
+        S.BidProgramStages.STAGE_NAME,
+        S.BidProgramStages.PLANNED_START,
+        S.BidProgramStages.PLANNED_END,
+        S.BidProgramStages.CADENCE,
+        S.BidProgramStages.CYCLES_PLANNED,
+        S.BidProgramStages.SORT_ORDER,
+    ]
+    updates = []
+    params = []
+    for field in allowed_fields:
+        if field in payload:
+            updates.append(f"{field} = ?")
+            params.append(payload.get(field))
+    if not updates:
+        return False
+    params.append(program_stage_id)
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.BidProgramStages.TABLE}
+                SET {', '.join(updates)}
+                WHERE {S.BidProgramStages.PROGRAM_STAGE_ID} = ?;
+                """,
+                params,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating bid program stage {program_stage_id}: {e}")
+        return False
+
+
+def delete_bid_program_stage(program_stage_id: int) -> bool:
+    """Delete a program stage."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.BidProgramStages.TABLE} WHERE {S.BidProgramStages.PROGRAM_STAGE_ID} = ?",
+                (program_stage_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error deleting bid program stage {program_stage_id}: {e}")
+        return False
+
+
+def get_bid_billing_schedule(bid_id: int):
+    """Return billing schedule lines for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.BidBillingSchedule.BILLING_LINE_ID},
+                       {S.BidBillingSchedule.PERIOD_START},
+                       {S.BidBillingSchedule.PERIOD_END},
+                       {S.BidBillingSchedule.AMOUNT},
+                       {S.BidBillingSchedule.NOTES},
+                       {S.BidBillingSchedule.SORT_ORDER}
+                FROM {S.BidBillingSchedule.TABLE}
+                WHERE {S.BidBillingSchedule.BID_ID} = ?
+                ORDER BY {S.BidBillingSchedule.SORT_ORDER}, {S.BidBillingSchedule.BILLING_LINE_ID}
+                """,
+                (bid_id,),
+            )
+            return [
+                {
+                    "billing_line_id": row[0],
+                    "period_start": row[1],
+                    "period_end": row[2],
+                    "amount": row[3],
+                    "notes": row[4],
+                    "sort_order": row[5],
+                }
+                for row in cursor.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching bid billing schedule for bid {bid_id}: {e}")
+        return []
+
+
+def create_bid_billing_line(bid_id: int, payload: Dict[str, Any]):
+    """Create a billing schedule line for a bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.BidBillingSchedule.TABLE} (
+                    {S.BidBillingSchedule.BID_ID},
+                    {S.BidBillingSchedule.PERIOD_START},
+                    {S.BidBillingSchedule.PERIOD_END},
+                    {S.BidBillingSchedule.AMOUNT},
+                    {S.BidBillingSchedule.NOTES},
+                    {S.BidBillingSchedule.SORT_ORDER}
+                )
+                OUTPUT INSERTED.{S.BidBillingSchedule.BILLING_LINE_ID}
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    bid_id,
+                    payload.get(S.BidBillingSchedule.PERIOD_START),
+                    payload.get(S.BidBillingSchedule.PERIOD_END),
+                    payload.get(S.BidBillingSchedule.AMOUNT),
+                    payload.get(S.BidBillingSchedule.NOTES),
+                    payload.get(S.BidBillingSchedule.SORT_ORDER, 0),
+                ),
+            )
+            line_id = cursor.fetchone()[0]
+            conn.commit()
+            return line_id
+    except Exception as e:
+        logger.error(f"Error creating bid billing schedule line for bid {bid_id}: {e}")
+        return None
+
+
+def update_bid_billing_line(billing_line_id: int, payload: Dict[str, Any]) -> bool:
+    """Update a billing schedule line."""
+    allowed_fields = [
+        S.BidBillingSchedule.PERIOD_START,
+        S.BidBillingSchedule.PERIOD_END,
+        S.BidBillingSchedule.AMOUNT,
+        S.BidBillingSchedule.NOTES,
+        S.BidBillingSchedule.SORT_ORDER,
+    ]
+    updates = []
+    params = []
+    for field in allowed_fields:
+        if field in payload:
+            updates.append(f"{field} = ?")
+            params.append(payload.get(field))
+    if not updates:
+        return False
+    params.append(billing_line_id)
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.BidBillingSchedule.TABLE}
+                SET {', '.join(updates)}
+                WHERE {S.BidBillingSchedule.BILLING_LINE_ID} = ?;
+                """,
+                params,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating bid billing schedule line {billing_line_id}: {e}")
+        return False
+
+
+def delete_bid_billing_line(billing_line_id: int) -> bool:
+    """Delete a billing schedule line."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.BidBillingSchedule.TABLE} WHERE {S.BidBillingSchedule.BILLING_LINE_ID} = ?",
+                (billing_line_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error deleting bid billing schedule line {billing_line_id}: {e}")
+        return False
+
+
+def create_bid_variation(payload: Dict[str, Any]):
+    """Create a bid variation."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.BidVariations.TABLE} (
+                    {S.BidVariations.PROJECT_ID},
+                    {S.BidVariations.BID_ID},
+                    {S.BidVariations.TITLE},
+                    {S.BidVariations.DESCRIPTION},
+                    {S.BidVariations.BASELINE_CONTRACT_VALUE},
+                    {S.BidVariations.REMAINING_VALUE},
+                    {S.BidVariations.PROPOSED_CHANGE_VALUE},
+                    {S.BidVariations.STATUS}
+                )
+                OUTPUT INSERTED.{S.BidVariations.VARIATION_ID}
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    payload.get(S.BidVariations.PROJECT_ID),
+                    payload.get(S.BidVariations.BID_ID),
+                    payload.get(S.BidVariations.TITLE),
+                    payload.get(S.BidVariations.DESCRIPTION),
+                    payload.get(S.BidVariations.BASELINE_CONTRACT_VALUE),
+                    payload.get(S.BidVariations.REMAINING_VALUE),
+                    payload.get(S.BidVariations.PROPOSED_CHANGE_VALUE),
+                    payload.get(S.BidVariations.STATUS),
+                ),
+            )
+            variation_id = cursor.fetchone()[0]
+            conn.commit()
+            return variation_id
+    except Exception as e:
+        logger.error(f"Error creating bid variation: {e}")
+        return None
+
+
+def list_bid_variations(project_id: Optional[int] = None, bid_id: Optional[int] = None):
+    """List variations filtered by project or bid."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            where = []
+            params: List[Any] = []
+            if project_id is not None:
+                where.append(f"{S.BidVariations.PROJECT_ID} = ?")
+                params.append(project_id)
+            if bid_id is not None:
+                where.append(f"{S.BidVariations.BID_ID} = ?")
+                params.append(bid_id)
+            where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+            cursor.execute(
+                f"""
+                SELECT {S.BidVariations.VARIATION_ID},
+                       {S.BidVariations.PROJECT_ID},
+                       {S.BidVariations.BID_ID},
+                       {S.BidVariations.TITLE},
+                       {S.BidVariations.DESCRIPTION},
+                       {S.BidVariations.BASELINE_CONTRACT_VALUE},
+                       {S.BidVariations.REMAINING_VALUE},
+                       {S.BidVariations.PROPOSED_CHANGE_VALUE},
+                       {S.BidVariations.STATUS},
+                       {S.BidVariations.CREATED_AT},
+                       {S.BidVariations.UPDATED_AT}
+                FROM {S.BidVariations.TABLE}
+                {where_sql}
+                ORDER BY {S.BidVariations.CREATED_AT} DESC, {S.BidVariations.VARIATION_ID} DESC
+                """,
+                params,
+            )
+            return [
+                {
+                    "variation_id": row[0],
+                    "project_id": row[1],
+                    "bid_id": row[2],
+                    "title": row[3],
+                    "description": row[4],
+                    "baseline_contract_value": row[5],
+                    "remaining_value": row[6],
+                    "proposed_change_value": row[7],
+                    "status": row[8],
+                    "created_at": row[9],
+                    "updated_at": row[10],
+                }
+                for row in cursor.fetchall()
+            ]
+    except Exception as e:
+        logger.error(f"Error listing bid variations: {e}")
+        return []
+
+
+def _coerce_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _project_payload_to_columns(payload: Dict[str, Any], fallback_client_id: Optional[int] = None):
+    """Convert project payload into insert columns and values."""
+    if not payload:
+        payload = {}
+    project_name = payload.get("project_name") or payload.get("name")
+    if not project_name:
+        return None, None
+
+    columns = [S.Projects.NAME]
+    values = [project_name]
+
+    client_id = payload.get("client_id", fallback_client_id)
+    if client_id is not None:
+        columns.append(S.Projects.CLIENT_ID)
+        values.append(_coerce_int(client_id))
+
+    status = payload.get("status")
+    if status:
+        columns.append(S.Projects.STATUS)
+        values.append(status)
+
+    priority = payload.get("priority")
+    if priority is not None:
+        columns.append(S.Projects.PRIORITY)
+        values.append(priority)
+
+    start_date = payload.get("start_date")
+    if start_date:
+        columns.append(S.Projects.START_DATE)
+        values.append(start_date)
+
+    end_date = payload.get("end_date")
+    if end_date:
+        columns.append(S.Projects.END_DATE)
+        values.append(end_date)
+
+    return columns, values
+
+
+def _cadence_to_days(cadence: Optional[str]) -> int:
+    value = (cadence or "").strip().lower()
+    if value in ("weekly", "week"):
+        return 7
+    if value in ("fortnightly", "fortnight"):
+        return 14
+    if value in ("monthly", "month"):
+        return 30
+    return 7
+
+
+def award_bid(
+    bid_id: int,
+    create_new_project: bool,
+    project_id: Optional[int],
+    project_payload: Optional[Dict[str, Any]] = None,
+):
+    """Award a bid and create downstream project artifacts."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            f"""
+            SELECT {S.Bids.BID_ID}, {S.Bids.STATUS}, {S.Bids.PROJECT_ID}, {S.Bids.CLIENT_ID}
+            FROM {S.Bids.TABLE}
+            WHERE {S.Bids.BID_ID} = ?
+            """,
+            (bid_id,),
+        )
+        bid_row = cursor.fetchone()
+        if not bid_row:
+            raise ValueError("Bid not found.")
+
+        bid_status = bid_row[1]
+        existing_project_id = bid_row[2]
+        bid_client_id = bid_row[3]
+
+        cursor.execute(
+            f"""
+            SELECT {S.BidAwardSummary.PROJECT_ID},
+                   {S.BidAwardSummary.CREATED_SERVICES},
+                   {S.BidAwardSummary.CREATED_REVIEWS},
+                   {S.BidAwardSummary.CREATED_CLAIMS},
+                   {S.BidAwardSummary.SERVICE_IDS_JSON},
+                   {S.BidAwardSummary.REVIEW_IDS_JSON},
+                   {S.BidAwardSummary.CLAIM_IDS_JSON}
+            FROM {S.BidAwardSummary.TABLE}
+            WHERE {S.BidAwardSummary.BID_ID} = ?
+            """,
+            (bid_id,),
+        )
+        summary_row = cursor.fetchone()
+        if summary_row:
+            return {
+                "project_id": summary_row[0],
+                "created_services": summary_row[1],
+                "created_reviews": summary_row[2],
+                "created_claims": summary_row[3],
+                "service_ids": json.loads(summary_row[4]) if summary_row[4] else [],
+                "review_ids": json.loads(summary_row[5]) if summary_row[5] else [],
+                "claim_ids": json.loads(summary_row[6]) if summary_row[6] else [],
+                "message": "Bid already awarded.",
+            }
+
+        if bid_status == "AWARDED":
+            raise RuntimeError("Bid already awarded but award summary is missing.")
+
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {S.BidScopeItems.TABLE} WHERE {S.BidScopeItems.BID_ID} = ?",
+            (bid_id,),
+        )
+        scope_count = cursor.fetchone()[0]
+        if not scope_count:
+            raise ValueError("Bid must include at least one scope item before award.")
+
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {S.BidBillingSchedule.TABLE} WHERE {S.BidBillingSchedule.BID_ID} = ?",
+            (bid_id,),
+        )
+        billing_count = cursor.fetchone()[0]
+        if not billing_count:
+            raise ValueError("Bid must include a billing schedule before award.")
+
+        if create_new_project:
+            columns, values = _project_payload_to_columns(project_payload, bid_client_id)
+            if not columns:
+                raise ValueError("project_payload with project_name is required when creating a new project.")
+            cursor.execute(
+                f"""
+                INSERT INTO {S.Projects.TABLE} ({', '.join(columns)})
+                OUTPUT INSERTED.{S.Projects.ID}
+                VALUES ({', '.join(['?'] * len(values))});
+                """,
+                values,
+            )
+            project_id = cursor.fetchone()[0]
+        else:
+            project_id = project_id or existing_project_id
+            if not project_id:
+                raise ValueError("project_id is required when create_new_project is false.")
+            cursor.execute(
+                f"SELECT {S.Projects.ID} FROM {S.Projects.TABLE} WHERE {S.Projects.ID} = ?",
+                (project_id,),
+            )
+            if cursor.fetchone() is None:
+                raise ValueError("Project not found for award.")
+
+        cursor.execute(
+            f"""
+            UPDATE {S.Bids.TABLE}
+            SET {S.Bids.STATUS} = 'AWARDED',
+                {S.Bids.PROJECT_ID} = ?,
+                {S.Bids.UPDATED_AT} = SYSDATETIME()
+            WHERE {S.Bids.BID_ID} = ?;
+            """,
+            (project_id, bid_id),
+        )
+
+        cursor.execute(
+            f"""
+            SELECT {S.BidScopeItems.SCOPE_ITEM_ID},
+                   {S.BidScopeItems.SERVICE_CODE},
+                   {S.BidScopeItems.TITLE},
+                   {S.BidScopeItems.DESCRIPTION},
+                   {S.BidScopeItems.STAGE_NAME},
+                   {S.BidScopeItems.INCLUDED_QTY},
+                   {S.BidScopeItems.UNIT},
+                   {S.BidScopeItems.UNIT_RATE},
+                   {S.BidScopeItems.LUMP_SUM},
+                   {S.BidScopeItems.IS_OPTIONAL},
+                   {S.BidScopeItems.OPTION_GROUP}
+            FROM {S.BidScopeItems.TABLE}
+            WHERE {S.BidScopeItems.BID_ID} = ?
+            ORDER BY {S.BidScopeItems.SORT_ORDER}, {S.BidScopeItems.SCOPE_ITEM_ID}
+            """,
+            (bid_id,),
+        )
+        scope_rows = cursor.fetchall()
+
+        service_ids: List[int] = []
+        service_values: List[Tuple[int, float]] = []
+        for row in scope_rows:
+            service_code = row[1]
+            title = row[2]
+            description = row[3]
+            stage_name = row[4]
+            included_qty = row[5]
+            unit = row[6]
+            unit_rate = row[7]
+            lump_sum = row[8]
+            is_optional = bool(row[9]) if row[9] is not None else False
+            option_group = row[10]
+
+            unit_qty = _coerce_int(included_qty)
+            agreed_fee = None
+            if lump_sum is not None:
+                agreed_fee = lump_sum
+            elif unit_rate is not None and unit_qty is not None:
+                agreed_fee = float(unit_rate) * unit_qty
+
+            notes = description
+            if is_optional:
+                optional_note = "Optional scope item"
+                if option_group:
+                    optional_note = f"{optional_note} ({option_group})"
+                notes = f"{notes}\n{optional_note}" if notes else optional_note
+
+            cursor.execute(
+                f"""
+                INSERT INTO {S.ProjectServices.TABLE} (
+                    {S.ProjectServices.PROJECT_ID},
+                    {S.ProjectServices.SERVICE_CODE},
+                    {S.ProjectServices.SERVICE_NAME},
+                    {S.ProjectServices.PHASE},
+                    {S.ProjectServices.UNIT_TYPE},
+                    {S.ProjectServices.UNIT_QTY},
+                    {S.ProjectServices.UNIT_RATE},
+                    {S.ProjectServices.LUMP_SUM_FEE},
+                    {S.ProjectServices.AGREED_FEE},
+                    {S.ProjectServices.BILL_RULE},
+                    {S.ProjectServices.NOTES}
+                )
+                OUTPUT INSERTED.{S.ProjectServices.SERVICE_ID}
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    project_id,
+                    service_code,
+                    title,
+                    stage_name,
+                    unit,
+                    unit_qty,
+                    unit_rate,
+                    lump_sum,
+                    agreed_fee,
+                    "Bid Award",
+                    notes,
+                ),
+            )
+            service_id = cursor.fetchone()[0]
+            service_ids.append(service_id)
+            service_value = float(agreed_fee) if agreed_fee is not None else 0.0
+            service_values.append((service_id, service_value))
+
+        cursor.execute(
+            f"""
+            SELECT {S.BidProgramStages.PROGRAM_STAGE_ID},
+                   {S.BidProgramStages.STAGE_NAME},
+                   {S.BidProgramStages.PLANNED_START},
+                   {S.BidProgramStages.CADENCE},
+                   {S.BidProgramStages.CYCLES_PLANNED}
+            FROM {S.BidProgramStages.TABLE}
+            WHERE {S.BidProgramStages.BID_ID} = ?
+            ORDER BY {S.BidProgramStages.SORT_ORDER}, {S.BidProgramStages.PROGRAM_STAGE_ID}
+            """,
+            (bid_id,),
+        )
+        program_rows = cursor.fetchall()
+        review_ids: List[int] = []
+        for row in program_rows:
+            stage_name = row[1]
+            planned_start = row[2] or datetime.utcnow().date()
+            cadence = row[3]
+            cycles_planned = int(row[4] or 0)
+            interval_days = _cadence_to_days(cadence)
+            for idx in range(cycles_planned):
+                review_date = planned_start + timedelta(days=interval_days * idx)
+                cursor.execute(
+                    f"""
+                    INSERT INTO {S.ReviewSchedule.TABLE} (
+                        {S.ReviewSchedule.PROJECT_ID},
+                        {S.ReviewSchedule.REVIEW_DATE},
+                        {S.ReviewSchedule.IS_WITHIN_LICENSE_PERIOD},
+                        {S.ReviewSchedule.IS_BLOCKED},
+                        {S.ReviewSchedule.CYCLE_ID},
+                        {S.ReviewSchedule.ASSIGNED_TO},
+                        {S.ReviewSchedule.STATUS},
+                        {S.ReviewSchedule.MANUAL_OVERRIDE}
+                    )
+                    OUTPUT INSERTED.{S.ReviewSchedule.SCHEDULE_ID}
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (project_id, review_date, None, None, None, None, "planned", stage_name),
+                )
+                review_ids.append(cursor.fetchone()[0])
+
+        cursor.execute(
+            f"""
+            SELECT {S.BidBillingSchedule.BILLING_LINE_ID},
+                   {S.BidBillingSchedule.PERIOD_START},
+                   {S.BidBillingSchedule.PERIOD_END},
+                   {S.BidBillingSchedule.AMOUNT},
+                   {S.BidBillingSchedule.NOTES}
+            FROM {S.BidBillingSchedule.TABLE}
+            WHERE {S.BidBillingSchedule.BID_ID} = ?
+            ORDER BY {S.BidBillingSchedule.SORT_ORDER}, {S.BidBillingSchedule.BILLING_LINE_ID}
+            """,
+            (bid_id,),
+        )
+        billing_rows = cursor.fetchall()
+
+        claim_ids: List[int] = []
+        total_service_value = sum(value for _, value in service_values)
+        service_count = len(service_values)
+
+        for row in billing_rows:
+            period_start = row[1]
+            period_end = row[2]
+            amount = float(row[3] or 0.0)
+            notes = row[4]
+
+            cursor.execute(
+                f"""
+                INSERT INTO {S.BillingClaims.TABLE} (
+                    {S.BillingClaims.PROJECT_ID},
+                    {S.BillingClaims.PERIOD_START},
+                    {S.BillingClaims.PERIOD_END},
+                    {S.BillingClaims.STATUS}
+                )
+                OUTPUT INSERTED.{S.BillingClaims.CLAIM_ID}
+                VALUES (?, ?, ?, ?);
+                """,
+                (project_id, period_start, period_end, "draft"),
+            )
+            claim_id = cursor.fetchone()[0]
+            claim_ids.append(claim_id)
+
+            allocations: List[Tuple[int, float]] = []
+            if total_service_value > 0:
+                for service_id, value in service_values:
+                    allocations.append((service_id, amount * (value / total_service_value)))
+            elif service_count > 0:
+                even_amount = amount / service_count if service_count else 0.0
+                allocations = [(service_id, even_amount) for service_id, _ in service_values]
+
+            for service_id, alloc_amount in allocations:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {S.BillingClaimLines.TABLE} (
+                        {S.BillingClaimLines.CLAIM_ID},
+                        {S.BillingClaimLines.SERVICE_ID},
+                        {S.BillingClaimLines.STAGE_LABEL},
+                        {S.BillingClaimLines.PREV_PCT},
+                        {S.BillingClaimLines.CURR_PCT},
+                        {S.BillingClaimLines.DELTA_PCT},
+                        {S.BillingClaimLines.AMOUNT_THIS_CLAIM},
+                        {S.BillingClaimLines.NOTE}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        claim_id,
+                        service_id,
+                        "Bid Award",
+                        0,
+                        0,
+                        0,
+                        round(alloc_amount, 2),
+                        notes,
+                    ),
+                )
+
+        created_services = len(service_ids)
+        created_reviews = len(review_ids)
+        created_claims = len(claim_ids)
+
+        cursor.execute(
+            f"""
+            INSERT INTO {S.BidAwardSummary.TABLE} (
+                {S.BidAwardSummary.BID_ID},
+                {S.BidAwardSummary.PROJECT_ID},
+                {S.BidAwardSummary.CREATED_SERVICES},
+                {S.BidAwardSummary.CREATED_REVIEWS},
+                {S.BidAwardSummary.CREATED_CLAIMS},
+                {S.BidAwardSummary.SERVICE_IDS_JSON},
+                {S.BidAwardSummary.REVIEW_IDS_JSON},
+                {S.BidAwardSummary.CLAIM_IDS_JSON}
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                bid_id,
+                project_id,
+                created_services,
+                created_reviews,
+                created_claims,
+                json.dumps(service_ids),
+                json.dumps(review_ids),
+                json.dumps(claim_ids),
+            ),
+        )
+
+        conn.commit()
+
+        return {
+            "project_id": project_id,
+            "created_services": created_services,
+            "created_reviews": created_reviews,
+            "created_claims": created_claims,
+            "service_ids": service_ids,
+            "review_ids": review_ids,
+            "claim_ids": claim_ids,
+        }

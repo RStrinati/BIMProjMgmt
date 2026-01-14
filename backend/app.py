@@ -34,12 +34,21 @@ from config import (
 
 from database import (  # noqa: E402
     add_bookmark,
+    archive_bid,
     create_client,
+    create_bid,
+    create_bid_billing_line,
+    create_bid_program_stage,
+    create_bid_scope_item,
+    create_bid_variation,
     create_project_service,
     create_review_cycle,
     create_service_review,
     create_service_template,
     delete_bookmark,
+    delete_bid_billing_line,
+    delete_bid_program_stage,
+    delete_bid_scope_item,
     delete_client,
     delete_project,
     delete_project_service,
@@ -91,6 +100,12 @@ from database import (  # noqa: E402
     get_model_register,
     get_naming_compliance_table,
     get_revizto_issues_detail,
+    get_bid,
+    get_bids,
+    get_bid_billing_schedule,
+    get_bid_program_stages,
+    get_bid_scope_items,
+    get_bid_sections,
     fetch_tasks_notes_view,
     insert_task_notes_record,
     update_task_notes_record,
@@ -131,6 +146,13 @@ from database import (  # noqa: E402
     create_issue_attribute_mapping,
     update_issue_attribute_mapping,
     deactivate_issue_attribute_mapping,
+    list_bid_variations,
+    replace_bid_sections,
+    update_bid,
+    update_bid_billing_line,
+    update_bid_program_stage,
+    update_bid_scope_item,
+    award_bid,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -356,6 +378,7 @@ class CustomJSONProvider(DefaultJSONProvider):
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "service_templates.json"
+BID_SCOPE_TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "bid_scope_templates.json"
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 _APP_LOG_FILE = LOG_DIR / "app.log"
@@ -482,6 +505,18 @@ def api_log_frontend_event():
     return "", 204
 
 
+@app.route('/api/health/schema', methods=['GET'])
+def api_schema_health_check():
+    """Validate required schema objects for runtime operations."""
+    try:
+        report = _schema_report()
+        status = 200 if report["ok"] else 409
+        return jsonify(report), status
+    except Exception as e:
+        logging.exception("Error running schema health check")
+        return jsonify({"error": str(e)}), 500
+
+
 def _serialize_datetime(value):
     if value is None:
         return None
@@ -490,6 +525,17 @@ def _serialize_datetime(value):
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time()).isoformat()
     return str(value)
+
+
+def _apply_query_timeout(conn, seconds: int) -> None:
+    """Best-effort query timeout without breaking drivers that lack cursor.timeout."""
+    if seconds <= 0:
+        return
+    try:
+        if hasattr(conn, "timeout"):
+            conn.timeout = seconds
+    except Exception:
+        logging.warning("Failed to set connection timeout", exc_info=True)
 
 
 def _normalise_validation_targets(targets):
@@ -513,6 +559,289 @@ def _derive_zone_code(file_name):
     if len(parts) >= 3:
         return parts[2].upper()
     return None
+
+
+BID_TYPES = {"PROPOSAL", "FEE_UPDATE", "VARIATION"}
+BID_STATUSES = {"DRAFT", "SUBMITTED", "AWARDED", "LOST", "ARCHIVED"}
+VARIATION_STATUSES = {"DRAFT", "SUBMITTED", "APPROVED", "REJECTED"}
+PROGRAM_STAGE_CADENCES = {"weekly", "fortnightly", "monthly"}
+
+
+def _schema_requirements() -> dict[str, list[str]]:
+    return {
+        S.Bids.TABLE: [
+            S.Bids.BID_ID,
+            S.Bids.BID_NAME,
+            S.Bids.BID_TYPE,
+            S.Bids.STATUS,
+            S.Bids.CLIENT_ID,
+            S.Bids.PROJECT_ID,
+        ],
+        S.BidSections.TABLE: [
+            S.BidSections.BID_SECTION_ID,
+            S.BidSections.BID_ID,
+            S.BidSections.SECTION_KEY,
+            S.BidSections.CONTENT_JSON,
+        ],
+        S.BidScopeItems.TABLE: [
+            S.BidScopeItems.SCOPE_ITEM_ID,
+            S.BidScopeItems.BID_ID,
+            S.BidScopeItems.TITLE,
+        ],
+        S.BidProgramStages.TABLE: [
+            S.BidProgramStages.PROGRAM_STAGE_ID,
+            S.BidProgramStages.BID_ID,
+            S.BidProgramStages.STAGE_NAME,
+        ],
+        S.BidBillingSchedule.TABLE: [
+            S.BidBillingSchedule.BILLING_LINE_ID,
+            S.BidBillingSchedule.BID_ID,
+            S.BidBillingSchedule.PERIOD_START,
+            S.BidBillingSchedule.PERIOD_END,
+        ],
+        S.BidAwardSummary.TABLE: [
+            S.BidAwardSummary.AWARD_ID,
+            S.BidAwardSummary.BID_ID,
+            S.BidAwardSummary.PROJECT_ID,
+        ],
+        S.BidVariations.TABLE: [
+            S.BidVariations.VARIATION_ID,
+            S.BidVariations.PROJECT_ID,
+            S.BidVariations.TITLE,
+        ],
+        S.Projects.TABLE: [S.Projects.ID, S.Projects.NAME],
+        S.Clients.TABLE: [S.Clients.CLIENT_ID],
+        S.Users.TABLE: [S.Users.ID, S.Users.NAME],
+        S.ProjectServices.TABLE: [
+            S.ProjectServices.SERVICE_ID,
+            S.ProjectServices.PROJECT_ID,
+            S.ProjectServices.SERVICE_NAME,
+        ],
+        S.ReviewSchedule.TABLE: [
+            S.ReviewSchedule.SCHEDULE_ID,
+            S.ReviewSchedule.PROJECT_ID,
+            S.ReviewSchedule.REVIEW_DATE,
+        ],
+        S.BillingClaims.TABLE: [
+            S.BillingClaims.CLAIM_ID,
+            S.BillingClaims.PROJECT_ID,
+            S.BillingClaims.PERIOD_START,
+            S.BillingClaims.PERIOD_END,
+        ],
+        S.BillingClaimLines.TABLE: [
+            S.BillingClaimLines.LINE_ID,
+            S.BillingClaimLines.CLAIM_ID,
+            S.BillingClaimLines.SERVICE_ID,
+            S.BillingClaimLines.STAGE_LABEL,
+            S.BillingClaimLines.AMOUNT_THIS_CLAIM,
+        ],
+    }
+
+
+def _schema_report() -> dict[str, Any]:
+    required = _schema_requirements()
+    tables = list(required.keys())
+    missing_tables: list[str] = []
+    missing_columns: dict[str, list[str]] = {}
+
+    with get_db_connection() as conn:
+        _apply_query_timeout(conn, 10)
+        cursor = conn.cursor()
+        placeholders = ", ".join(["?"] * len(tables))
+        cursor.execute(
+            f"""
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME IN ({placeholders})
+            """,
+            tables,
+        )
+        existing_tables = {row[0] for row in cursor.fetchall()}
+        for table in tables:
+            if table not in existing_tables:
+                missing_tables.append(table)
+
+        cursor.execute(
+            f"""
+            SELECT TABLE_NAME, COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME IN ({placeholders})
+            """,
+            tables,
+        )
+        column_map: dict[str, set[str]] = {}
+        for row in cursor.fetchall():
+            column_map.setdefault(row[0], set()).add(row[1])
+
+    for table, columns in required.items():
+        if table in missing_tables:
+            continue
+        existing = column_map.get(table, set())
+        missing = [column for column in columns if column not in existing]
+        if missing:
+            missing_columns[table] = missing
+
+    bid_tables = {
+        S.Bids.TABLE,
+        S.BidSections.TABLE,
+        S.BidScopeItems.TABLE,
+        S.BidProgramStages.TABLE,
+        S.BidBillingSchedule.TABLE,
+        S.BidAwardSummary.TABLE,
+        S.BidVariations.TABLE,
+    }
+    bid_missing = [table for table in bid_tables if table in missing_tables]
+
+    return {
+        "ok": not missing_tables and not missing_columns,
+        "missing_tables": missing_tables,
+        "missing_columns": missing_columns,
+        "bid_module_ready": len(bid_missing) == 0,
+        "bid_missing_tables": sorted(bid_missing),
+        "required_tables": sorted(tables),
+    }
+
+
+def _ensure_bid_schema_ready():
+    report = _schema_report()
+    if not report["bid_module_ready"]:
+        return report, (
+            jsonify({
+                "error": "Bid module not enabled - pending DB migration.",
+                "details": report,
+            }),
+            409,
+        )
+    return report, None
+
+
+def _normalize_bid_payload(payload: dict, is_update: bool = False):
+    data = payload or {}
+    result: dict[str, Any] = {}
+
+    bid_name = (data.get("bid_name") or "").strip()
+    if bid_name:
+        result[S.Bids.BID_NAME] = bid_name
+    elif not is_update:
+        return None, "bid_name is required"
+
+    bid_type = data.get("bid_type")
+    if bid_type is None and not is_update:
+        bid_type = "PROPOSAL"
+    if bid_type is not None:
+        bid_type = str(bid_type).strip().upper()
+        if bid_type not in BID_TYPES:
+            return None, f"bid_type must be one of {sorted(BID_TYPES)}"
+        result[S.Bids.BID_TYPE] = bid_type
+
+    status = data.get("status")
+    if status is None and not is_update:
+        status = "DRAFT"
+    if status is not None:
+        status = str(status).strip().upper()
+        if status not in BID_STATUSES:
+            return None, f"status must be one of {sorted(BID_STATUSES)}"
+        result[S.Bids.STATUS] = status
+
+    probability = data.get("probability")
+    if probability is not None and probability != "":
+        try:
+            probability_value = int(probability)
+        except (TypeError, ValueError):
+            return None, "probability must be an integer"
+        if probability_value < 0 or probability_value > 100:
+            return None, "probability must be between 0 and 100"
+        result[S.Bids.PROBABILITY] = probability_value
+
+    for key, column in [
+        ("project_id", S.Bids.PROJECT_ID),
+        ("client_id", S.Bids.CLIENT_ID),
+        ("owner_user_id", S.Bids.OWNER_USER_ID),
+        ("validity_days", S.Bids.VALIDITY_DAYS),
+    ]:
+        if key in data:
+            result[column] = data.get(key)
+
+    currency_code = data.get("currency_code")
+    if currency_code is None and not is_update:
+        currency_code = "AUD"
+    if currency_code is not None:
+        result[S.Bids.CURRENCY_CODE] = str(currency_code).strip().upper()
+
+    stage_framework = data.get("stage_framework")
+    if stage_framework is None and not is_update:
+        stage_framework = "CUSTOM"
+    if stage_framework is not None:
+        result[S.Bids.STAGE_FRAMEWORK] = str(stage_framework).strip().upper()
+
+    if "gst_included" in data:
+        result[S.Bids.GST_INCLUDED] = bool(data.get("gst_included"))
+    elif not is_update:
+        result[S.Bids.GST_INCLUDED] = True
+
+    if "pi_notes" in data:
+        result[S.Bids.PI_NOTES] = data.get("pi_notes")
+
+    return result, None
+
+
+def _normalize_scope_template_item(template_item: dict, sort_order: int):
+    """Map a bid scope template item into a bid scope payload."""
+    title = (template_item.get('service_name') or template_item.get('title') or '').strip()
+    if not title:
+        return None, "Template item is missing a title or service_name."
+
+    service_code = (template_item.get('service_code') or template_item.get('code') or '').strip()
+    if not service_code:
+        service_code = None
+
+    stage_name = (template_item.get('phase') or template_item.get('stage_name') or '').strip()
+    if not stage_name:
+        stage_name = None
+
+    description = template_item.get('notes')
+    if description is None:
+        description = template_item.get('description')
+
+    unit_type = template_item.get('unit_type') or template_item.get('unit')
+    unit = str(unit_type).strip() if unit_type is not None else None
+
+    included_qty = None
+    if template_item.get('default_units') is not None:
+        included_qty = template_item.get('default_units')
+    elif template_item.get('included_qty') is not None:
+        included_qty = template_item.get('included_qty')
+    elif template_item.get('quantity') is not None:
+        included_qty = template_item.get('quantity')
+
+    unit_rate = template_item.get('unit_rate')
+    lump_sum = template_item.get('lump_sum_fee')
+    if lump_sum is None:
+        lump_sum = template_item.get('lump_sum')
+
+    deliverables_json = None
+    deliverables = template_item.get('deliverables')
+    if isinstance(deliverables, (list, dict)):
+        deliverables_json = json.dumps(deliverables)
+    elif deliverables is not None:
+        deliverables_json = str(deliverables)
+
+    return {
+        S.BidScopeItems.SERVICE_CODE: service_code,
+        S.BidScopeItems.TITLE: title,
+        S.BidScopeItems.DESCRIPTION: description,
+        S.BidScopeItems.STAGE_NAME: stage_name,
+        S.BidScopeItems.DELIVERABLES_JSON: deliverables_json,
+        S.BidScopeItems.INCLUDED_QTY: included_qty,
+        S.BidScopeItems.UNIT: unit,
+        S.BidScopeItems.UNIT_RATE: unit_rate,
+        S.BidScopeItems.LUMP_SUM: lump_sum,
+        S.BidScopeItems.IS_OPTIONAL: bool(template_item.get('is_optional')),
+        S.BidScopeItems.OPTION_GROUP: template_item.get('option_group'),
+        S.BidScopeItems.SORT_ORDER: sort_order,
+    }, None
 
 
 def _build_control_model_configuration(project_id: int) -> dict:
@@ -799,6 +1128,32 @@ def _read_service_template_file():
         return []
     except Exception as exc:
         logging.exception("Unexpected error reading service template file")
+        return []
+
+
+def _read_bid_scope_template_file():
+    """Read file-based bid scope templates."""
+    try:
+        if not BID_SCOPE_TEMPLATE_FILE_PATH.exists():
+            BID_SCOPE_TEMPLATE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            return []
+
+        with open(BID_SCOPE_TEMPLATE_FILE_PATH, 'r', encoding='utf-8') as handle:
+            data = json.load(handle)
+
+        templates = data.get('templates', [])
+        if isinstance(templates, list):
+            return templates
+
+        logging.error("Bid scope template file missing 'templates' array")
+        return []
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError as exc:
+        logging.error("Invalid JSON in bid scope template file: %s", exc)
+        return []
+    except Exception:
+        logging.exception("Unexpected error reading bid scope template file")
         return []
 
 
@@ -1462,6 +1817,7 @@ def api_projects_stats():
     try:
         project_ids = _parse_id_list("project_ids")
         with get_db_connection() as conn:
+            _apply_query_timeout(conn, 10)
             cursor = conn.cursor()
             base_query = f"""
                 SELECT {S.Projects.STATUS}, COUNT(*)
@@ -1769,6 +2125,384 @@ def api_delete_client_route(client_id):
     if message:
         return jsonify({'error': message}), 400
     return jsonify({'error': 'Failed to delete client'}), 500
+
+
+# ===================== Bid Management API =====================
+
+@app.route('/api/bid_scope_templates', methods=['GET'])
+def list_bid_scope_templates_endpoint():
+    templates = _read_bid_scope_template_file()
+    return jsonify(templates)
+
+
+@app.route('/api/bids', methods=['GET'])
+def list_bids_endpoint():
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    try:
+        status = request.args.get('status')
+        project_id = request.args.get('project_id', type=int)
+        client_id = request.args.get('client_id', type=int)
+        bids = get_bids(status=status, project_id=project_id, client_id=client_id)
+        return jsonify(bids)
+    except Exception as e:
+        logging.exception("Error fetching bids")
+        return jsonify({'error': str(e), 'schema': report}), 500
+
+
+@app.route('/api/bids', methods=['POST'])
+def create_bid_endpoint():
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    normalized, error = _normalize_bid_payload(payload, is_update=False)
+    if error:
+        return jsonify({'error': error}), 400
+    bid = create_bid(normalized)
+    if not bid:
+        return jsonify({'error': 'Failed to create bid'}), 500
+    return jsonify(bid), 201
+
+
+@app.route('/api/bids/<int:bid_id>', methods=['GET'])
+def get_bid_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    bid = get_bid(bid_id)
+    if not bid:
+        return jsonify({'error': 'Bid not found'}), 404
+    return jsonify(bid)
+
+
+@app.route('/api/bids/<int:bid_id>', methods=['PUT'])
+def update_bid_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    normalized, error = _normalize_bid_payload(payload, is_update=True)
+    if error:
+        return jsonify({'error': error}), 400
+    if not normalized:
+        return jsonify({'error': 'No valid fields to update'}), 400
+    updated = update_bid(bid_id, normalized)
+    if not updated:
+        return jsonify({'error': 'Bid not found or no changes applied'}), 404
+    bid = get_bid(bid_id)
+    return jsonify(bid)
+
+
+@app.route('/api/bids/<int:bid_id>', methods=['DELETE'])
+def archive_bid_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    success = archive_bid(bid_id)
+    if not success:
+        return jsonify({'error': 'Bid not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/sections', methods=['GET'])
+def get_bid_sections_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    sections = get_bid_sections(bid_id)
+    return jsonify(sections)
+
+
+@app.route('/api/bids/<int:bid_id>/sections', methods=['PUT'])
+def replace_bid_sections_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    sections = payload.get('sections')
+    if not isinstance(sections, list):
+        return jsonify({'error': 'sections must be a list'}), 400
+    success = replace_bid_sections(bid_id, sections)
+    if not success:
+        return jsonify({'error': 'Failed to update sections'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/scope-items', methods=['GET'])
+def list_bid_scope_items_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    items = get_bid_scope_items(bid_id)
+    return jsonify(items)
+
+
+@app.route('/api/bids/<int:bid_id>/scope-items', methods=['POST'])
+def create_bid_scope_item_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    if not payload.get('title'):
+        return jsonify({'error': 'title is required'}), 400
+    scope_item_id = create_bid_scope_item(bid_id, payload)
+    if not scope_item_id:
+        return jsonify({'error': 'Failed to create scope item'}), 500
+    return jsonify({'scope_item_id': scope_item_id}), 201
+
+
+@app.route('/api/bids/<int:bid_id>/scope-items/<int:scope_item_id>', methods=['PUT'])
+def update_bid_scope_item_endpoint(bid_id, scope_item_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    updated = update_bid_scope_item(scope_item_id, payload)
+    if not updated:
+        return jsonify({'error': 'Scope item not found or no changes applied'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/scope-items/<int:scope_item_id>', methods=['DELETE'])
+def delete_bid_scope_item_endpoint(bid_id, scope_item_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    deleted = delete_bid_scope_item(scope_item_id)
+    if not deleted:
+        return jsonify({'error': 'Scope item not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/scope-items/import-template', methods=['POST'])
+def import_bid_scope_template_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    template_name = (payload.get('template_name') or payload.get('name') or '').strip()
+    if not template_name:
+        return jsonify({'error': 'template_name is required'}), 400
+
+    templates = _read_bid_scope_template_file()
+    template = next((item for item in templates if item.get('name') == template_name), None)
+    if not template:
+        return jsonify({'error': f"Template '{template_name}' not found"}), 404
+
+    items = template.get('items') or []
+    if not isinstance(items, list):
+        return jsonify({'error': 'Template items must be a list'}), 400
+
+    if payload.get('replace_existing'):
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    DELETE FROM {S.BidScopeItems.TABLE}
+                    WHERE {S.BidScopeItems.BID_ID} = ?
+                    """,
+                    (bid_id,),
+                )
+                conn.commit()
+        except Exception as exc:
+            logging.exception("Failed to clear existing scope items")
+            return jsonify({'error': str(exc)}), 500
+
+    created_ids = []
+    for index, item in enumerate(items, start=1):
+        normalized, error = _normalize_scope_template_item(item, index)
+        if error:
+            return jsonify({'error': error, 'item_index': index}), 400
+        scope_item_id = create_bid_scope_item(bid_id, normalized)
+        if not scope_item_id:
+            return jsonify({'error': 'Failed to create scope item from template'}), 500
+        created_ids.append(scope_item_id)
+
+    return jsonify({
+        'template_name': template_name,
+        'created_count': len(created_ids),
+        'scope_item_ids': created_ids,
+    })
+
+
+@app.route('/api/bids/<int:bid_id>/program-stages', methods=['GET'])
+def list_bid_program_stages_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    stages = get_bid_program_stages(bid_id)
+    return jsonify(stages)
+
+
+@app.route('/api/bids/<int:bid_id>/program-stages', methods=['POST'])
+def create_bid_program_stage_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    if not payload.get('stage_name'):
+        return jsonify({'error': 'stage_name is required'}), 400
+    if 'cadence' in payload:
+        cadence_value = payload.get('cadence')
+        if cadence_value is None or str(cadence_value).strip() == '':
+            payload['cadence'] = None
+        else:
+            cadence = str(cadence_value).strip().lower()
+            if cadence not in PROGRAM_STAGE_CADENCES:
+                return jsonify({'error': f"cadence must be one of {sorted(PROGRAM_STAGE_CADENCES)}"}), 400
+            payload['cadence'] = cadence
+    stage_id = create_bid_program_stage(bid_id, payload)
+    if not stage_id:
+        return jsonify({'error': 'Failed to create program stage'}), 500
+    return jsonify({'program_stage_id': stage_id}), 201
+
+
+@app.route('/api/bids/<int:bid_id>/program-stages/<int:program_stage_id>', methods=['PUT'])
+def update_bid_program_stage_endpoint(bid_id, program_stage_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    if 'cadence' in payload:
+        cadence_value = payload.get('cadence')
+        if cadence_value is None or str(cadence_value).strip() == '':
+            payload['cadence'] = None
+        else:
+            cadence = str(cadence_value).strip().lower()
+            if cadence not in PROGRAM_STAGE_CADENCES:
+                return jsonify({'error': f"cadence must be one of {sorted(PROGRAM_STAGE_CADENCES)}"}), 400
+            payload['cadence'] = cadence
+    updated = update_bid_program_stage(program_stage_id, payload)
+    if not updated:
+        return jsonify({'error': 'Program stage not found or no changes applied'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/program-stages/<int:program_stage_id>', methods=['DELETE'])
+def delete_bid_program_stage_endpoint(bid_id, program_stage_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    deleted = delete_bid_program_stage(program_stage_id)
+    if not deleted:
+        return jsonify({'error': 'Program stage not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/billing-schedule', methods=['GET'])
+def list_bid_billing_schedule_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    lines = get_bid_billing_schedule(bid_id)
+    return jsonify(lines)
+
+
+@app.route('/api/bids/<int:bid_id>/billing-schedule', methods=['POST'])
+def create_bid_billing_line_endpoint(bid_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    required_fields = ['period_start', 'period_end', 'amount']
+    if not all(payload.get(field) for field in required_fields):
+        return jsonify({'error': 'period_start, period_end, and amount are required'}), 400
+    line_id = create_bid_billing_line(bid_id, payload)
+    if not line_id:
+        return jsonify({'error': 'Failed to create billing line'}), 500
+    return jsonify({'billing_line_id': line_id}), 201
+
+
+@app.route('/api/bids/<int:bid_id>/billing-schedule/<int:billing_line_id>', methods=['PUT'])
+def update_bid_billing_line_endpoint(bid_id, billing_line_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    updated = update_bid_billing_line(billing_line_id, payload)
+    if not updated:
+        return jsonify({'error': 'Billing line not found or no changes applied'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/billing-schedule/<int:billing_line_id>', methods=['DELETE'])
+def delete_bid_billing_line_endpoint(bid_id, billing_line_id):
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    deleted = delete_bid_billing_line(billing_line_id)
+    if not deleted:
+        return jsonify({'error': 'Billing line not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route('/api/bids/<int:bid_id>/award', methods=['POST'])
+def award_bid_endpoint(bid_id):
+    report = _schema_report()
+    if not report["ok"]:
+        return jsonify({
+            "error": "Schema validation failed. Bid award cannot proceed.",
+            "details": report,
+        }), 409
+
+    payload = request.get_json(silent=True) or {}
+    create_new_project = bool(payload.get("create_new_project"))
+    project_id = payload.get("project_id")
+    project_payload = payload.get("project_payload")
+
+    try:
+        result = award_bid(
+            bid_id=bid_id,
+            create_new_project=create_new_project,
+            project_id=project_id,
+            project_payload=project_payload,
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 409
+    except Exception as e:
+        logging.exception("Error awarding bid")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/variations', methods=['GET'])
+def list_variations_endpoint():
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    project_id = request.args.get('project_id', type=int)
+    bid_id = request.args.get('bid_id', type=int)
+    variations = list_bid_variations(project_id=project_id, bid_id=bid_id)
+    return jsonify(variations)
+
+
+@app.route('/api/variations', methods=['POST'])
+def create_variation_endpoint():
+    report, error_response = _ensure_bid_schema_ready()
+    if error_response:
+        return error_response
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'title is required'}), 400
+    if payload.get('project_id') is None:
+        return jsonify({'error': 'project_id is required'}), 400
+    if payload.get('proposed_change_value') is None:
+        return jsonify({'error': 'proposed_change_value is required'}), 400
+    status = payload.get('status') or 'DRAFT'
+    status = str(status).strip().upper()
+    if status not in VARIATION_STATUSES:
+        return jsonify({'error': f"status must be one of {sorted(VARIATION_STATUSES)}"}), 400
+    payload['status'] = status
+    variation_id = create_bid_variation(payload)
+    if not variation_id:
+        return jsonify({'error': 'Failed to create variation'}), 500
+    return jsonify({'variation_id': variation_id}), 201
 
 
 # --- Project Aliases API ---

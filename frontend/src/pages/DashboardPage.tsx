@@ -48,6 +48,7 @@ import { projectsApi } from '@/api';
 import { dashboardApi } from '@/api/dashboard';
 import apiClient from '@/api/client';
 import DashboardTimelineChart from '@/components/DashboardTimelineChart';
+import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import type {
   DashboardTimelineProject,
   WarehouseDashboardMetrics,
@@ -63,6 +64,7 @@ import type {
 import { profilerLog } from '@/utils/perfLogger';
 import { useNavigate } from 'react-router-dom';
 import { chartColorSchemes } from '@/components/dashboards/themes';
+import { featureFlags } from '@/config/featureFlags';
 
 const EMPTY_PROJECTS: DashboardTimelineProject[] = [];
 const TIMELINE_WINDOW_MONTHS = 12;
@@ -221,6 +223,7 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const showLinearTimeline = featureFlags.linearTimeline;
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
     try {
       const stored = localStorage.getItem('dashboard_saved_views');
@@ -1276,16 +1279,28 @@ export function DashboardPage() {
           <Typography variant="h5" gutterBottom sx={{ mt: 4, fontWeight: 700 }}>
             Project Timeline
           </Typography>
-          {isTimelineError && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Timeline data unavailable: {timelineError instanceof Error ? timelineError.message : 'Request failed.'}
-            </Typography>
+          {showLinearTimeline ? (
+            <TimelinePanel
+              title="Timeline"
+              projectIds={selectedProjects.length ? selectedProjects : undefined}
+              manager={selectedManager !== 'all' ? selectedManager : undefined}
+              type={selectedType !== 'all' ? selectedType : undefined}
+              client={selectedClient !== 'all' ? selectedClient : undefined}
+            />
+          ) : (
+            <>
+              {isTimelineError && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Timeline data unavailable: {timelineError instanceof Error ? timelineError.message : 'Request failed.'}
+                </Typography>
+              )}
+              <DashboardTimelineChart
+                projects={deferredProjects}
+                isLoading={isTimelineLoading || isFiltering}
+                hasActiveFilters={hasActiveFilters}
+              />
+            </>
           )}
-          <DashboardTimelineChart
-            projects={deferredProjects}
-            isLoading={isTimelineLoading || isFiltering}
-            hasActiveFilters={hasActiveFilters}
-          />
         </TabPanel>
 
         <TabPanel value={dashboardTab} index={1}>

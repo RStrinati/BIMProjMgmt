@@ -35,6 +35,122 @@ export interface Project {
   agreed_fee?: number;
 }
 
+export interface Bid {
+  bid_id: number;
+  project_id?: number | null;
+  client_id?: number | null;
+  bid_name: string;
+  bid_type: 'PROPOSAL' | 'FEE_UPDATE' | 'VARIATION' | string;
+  status: 'DRAFT' | 'SUBMITTED' | 'AWARDED' | 'LOST' | 'ARCHIVED' | string;
+  probability?: number | null;
+  owner_user_id?: number | null;
+  currency_code?: string | null;
+  stage_framework?: string | null;
+  validity_days?: number | null;
+  gst_included?: boolean | null;
+  pi_notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  client_name?: string | null;
+  owner_name?: string | null;
+  project_name?: string | null;
+}
+
+export interface BidSection {
+  bid_section_id: number;
+  section_key: string;
+  content_json?: string | Record<string, any> | null;
+  sort_order?: number | null;
+}
+
+export interface BidScopeItem {
+  scope_item_id: number;
+  service_code?: string | null;
+  title: string;
+  description?: string | null;
+  stage_name?: string | null;
+  deliverables_json?: string | Record<string, any> | null;
+  included_qty?: number | null;
+  unit?: string | null;
+  unit_rate?: number | null;
+  lump_sum?: number | null;
+  is_optional?: boolean | null;
+  option_group?: string | null;
+  sort_order?: number | null;
+}
+
+export interface BidScopeTemplateItem {
+  phase?: string | null;
+  service_code?: string | null;
+  service_name?: string | null;
+  unit_type?: string | null;
+  default_units?: number | null;
+  unit_rate?: number | null;
+  lump_sum_fee?: number | null;
+  notes?: string | null;
+  deliverables?: string[] | string | null;
+}
+
+export interface BidScopeTemplate {
+  name: string;
+  sector?: string | null;
+  notes?: string | null;
+  items: BidScopeTemplateItem[];
+}
+
+export interface BidProgramStage {
+  program_stage_id: number;
+  stage_name: string;
+  planned_start?: string | null;
+  planned_end?: string | null;
+  cadence?: string | null;
+  cycles_planned?: number | null;
+  sort_order?: number | null;
+}
+
+export interface BidBillingLine {
+  billing_line_id: number;
+  period_start: string;
+  period_end: string;
+  amount: number;
+  notes?: string | null;
+  sort_order?: number | null;
+}
+
+export interface BidAwardResult {
+  project_id: number;
+  created_services: number;
+  created_reviews: number;
+  created_claims: number;
+  service_ids?: number[];
+  review_ids?: number[];
+  claim_ids?: number[];
+  message?: string;
+}
+
+export interface BidVariation {
+  variation_id: number;
+  project_id: number;
+  bid_id?: number | null;
+  title: string;
+  description?: string | null;
+  baseline_contract_value?: number | null;
+  remaining_value?: number | null;
+  proposed_change_value: number;
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SchemaHealthReport {
+  ok: boolean;
+  missing_tables: string[];
+  missing_columns: Record<string, string[]>;
+  bid_module_ready: boolean;
+  bid_missing_tables: string[];
+  required_tables: string[];
+}
+
 export interface ReviewCycle {
   cycle_id: number;
   project_id: number;

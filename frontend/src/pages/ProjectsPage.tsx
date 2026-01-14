@@ -31,6 +31,8 @@ import {
 import { projectsApi, usersApi } from '@/api';
 import type { Project, User } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
+import { featureFlags } from '@/config/featureFlags';
+import ProjectsPanelPage from '@/pages/ProjectsPanelPage';
 
 const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
@@ -72,6 +74,10 @@ const formatNumericDisplay = (value: number | string | null | undefined): string
 };
 
 export function ProjectsPage() {
+  if (featureFlags.projectsPanel) {
+    return <ProjectsPanelPage />;
+  }
+
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,27 +89,33 @@ export function ProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
+  const [statsEnabled, setStatsEnabled] = useState(false);
 
   // Fetch projects using React Query
+  const projectFilters = {};
   const {
     data: projects,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', projectFilters],
     queryFn: () => projectsApi.getAll(),
   });
 
   // Fetch stats
   const { data: stats } = useQuery({
-    queryKey: ['projects', 'stats'],
+    queryKey: ['projects', 'stats', projectFilters],
     queryFn: () => projectsApi.getStats(),
+    enabled: statsEnabled,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
   });
 
   // Fetch review statistics
   const { data: reviewStats } = useQuery({
-    queryKey: ['projects', 'review-stats'],
+    queryKey: ['projects', 'review-stats', projectFilters],
     queryFn: () => projectsApi.getReviewStats(),
   });
 
@@ -285,7 +297,7 @@ export function ProjectsPage() {
 
   return (
     <Profiler id="ProjectsPage" onRender={profilerLog}>
-      <Box>
+      <Box data-testid="projects-legacy-root">
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
@@ -381,7 +393,15 @@ export function ProjectsPage() {
       </Stack>
 
       {/* Stats Cards */}
-      {stats && (
+      {!statsEnabled && (
+        <Box sx={{ mb: 3 }}>
+          <Button variant="outlined" onClick={() => setStatsEnabled(true)}>
+            Load project stats
+          </Button>
+        </Box>
+      )}
+
+      {statsEnabled && stats && (
         <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>

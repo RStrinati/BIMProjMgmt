@@ -74,6 +74,15 @@ class ConnectionPool:
         except pyodbc.Error as e:
             logger.error(f"Failed to create connection to {self.database_name}: {e}")
             raise
+
+    def stats(self) -> dict[str, int]:
+        with self._lock:
+            created = self._created_connections
+        return {
+            "created": created,
+            "available": self._pool.qsize(),
+            "max_size": self.max_size,
+        }
     
     def _is_connection_alive(self, conn: pyodbc.Connection) -> bool:
         """Check if a connection is still alive."""
@@ -109,6 +118,13 @@ class ConnectionPool:
                 conn.close()
                 conn = self._create_connection()
             
+            logger.debug(
+                "Acquired connection db=%s created=%s available=%s max=%s",
+                self.database_name,
+                self.stats()["created"],
+                self.stats()["available"],
+                self.max_size,
+            )
             return conn
             
         except Empty:
@@ -117,7 +133,15 @@ class ConnectionPool:
                 can_create = self._created_connections < self.max_size
             if can_create:
                 logger.info(f"Creating new connection for {self.database_name} (pool exhausted)")
-                return self._create_connection()
+                conn = self._create_connection()
+                logger.debug(
+                    "Acquired new connection db=%s created=%s available=%s max=%s",
+                    self.database_name,
+                    self.stats()["created"],
+                    self.stats()["available"],
+                    self.max_size,
+                )
+                return conn
             raise Exception(f"Connection pool exhausted for {self.database_name} (max={self.max_size})")
     
     def return_connection(self, conn: pyodbc.Connection):
@@ -138,6 +162,13 @@ class ConnectionPool:
             # Return to pool if it's still alive
             if self._is_connection_alive(conn):
                 self._pool.put_nowait(conn)
+                logger.debug(
+                    "Returned connection db=%s created=%s available=%s max=%s",
+                    self.database_name,
+                    self.stats()["created"],
+                    self.stats()["available"],
+                    self.max_size,
+                )
             else:
                 logger.warning(f"Discarding dead connection for {self.database_name}")
                 conn.close()

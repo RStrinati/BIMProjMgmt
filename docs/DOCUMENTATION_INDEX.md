@@ -1,19 +1,34 @@
-# Documentation Index - BIM Project Management System
+# 📚 Documentation Index - BIM Project Management System
 
-**Complete guide to all project documentation** 📚
+**Complete guide to all project documentation**
 
-Last Updated: October 13, 2025
+**Last Updated:** January 14, 2026  
+**Status:** ✅ Reorganized with 7 category directories
 
 ---
 
-## 🎯 Start Here
+## 🚀 Quick Navigation
 
-**New to the project?** Read these in order:
+### I'm New - Where Do I Start?
+1. **[core/DEVELOPER_ONBOARDING.md](./core/DEVELOPER_ONBOARDING.md)** - Complete onboarding guide
+2. **[core/DATABASE_CONNECTION_GUIDE.md](./core/DATABASE_CONNECTION_GUIDE.md)** ⭐ **MANDATORY** - Database patterns
+3. **[core/DB_CONNECTION_QUICK_REF.md](./core/DB_CONNECTION_QUICK_REF.md)** - Quick reference (print this!)
+4. **[core/ROADMAP.md](./core/ROADMAP.md)** - Project vision and features
 
-1. 📖 **[DEVELOPER_ONBOARDING.md](./DEVELOPER_ONBOARDING.md)** - Complete onboarding guide for new developers
-2. 📋 **[DB_CONNECTION_QUICK_REF.md](./DB_CONNECTION_QUICK_REF.md)** - Print this! Quick reference for database patterns
-3. 📚 **[DATABASE_CONNECTION_GUIDE.md](./DATABASE_CONNECTION_GUIDE.md)** - Comprehensive database connection guide (mandatory reading)
-4. 🗺️ **[REACT_INTEGRATION_ROADMAP.md](./REACT_INTEGRATION_ROADMAP.md)** - Frontend development roadmap (if doing frontend work)
+### I Need to Work on Database
+→ See **[`core/`](./core/)** directory
+
+### I Need to Integrate External Systems (ACC, APS, Revizto)
+→ See **[`integrations/`](./integrations/)** directory
+
+### I Need to Implement a Feature
+→ See **[`features/`](./features/)** directory
+
+### I'm Debugging an Error
+→ See **[`troubleshooting/`](./troubleshooting/)** directory
+
+### I Need Historical/Reference Information
+→ See **[`reference/`](./reference/)** or **[`archive/`](./archive/)** directories
 
 ---
 

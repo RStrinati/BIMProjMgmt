@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AppBar,
   Box,
@@ -27,6 +27,7 @@ import {
   Settings as SettingsIcon,
   CloudUpload as CloudUploadIcon,
   Search as SearchIcon,
+  Gavel as GavelIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -36,15 +37,8 @@ interface MenuItem {
   text: string;
   icon: JSX.Element;
   path: string;
+  disabled?: boolean;
 }
-
-const menuItems: MenuItem[] = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
-  { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
-  { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
-  { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
-];
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -55,6 +49,19 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+  const bidsReady = true;
+
+  const menuItems: MenuItem[] = useMemo(
+    () => [
+      { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+      { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
+      { text: bidsReady ? 'Bids' : 'Bids (DB pending)', icon: <GavelIcon />, path: '/bids', disabled: !bidsReady },
+      { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
+      { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
+      { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
+    ],
+    [bidsReady],
+  );
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -66,6 +73,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     const labelMap: Record<string, string> = {
       projects: 'Projects',
+      bids: 'Bids',
       'data-imports': 'Data Imports',
       tasks: 'Tasks',
       reviews: 'Reviews',
@@ -103,9 +111,12 @@ export function MainLayout({ children }: MainLayoutProps) {
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}
+              disabled={item.disabled}
               onClick={() => {
-                navigate(item.path);
-                setMobileOpen(false);
+                if (!item.disabled) {
+                  navigate(item.path);
+                  setMobileOpen(false);
+                }
               }}
             >
               <ListItemIcon sx={{ color: location.pathname === item.path ? 'primary.main' : 'inherit' }}>

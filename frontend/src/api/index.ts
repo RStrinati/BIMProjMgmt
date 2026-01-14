@@ -17,6 +17,7 @@ export {
   accConnectorApi,
   accDataImportApi,
 } from './dataImports';
+export { bidsApi } from './bids';
 export { default as apiClient } from './client';
 export { usersApi } from './users';
 export { projectAliasesApi } from './projectAliases';

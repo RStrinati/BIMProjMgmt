@@ -113,7 +113,7 @@ const DataImportsPage: React.FC = () => {
   } = useQuery<Project>({
     queryKey: ['project', effectiveProjectId],
     queryFn: () => projectsApi.getById(effectiveProjectId!),
-    enabled: !!effectiveProjectId,
+    enabled: Number.isFinite(effectiveProjectId),
   });
 
   // Set default project if coming from URL

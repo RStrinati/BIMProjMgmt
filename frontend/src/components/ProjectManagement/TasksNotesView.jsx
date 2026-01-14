@@ -34,23 +34,23 @@ import { projectsApi } from '@/api/projects';
 import { usersApi } from '@/api/users';
 import { profilerLog } from '@/utils/perfLogger';
 
-const defaultFilters = {
+const buildDefaultFilters = (projectId) => ({
   dateFrom: null,
   dateTo: null,
-  projectId: '',
+  projectId: projectId ? String(projectId) : '',
   userId: '',
-};
+});
 
-const defaultFormState = {
+const buildDefaultFormState = (projectId) => ({
   task_name: '',
-  project_id: '',
+  project_id: projectId ? String(projectId) : '',
   task_date: null,
   time_start: '',
   time_end: '',
   assigned_to: '',
   notes: '',
   task_items: [],
-};
+});
 
 const asDisplayDate = (value) => {
   if (!value) {
@@ -123,23 +123,56 @@ const toApiDate = (value) => {
   return format(date, 'yyyy-MM-dd');
 };
 
-export function TasksNotesView() {
+export function TasksNotesView({
+  initialProjectId,
+  hideFilters = false,
+  hideHeader = false,
+  hideCreate = false,
+  defaultPageSize,
+  onTaskCreated,
+} = {}) {
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
-  const [filters, setFilters] = useState(defaultFilters);
-  const [showFilters, setShowFilters] = useState(true);
-  const [formState, setFormState] = useState(defaultFormState);
+  const [filters, setFilters] = useState(() => buildDefaultFilters(initialProjectId));
+  const [showFilters, setShowFilters] = useState(!hideFilters);
+  const [formState, setFormState] = useState(() => buildDefaultFormState(initialProjectId));
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [pendingToggleKey, setPendingToggleKey] = useState(null);
   const [inlineMode, setInlineMode] = useState(false);
   const [inlineAnchor, setInlineAnchor] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(defaultPageSize ?? 25);
   const [totalTasks, setTotalTasks] = useState(0);
+  const defaultFilters = useMemo(() => buildDefaultFilters(initialProjectId), [initialProjectId]);
+
+  useEffect(() => {
+    setShowFilters(!hideFilters);
+  }, [hideFilters]);
+
+  useEffect(() => {
+    if (defaultPageSize && defaultPageSize !== rowsPerPage) {
+      setRowsPerPage(defaultPageSize);
+      setPage(0);
+    }
+  }, [defaultPageSize]);
+
+  useEffect(() => {
+    if (!initialProjectId) {
+      return;
+    }
+    setFilters((prev) => ({
+      ...prev,
+      projectId: String(initialProjectId),
+    }));
+    setFormState((prev) => ({
+      ...prev,
+      project_id: String(initialProjectId),
+    }));
+  }, [initialProjectId]);
 
   const updateFilters = useCallback((updater) => {
     setFilters((prev) => {
@@ -281,7 +314,7 @@ export function TasksNotesView() {
       : `Showing ${tasksDisplayStart}-${tasksDisplayEnd} of ${totalTasks} tasks`;
 
   const resetForm = () => {
-    setFormState(defaultFormState);
+    setFormState(buildDefaultFormState(initialProjectId));
     setInlineMode(false);
     setInlineAnchor(null);
     setEditingTaskId(null);
@@ -292,7 +325,7 @@ export function TasksNotesView() {
       filters.dateFrom instanceof Date ? new Date(filters.dateFrom) : new Date();
     const defaultProject = filters.projectId ? String(filters.projectId) : '';
     setFormState({
-      ...defaultFormState,
+      ...buildDefaultFormState(initialProjectId),
       task_date: defaultDate,
       project_id: defaultProject,
     });
@@ -419,7 +452,10 @@ export function TasksNotesView() {
       if (editingTaskId) {
         await tasksApi.update(editingTaskId, payload);
       } else {
-        await tasksApi.create(payload);
+        const createdTask = await tasksApi.create(payload);
+        if (onTaskCreated) {
+          onTaskCreated(createdTask);
+        }
       }
       await loadTasks();
       resetForm();
@@ -519,6 +555,7 @@ export function TasksNotesView() {
             label="Project"
             value={formState.project_id}
             onChange={(event) => handleFormFieldChange('project_id', event.target.value)}
+            disabled={Boolean(initialProjectId)}
           >
             {projects.map((project) => (
               <MenuItem key={project.project_id} value={project.project_id}>
@@ -629,30 +666,36 @@ export function TasksNotesView() {
     <Profiler id="TasksNotesView" onRender={profilerLog}>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <Box display="flex" flexDirection="column" gap={3}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h5" fontWeight={600}>
-            Tasks &amp; Notes
-          </Typography>
-          <Box display="flex" gap={1}>
-            <Button
-              variant="outlined"
-              startIcon={<FilterListIcon />}
-              onClick={() => setShowFilters((prev) => !prev)}
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleStartInlineCreate('top')}
-              disabled={inlineMode}
-            >
-              Add Task Row
-            </Button>
+        {!hideHeader && (
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h5" fontWeight={600}>
+              Tasks &amp; Notes
+            </Typography>
+            <Box display="flex" gap={1}>
+              {!hideFilters && (
+                <Button
+                  variant="outlined"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => setShowFilters((prev) => !prev)}
+                >
+                  {showFilters ? 'Hide Filters' : 'Show Filters'}
+                </Button>
+              )}
+              {!hideCreate && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleStartInlineCreate('top')}
+                  disabled={inlineMode}
+                >
+                  Add Task Row
+                </Button>
+              )}
+            </Box>
           </Box>
-        </Box>
+        )}
 
-        {showFilters && (
+        {!hideFilters && showFilters && (
           <Paper sx={{ p: 2 }}>
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} sm={6} md={3}>
@@ -694,6 +737,7 @@ export function TasksNotesView() {
                         projectId: event.target.value,
                       }))
                     }
+                    disabled={Boolean(initialProjectId)}
                   >
                     <MenuItem value="">All projects</MenuItem>
                     {projects.map((project) => (

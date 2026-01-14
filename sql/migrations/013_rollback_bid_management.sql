@@ -1,0 +1,64 @@
+-- Rollback for bid management schema (drop new objects only).
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidVariations'
+)
+BEGIN
+    DROP TABLE dbo.BidVariations;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidAwardSummary'
+)
+BEGIN
+    DROP TABLE dbo.BidAwardSummary;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidBillingSchedule'
+)
+BEGIN
+    DROP TABLE dbo.BidBillingSchedule;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidProgramStages'
+)
+BEGIN
+    DROP TABLE dbo.BidProgramStages;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidScopeItems'
+)
+BEGIN
+    DROP TABLE dbo.BidScopeItems;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'BidSections'
+)
+BEGIN
+    DROP TABLE dbo.BidSections;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Bids'
+)
+BEGIN
+    DROP TABLE dbo.Bids;
+END;
