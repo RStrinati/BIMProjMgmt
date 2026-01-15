@@ -11,7 +11,11 @@ export type TimelineRowModel = {
   start?: string;
   end?: string;
   colorToken: string;
-  meta?: string[];
+  priorityLabel?: string | null;
+  priorityValue?: string | number | null;
+  leadLabel?: string | null;
+  leadInitials?: string | null;
+  progressLabel?: string | null;
   bar: { xStart: number; xEnd: number };
   hasDates: boolean;
 };
@@ -23,7 +27,7 @@ export type TimelineModel = {
     maxDate: Date;
     zoom: TimelineZoom;
   };
-  ticks: { date: Date; x: number; label?: string }[];
+  ticks: { date: Date; x: number; label?: string; subLabel?: string; isMajor?: boolean }[];
   todayX?: number;
   rangeWidth: number;
 };
@@ -89,6 +93,66 @@ const formatTick = (date: Date, zoom: TimelineZoom) => {
     return date.toLocaleDateString('en-AU', { month: 'short' });
   }
   return date.toLocaleDateString('en-AU', { month: 'short' });
+};
+
+const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical' };
+
+const resolvePriorityLabel = (
+  priority: DashboardTimelineProject['priority'],
+  fallbackLabel?: string | null,
+): string | null => {
+  if (fallbackLabel && fallbackLabel.trim() !== '') {
+    return fallbackLabel;
+  }
+  if (typeof priority === 'number') {
+    return REVERSE_PRIORITY_MAP[priority] || 'Medium';
+  }
+  if (typeof priority === 'string' && priority.trim() !== '') {
+    const trimmed = priority.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const numericPriority = parseInt(trimmed, 10);
+      return REVERSE_PRIORITY_MAP[numericPriority] || 'Medium';
+    }
+    return trimmed;
+  }
+  return fallbackLabel ?? null;
+};
+
+const resolveLeadLabel = (project: DashboardTimelineProject) => {
+  if (project.internal_lead_name && project.internal_lead_name.trim()) {
+    return project.internal_lead_name.trim();
+  }
+  if (project.lead_name && project.lead_name.trim()) {
+    return project.lead_name.trim();
+  }
+  if (project.internal_lead != null) {
+    return `User ${project.internal_lead}`;
+  }
+  return null;
+};
+
+const getInitials = (value: string) => {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+const resolveProgressLabel = (project: DashboardTimelineProject) => {
+  const progressRaw = project.progress_pct;
+  const billedRaw = project.service_billed_pct;
+  if (progressRaw != null && Number.isFinite(Number(progressRaw))) {
+    return `${Math.round(Number(progressRaw))}%`;
+  }
+  if (billedRaw != null && Number.isFinite(Number(billedRaw))) {
+    return `${Math.round(Number(billedRaw))}%`;
+  }
+  const totalAgreed = Number(project.total_service_agreed_fee ?? project.agreed_fee);
+  const totalBilled = Number(project.total_service_billed_amount);
+  if (Number.isFinite(totalAgreed) && Number.isFinite(totalBilled) && totalAgreed > 0) {
+    return `${Math.round((totalBilled / totalAgreed) * 100)}%`;
+  }
+  return null;
 };
 
 const getColorToken = (project: DashboardTimelineProject) => {
@@ -192,26 +256,61 @@ export const useTimelineModel = ({
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[zoom];
     const rangeWidth = totalDays * pixelsPerDay;
 
-    const ticks: { date: Date; x: number; label?: string }[] = [];
-    let cursor = new Date(startAnchor);
-    while (cursor <= endAnchor) {
-      const offsetDays = diffDays(startAnchor, cursor);
-      ticks.push({
-        date: new Date(cursor),
-        x: offsetDays * pixelsPerDay,
-        label: formatTick(cursor, zoom),
-      });
-      if (zoom === 'week') {
-        cursor = addDays(cursor, 7);
-      } else if (zoom === 'month') {
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-      } else {
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-      }
-      if (ticks.length > 240) {
+    const ticks: { date: Date; x: number; label?: string; subLabel?: string; isMajor?: boolean }[] = [];
+    const tickMap = new Map<number, { date: Date; x: number; label?: string; subLabel?: string; isMajor?: boolean }>();
+
+    const ensureTick = (date: Date) => {
+      const timestamp = toStartOfDay(date).getTime();
+      const existing = tickMap.get(timestamp);
+      if (existing) return existing;
+      const offsetDays = diffDays(startAnchor, date);
+      const tick = { date: new Date(date), x: offsetDays * pixelsPerDay };
+      tickMap.set(timestamp, tick);
+      return tick;
+    };
+
+    const maxTicks = 240;
+    let dayInterval = zoom === 'week' ? 1 : zoom === 'month' ? 2 : 7;
+    if (Math.ceil(totalDays / dayInterval) > maxTicks) {
+      dayInterval = Math.max(1, Math.ceil(totalDays / maxTicks));
+    }
+
+    let dayCursor = new Date(startAnchor);
+    while (dayCursor <= endAnchor) {
+      const tick = ensureTick(dayCursor);
+      tick.subLabel = String(dayCursor.getDate());
+      dayCursor = addDays(dayCursor, dayInterval);
+      if (tickMap.size > maxTicks * 2) {
         break;
       }
     }
+
+    if (zoom === 'week') {
+      let majorCursor = new Date(startAnchor);
+      while (majorCursor <= endAnchor) {
+        const tick = ensureTick(majorCursor);
+        tick.label = formatTick(majorCursor, zoom);
+        tick.isMajor = true;
+        majorCursor = addDays(majorCursor, 7);
+        if (tickMap.size > maxTicks * 2) {
+          break;
+        }
+      }
+    } else {
+      let majorCursor = startOfMonth(startAnchor);
+      while (majorCursor <= endAnchor) {
+        const tick = ensureTick(majorCursor);
+        tick.label = formatTick(majorCursor, zoom);
+        tick.isMajor = true;
+        majorCursor = new Date(majorCursor.getFullYear(), majorCursor.getMonth() + 1, 1);
+        if (tickMap.size > maxTicks * 2) {
+          break;
+        }
+      }
+    }
+
+    tickMap.forEach((tick) => ticks.push(tick));
+    ticks.sort((a, b) => a.x - b.x);
 
     const todayOffset = today >= startAnchor && today <= endAnchor ? diffDays(startAnchor, today) * pixelsPerDay : undefined;
 
@@ -223,14 +322,20 @@ export const useTimelineModel = ({
       const safeEnd = end ?? safeStart;
       const xStart = diffDays(startAnchor, safeStart) * pixelsPerDay;
       const xEnd = diffDays(startAnchor, safeEnd) * pixelsPerDay;
-      const meta = [project.client_name, project.project_manager].filter(Boolean) as string[];
+      const priorityLabel = resolvePriorityLabel(project.priority, project.priority_label);
+      const leadLabel = resolveLeadLabel(project);
+      const progressLabel = resolveProgressLabel(project);
       return {
         id: project.project_id,
         label: project.project_name,
         start: project.start_date ?? undefined,
         end: project.end_date ?? undefined,
         colorToken: getColorToken(project),
-        meta,
+        priorityLabel,
+        priorityValue: project.priority ?? null,
+        leadLabel,
+        leadInitials: leadLabel ? getInitials(leadLabel) : null,
+        progressLabel,
         bar: {
           xStart,
           xEnd: Math.max(xEnd, xStart + 6),

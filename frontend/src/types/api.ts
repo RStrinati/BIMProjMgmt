@@ -210,6 +210,16 @@ export interface DashboardTimelineProject {
   client_name?: string | null;
   type_id?: number | null;
   project_type?: string | null;
+  priority?: string | number | null;
+  priority_label?: string | null;
+  internal_lead?: number | null;
+  internal_lead_name?: string | null;
+  lead_name?: string | null;
+  progress_pct?: number | null;
+  service_billed_pct?: number | null;
+  total_service_billed_amount?: number | null;
+  total_service_agreed_fee?: number | null;
+  agreed_fee?: number | null;
   review_items: DashboardTimelineReviewItem[];
 }
 
@@ -772,6 +782,29 @@ export interface ServiceReview {
   service_name?: string;
   service_phase?: string;
   is_billed?: boolean;
+}
+
+export interface ProjectReviewItem {
+  review_id: number;
+  service_id: number;
+  project_id: number;
+  cycle_no: number;
+  planned_date?: string | null;
+  due_date?: string | null;
+  status?: string | null;
+  disciplines?: string | null;
+  deliverables?: string | null;
+  is_billed?: boolean | null;
+  billing_amount?: number | null;
+  invoice_reference?: string | null;
+  service_name?: string | null;
+  service_code?: string | null;
+  phase?: string | null;
+}
+
+export interface ProjectReviewsResponse {
+  items: ProjectReviewItem[];
+  total: number;
 }
 
 export interface ReviewBillingRecord extends ServiceReview {

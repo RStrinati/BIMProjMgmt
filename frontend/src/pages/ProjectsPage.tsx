@@ -33,6 +33,7 @@ import type { Project, User } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
 import { featureFlags } from '@/config/featureFlags';
 import ProjectsPanelPage from '@/pages/ProjectsPanelPage';
+import ProjectsHomePageV2 from '@/pages/ProjectsHomePageV2';
 
 const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
@@ -74,6 +75,9 @@ const formatNumericDisplay = (value: number | string | null | undefined): string
 };
 
 export function ProjectsPage() {
+  if (featureFlags.projectsHomeV2) {
+    return <ProjectsHomePageV2 />;
+  }
   if (featureFlags.projectsPanel) {
     return <ProjectsPanelPage />;
   }

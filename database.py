@@ -510,6 +510,125 @@ def get_service_reviews(service_id):
         return []
 
 
+def get_project_reviews(
+    project_id,
+    status=None,
+    service_id=None,
+    from_date=None,
+    to_date=None,
+    sort_by="planned_date",
+    sort_dir="asc",
+    limit=None,
+    page=None,
+):
+    """Get all reviews for a project with optional filters."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            _set_cursor_timeout(cursor, 10)
+
+            filters = [f"ps.{S.ProjectServices.PROJECT_ID} = ?"]
+            params = [project_id]
+
+            if status:
+                filters.append(f"sr.{S.ServiceReviews.STATUS} = ?")
+                params.append(status)
+
+            if service_id:
+                filters.append(f"sr.{S.ServiceReviews.SERVICE_ID} = ?")
+                params.append(service_id)
+
+            if from_date:
+                filters.append(
+                    f"(sr.{S.ServiceReviews.PLANNED_DATE} >= ? OR sr.{S.ServiceReviews.DUE_DATE} >= ?)"
+                )
+                params.extend([from_date, from_date])
+
+            if to_date:
+                filters.append(
+                    f"(sr.{S.ServiceReviews.PLANNED_DATE} <= ? OR sr.{S.ServiceReviews.DUE_DATE} <= ?)"
+                )
+                params.extend([to_date, to_date])
+
+            where_clause = " AND ".join(filters)
+
+            sort_columns = {
+                "planned_date": f"sr.{S.ServiceReviews.PLANNED_DATE}",
+                "due_date": f"sr.{S.ServiceReviews.DUE_DATE}",
+                "status": f"sr.{S.ServiceReviews.STATUS}",
+                "service_name": f"ps.{S.ProjectServices.SERVICE_NAME}",
+            }
+            sort_column = sort_columns.get(sort_by, sort_columns["planned_date"])
+            sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+
+            base_sql = f"""
+                FROM {S.ServiceReviews.TABLE} sr
+                JOIN {S.ProjectServices.TABLE} ps
+                    ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE {where_clause}
+            """
+
+            cursor.execute(f"SELECT COUNT(1) {base_sql}", params)
+            total = int(cursor.fetchone()[0] or 0)
+
+            select_sql = f"""
+                SELECT
+                    sr.{S.ServiceReviews.REVIEW_ID},
+                    sr.{S.ServiceReviews.SERVICE_ID},
+                    ps.{S.ProjectServices.PROJECT_ID},
+                    sr.{S.ServiceReviews.CYCLE_NO},
+                    sr.{S.ServiceReviews.PLANNED_DATE},
+                    sr.{S.ServiceReviews.DUE_DATE},
+                    sr.{S.ServiceReviews.STATUS},
+                    sr.{S.ServiceReviews.DISCIPLINES},
+                    sr.{S.ServiceReviews.DELIVERABLES},
+                    sr.{S.ServiceReviews.IS_BILLED},
+                    sr.{S.ServiceReviews.BILLING_AMOUNT},
+                    sr.{S.ServiceReviews.INVOICE_REFERENCE},
+                    ps.{S.ProjectServices.SERVICE_NAME},
+                    ps.{S.ProjectServices.SERVICE_CODE},
+                    ps.{S.ProjectServices.PHASE}
+                {base_sql}
+                ORDER BY {sort_column} {sort_direction}
+            """
+
+            query_params = list(params)
+            if limit:
+                page = page if page and page > 0 else 1
+                offset = max(page - 1, 0) * limit
+                select_sql += " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
+                query_params.extend([offset, limit])
+
+            cursor.execute(select_sql, query_params)
+            rows = cursor.fetchall()
+
+            items = [
+                dict(
+                    review_id=row[0],
+                    service_id=row[1],
+                    project_id=row[2],
+                    cycle_no=row[3],
+                    planned_date=row[4],
+                    due_date=row[5],
+                    status=row[6],
+                    disciplines=row[7],
+                    deliverables=row[8],
+                    is_billed=bool(row[9]) if row[9] is not None else None,
+                    billing_amount=float(row[10]) if row[10] is not None else None,
+                    invoice_reference=row[11],
+                    service_name=row[12],
+                    service_code=row[13],
+                    phase=row[14],
+                )
+                for row in rows
+            ]
+
+            return {"items": items, "total": total}
+    except Exception as e:
+        logger.error(f"Error fetching project reviews: {e}")
+        return None
+
+
 def _to_decimal(value):
     """Safely convert a value to Decimal or return None."""
     if value is None or value == '':
@@ -8767,4 +8886,169 @@ def award_bid(
             "service_ids": service_ids,
             "review_ids": review_ids,
             "claim_ids": claim_ids,
+        }
+
+
+def get_reconciled_issues_table(
+    project_id: Optional[str] = None,
+    source_system: Optional[str] = None,
+    status_normalized: Optional[str] = None,
+    priority_normalized: Optional[str] = None,
+    discipline_normalized: Optional[str] = None,
+    assignee_user_key: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "updated_at",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """
+    Return paginated issues from vw_Issues_Reconciled with reconciled identifiers.
+    
+    This view combines ACC and Revizto issues with human-friendly display_ids:
+    - ACC mapped: "ACC-" + issue_number (e.g., "ACC-924")
+    - ACC unmapped: "ACC-" + first 8 chars of UUID (e.g., "ACC-66C8A7AA")
+    - Revizto: "REV-" + issue_id (e.g., "REV-12345")
+    
+    Supports filters:
+    - project_id: filter by project
+    - source_system: 'ACC' or 'Revizto'
+    - status_normalized: issue status
+    - priority_normalized: issue priority
+    - discipline_normalized: discipline
+    - assignee_user_key: assigned to user
+    - search: search in title/issue_key/display_id
+    
+    Supports pagination: page (1-indexed), page_size
+    Supports sorting: updated_at, created_at, priority_normalized, status_normalized, display_id
+    """
+    allowed_sort = {
+        "updated_at": "updated_at",
+        "created_at": "created_at",
+        "priority_normalized": "priority_normalized",
+        "status_normalized": "status_normalized",
+        "display_id": "display_id",
+    }
+    sort_col = allowed_sort.get(sort_by, "updated_at")
+    sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    offset = max(page - 1, 0) * page_size
+
+    try:
+        with get_db_connection(Config.PROJECT_MGMT_DB) as conn:  # ProjectManagement DB (not warehouse)
+            cursor = conn.cursor()
+            
+            # Build WHERE clause dynamically
+            params = []
+            where_clauses = []
+            
+            if project_id:
+                where_clauses.append("project_id = ?")
+                params.append(project_id)
+            
+            if source_system:
+                where_clauses.append("source_system = ?")
+                params.append(source_system)
+            
+            if status_normalized:
+                where_clauses.append("LOWER(status_normalized) = LOWER(?)")
+                params.append(status_normalized)
+            
+            if priority_normalized:
+                where_clauses.append("LOWER(priority_normalized) = LOWER(?)")
+                params.append(priority_normalized)
+            
+            if discipline_normalized:
+                where_clauses.append("LOWER(discipline_normalized) = LOWER(?)")
+                params.append(discipline_normalized)
+            
+            if assignee_user_key:
+                where_clauses.append("assignee_user_key = ?")
+                params.append(assignee_user_key)
+            
+            if search:
+                search_pattern = f"%{search}%"
+                where_clauses.append("(title LIKE ? OR issue_key LIKE ? OR display_id LIKE ?)")
+                params.extend([search_pattern, search_pattern, search_pattern])
+            
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            
+            # Get total count
+            count_query = f"SELECT COUNT(*) FROM dbo.vw_Issues_Reconciled {where_sql}"
+            cursor.execute(count_query, params)
+            total_count = cursor.fetchone()[0]
+            
+            # Get paginated rows with all columns
+            data_query = f"""
+            SELECT
+                issue_key,
+                source_system,
+                source_issue_id,
+                source_project_id,
+                project_id,
+                display_id,
+                acc_issue_number,
+                acc_issue_uuid,
+                acc_id_type,
+                title,
+                status_raw,
+                status_normalized,
+                priority_raw,
+                priority_normalized,
+                discipline_raw,
+                discipline_normalized,
+                assignee_user_key,
+                created_at,
+                updated_at,
+                closed_at,
+                location_root,
+                location_building,
+                location_level,
+                acc_status,
+                acc_created_at,
+                acc_updated_at,
+                is_deleted,
+                import_run_id
+            FROM dbo.vw_Issues_Reconciled
+            {where_sql}
+            ORDER BY {sort_col} {sort_direction}
+            OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY
+            """
+            
+            cursor.execute(data_query, params)
+            rows = cursor.fetchall()
+            
+            # Format rows as dicts
+            columns = [
+                'issue_key', 'source_system', 'source_issue_id', 'source_project_id',
+                'project_id', 'display_id', 'acc_issue_number', 'acc_issue_uuid', 'acc_id_type',
+                'title', 'status_raw', 'status_normalized', 'priority_raw', 'priority_normalized',
+                'discipline_raw', 'discipline_normalized', 'assignee_user_key', 'created_at',
+                'updated_at', 'closed_at', 'location_root', 'location_building', 'location_level',
+                'acc_status', 'acc_created_at', 'acc_updated_at', 'is_deleted', 'import_run_id'
+            ]
+            
+            formatted_rows = []
+            for row in rows:
+                row_dict = dict(zip(columns, row))
+                # Convert datetime objects to ISO format strings
+                for dt_field in ['created_at', 'updated_at', 'closed_at', 'acc_created_at', 'acc_updated_at']:
+                    if row_dict[dt_field]:
+                        row_dict[dt_field] = row_dict[dt_field].isoformat()
+                formatted_rows.append(row_dict)
+            
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "rows": formatted_rows,
+            }
+    
+    except Exception as e:
+        logger.exception("Error fetching reconciled issues table")
+        return {
+            "page": page,
+            "page_size": page_size,
+            "total_count": 0,
+            "rows": [],
+            "error": str(e),
         }

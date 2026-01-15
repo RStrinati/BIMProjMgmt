@@ -22,3 +22,4 @@ export { default as apiClient } from './client';
 export { usersApi } from './users';
 export { projectAliasesApi } from './projectAliases';
 export { mappingsApi } from './mappings';
+export { projectReviewsApi } from './projectReviews';

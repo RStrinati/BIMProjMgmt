@@ -15,6 +15,9 @@ type TimelinePanelProps = {
   type?: string;
   client?: string;
   title?: string;
+  searchText?: string;
+  onSearchTextChange?: (value: string) => void;
+  showSearch?: boolean;
 };
 
 const TIMELINE_MONTHS = 12;
@@ -27,9 +30,12 @@ export function TimelinePanel({
   type,
   client,
   title = 'Timeline',
+  searchText,
+  onSearchTextChange,
+  showSearch = true,
 }: TimelinePanelProps) {
   const navigate = useNavigate();
-  const [searchText, setSearchText] = useState('');
+  const [internalSearchText, setInternalSearchText] = useState('');
   const [preset, setPreset] = useState<TimelinePreset>('all');
   const [zoom, setZoom] = useState<TimelineZoom>('month');
 
@@ -56,13 +62,16 @@ export function TimelinePanel({
 
   const projects: DashboardTimelineProject[] = data?.projects ?? [];
 
+  const resolvedSearchText = searchText ?? internalSearchText;
+  const handleSearchChange = onSearchTextChange ?? setInternalSearchText;
+
   const model = useTimelineModel({
     projects,
     projectIds,
     manager,
     type,
     client,
-    searchText,
+    searchText: resolvedSearchText,
     preset,
     zoom,
   });
@@ -118,13 +127,15 @@ export function TimelinePanel({
             <ToggleButton value="month">Month</ToggleButton>
             <ToggleButton value="quarter">Quarter</ToggleButton>
           </ToggleButtonGroup>
-          <TextField
-            size="small"
-            placeholder="Search projects"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            sx={{ minWidth: 200 }}
-          />
+          {showSearch && (
+            <TextField
+              size="small"
+              placeholder="Search projects"
+              value={resolvedSearchText}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              sx={{ minWidth: 200 }}
+            />
+          )}
         </Stack>
       </Stack>
 

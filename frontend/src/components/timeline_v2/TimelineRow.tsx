@@ -1,4 +1,5 @@
-import { Box, Chip, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Stack, Typography } from '@mui/material';
+import { FlagRounded } from '@mui/icons-material';
 import type { TimelineRowModel } from './useTimelineModel';
 
 type TimelineRowProps = {
@@ -17,6 +18,36 @@ const resolvePalette = (token: string, palette: any) => {
     light: palette.grey[200],
     main: palette.grey[500],
   };
+};
+
+const resolvePriorityTone = (value?: string | number | null) => {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim().toLowerCase();
+    if (/^\d+$/.test(trimmed)) {
+      return resolvePriorityTone(Number(trimmed));
+    }
+    if (trimmed === 'high' || trimmed === 'critical') {
+      return 'error';
+    }
+    if (trimmed === 'medium') {
+      return 'warning';
+    }
+    if (trimmed === 'low') {
+      return 'info';
+    }
+  }
+  const normalized = typeof value === 'number' ? value : value.toString().trim().toLowerCase();
+  if (normalized === 4 || normalized === 3 || normalized === 'high' || normalized === 'critical') {
+    return 'error';
+  }
+  if (normalized === 2 || normalized === 'medium') {
+    return 'warning';
+  }
+  if (normalized === 1 || normalized === 'low') {
+    return 'info';
+  }
+  return 'info';
 };
 
 export function TimelineRow({
@@ -47,22 +78,46 @@ export function TimelineRow({
         '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main' },
       }}
     >
-      <Box sx={{ width: labelWidth, pr: 2, overflow: 'hidden' }}>
-        <Typography variant="body2" noWrap fontWeight={600}>
-          {row.label}
-        </Typography>
-        {row.meta?.length ? (
-          <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap' }}>
-            {row.meta.slice(0, 2).map((item) => (
-              <Chip key={item} size="small" label={item} variant="outlined" />
-            ))}
+      <Box sx={{ width: labelWidth, pr: 2, overflow: 'hidden' }} data-testid="timeline-row-label">
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Typography variant="body2" noWrap fontWeight={600} sx={{ minWidth: 0, flex: 1 }}>
+            {row.label}
+          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+            {row.priorityLabel || row.priorityValue != null ? (
+              <Box data-testid="timeline-row-priority" sx={{ display: 'flex', alignItems: 'center' }}>
+                <FlagRounded
+                  fontSize="small"
+                  sx={(theme) => ({
+                    color: resolvePriorityTone(row.priorityLabel ?? row.priorityValue)
+                      ? theme.palette[resolvePriorityTone(row.priorityLabel ?? row.priorityValue) as 'error' | 'warning' | 'info'].main
+                      : theme.palette.text.disabled,
+                  })}
+                />
+              </Box>
+            ) : null}
+            {row.leadLabel ? (
+              <Avatar
+                data-testid="timeline-row-lead"
+                sx={{
+                  width: 18,
+                  height: 18,
+                  fontSize: 10,
+                  bgcolor: 'grey.200',
+                  color: 'text.primary',
+                }}
+              >
+                {row.leadInitials}
+              </Avatar>
+            ) : null}
           </Stack>
-        ) : null}
+        </Stack>
       </Box>
       <Box sx={{ position: 'relative', flex: 1, height: rowHeight, minWidth: laneWidth }}>
         {row.hasDates ? (
           <Box
             className="timeline-bar"
+            aria-label={row.progressLabel ?? '--%'}
             sx={{
               position: 'absolute',
               left: row.bar.xStart,
@@ -74,8 +129,26 @@ export function TimelineRow({
               border: (theme) => `1px solid ${resolvePalette(row.colorToken, theme.palette).main}`,
               opacity: 0.85,
               transition: 'opacity 120ms ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              px: 0.5,
+              overflow: 'hidden',
+              color: (theme) =>
+                theme.palette.getContrastText(resolvePalette(row.colorToken, theme.palette).light),
             }}
-          />
+          >
+            {row.progressLabel ? (
+              <Typography
+                data-testid="timeline-bar-label"
+                variant="caption"
+                noWrap
+                sx={{ fontWeight: 600, lineHeight: 1 }}
+              >
+                {row.progressLabel}
+              </Typography>
+            ) : null}
+          </Box>
         ) : (
           <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
             No dates

@@ -15,24 +15,17 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { projectsApi, usersApi, serviceReviewsApi } from '@/api';
-import { projectServicesApi } from '@/api/services';
+import { projectsApi, usersApi } from '@/api';
 import type { Project, User } from '@/types/api';
-import type { ProjectService, ProjectServicesListResponse } from '@/api/services';
-import type { ServiceReview } from '@/types/api';
 import { ListView } from '@/components/ui/ListView';
 import { DetailsPanel } from '@/components/ui/DetailsPanel';
 import { InlineField } from '@/components/ui/InlineField';
 import { useNavigate } from 'react-router-dom';
 import { ProjectStatusInline } from '@/components/projects/ProjectStatusInline';
 import { ProjectLeadInline } from '@/components/projects/ProjectLeadInline';
-import { ServiceStatusInline } from '@/components/projects/ServiceStatusInline';
-import { ReviewStatusInline } from '@/components/projects/ReviewStatusInline';
 import { useUpdateProject } from '@/hooks/useUpdateProject';
-import { useUpdateServiceStatus } from '@/hooks/useUpdateServiceStatus';
-import { useUpdateReviewStatus } from '@/hooks/useUpdateReviewStatus';
-import { formatServiceStatusLabel } from '@/utils/serviceStatus';
-import { formatReviewStatusLabel } from '@/utils/reviewStatus';
+import { ProjectServicesList } from '@/features/projects/services/ProjectServicesList';
+import { ProjectServiceReviewsPanel } from '@/features/projects/services/ProjectServiceReviewsPanel';
 
 const VIEW_STORAGE_KEY = 'projects_panel_view_state';
 
@@ -104,10 +97,7 @@ export default function ProjectsPanelPage() {
   const [viewId, setViewId] = useState<ViewId>(storedViewState.viewId);
   const [searchTerm, setSearchTerm] = useState(storedViewState.searchTerm);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [serviceSaveError, setServiceSaveError] = useState<string | null>(null);
-  const [reviewSaveError, setReviewSaveError] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState(0);
 
   const currentUserId = useMemo(() => {
@@ -182,8 +172,6 @@ export default function ProjectsPanelPage() {
     queryFn: () => usersApi.getAll(),
   });
   const updateProject = useUpdateProject();
-  const updateServiceStatus = useUpdateServiceStatus();
-  const updateReviewStatus = useUpdateReviewStatus();
 
   const filtered = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -231,72 +219,6 @@ export default function ProjectsPanelPage() {
   const selectedProject = filtered.find((project) => project.project_id === selectedId) ?? filtered[0] ?? null;
 
   const servicesParams = useMemo(() => ({}), []);
-  const { data: servicesPayload } = useQuery<ProjectServicesListResponse>({
-    queryKey: ['projectServices', selectedProject?.project_id, servicesParams],
-    queryFn: () =>
-      selectedProject ? projectServicesApi.getAll(selectedProject.project_id) : Promise.resolve([]),
-    enabled: Boolean(selectedProject),
-  });
-
-  const services = useMemo<ProjectService[]>(() => {
-    if (!servicesPayload) {
-      return [];
-    }
-    if (Array.isArray(servicesPayload)) {
-      return servicesPayload;
-    }
-    const items = servicesPayload.items ?? servicesPayload.services ?? servicesPayload.results;
-    return Array.isArray(items) ? items : [];
-  }, [servicesPayload]);
-
-  useEffect(() => {
-    if (!services.length) {
-      setSelectedServiceId(null);
-      return;
-    }
-    const stillExists = services.some((service) => service.service_id === selectedServiceId);
-    if (!stillExists) {
-      setSelectedServiceId(services[0].service_id);
-    }
-  }, [services, selectedServiceId]);
-
-  const selectedService =
-    services.find((service) => service.service_id === selectedServiceId) ?? services[0] ?? null;
-
-  const {
-    data: reviews = [],
-    isLoading: reviewsLoading,
-    isFetching: reviewsFetching,
-  } = useQuery<ServiceReview[]>({
-    queryKey: ['serviceReviews', selectedProject?.project_id, selectedService?.service_id],
-    queryFn: async () => {
-      if (!selectedProject || !selectedService) {
-        return [];
-      }
-      const response = await serviceReviewsApi.getAll(
-        selectedProject.project_id,
-        selectedService.service_id,
-      );
-      return response.data;
-    },
-    enabled: Boolean(selectedProject && selectedService),
-  });
-
-  const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!reviews.length) {
-      setSelectedReviewId(null);
-      return;
-    }
-    const stillExists = reviews.some((review) => review.review_id === selectedReviewId);
-    if (!stillExists) {
-      setSelectedReviewId(reviews[0].review_id);
-    }
-  }, [reviews, selectedReviewId]);
-
-  const selectedReview =
-    reviews.find((review) => review.review_id === selectedReviewId) ?? reviews[0] ?? null;
 
   const handleHover = (project: Project) => {
     queryClient.prefetchQuery({
@@ -333,61 +255,6 @@ export default function ProjectsPanelPage() {
         },
       },
     );
-  };
-
-  const handleServiceStatusChange = (nextStatus: string | null) => {
-    if (!selectedProject || !selectedService) {
-      return;
-    }
-    setServiceSaveError(null);
-    updateServiceStatus.mutate(
-      {
-        projectId: selectedProject.project_id,
-        serviceId: selectedService.service_id,
-        status: nextStatus,
-        params: servicesParams,
-      },
-      {
-        onError: (error) => {
-          setServiceSaveError(error.message || 'Failed to update service status.');
-        },
-      },
-    );
-  };
-
-  const handleReviewStatusChange = (nextStatus: string | null) => {
-    if (!selectedProject || !selectedService || !selectedReview) {
-      return;
-    }
-    setReviewSaveError(null);
-    updateReviewStatus.mutate(
-      {
-        projectId: selectedProject.project_id,
-        serviceId: selectedService.service_id,
-        reviewId: selectedReview.review_id,
-        status: nextStatus,
-      },
-      {
-        onError: (error) => {
-          setReviewSaveError(error.message || 'Failed to update review status.');
-        },
-      },
-    );
-  };
-
-  const formatCurrency = (value?: number | null) => {
-    if (value === undefined || value === null) {
-      return '--';
-    }
-    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(value);
-  };
-
-  const formatDate = (value?: string | null) => {
-    if (!value) {
-      return '--';
-    }
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString();
   };
 
   return (
@@ -536,103 +403,14 @@ export default function ProjectsPanelPage() {
                 </Stack>
               )}
               {panelTab === 1 && (
-                <Stack spacing={2}>
-                  <ListView<ProjectService>
-                    items={services}
-                    getItemId={(service) => service.service_id}
-                    getItemTestId={(service) => `projects-panel-service-row-${service.service_id}`}
-                    selectedId={selectedService?.service_id ?? null}
-                    onSelect={(service) => setSelectedServiceId(service.service_id)}
-                    renderPrimary={(service) => `${service.service_code} - ${service.service_name}`}
-                    renderSecondary={(service) =>
-                      [
-                        service.phase ? `Phase: ${service.phase}` : null,
-                        service.status ? `Status: ${formatServiceStatusLabel(service.status)}` : null,
-                        service.progress_pct != null ? `Progress: ${service.progress_pct}%` : null,
-                        service.agreed_fee != null ? `Fee: ${formatCurrency(service.agreed_fee)}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' | ')
-                    }
-                    emptyState={
-                      <Typography color="text.secondary" sx={{ px: 2 }}>
-                        {selectedProject ? 'No services for this project yet.' : 'Select a project to view services.'}
-                      </Typography>
-                    }
-                  />
-                  {selectedService && (
-                    <Stack spacing={2}>
-                      {serviceSaveError && (
-                        <Alert severity="error" data-testid="projects-panel-service-save-error">
-                          {serviceSaveError}
-                        </Alert>
-                      )}
-                      <InlineField label="Service code" value={selectedService.service_code} />
-                      <InlineField label="Service name" value={selectedService.service_name} />
-                      <InlineField label="Phase" value={selectedService.phase} />
-                      <ServiceStatusInline
-                        value={selectedService.status ?? null}
-                        onChange={handleServiceStatusChange}
-                        isSaving={updateServiceStatus.isPending}
-                        disabled={updateServiceStatus.isPending}
-                      />
-                      <InlineField label="Progress" value={formatNumber(selectedService.progress_pct, '%')} />
-                      <InlineField label="Agreed fee" value={formatCurrency(selectedService.agreed_fee)} />
-                      <Stack spacing={1}>
-                        <Typography variant="subtitle2">Reviews</Typography>
-                        <ListView<ServiceReview>
-                          items={reviews}
-                          getItemId={(review) => review.review_id}
-                          getItemTestId={(review) => `projects-panel-review-row-${review.review_id}`}
-                          selectedId={selectedReview?.review_id ?? null}
-                          onSelect={(review) => setSelectedReviewId(review.review_id)}
-                          renderPrimary={(review) =>
-                            `Cycle ${review.cycle_no} · ${formatReviewStatusLabel(review.status)}`
-                          }
-                          renderSecondary={(review) =>
-                            [
-                              `Planned: ${formatDate(review.planned_date)}`,
-                              review.due_date ? `Due: ${formatDate(review.due_date)}` : null,
-                              review.disciplines ? `Disciplines: ${review.disciplines}` : null,
-                              review.deliverables ? `Deliverables: ${review.deliverables}` : null,
-                              review.is_billed != null ? `Billed: ${review.is_billed ? 'Yes' : 'No'}` : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' | ')
-                          }
-                          emptyState={
-                            <Typography color="text.secondary" sx={{ px: 2 }}>
-                              {reviewsLoading || reviewsFetching
-                                ? 'Loading reviews...'
-                                : 'No reviews for this service yet.'}
-                            </Typography>
-                          }
-                        />
-                        {selectedReview && (
-                          <Stack spacing={2}>
-                            {reviewSaveError && (
-                              <Alert severity="error" data-testid="projects-panel-review-save-error">
-                                {reviewSaveError}
-                              </Alert>
-                            )}
-                            <InlineField label="Cycle" value={selectedReview.cycle_no} />
-                            <InlineField label="Planned date" value={formatDate(selectedReview.planned_date)} />
-                            <InlineField label="Due date" value={formatDate(selectedReview.due_date)} />
-                            <ReviewStatusInline
-                              value={selectedReview.status ?? null}
-                              onChange={handleReviewStatusChange}
-                              isSaving={updateReviewStatus.isPending}
-                              disabled={updateReviewStatus.isPending}
-                            />
-                            <InlineField label="Disciplines" value={selectedReview.disciplines} />
-                            <InlineField label="Deliverables" value={selectedReview.deliverables} />
-                            <InlineField label="Billed" value={selectedReview.is_billed ? 'Yes' : 'No'} />
-                          </Stack>
-                        )}
-                      </Stack>
-                    </Stack>
+                <ProjectServicesList
+                  projectId={selectedProject.project_id}
+                  params={servicesParams}
+                  testIdPrefix="projects-panel"
+                  renderExtraDetails={(service) => (
+                    <ProjectServiceReviewsPanel projectId={selectedProject.project_id} service={service} />
                   )}
-                </Stack>
+                />
               )}
             </Stack>
           )}

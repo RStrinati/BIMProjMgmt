@@ -13,6 +13,7 @@ import TasksNotesPage from './pages/TasksNotesPage';
 import { BidsListPage } from './pages/BidsListPage';
 import BidDetailPage from './pages/BidDetailPage';
 import ProjectWorkspacePageV2 from './pages/ProjectWorkspacePageV2';
+import { IssuesPage } from './pages/IssuesPage';
 import { featureFlags } from './config/featureFlags';
 
 // Create React Query client
@@ -44,6 +45,7 @@ function App() {
               <Route path="/data-imports" element={<DataImportsPage />} />
               <Route path="/bids" element={<BidsListPage />} />
               <Route path="/bids/:id" element={<BidDetailPage />} />
+              {featureFlags.issuesHub && <Route path="/issues" element={<IssuesPage />} />}
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
               <Route path="/tasks" element={<TasksNotesPage />} />
               <Route path="/settings" element={<SettingsPage />} />

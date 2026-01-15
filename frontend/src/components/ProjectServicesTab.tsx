@@ -1,4 +1,4 @@
-import { Profiler, type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Profiler, type ChangeEvent, useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -35,11 +35,15 @@ import {
   Delete as DeleteIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { projectServicesApi, serviceReviewsApi, serviceItemsApi, fileServiceTemplatesApi } from '@/api';
 import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService, ServiceReview, ServiceItem, FileServiceTemplate, ApplyTemplateResult } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
+import { BlockerBadge } from '@/components/ui/BlockerBadge';
+import { LinkedIssuesList } from '@/components/ui/LinkedIssuesList';
+import { featureFlags } from '@/config/featureFlags';
 
 interface ProjectServicesTabProps {
   projectId: number;
@@ -484,6 +488,7 @@ function ServiceRow({
                         <TableCell>Priority</TableCell>
                         <TableCell>Invoice / Folder</TableCell>
                         <TableCell>Billed</TableCell>
+                        {featureFlags.anchorLinks && <TableCell>Blockers</TableCell>}
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -536,6 +541,18 @@ function ServiceRow({
                               size="small"
                             />
                           </TableCell>
+                          {featureFlags.anchorLinks && (
+                            <TableCell>
+                              <BlockerBadge
+                                projectId={projectId}
+                                anchorType="item"
+                                anchorId={item.item_id}
+                                enabled={true}
+                                onClick={() => handleOpenItemDetail(item.item_id)}
+                                data-testid={`project-services-tab-item-blockers-${item.item_id}`}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell align="right">
                             <IconButton
                               size="small"
@@ -622,6 +639,15 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   });
   const [templateDialogError, setTemplateDialogError] = useState('');
   const [templateFeedback, setTemplateFeedback] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [isItemDetailOpen, setIsItemDetailOpen] = useState(false);
+
+  // Handler for opening item detail modal
+  const handleOpenItemDetail = useCallback((itemId: number) => {
+    console.debug('[ProjectServicesTab] Opening item detail modal', { itemId });
+    setSelectedItemId(itemId);
+    setIsItemDetailOpen(true);
+  }, []);
 
   // Fetch project services
   const {
@@ -1768,6 +1794,53 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Item Detail Modal for Anchor Links */}
+      {featureFlags.anchorLinks && selectedItemId !== null && (
+        <Dialog
+          open={isItemDetailOpen}
+          onClose={() => {
+            setIsItemDetailOpen(false);
+            setSelectedItemId(null);
+          }}
+          maxWidth="md"
+          fullWidth
+          data-testid="project-services-tab-item-detail-modal"
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Linked Issues - Item #{selectedItemId}</Typography>
+            <IconButton
+              onClick={() => {
+                setIsItemDetailOpen(false);
+                setSelectedItemId(null);
+              }}
+              size="small"
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers sx={{ minHeight: '400px' }}>
+            <LinkedIssuesList
+              projectId={projectId}
+              anchorType="item"
+              anchorId={selectedItemId}
+              enabled={isItemDetailOpen && selectedItemId !== null}
+              readonly={false}
+              data-testid="project-services-tab-item-linked-issues"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setIsItemDetailOpen(false);
+                setSelectedItemId(null);
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       </Box>
     </Profiler>
   );

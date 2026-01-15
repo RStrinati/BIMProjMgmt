@@ -92,6 +92,7 @@ from database import (  # noqa: E402
     get_revizto_extraction_runs,
     complete_revizto_extraction_run,
     get_service_reviews,
+    get_project_reviews,
     get_service_review_billing,
     get_service_templates,
     get_users_list,
@@ -153,6 +154,7 @@ from database import (  # noqa: E402
     update_bid_program_stage,
     update_bid_scope_item,
     award_bid,
+    get_reconciled_issues_table,
 )
 from shared.project_service import (  # noqa: E402
     ProjectServiceError,
@@ -166,6 +168,13 @@ from constants import schema as S  # noqa: E402
 from review_validation import ValidationError, validate_template  # noqa: E402
 from review_management_service import ReviewManagementService  # noqa: E402
 from services.project_alias_service import ProjectAliasManager  # noqa: E402
+from backend.anchor_links import (  # noqa: E402
+    get_anchor_linked_issues,
+    get_anchor_blocker_counts,
+    create_issue_anchor_link,
+    delete_issue_anchor_link,
+    get_issue_linked_anchors,
+)
 
 
 # --- Revizto utility helpers ---
@@ -1692,6 +1701,53 @@ def api_delete_project_service(project_id, service_id):
 
 
 # --- Service Reviews API ---
+@app.route('/api/projects/<int:project_id>/reviews', methods=['GET'])
+def api_get_project_reviews(project_id):
+    start_time = perf_counter()
+    status = request.args.get('status')
+    sort_by = request.args.get('sort_by', 'planned_date')
+    sort_dir = request.args.get('sort_dir', 'asc')
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    def _parse_int(value: Optional[str]) -> Optional[int]:
+        if not value:
+            return None
+        try:
+            parsed = int(value)
+            return parsed if parsed >= 0 else None
+        except ValueError:
+            return None
+
+    service_id = _parse_int(request.args.get('service_id'))
+    limit = _parse_int(request.args.get('limit'))
+    page = _parse_int(request.args.get('page'))
+
+    payload = get_project_reviews(
+        project_id,
+        status=status,
+        service_id=service_id,
+        from_date=from_date,
+        to_date=to_date,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        limit=limit,
+        page=page,
+    )
+
+    duration_ms = (perf_counter() - start_time) * 1000
+    logging.info(
+        "project reviews fetched project_id=%s total=%s duration_ms=%.2f",
+        project_id,
+        payload.get("total") if payload else "error",
+        duration_ms,
+    )
+
+    if payload is None:
+        return jsonify({'error': 'Failed to load project reviews'}), 500
+
+    return jsonify(payload)
+
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews', methods=['GET'])
 def api_get_service_reviews(project_id, service_id):
     reviews = get_service_reviews(service_id)
@@ -5578,6 +5634,268 @@ def api_get_dashboard_timeline():
         return jsonify(_with_dashboard_meta(timeline_data, filters))
     except Exception as e:
         logging.exception("Error fetching dashboard timeline data")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issues/table', methods=['GET'])
+def api_issues_reconciled_table():
+    """
+    GET /api/issues/table
+    
+    Return paginated issues from vw_Issues_Reconciled with reconciled display_ids.
+    
+    Query Parameters:
+    - project_id (str): Filter by project ID
+    - source_system (str): 'ACC' or 'Revizto'
+    - status_normalized (str): Filter by normalized status
+    - priority_normalized (str): Filter by normalized priority
+    - discipline_normalized (str): Filter by normalized discipline
+    - assignee_user_key (str): Filter by assigned user
+    - search (str): Search in title/issue_key/display_id (substring match)
+    - page (int, default=1): Page number (1-indexed)
+    - page_size (int, default=50): Results per page
+    - sort_by (str, default='updated_at'): Sort column (updated_at, created_at, priority_normalized, status_normalized, display_id)
+    - sort_dir (str, default='desc'): Sort direction (asc/desc)
+    
+    Response:
+    {
+      "page": int,
+      "page_size": int,
+      "total_count": int,
+      "rows": [
+        {
+          "issue_key": str,
+          "source_system": str ('ACC' or 'Revizto'),
+          "source_issue_id": str,
+          "source_project_id": str,
+          "project_id": str,
+          "display_id": str ('ACC-X', 'ACC-XXXXXXXX', or 'REV-X'),
+          "acc_issue_number": int (null for unmapped ACC or Revizto),
+          "acc_issue_uuid": str (null for unmapped ACC or Revizto),
+          "acc_id_type": str ('uuid', 'legacy', or null),
+          "title": str,
+          "status_raw": str,
+          "status_normalized": str,
+          "priority_raw": str,
+          "priority_normalized": str,
+          "discipline_raw": str,
+          "discipline_normalized": str,
+          "assignee_user_key": str,
+          "created_at": str (ISO 8601),
+          "updated_at": str (ISO 8601),
+          "closed_at": str (ISO 8601 or null),
+          ... (additional fields)
+        }
+      ]
+    }
+    """
+    try:
+        # Extract query parameters
+        project_id = request.args.get('project_id', None)
+        source_system = request.args.get('source_system', None)
+        status_normalized = request.args.get('status_normalized', None)
+        priority_normalized = request.args.get('priority_normalized', None)
+        discipline_normalized = request.args.get('discipline_normalized', None)
+        assignee_user_key = request.args.get('assignee_user_key', None)
+        search = request.args.get('search', None)
+        
+        # Pagination & sorting
+        page = max(int(request.args.get('page', 1)), 1)
+        page_size = min(int(request.args.get('page_size', 50)), 500)  # Cap at 500
+        sort_by = request.args.get('sort_by', 'updated_at')
+        sort_dir = request.args.get('sort_dir', 'desc')
+        
+        # Call database function
+        result = get_reconciled_issues_table(
+            project_id=project_id,
+            source_system=source_system,
+            status_normalized=status_normalized,
+            priority_normalized=priority_normalized,
+            discipline_normalized=discipline_normalized,
+            assignee_user_key=assignee_user_key,
+            search=search,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        logging.exception("Error fetching reconciled issues table")
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================================================
+# ISSUE ANCHOR LINKS ENDPOINTS
+# ========================================================================
+
+@app.route('/api/projects/<int:project_id>/anchors/<anchor_type>/<int:anchor_id>/issues', methods=['GET'])
+def api_get_anchor_linked_issues(project_id: int, anchor_type: str, anchor_id: int):
+    """
+    Get issues linked to an anchor (review, service, or item).
+    
+    Query params:
+        - page: pagination page (1-based, default 1)
+        - page_size: records per page (default 20, max 100)
+        - sort_by: updated_at | priority_normalized | status_normalized (default updated_at)
+        - sort_dir: ASC or DESC (default DESC)
+        - link_role: optional filter for 'blocks', 'evidence', or 'relates'
+    """
+    try:
+        page = max(int(request.args.get('page', 1)), 1)
+        page_size = min(int(request.args.get('page_size', 20)), 100)
+        sort_by = request.args.get('sort_by', 'updated_at')
+        sort_dir = request.args.get('sort_dir', 'DESC')
+        link_role_filter = request.args.get('link_role', None)
+        
+        result = get_anchor_linked_issues(
+            project_id=project_id,
+            anchor_type=anchor_type,
+            anchor_id=anchor_id,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            link_role_filter=link_role_filter,
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error fetching anchor linked issues: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/anchors/<anchor_type>/<int:anchor_id>/counts', methods=['GET'])
+def api_get_anchor_blocker_counts(project_id: int, anchor_type: str, anchor_id: int):
+    """
+    Get blocker badge counts for an anchor.
+    
+    Returns:
+        - total_linked: total number of linked issues
+        - open_count: open/in-progress/in-review issues
+        - closed_count: closed/resolved issues
+        - critical_count: critical priority issues
+        - high_count: high priority issues
+        - medium_count: medium priority issues
+    """
+    try:
+        result = get_anchor_blocker_counts(
+            project_id=project_id,
+            anchor_type=anchor_type,
+            anchor_id=anchor_id,
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error fetching anchor blocker counts: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issue-links', methods=['POST'])
+def api_create_issue_anchor_link():
+    """
+    Create a new issue-anchor link.
+    
+    Body:
+    {
+        "project_id": int,
+        "issue_key_hash": "hex_string_64_chars",
+        "anchor_type": "review" | "service" | "item",
+        "anchor_id": int,
+        "link_role": "blocks" | "evidence" | "relates" (default: blocks),
+        "note": "optional explanation",
+        "created_by": "optional user"
+    }
+    """
+    try:
+        body = request.get_json() or {}
+        
+        # Parse hex-encoded issue_key_hash back to bytes
+        issue_key_hash_hex = body.get('issue_key_hash', '')
+        try:
+            issue_key_hash = bytes.fromhex(issue_key_hash_hex)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid issue_key_hash format (must be hex string)'}), 400
+        
+        result = create_issue_anchor_link(
+            project_id=body.get('project_id'),
+            issue_key_hash=issue_key_hash,
+            anchor_type=body.get('anchor_type'),
+            anchor_id=body.get('anchor_id'),
+            link_role=body.get('link_role', 'blocks'),
+            note=body.get('note'),
+            created_by=body.get('created_by'),
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 201
+    
+    except Exception as e:
+        logging.exception(f"Error creating issue anchor link: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issue-links/<int:link_id>', methods=['DELETE'])
+def api_delete_issue_anchor_link(link_id: int):
+    """
+    Soft-delete an issue-anchor link.
+    """
+    try:
+        result = delete_issue_anchor_link(link_id=link_id)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error deleting issue anchor link: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issues/<issue_key_hash>/links', methods=['GET'])
+def api_get_issue_linked_anchors(issue_key_hash: str):
+    """
+    Get all anchors linked to a specific issue.
+    
+    Params:
+        - project_id (required, query param): project context
+    """
+    try:
+        project_id = request.args.get('project_id', type=int)
+        if not project_id:
+            return jsonify({'error': 'project_id query param is required'}), 400
+        
+        # Parse hex-encoded issue_key_hash back to bytes
+        try:
+            issue_key_hash_bytes = bytes.fromhex(issue_key_hash)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid issue_key_hash format (must be hex string)'}), 400
+        
+        result = get_issue_linked_anchors(
+            project_id=project_id,
+            issue_key_hash=issue_key_hash_bytes,
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error fetching issue linked anchors: {e}")
         return jsonify({'error': str(e)}), 500
 
 

@@ -28,8 +28,10 @@ import {
   CloudUpload as CloudUploadIcon,
   Search as SearchIcon,
   Gavel as GavelIcon,
+  BugReport as BugReportIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { featureFlags } from '../../config/featureFlags';
 
 const drawerWidth = 240;
 
@@ -52,14 +54,26 @@ export function MainLayout({ children }: MainLayoutProps) {
   const bidsReady = true;
 
   const menuItems: MenuItem[] = useMemo(
-    () => [
-      { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-      { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
-      { text: bidsReady ? 'Bids' : 'Bids (DB pending)', icon: <GavelIcon />, path: '/bids', disabled: !bidsReady },
-      { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
-      { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
-      { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
-    ],
+    () => {
+      const items: MenuItem[] = [
+        { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+        { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
+        { text: bidsReady ? 'Bids' : 'Bids (DB pending)', icon: <GavelIcon />, path: '/bids', disabled: !bidsReady },
+        { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
+      ];
+
+      // Add Issues nav item if feature flag is enabled
+      if (featureFlags.issuesHub) {
+        items.push({ text: 'Issues', icon: <BugReportIcon />, path: '/issues' });
+      }
+
+      items.push(
+        { text: 'Reviews (redirect)', icon: <CheckCircleIcon />, path: '/reviews' },
+        { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks' },
+      );
+
+      return items;
+    },
     [bidsReady],
   );
 
@@ -110,6 +124,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
+              data-testid={item.path === '/issues' ? 'nav-issues' : undefined}
               selected={location.pathname === item.path}
               disabled={item.disabled}
               onClick={() => {

@@ -23,6 +23,63 @@ This system provides enterprise-grade construction project lifecycle management 
 - **🔗 Data Integration** - ACC, Revizto, Revit Health, IFC models, and Autodesk Platform Services (APS)
 - **🤖 Automation** - Dynamo batch processing, automated health checks, and issue pattern recognition
 
+## 📐 Core Conceptual Model (AUTHORITATIVE - Option A)
+
+The entire system is organized around this data model hierarchy:
+
+```
+Project
+├─ Services (project offerings/scopes)
+│  ├─ Reviews (recurring cycles/meetings - cadence-based)
+│  └─ Items (service deliverables - one-off or bundled)
+└─ Tasks (project-owned execution units - independent)
+```
+
+### Key Definitions
+
+| Concept | Definition | Scope | Examples |
+|---------|-----------|-------|----------|
+| **Project** | Container for all project work, scheduling, and resources | Everything in this system | Construction project, renovation, consulting engagement |
+| **Service** (ProjectService) | A defined offering/scope of work sold to the client | Under a project | Design review, construction admin, quality assurance |
+| **Review** (ServiceReview) | Recurring meeting/cycle for a service at regular cadence | Under a service | Weekly design review, bi-weekly progress review |
+| **Item** (ServiceItem) | A specific deliverable or offering within a service | Under a service | Monthly inspection report, submittal review set, schedule update |
+| **Task** (ProjectTask) | Execution unit for work, tracked independently across project | Under a project (not under service/review/item) | Complete model review, prepare RFI response, schedule coordination meeting |
+
+### Critical Relationships & Rules
+
+- **Items are NOT Tasks**: Items are service-owned deliverables. Tasks are project-owned execution units.
+- **Reviews and Items are peers**: Both attach directly to Services independently. Neither requires the other.
+- **Service Independence**: Reviews and Items operate independently—a Review cycle does not require Items, and Items do not require Review cycles.
+- **No mandatory cross-references**: There is no `review_id` foreign key in Items, and no `item_id` foreign key in Reviews.
+- **Task Independence**: Tasks are scoped to the project, not to individual Services, Reviews, or Items (though they may reference these for context).
+- **Unmapped imports are valid**: External data (ACC issues, Revizto extractions) can attach to Project or Service without requiring Review or Item mapping.
+
+### What This Means in Practice
+
+```python
+# Service lifecycle
+service = Project.add_service(name="Construction Administration")
+
+# Option 1: Set up recurring reviews (cadence-based)
+reviews = service.add_review_cycles(cadence="weekly", stage="construction")
+
+# Option 2: Define deliverables/items (service offerings)
+items = service.add_items([
+  {"name": "Weekly Progress Report", "type": "report"},
+  {"name": "RFI Submittal Review", "type": "review"}
+])
+
+# Option 3: Both—independent of each other
+# Weekly reviews happen at a cadence; items are delivered per scope
+
+# Separate from all of the above: project-level execution
+task = Project.add_task(name="Coordinate HVAC ductwork", priority="high")
+# This task can reference the Construction Admin service for context,
+# but it is not "owned by" or "under" that service
+```
+
+---
+
 ## 🏗️ Architecture
 
 ### Technology Stack
@@ -168,6 +225,12 @@ REVIT_HEALTH_DB=RevitHealthCheckDB
 
 Access all features through the modern web dashboard at `http://localhost:5173` (development) or your deployed URL.
 
+### Navigation & Workspace
+- **Project Workspace**: Dedicated workspace per project with all services, reviews, and tasks
+- **Multi-Panel UI**: Side-by-side navigation with detail panels (Projects, Bids, Analytics)
+- **Breadcrumb Navigation**: Context-aware navigation across hierarchies
+- **Workspace Persistence**: Save and restore workspace state per user
+
 ### 1. Project Management Dashboard
 - **Project Creation & Configuration** - Initialize new projects with comprehensive metadata
 - **Service Templates** - Apply pre-configured templates (SINSW-MPHS, AWS-Day1, NEXTDC-S5)
@@ -201,16 +264,20 @@ Access all features through the modern web dashboard at `http://localhost:5173` 
 - **Workload Analytics** - Current assignments and availability dashboard
 
 ### 5. Issue Analytics Dashboard
-- **Multi-Source Integration** - ACC issues, Revizto issues, custom issue tracking
-- **Automated Categorization** - ML-powered issue classification using keywords
-- **Advanced Filtering** - By project, type, priority, status, discipline, date range
+- **Multi-Source Integration** - ACC issues, Revizto issues, custom issue tracking with unified interface
+- **Automated Categorization** - ML-powered issue classification using NLP and semantic analysis
+- **Advanced Filtering** - By project, type, priority, status, discipline, date range, anchor location
+- **Issue Anchor Linking** - Link issues to specific project anchors (buildings, areas, phases)
 - **Interactive Visualizations**:
-  - Issue trends over time (line charts)
+  - Issue trends over time (line charts with date range selection)
   - Distribution by type, priority, status (pie/bar charts)
   - Discipline-specific breakdowns
   - Age analysis and resolution metrics
-- **Issue Overview** - Cross-project and per-project summaries with KPIs
+  - Anchor-based issue distribution
+- **Issue Overview** - Cross-project and per-project summaries with KPIs and trend analysis
+- **Issue Reliability Metrics** - Track issue data quality and source system confidence
 - **Export Capabilities** - CSV/Excel export for external reporting
+- **Issue Detail Views** - Comprehensive issue records with linked anchors and metadata
 
 ### 6. Model Health & Quality Dashboards
 - **Revit Health Monitoring**:
@@ -261,9 +328,35 @@ Access all features through the modern web dashboard at `http://localhost:5173` 
   - Metadata parsing
   - Element categorization
 
+#### Import Semantics & Data Attachment
+
+Imported data (issues, health metrics, documents) must be linked to the Core Model in a standardized way:
+
+| Priority | Target | Required? | Use Case | Example |
+|----------|--------|-----------|----------|---------|
+| 1 (Always) | `Project` | ✅ Yes | All imports attach to a project context | ACC issues always map to a project_id |
+| 2 (Primary) | `Service` | ⚠️ Often | Scope-specific imports (design review issues, construction admin deliverables) | Weekly review issues attach to "Design Review" service |
+| 3 (Optional) | `Review` | ❌ No | Context only; never required for import validity | An issue *may* reference a specific review cycle for context |
+| 4 (Optional) | `Item` | ❌ No | Context only; never required for import validity | An issue *may* reference a deliverable item for context |
+| 5 (Valid State) | Unmapped | ✅ Yes | Acceptable when source→target mapping is undefined | ACC project with no local mapping, pending manual assignment |
+
+**Key Principles:**
+- Always link to Project (required)
+- Prefer Service (recommended when scope is clear)
+- Review/Item linkage is optional context only
+- Never force unmapped data into artificial Task entries
+- Preserve import fidelity—link only what is certain
+
 ### 8. Billing & Financial Management
+- **Bid & Contract Management**:
+  - Comprehensive bid lifecycle (creation, scoping, award, archive)
+  - Scope item management with templates
+  - Program stage tracking and scheduling
+  - Billing schedule with line-item detail
+  - Award processing with date tracking
+  - Variation tracking for scope changes
 - **Billing Claims Generation**:
-  - Automated monthly claim creation
+  - Automated monthly claim creation (from service reviews)
   - Progress-based billing calculation
   - Line item detail with review linkage
 - **Service Billing Tracking**:
@@ -294,12 +387,34 @@ Access all features through the modern web dashboard at `http://localhost:5173` 
 - **External System Integration**:
   - ACC project ID mapping
   - Alias management for cross-reference
-  - Auto-mapping suggestions
+  - Auto-mapping suggestions with analysis
   - Validation and verification
+  - Project type and configuration mapping
 - **Unmapped Project Detection**:
   - Identify unlinked external projects
   - Bulk mapping operations
   - Mapping statistics and coverage
+  - Smart alias analysis and validation
+
+### 10a. Building Envelope Performance (BEP) Matrix
+- **BEP Section Management**:
+  - Configurable BEP sections with versioning
+  - Content templates and defaults
+  - Section-level approval workflows
+- **Approval Tracking**:
+  - User approvals with comments
+  - Version history and change tracking
+  - Project-level approval status
+
+### 10b. Issue Anchor Linking
+- **Anchor-Issue Mapping**:
+  - Link issues to specific project anchors (areas, buildings, phases)
+  - Multiple anchor type support
+  - Cross-anchor issue visualization
+- **Anchor Navigation**:
+  - Project anchor hierarchy navigation
+  - Issue filtering by anchor location
+  - Anchor-based reporting and analytics
 
 ### 11. Document Management
 - **Document Tracking** - File versioning and metadata
@@ -468,6 +583,14 @@ GET /api/dashboard/warehouse-metrics
 # - Trend analysis
 # - Performance indicators
 # - Query execution times logged to logs/warehouse.log
+
+# Issue Reliability Report
+GET /api/settings/issue-reliability
+
+# Returns:
+# - Data quality metrics by source system
+# - Issue source confidence scores
+# - Mapping accuracy statistics
 ```
 
 #### Issue Analytics
@@ -702,6 +825,8 @@ DELETE /api/project_aliases/{name}        # Delete alias
 GET    /api/project_aliases/summary       # Alias statistics
 GET    /api/project_aliases/unmapped      # Unmapped projects
 POST   /api/project_aliases/auto-map      # Auto-map suggestions
+POST   /api/project_aliases/analyze       # Analyze project-alias relationships
+GET    /api/project_aliases/validation    # Validation status
 ```
 
 #### Service Templates
@@ -713,6 +838,43 @@ DELETE /api/service_templates/{id}        # Delete template
 GET    /api/service_templates/file        # Get template file
 POST   /api/service_templates/file        # Upload template file
 DELETE /api/service_templates/file        # Delete template file
+```
+
+#### Bid Management
+```
+GET    /api/bids                          # List all bids
+POST   /api/bids                          # Create new bid
+GET    /api/bids/{bid_id}                 # Get bid details
+PUT    /api/bids/{bid_id}                 # Update bid
+DELETE /api/bids/{bid_id}                 # Delete/archive bid
+GET    /api/bids/{bid_id}/scope-items     # Get bid scope items
+POST   /api/bids/{bid_id}/scope-items     # Add scope item
+PUT    /api/bids/{bid_id}/scope-items/{id}        # Update scope item
+DELETE /api/bids/{bid_id}/scope-items/{id}        # Delete scope item
+GET    /api/bids/{bid_id}/program-stages  # Get program stages
+POST   /api/bids/{bid_id}/program-stages  # Create program stage
+GET    /api/bids/{bid_id}/billing-schedule        # Get billing schedule
+POST   /api/bids/{bid_id}/billing-schedule        # Add billing line
+PUT    /api/bids/{bid_id}/billing-schedule/{id}   # Update billing line
+POST   /api/bids/{bid_id}/award           # Award bid (update status)
+```
+
+#### Variations & Change Management
+```
+GET    /api/variations                    # List variations
+POST   /api/variations                    # Create variation
+```
+
+#### BEP & Approvals
+```
+GET    /api/bep_matrix                    # Get BEP matrix
+GET    /api/reference/{table}             # Get reference options (project_types, etc.)
+```
+
+#### Issue Anchor Linking
+```
+GET    /api/projects/{id}/anchors/{type}/{anchor_id}/issues    # Get issues for anchor
+GET    /api/issues/{issue_key}/links                           # Get anchor links for issue
 ```
 
 #### Application Integration
@@ -903,15 +1065,15 @@ BIMProjMngmt/
 |---------------|---------|-----------|
 | `constants/schema.py` | **Database schema constants** - Never hardcode table/column names | ✅ YES |
 | `database_pool.py` | **Connection pooling** - All new code must use this | ✅ YES |
-| `backend/app.py` | **Main API server** - All REST endpoints defined here | ✅ YES |
+| `backend/app.py` | **Main API server** - All REST endpoints defined here (5900+ lines) | ✅ YES |
 | `frontend/src/api/` | **API client layer** - Axios calls to backend | ✅ YES |
 | `config.py` | **Environment config** - Database credentials, service URLs | ✅ YES |
 | `docs/DATABASE_CONNECTION_GUIDE.md` | **Mandatory reading** for all developers | ✅ YES |
-| `handlers/*.py` | Data import processors for external sources | ⚠️ Important |
-| `warehouse/*.py` | Analytics and reporting query functions | ⚠️ Important |
-| `services/` | External microservices (C#, Node.js) | ⚠️ Important |
-| `sql/migrations/` | Database schema version control | ⚠️ Important |
-| `tests/` | Automated test suite | ⚠️ Important |
+| `handlers/*.py` | Data import processors (ACC, Revit Health, IFC) | ⚠️ Important |
+| `warehouse/etl/pipeline.py` | Data warehouse orchestration and incremental loads | ⚠️ Important |
+| `services/` | Business logic services and external microservices | ⚠️ Important |
+| `sql/migrations/` | Database schema version control and migrations | ⚠️ Important |
+| `tests/` | Automated test suite (pytest) | ⚠️ Important |
 | `tools/` | Development and debugging utilities | 📘 Reference |
 
 ## 🧪 Testing
@@ -1018,9 +1180,11 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the detailed multi-phase development 
 ### In Progress 🚧 (Q1-Q2 2026)
 - 🚧 Advanced reporting engine with custom templates
 - 🚧 Real-time collaboration and notifications
-- 🚧 Enhanced issue pattern recognition (ML/NLP)
+- 🚧 Enhanced issue pattern recognition and root cause analysis
 - 🚧 Performance optimization and caching strategies
 - 🚧 Comprehensive API documentation (OpenAPI/Swagger)
+- 🚧 Bid performance analytics and historical trending
+- 🚧 Anchor-based project portfolio analytics
 
 ### Planned Features 📋 (2026)
 - 📋 AI-powered issue categorization and risk prediction

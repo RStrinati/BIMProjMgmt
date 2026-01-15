@@ -12,6 +12,7 @@ type TimelineGridProps = {
 const ROW_HEIGHT = 36;
 const LABEL_WIDTH = 200;
 const OVERSCAN = 6;
+const HEADER_HEIGHT = 52;
 
 export function TimelineGrid({ model, onRowClick, height = 520 }: TimelineGridProps) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +48,7 @@ export function TimelineGrid({ model, onRowClick, height = 520 }: TimelineGridPr
 
   return (
     <Box
+      data-testid="timeline-grid-root"
       sx={{
         border: (theme) => `1px solid ${theme.palette.divider}`,
         borderRadius: 2,
@@ -66,27 +68,49 @@ export function TimelineGrid({ model, onRowClick, height = 520 }: TimelineGridPr
             flex: 1,
             overflow: 'hidden',
             position: 'relative',
-            height: 40,
+            height: HEADER_HEIGHT,
           }}
         >
           <Box sx={{ position: 'relative', height: '100%', minWidth: model.rangeWidth }}>
-            {model.ticks.map((tick) => (
-              <Box key={tick.date.toISOString()} sx={{ position: 'absolute', left: tick.x, top: 0, height: '100%' }}>
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 18,
-                    left: 0,
-                    width: 1,
-                    height: 14,
-                    bgcolor: 'divider',
-                  }}
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', top: 2, left: 4 }}>
-                  {tick.label}
-                </Typography>
-              </Box>
-            ))}
+            <Box sx={{ position: 'absolute', inset: 0, height: 24 }}>
+              {model.ticks
+                .filter((tick) => tick.label)
+                .map((tick) => (
+                  <Typography
+                    key={`label-${tick.date.toISOString()}`}
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ position: 'absolute', top: 2, left: tick.x + 4, whiteSpace: 'nowrap' }}
+                  >
+                    {tick.label}
+                  </Typography>
+                ))}
+            </Box>
+            <Box data-testid="timeline-day-ticks" sx={{ position: 'absolute', top: 24, height: 24, left: 0, right: 0 }}>
+              {model.ticks
+                .filter((tick) => tick.subLabel)
+                .map((tick) => (
+                  <Box key={`day-${tick.date.toISOString()}`} sx={{ position: 'absolute', left: tick.x, top: 0 }}>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: 1,
+                        height: 14,
+                        bgcolor: 'divider',
+                      }}
+                    />
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ position: 'absolute', top: 14, left: 4, fontSize: 11 }}
+                    >
+                      {tick.subLabel}
+                    </Typography>
+                  </Box>
+                ))}
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -103,6 +127,7 @@ export function TimelineGrid({ model, onRowClick, height = 520 }: TimelineGridPr
         <Box sx={{ position: 'relative', minWidth: model.rangeWidth + LABEL_WIDTH }}>
           {model.todayX != null && (
             <Box
+              data-testid="timeline-today-line"
               sx={{
                 position: 'absolute',
                 top: 0,
@@ -110,7 +135,7 @@ export function TimelineGrid({ model, onRowClick, height = 520 }: TimelineGridPr
                 left: LABEL_WIDTH + model.todayX,
                 width: 1,
                 bgcolor: 'primary.main',
-                opacity: 0.35,
+                opacity: 0.3,
                 pointerEvents: 'none',
               }}
             />

@@ -1,22 +1,33 @@
 import { test, expect } from '@playwright/test';
 
+const today = new Date();
+const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+const startDate = new Date(today);
+startDate.setDate(today.getDate() - 10);
+const endDate = new Date(today);
+endDate.setDate(today.getDate() + 20);
+
 const timelinePayload = {
   projects: [
     {
       project_id: 1,
       project_name: 'Alpha Campus',
-      start_date: '2024-01-01',
-      end_date: '2024-03-15',
+      start_date: formatDate(startDate),
+      end_date: formatDate(endDate),
       project_manager: 'Jordan Lead',
       client_name: 'Acme',
       project_type: 'Data Center',
+      priority: 'High',
+      internal_lead: 7,
+      internal_lead_name: 'Morgan Lead',
+      progress_pct: 37,
       review_items: [],
     },
     {
       project_id: 2,
       project_name: 'Beta Expansion',
-      start_date: '2024-02-01',
-      end_date: '2024-04-30',
+      start_date: formatDate(startDate),
+      end_date: formatDate(endDate),
       project_manager: 'Taylor Lead',
       client_name: 'Orbit',
       project_type: 'Health',
@@ -50,11 +61,18 @@ test.describe('Linear timeline (flagged)', () => {
     await page.goto('/');
 
     await expect(page.getByTestId('linear-timeline-panel')).toBeVisible();
+    await expect(page.getByTestId('timeline-grid-root')).toBeVisible();
     await expect(page.getByText('Alpha Campus')).toBeVisible();
+    await expect(page.getByTestId('timeline-row-label').first()).toContainText('Alpha Campus');
+    await expect(page.getByTestId('timeline-row-label').first()).not.toContainText('Acme');
+    await expect(page.getByTestId('timeline-row-priority').first()).toBeVisible();
+    await expect(page.getByTestId('timeline-row-lead').first()).toBeVisible();
+    await expect(page.getByTestId('timeline-bar-label').first()).toContainText('37%');
+    await expect(page.getByTestId('timeline-today-line')).toBeVisible();
 
     const zoomWeek = page.getByRole('button', { name: 'Week' });
     await zoomWeek.click();
-    await expect(page.getByText('1 Jan')).toBeVisible();
+    await expect(page.getByTestId('timeline-day-ticks')).toContainText(String(today.getDate()));
 
     expect(consoleErrors).toEqual([]);
   });

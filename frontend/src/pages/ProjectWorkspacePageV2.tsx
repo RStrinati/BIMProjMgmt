@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,11 +19,20 @@ import {
   Typography,
 } from '@mui/material';
 import { projectsApi, tasksApi, usersApi } from '@/api';
-import type { Project, TaskPayload, User } from '@/types/api';
+import { serviceReviewsApi } from '@/api/services';
+import type { Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview, TaskPayload, User } from '@/types/api';
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
 import { featureFlags } from '@/config/featureFlags';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
+import { ReviewStatusInline } from '@/components/projects/ReviewStatusInline';
+import { useProjectReviews } from '@/hooks/useProjectReviews';
+import { toApiReviewStatus } from '@/utils/reviewStatus';
+import { ProjectServicesList } from '@/features/projects/services/ProjectServicesList';
+import { BlockerBadge } from '@/components/ui/BlockerBadge';
+import { LinkedIssuesList } from '@/components/ui/LinkedIssuesList';
+import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 const BASE_TABS = ['Overview', 'Services', 'Reviews', 'Tasks'] as const;
 const DISPLAY_MODES = ['Comfortable', 'Compact'] as const;
@@ -61,11 +70,37 @@ export default function ProjectWorkspacePageV2() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('Comfortable');
   const [taskDraft, setTaskDraft] = useState('');
   const [taskError, setTaskError] = useState<string | null>(null);
+  const [reviewUpdateError, setReviewUpdateError] = useState<string | null>(null);
+  const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
+  const [isReviewDetailOpen, setIsReviewDetailOpen] = useState(false);
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([{
     id: 1,
     label: 'Workspace opened',
     createdAt: new Date().toISOString(),
   }]);
+
+  // Handler for opening review detail modal
+  const handleOpenReviewDetail = useCallback((reviewId: number) => {
+    console.debug('[ProjectWorkspaceV2] Opening review detail modal', { reviewId });
+    setSelectedReviewId(reviewId);
+    setIsReviewDetailOpen(true);
+    console.debug('[ProjectWorkspaceV2] State should be updated', { reviewId, isReviewDetailOpen: true });
+  }, []);
+
+  // Log state changes for debugging
+  useEffect(() => {
+    console.debug('[ProjectWorkspaceV2] State changed', { selectedReviewId, isReviewDetailOpen });
+  }, [selectedReviewId, isReviewDetailOpen]);
+
+  // Log modal visibility state
+  useEffect(() => {
+    console.debug('[ProjectWorkspaceV2] Dialog visibility', {
+      anchorLinksFlag: featureFlags.anchorLinks,
+      isReviewDetailOpen,
+      selectedReviewId,
+      shouldDialogBeOpen: featureFlags.anchorLinks && isReviewDetailOpen && selectedReviewId !== null,
+    });
+  }, [isReviewDetailOpen, selectedReviewId]);
 
   const { data: project, isLoading, error } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -167,6 +202,86 @@ export default function ProjectWorkspacePageV2() {
     };
   }, [project]);
 
+  const reviewsFilters = useMemo(
+    () => ({
+      sort_by: 'planned_date' as const,
+      sort_dir: 'asc' as const,
+    }),
+    [],
+  );
+
+  const {
+    data: projectReviews,
+    isLoading: projectReviewsLoading,
+    error: projectReviewsError,
+  } = useProjectReviews(projectId, reviewsFilters);
+
+  const reviewItems = useMemo<ProjectReviewItem[]>(
+    () => projectReviews?.items ?? [],
+    [projectReviews],
+  );
+
+  const updateReviewStatus = useMutation<
+    Awaited<ReturnType<typeof serviceReviewsApi.update>>,
+    Error,
+    { review: ProjectReviewItem; status: string | null },
+    { previousProjectReviews: Array<[unknown, ProjectReviewsResponse | undefined]>; previousServiceReviews?: ServiceReview[] }
+  >({
+    mutationFn: ({ review, status }) =>
+      serviceReviewsApi.update(projectId, review.service_id, review.review_id, {
+        status: toApiReviewStatus(status),
+      }),
+    onMutate: async ({ review, status }) => {
+      setReviewUpdateError(null);
+      const nextStatus = toApiReviewStatus(status);
+      await queryClient.cancelQueries({ queryKey: ['projectReviews', projectId] });
+
+      const previousProjectReviews = queryClient.getQueriesData<ProjectReviewsResponse>({
+        queryKey: ['projectReviews', projectId],
+      });
+
+      queryClient.setQueriesData<ProjectReviewsResponse>(
+        { queryKey: ['projectReviews', projectId] },
+        (existing) => {
+          if (!existing) return existing;
+          return {
+            ...existing,
+            items: existing.items.map((item) =>
+              item.review_id === review.review_id ? { ...item, status: nextStatus } : item,
+            ),
+          };
+        },
+      );
+
+      const serviceReviewsKey = ['serviceReviews', projectId, review.service_id];
+      const previousServiceReviews = queryClient.getQueryData<ServiceReview[]>(serviceReviewsKey);
+      if (previousServiceReviews) {
+        queryClient.setQueryData<ServiceReview[]>(serviceReviewsKey, (existing) =>
+          existing?.map((item) =>
+            item.review_id === review.review_id ? { ...item, status: nextStatus } : item,
+          ) ?? existing,
+        );
+      }
+
+      return { previousProjectReviews, previousServiceReviews };
+    },
+    onError: (error, { review }, context) => {
+      setReviewUpdateError(error.message || 'Failed to update review status.');
+      if (context?.previousProjectReviews) {
+        context.previousProjectReviews.forEach(([key, data]) => {
+          queryClient.setQueryData(key as unknown[], data);
+        });
+      }
+      if (context?.previousServiceReviews) {
+        queryClient.setQueryData(['serviceReviews', projectId, review.service_id], context.previousServiceReviews);
+      }
+    },
+    onSettled: (_data, _error, { review }) => {
+      queryClient.invalidateQueries({ queryKey: ['projectReviews', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, review.service_id] });
+    },
+  });
+
   const tabs = useMemo(() => {
     if (showTimeline) {
       return [...BASE_TABS, 'Timeline'];
@@ -213,6 +328,10 @@ export default function ProjectWorkspacePageV2() {
       </Stack>
 
       {error && <Alert severity="error">Failed to load project.</Alert>}
+
+      <Box data-testid="debug-anchor-links-flag" sx={{ p: 1, background: '#f0f0f0', mb: 2, fontSize: '12px' }}>
+        anchorLinksFlag={String(featureFlags.anchorLinks)} | isReviewDetailOpen={String(isReviewDetailOpen)} | selectedReviewId={String(selectedReviewId)}
+      </Box>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)}>
@@ -332,14 +451,124 @@ export default function ProjectWorkspacePageV2() {
         )}
 
         {activeLabel === 'Services' && (
-          <Typography color="text.secondary" data-testid="project-workspace-v2-services">
-            Services view is coming next.
-          </Typography>
+          <Box data-testid="project-workspace-v2-services">
+            {Number.isFinite(projectId) ? (
+              <ProjectServicesList
+                projectId={projectId}
+                testIdPrefix="project-workspace-v2"
+              />
+            ) : (
+              <Typography color="text.secondary">Select a project to view services.</Typography>
+            )}
+          </Box>
         )}
         {activeLabel === 'Reviews' && (
-          <Typography color="text.secondary" data-testid="project-workspace-v2-reviews">
-            Reviews view is coming next.
-          </Typography>
+          <Box data-testid="project-workspace-v2-reviews">
+            {reviewUpdateError && (
+              <Alert severity="error" sx={{ mb: 2 }} data-testid="project-workspace-v2-reviews-error">
+                {reviewUpdateError}
+              </Alert>
+            )}
+            {projectReviewsError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                Failed to load project reviews.
+              </Alert>
+            )}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '2fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
+                  gap: 2,
+                  mb: 1,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Service
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Cycle
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Planned
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Due
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Status
+                </Typography>
+                {featureFlags.anchorLinks && (
+                  <Typography variant="caption" color="text.secondary">
+                    Blockers
+                  </Typography>
+                )}
+              </Box>
+              {projectReviewsLoading ? (
+                <Typography color="text.secondary">Loading reviews...</Typography>
+              ) : reviewItems.length ? (
+                <Stack spacing={1}>
+                  {reviewItems.map((review) => {
+                    const isSaving =
+                      updateReviewStatus.isPending &&
+                      updateReviewStatus.variables?.review.review_id === review.review_id;
+                    const serviceLabel = [review.service_code, review.service_name]
+                      .filter(Boolean)
+                      .join(' | ');
+                    return (
+                      <Box
+                        key={review.review_id}
+                        data-testid={`project-workspace-v2-review-row-${review.review_id}`}
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', md: '2fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
+                          gap: 2,
+                          alignItems: 'center',
+                          p: 1,
+                          borderRadius: 1,
+                          border: (theme) => `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {serviceLabel || 'Service'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {[review.phase, review.disciplines, review.deliverables]
+                              .filter(Boolean)
+                              .join(' | ') || 'No metadata'}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">#{review.cycle_no}</Typography>
+                        <Typography variant="body2">{formatDate(review.planned_date)}</Typography>
+                        <Typography variant="body2">{formatDate(review.due_date)}</Typography>
+                        <ReviewStatusInline
+                          value={review.status ?? null}
+                          onChange={(nextStatus) =>
+                            updateReviewStatus.mutate({ review, status: nextStatus })
+                          }
+                          isSaving={isSaving}
+                          disabled={updateReviewStatus.isPending}
+                        />
+                        {featureFlags.anchorLinks && (
+                          <BlockerBadge
+                            projectId={projectId}
+                            anchorType="review"
+                            anchorId={review.review_id}
+                            enabled={true}
+                            onClick={() => handleOpenReviewDetail(review.review_id)}
+                            data-testid={`project-workspace-v2-review-blockers-${review.review_id}`}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Typography color="text.secondary">No reviews found for this project.</Typography>
+              )}
+            </Paper>
+          </Box>
         )}
         {activeLabel === 'Tasks' && (
           <Box data-testid="project-workspace-v2-tasks">
@@ -373,6 +602,57 @@ export default function ProjectWorkspacePageV2() {
           </Box>
         )}
       </Paper>
+
+      {/* Review Detail Modal for Anchor Links */}
+      <Dialog
+        open={featureFlags.anchorLinks && isReviewDetailOpen && selectedReviewId !== null}
+        onClose={() => {
+          console.debug('[ProjectWorkspaceV2] Modal close requested');
+          setIsReviewDetailOpen(false);
+          setSelectedReviewId(null);
+        }}
+        maxWidth="md"
+        fullWidth
+        keepMounted
+        PaperProps={{
+          'data-testid': 'anchor-links-modal',
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ fontWeight: 600 }}>Linked Issues - Review #{selectedReviewId}</Box>
+          <IconButton
+            onClick={() => {
+              setIsReviewDetailOpen(false);
+              setSelectedReviewId(null);
+            }}
+            size="small"
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ minHeight: '400px' }}>
+          {selectedReviewId !== null && (
+            <LinkedIssuesList
+              projectId={projectId}
+              anchorType="review"
+              anchorId={selectedReviewId}
+              enabled={isReviewDetailOpen && selectedReviewId !== null}
+              readonly={false}
+              data-testid="project-workspace-v2-review-linked-issues"
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setIsReviewDetailOpen(false);
+              setSelectedReviewId(null);
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
