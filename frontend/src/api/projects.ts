@@ -8,15 +8,9 @@ export const projectsApi = {
     return response.data;
   },
 
-  // Get single project by ID
-  getById: async (id: number): Promise<Project> => {
-    const response = await apiClient.get<Project>(`/project/${id}`);
-    return response.data;
-  },
-
-  // Create new project
-  create: async (project: Partial<Project>): Promise<Project> => {
-    const response = await apiClient.post<Project>('/projects', project);
+  // Get all projects with health metrics
+  getAllWithHealth: async (): Promise<Project[]> => {
+    const response = await apiClient.get<Project[]>('/projects/overview');
     return response.data;
   },
 

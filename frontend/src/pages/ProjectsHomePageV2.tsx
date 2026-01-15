@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Box,
+  Button,
+  CircularProgress,
   MenuItem,
   Paper,
   Stack,
@@ -10,13 +12,25 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+  Card,
+  CardContent,
 } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { projectsApi } from '@/api';
 import type { Project } from '@/types/api';
 import { ListView } from '@/components/ui/ListView';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import { featureFlags } from '@/config/featureFlags';
+
+const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
 type DisplayMode = 'list' | 'board' | 'timeline';
 
@@ -26,6 +40,9 @@ type ViewState = {
   viewId: ViewId;
   searchTerm: string;
 };
+
+type SortField = 'name' | 'status' | 'target_date' | 'health';
+type SortOrder = 'asc' | 'desc';
 
 const VIEW_STORAGE_KEY = 'projects_panel_view_state';
 const DISPLAY_STORAGE_KEY = 'projects_home_display_mode';
@@ -84,13 +101,30 @@ const parseDateValue = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
+const getStatusColor = (status?: string): 'success' | 'warning' | 'error' | 'default' => {
+  switch (status?.toLowerCase()) {
+    case 'active':
+      return 'success';
+    case 'on hold':
+      return 'warning';
+    case 'completed':
+      return 'default';
+    default:
+      return 'default';
+  }
+};
+
 export default function ProjectsHomePageV2() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const storedViewState = useMemo(() => safeParseStoredViewState(), []);
   const [displayMode, setDisplayMode] = useState<DisplayMode>(readDisplayMode);
   const [viewId, setViewId] = useState<ViewId>(storedViewState.viewId);
   const [searchTerm, setSearchTerm] = useState(storedViewState.searchTerm);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const currentUserId = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -146,9 +180,9 @@ export default function ProjectsHomePageV2() {
 
   const activeView = viewDefinitions.find((view) => view.id === viewId) ?? viewDefinitions[0];
 
-  const { data: projects = [], isLoading, error } = useQuery({
+  const { data: projects = [], isLoading, error, refetch } = useQuery({
     queryKey: ['projects-home-v2'],
-    queryFn: () => projectsApi.getAll(),
+    queryFn: () => projectsApi.getAllWithHealth(),
   });
 
   const filteredProjects = useMemo(() => {
@@ -167,8 +201,32 @@ export default function ProjectsHomePageV2() {
         )
       : viewFiltered;
     const sorted = activeView.sort ? [...searched].sort(activeView.sort) : searched;
-    return sorted;
-  }, [projects, searchTerm, activeView]);
+    
+    // Apply table sort
+    return [...sorted].sort((a, b) => {
+      let aVal: any = '';
+      let bVal: any = '';
+      
+      if (sortField === 'name') {
+        aVal = a.project_name || '';
+        bVal = b.project_name || '';
+      } else if (sortField === 'status') {
+        aVal = a.status || '';
+        bVal = b.status || '';
+      } else if (sortField === 'target_date') {
+        aVal = parseDateValue(a.end_date);
+        bVal = parseDateValue(b.end_date);
+      } else if (sortField === 'health') {
+        aVal = a.health_pct ?? -1;
+        bVal = b.health_pct ?? -1;
+      }
+      
+      if (typeof aVal === 'string') {
+        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+  }, [projects, searchTerm, activeView, sortField, sortOrder]);
 
   const timelineProjectIds = useMemo(
     () => filteredProjects.map((project) => project.project_id),
@@ -194,6 +252,39 @@ export default function ProjectsHomePageV2() {
 
   const showMyWorkHint = activeView.id === 'my_work' && currentUserId == null;
 
+  const handleSortClick = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const handleCreateProject = () => {
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+  };
+
+  const handleProjectCreated = () => {
+    setDialogOpen(false);
+    // Invalidate and refetch projects
+    queryClient.invalidateQueries({ queryKey: ['projects-home-v2'] });
+    refetch();
+  };
+
+  // Get unique statuses for board grouping
+  const statusGroups = useMemo(() => {
+    const statuses = new Set<string>();
+    filteredProjects.forEach((p) => {
+      if (p.status) statuses.add(p.status);
+    });
+    return Array.from(statuses).sort();
+  }, [filteredProjects]);
+
   return (
     <Box data-testid="projects-home-v2-root" sx={{ display: 'grid', gap: 2 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
@@ -204,6 +295,14 @@ export default function ProjectsHomePageV2() {
           </Typography>
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateProject}
+            data-testid="create-project-button"
+          >
+            Create Project
+          </Button>
           <TextField
             select
             size="small"
@@ -255,55 +354,215 @@ export default function ProjectsHomePageV2() {
         </Alert>
       )}
 
-      {displayMode === 'list' && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <ListView<Project>
-            items={filteredProjects}
-            getItemId={(project) => project.project_id}
-            getItemTestId={(project) => `projects-home-list-row-${project.project_id}`}
-            selectedId={selectedProjectId}
-            onSelect={(project) => {
-              setSelectedProjectId(project.project_id);
-              navigate(`/projects/${project.project_id}`);
-            }}
-            renderPrimary={(project) => project.project_name}
-            renderSecondary={(project) => project.client_name || project.project_number || 'Unassigned client'}
-            emptyState={
-              <Typography color="text.secondary" sx={{ px: 2 }}>
-                {isLoading ? 'Loading projects...' : 'No projects found.'}
-              </Typography>
-            }
-          />
-        </Paper>
+      {isLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
       )}
 
-      {displayMode === 'board' && (
-        <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            Board view
-          </Typography>
-          <Typography color="text.secondary">
-            Board layout is coming next. Switch to List or Timeline for now.
-          </Typography>
-        </Paper>
+      {/* LIST VIEW */}
+      {displayMode === 'list' && !isLoading && (
+        <TableContainer component={Paper} variant="outlined" data-testid="projects-list-table">
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'grey.100' }}>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'name'}
+                    direction={sortField === 'name' ? sortOrder : 'asc'}
+                    onClick={() => handleSortClick('name')}
+                  >
+                    Project Name
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'health'}
+                    direction={sortField === 'health' ? sortOrder : 'asc'}
+                    onClick={() => handleSortClick('health')}
+                  >
+                    Health %
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>Priority</TableCell>
+                <TableCell>Lead</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'target_date'}
+                    direction={sortField === 'target_date' ? sortOrder : 'asc'}
+                    onClick={() => handleSortClick('target_date')}
+                  >
+                    Target Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === 'status'}
+                    direction={sortField === 'status' ? sortOrder : 'asc'}
+                    onClick={() => handleSortClick('status')}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredProjects.map((project) => (
+                <TableRow
+                  key={project.project_id}
+                  data-testid={`project-row-${project.project_id}`}
+                  hover
+                  onClick={() => navigate(`/projects/${project.project_id}`)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <TableCell>{project.project_name || '—'}</TableCell>
+                  <TableCell>
+                    {project.health_pct != null ? `${Math.round(project.health_pct)}%` : '—'}
+                  </TableCell>
+                  <TableCell>{project.priority || '—'}</TableCell>
+                  <TableCell>{project.internal_lead || '—'}</TableCell>
+                  <TableCell>
+                    {project.end_date ? new Date(project.end_date).toLocaleDateString() : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: getStatusColor(project.status) === 'success' ? 'success.main' : 
+                               getStatusColor(project.status) === 'warning' ? 'warning.main' : 'inherit',
+                      }}
+                    >
+                      {project.status || '—'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredProjects.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">
+                      {isLoading ? 'Loading...' : 'No projects found'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
-      {displayMode === 'timeline' && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
+      {/* BOARD VIEW */}
+      {displayMode === 'board' && !isLoading && (
+        <Box
+          data-testid="projects-board-view"
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(320px, 1fr))`,
+            gap: 2,
+          }}
+        >
+          {statusGroups.map((status) => {
+            const statusProjects = filteredProjects.filter((p) => p.status === status);
+            return (
+              <Paper key={status} variant="outlined" sx={{ p: 2, backgroundColor: 'grey.50' }}>
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+                  {status} ({statusProjects.length})
+                </Typography>
+                <Stack spacing={1}>
+                  {statusProjects.map((project) => (
+                    <Card
+                      key={project.project_id}
+                      data-testid={`project-card-${project.project_id}`}
+                      sx={{
+                        p: 1.5,
+                        cursor: 'pointer',
+                        '&:hover': { boxShadow: 1 },
+                      }}
+                      onClick={() => navigate(`/projects/${project.project_id}`)}
+                    >
+                      <CardContent sx={{ p: 0 }}>
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                          {project.project_name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {project.client_name || 'Unassigned'}
+                        </Typography>
+                        {project.health_pct != null && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5, color: 'primary.main' }}>
+                            Health: {Math.round(project.health_pct)}%
+                          </Typography>
+                        )}
+                        {project.end_date && (
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            Target: {new Date(project.end_date).toLocaleDateString()}
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {statusProjects.length === 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                      No projects
+                    </Typography>
+                  )}
+                </Stack>
+              </Paper>
+            );
+          })}
+          {statusGroups.length === 0 && (
+            <Typography color="text.secondary">No projects found.</Typography>
+          )}
+        </Box>
+      )}
+
+      {/* TIMELINE VIEW */}
+      {displayMode === 'timeline' && !isLoading && (
+        <Paper variant="outlined" sx={{ p: 2, overflow: 'hidden' }} data-testid="projects-timeline-view">
           {featureFlags.linearTimeline ? (
-            <TimelinePanel
-              title="Projects timeline"
-              projectIds={timelineProjectIds.length ? timelineProjectIds : undefined}
-              searchText={searchTerm}
-              onSearchTextChange={setSearchTerm}
-              showSearch={false}
-            />
+            <Box sx={{ width: '100%', overflow: 'auto' }}>
+              <TimelinePanel
+                title="Projects timeline"
+                projectIds={timelineProjectIds.length ? timelineProjectIds : undefined}
+                searchText={searchTerm}
+                onSearchTextChange={setSearchTerm}
+                showSearch={false}
+              />
+            </Box>
           ) : (
             <Typography color="text.secondary">
               Enable `ff_linear_timeline` to view the new timeline.
             </Typography>
           )}
         </Paper>
+      )}
+
+      {/* CREATE PROJECT DIALOG */}
+      {dialogOpen && (
+        <Suspense
+          fallback={(
+            <Box
+              position="fixed"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              sx={{ bgcolor: 'rgba(0,0,0,0.25)', zIndex: (theme) => theme.zIndex.modal - 1 }}
+            >
+              <CircularProgress />
+            </Box>
+          )}
+        >
+          <ProjectFormDialog
+            key="create-new"
+            open={dialogOpen}
+            onClose={handleDialogClose}
+            mode="create"
+            onSuccess={handleProjectCreated}
+          />
+        </Suspense>
       )}
     </Box>
   );

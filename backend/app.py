@@ -70,6 +70,7 @@ from database import (  # noqa: E402
     get_project_folders,
     get_project_health_files,
     get_projects_full,
+    get_projects_with_health,
     get_warehouse_dashboard_metrics,
     get_warehouse_issues_history,
     get_dashboard_issues_kpis,
@@ -1900,6 +1901,22 @@ def api_projects_stats():
         return jsonify(stats)
     except Exception as e:
         logging.exception("Failed to get project stats")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/overview', methods=['GET'])
+def api_projects_overview():
+    """Get projects with calculated health metrics.
+    
+    Returns list of projects with health_pct calculated from:
+    - Primary: percentage of completed services
+    - Fallback: percentage of completed reviews
+    """
+    try:
+        projects = get_projects_with_health()
+        return jsonify(projects)
+    except Exception as e:
+        logging.exception("Failed to get projects overview with health")
         return jsonify({'error': str(e)}), 500
 
 

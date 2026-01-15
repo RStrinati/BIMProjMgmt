@@ -30,6 +30,7 @@ interface ProjectFormDialogProps {
   onClose: () => void;
   project?: Project | null;
   mode: 'create' | 'edit';
+  onSuccess?: () => void;
 }
 
 type FormState = {
@@ -78,7 +79,7 @@ const emptyFormState: FormState = {
 
 const REVERSE_PRIORITY_MAP: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
 
-const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, project, mode }) => {
+const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, project, mode, onSuccess }) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -188,6 +189,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-home-v2'] });
+      onSuccess?.();
       onClose();
     },
     onError: (err: any) => {
@@ -203,6 +206,8 @@ const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ open, onClose, pr
       queryClient.invalidateQueries({ queryKey: ['projects', 'stats'] });
       queryClient.invalidateQueries({ queryKey: ['projects', 'review-stats'] });
       queryClient.invalidateQueries({ queryKey: ['project', project?.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['projects-home-v2'] });
+      onSuccess?.();
       onClose();
     },
     onError: (err: any) => {

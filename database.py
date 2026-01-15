@@ -3605,6 +3605,67 @@ def get_projects_full():
         return []
 
 
+def get_projects_with_health():
+    """Return all projects with calculated health percentage.
+    
+    Health is calculated as:
+    - Primary: percentage of completed services (completed_services / total_services)
+    - Fallback: percentage of completed reviews (completed_reviews / total_reviews)
+    - If neither available: null
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Get all projects with service and review completion metrics
+            cursor.execute(f"""
+                SELECT 
+                    p.{S.Projects.ID},
+                    p.{S.Projects.NAME},
+                    p.{S.Projects.STATUS},
+                    p.{S.Projects.PRIORITY},
+                    p.{S.Projects.INTERNAL_LEAD},
+                    p.{S.Projects.END_DATE},
+                    COALESCE(
+                        CASE 
+                            WHEN Svc.total_services > 0 
+                            THEN (SVC.completed_services * 100) / SVC.total_services
+                            WHEN Rev.total_reviews > 0 
+                            THEN (Rev.completed_reviews * 100) / Rev.total_reviews
+                            ELSE NULL
+                        END,
+                        NULL
+                    ) AS health_pct,
+                    COALESCE(SVC.total_services, 0) AS total_services,
+                    COALESCE(SVC.completed_services, 0) AS completed_services,
+                    COALESCE(Rev.total_reviews, 0) AS total_reviews,
+                    COALESCE(Rev.completed_reviews, 0) AS completed_reviews
+                FROM {S.Projects.TABLE} p
+                LEFT JOIN (
+                    SELECT 
+                        {S.ProjectServices.PROJECT_ID},
+                        COUNT(*) AS total_services,
+                        SUM(CASE WHEN {S.ProjectServices.STATUS} = 'completed' THEN 1 ELSE 0 END) AS completed_services
+                    FROM {S.ProjectServices.TABLE}
+                    GROUP BY {S.ProjectServices.PROJECT_ID}
+                ) SVC ON p.{S.Projects.ID} = SVC.{S.ProjectServices.PROJECT_ID}
+                LEFT JOIN (
+                    SELECT 
+                        ps.{S.ProjectServices.PROJECT_ID} AS project_id,
+                        COUNT(sr.{S.ServiceReviews.REVIEW_ID}) AS total_reviews,
+                        SUM(CASE WHEN sr.{S.ServiceReviews.STATUS} = 'completed' THEN 1 ELSE 0 END) AS completed_reviews
+                    FROM {S.ServiceReviews.TABLE} sr
+                    INNER JOIN {S.ProjectServices.TABLE} ps ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                    GROUP BY ps.{S.ProjectServices.PROJECT_ID}
+                ) Rev ON p.{S.Projects.ID} = Rev.project_id
+                ORDER BY p.{S.Projects.NAME}
+            """)
+            
+            columns = [c[0] for c in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ Error fetching projects with health: {e}")
+        return []
+
 
 def upsert_bep_section(project_id, section_id, responsible_user_id, status, notes):
     """Create or update a project BEP section record."""
