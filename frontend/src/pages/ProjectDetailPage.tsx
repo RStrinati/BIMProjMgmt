@@ -34,7 +34,7 @@ import { issuesApi } from '@/api';
 import { projectServicesApi } from '@/api/services';
 import type { ProjectService, ProjectServicesListResponse } from '@/api/services';
 import type { Project, User } from '@/types/api';
-import { ProjectServicesTab } from '@/components/ProjectServicesTab';
+import { ProjectServicesTab } from '@/components/ProjectServicesTab_Linear';
 import { profilerLog } from '@/utils/perfLogger';
 
 interface TabPanelProps {
