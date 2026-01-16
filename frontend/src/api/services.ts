@@ -201,3 +201,6 @@ export const serviceItemsStatsApi = {
   getAll: (serviceId?: number) =>
     apiClient.get<Record<string, any>>(`/service_items_statistics${serviceId ? `?service_id=${serviceId}` : ''}`),
 };
+
+// Re-export types for component usage
+export type { ServiceReview, ServiceItem };

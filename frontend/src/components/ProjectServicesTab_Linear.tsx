@@ -1,4 +1,4 @@
-import { Profiler, type ChangeEvent, useEffect, useMemo, useState, useCallback } from 'react';
+import { Profiler, type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -16,22 +16,19 @@ import {
   FormControlLabel,
   Table,
   TableBody,
+  TableCell,
   TableContainer,
   TableHead,
   TableRow,
   Paper,
   TablePagination,
   Stack,
-  IconButton,
 } from '@mui/material';
-import { Add as AddIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { projectServicesApi, serviceReviewsApi, serviceItemsApi, fileServiceTemplatesApi } from '@/api';
 import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService, ServiceReview, ServiceItem, FileServiceTemplate, ApplyTemplateResult } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
-import { BlockerBadge } from '@/components/ui/BlockerBadge';
-import { LinkedIssuesList } from '@/components/ui/LinkedIssuesList';
-import { featureFlags } from '@/config/featureFlags';
 import { ServicesSummaryStrip } from './ProjectServices/ServicesSummaryStrip';
 import { ServicesListRow } from './ProjectServices/ServicesListRow';
 import { ServiceDetailDrawer } from './ProjectServices/ServiceDetailDrawer';
@@ -286,16 +283,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   const [templateDialogError, setTemplateDialogError] = useState('');
   const [templateFeedback, setTemplateFeedback] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
-  // Item detail modal (anchor links)
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [isItemDetailOpen, setIsItemDetailOpen] = useState(false);
-
-  const handleOpenItemDetail = useCallback((itemId: number) => {
-    console.debug('[ProjectServicesTab] Opening item detail modal', { itemId });
-    setSelectedItemId(itemId);
-    setIsItemDetailOpen(true);
-  }, []);
-
   // Fetch services
   const {
     data: servicesPayload,
@@ -489,7 +476,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
   const deleteServiceMutation = useMutation({
     mutationFn: (serviceId: number) => projectServicesApi.delete(projectId, serviceId),
-    onSuccess: (_result, serviceId) => {
+    onSuccess: (_result) => {
       queryClient.invalidateQueries({ queryKey: ['projectServices', projectId] });
       setSelectedService(null);
       setIsDrawerOpen(false);
@@ -674,29 +661,31 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
   const handleOpenReviewDialog = (
     service: ProjectService,
-    options?: { review?: ServiceReview; existingReviewCount?: number },
+    review?: ServiceReview,
+    existingReviewCount?: number,
   ) => {
-    const { review, existingReviewCount = 0 } = options ?? {};
+    const reviewObj = review;
+    const count = existingReviewCount ?? 0;
     setSelectedService(service);
 
-    if (review) {
-      setSelectedReview(review);
+    if (reviewObj) {
+      setSelectedReview(reviewObj);
       setReviewFormData({
-        cycle_no: review.cycle_no,
-        planned_date: review.planned_date,
-        due_date: review.due_date || '',
-        disciplines: review.disciplines || '',
-        deliverables: review.deliverables || '',
-        status: review.status,
-        weight_factor: review.weight_factor ?? 1,
-        invoice_reference: review.invoice_reference || '',
-        evidence_links: review.evidence_links || '',
-        is_billed: review.is_billed ?? (review.status === 'completed'),
+        cycle_no: reviewObj.cycle_no,
+        planned_date: reviewObj.planned_date,
+        due_date: reviewObj.due_date || '',
+        disciplines: reviewObj.disciplines || '',
+        deliverables: reviewObj.deliverables || '',
+        status: reviewObj.status,
+        weight_factor: reviewObj.weight_factor ?? 1,
+        invoice_reference: reviewObj.invoice_reference || '',
+        evidence_links: reviewObj.evidence_links || '',
+        is_billed: reviewObj.is_billed ?? (reviewObj.status === 'completed'),
       });
     } else {
       setSelectedReview(null);
       setReviewFormData({
-        cycle_no: existingReviewCount + 1,
+        cycle_no: count + 1,
         planned_date: '',
         due_date: '',
         disciplines: '',
@@ -709,6 +698,16 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
       });
     }
     setReviewDialogOpen(true);
+  };
+
+  // Wrapper for drawer onAddReview signature
+  const handleAddReview = (service: ProjectService, existingReviewCount: number) => {
+    handleOpenReviewDialog(service, undefined, existingReviewCount);
+  };
+
+  // Wrapper for drawer onEditReview signature
+  const handleEditReview = (service: ProjectService, review: ServiceReview, existingReviewCount: number) => {
+    handleOpenReviewDialog(service, review, existingReviewCount);
   };
 
   const handleCloseReviewDialog = () => {
@@ -984,8 +983,8 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             onClose={handleCloseDrawer}
             onEditService={handleOpenServiceDialog}
             onDeleteService={handleDeleteService}
-            onAddReview={handleOpenReviewDialog}
-            onEditReview={handleOpenReviewDialog}
+            onAddReview={handleAddReview}
+            onEditReview={handleEditReview}
             onDeleteReview={handleDeleteReview}
             onAddItem={handleOpenItemDialog}
             onEditItem={handleOpenItemDialog}
@@ -1427,7 +1426,8 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
           </DialogActions>
         </Dialog>
 
-        {/* Item Detail Modal (Anchor Links) */}
+        {/* Item Detail Modal (Anchor Links) - DISABLED FOR NOW */}
+        {/*
         {featureFlags.anchorLinks && selectedItemId !== null && (
           <Dialog
             open={isItemDetailOpen}
@@ -1473,6 +1473,7 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             </DialogActions>
           </Dialog>
         )}
+        */}
       </Box>
     </Profiler>
   );

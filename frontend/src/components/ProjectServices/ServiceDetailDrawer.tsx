@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Drawer,
@@ -19,7 +19,6 @@ import {
   TableHead,
   TableRow,
   LinearProgress,
-  Link,
 } from '@mui/material';
 import { Close as CloseIcon, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { serviceReviewsApi, serviceItemsApi } from '@/api';
@@ -106,19 +105,6 @@ export function ServiceDetailDrawer({
   const progressValue = service.billing_progress_pct ?? service.progress_pct ?? 0;
   const reviewsErrorMessage = reviewsError instanceof Error ? reviewsError.message : 'Failed to load reviews';
   const itemsErrorMessage = itemsError instanceof Error ? itemsError.message : 'Failed to load items';
-
-  const renderInvoiceReference = (value?: string | null) => {
-    if (!value) return '—';
-    const trimmed = String(value).trim();
-    if (/^https?:\/\//i.test(trimmed)) {
-      return (
-        <Link href={trimmed} target="_blank" rel="noopener noreferrer" sx={{ fontSize: 'inherit' }}>
-          Open
-        </Link>
-      );
-    }
-    return trimmed;
-  };
 
   return (
     <Drawer
@@ -253,7 +239,7 @@ export function ServiceDetailDrawer({
           <Box sx={{ mb: 2 }}>
             <Tabs
               value={tabValue}
-              onChange={(e, newValue) => setTabValue(newValue)}
+              onChange={(_e, newValue) => setTabValue(newValue)}
               sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 2 }}
             >
               <Tab label="Reviews" data-testid="service-drawer-tab-reviews" />

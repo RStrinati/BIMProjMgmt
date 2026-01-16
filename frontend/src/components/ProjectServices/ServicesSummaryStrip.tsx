@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, LinearProgress, Typography, Stack } from '@mui/material';
 
 interface ServicesSummaryStripProps {
