@@ -57,7 +57,7 @@ test.describe('Project workspace v2', () => {
     await page.getByRole('tab', { name: 'Services' }).click();
     await expect(page.getByTestId('project-workspace-v2-services')).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Reviews' }).click();
+    await page.getByRole('tab', { name: 'Deliverables' }).click();
     await expect(page.getByTestId('project-workspace-v2-reviews')).toBeVisible();
 
     await page.getByRole('tab', { name: 'Tasks' }).click();

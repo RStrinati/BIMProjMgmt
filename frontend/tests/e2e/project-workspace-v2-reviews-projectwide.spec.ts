@@ -21,6 +21,7 @@ const projectReviewsPayload = {
       is_billed: false,
       billing_amount: 0,
       invoice_reference: null,
+      invoice_date: null,
       service_name: 'Design Review',
       service_code: 'DR-01',
       phase: 'Concept',
@@ -91,11 +92,15 @@ test.describe('Workspace v2 project-wide reviews', () => {
     await setupMocks(page);
 
     await page.goto('/projects/1');
-    await page.getByRole('tab', { name: 'Reviews' }).click();
+    await page.getByRole('tab', { name: 'Deliverables' }).click();
 
     const reviewRow = page.getByTestId('project-workspace-v2-review-row-101');
     await expect(reviewRow).toBeVisible();
     await expect(reviewRow).toContainText('DR-01');
+
+    // Verify Invoice Date column header is present
+    const invoiceDateHeader = page.locator('text=Invoice Date');
+    await expect(invoiceDateHeader).toBeVisible();
 
     const statusSelect = reviewRow.getByTestId('projects-panel-review-status-select');
     await statusSelect.click();

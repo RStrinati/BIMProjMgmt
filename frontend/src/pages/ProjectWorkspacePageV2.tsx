@@ -18,14 +18,16 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { projectsApi, tasksApi, usersApi } from '@/api';
+import { projectsApi, projectReviewsApi, tasksApi, usersApi } from '@/api';
 import { serviceReviewsApi } from '@/api/services';
 import type { Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview, TaskPayload, User } from '@/types/api';
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
+import { IssuesTabContent } from '@/components/ProjectManagement/IssuesTabContent';
 import { featureFlags } from '@/config/featureFlags';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import { ReviewStatusInline } from '@/components/projects/ReviewStatusInline';
+import { EditableCell, ToggleCell } from '@/components/projects/EditableCells';
 import { useProjectReviews } from '@/hooks/useProjectReviews';
 import { toApiReviewStatus } from '@/utils/reviewStatus';
 import { ProjectServicesList } from '@/features/projects/services/ProjectServicesList';
@@ -34,7 +36,7 @@ import { LinkedIssuesList } from '@/components/ui/LinkedIssuesList';
 import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
-const BASE_TABS = ['Overview', 'Services', 'Reviews', 'Tasks'] as const;
+const BASE_TABS = ['Overview', 'Services', 'Deliverables', 'Issues', 'Tasks'] as const;
 const DISPLAY_MODES = ['Comfortable', 'Compact'] as const;
 
 type DisplayMode = (typeof DISPLAY_MODES)[number];
@@ -227,10 +229,12 @@ export default function ProjectWorkspacePageV2() {
     { review: ProjectReviewItem; status: string | null },
     { previousProjectReviews: Array<[unknown, ProjectReviewsResponse | undefined]>; previousServiceReviews?: ServiceReview[] }
   >({
-    mutationFn: ({ review, status }) =>
-      serviceReviewsApi.update(projectId, review.service_id, review.review_id, {
-        status: toApiReviewStatus(status),
-      }),
+    mutationFn: ({ review, status }) => {
+      const statusValue = toApiReviewStatus(status);
+      return serviceReviewsApi.update(projectId, review.service_id, review.review_id, {
+        status: statusValue || undefined,
+      });
+    },
     onMutate: async ({ review, status }) => {
       setReviewUpdateError(null);
       const nextStatus = toApiReviewStatus(status);
@@ -258,7 +262,7 @@ export default function ProjectWorkspacePageV2() {
       if (previousServiceReviews) {
         queryClient.setQueryData<ServiceReview[]>(serviceReviewsKey, (existing) =>
           existing?.map((item) =>
-            item.review_id === review.review_id ? { ...item, status: nextStatus } : item,
+            item.review_id === review.review_id ? { ...item, status: nextStatus ?? item.status } : item,
           ) ?? existing,
         );
       }
@@ -274,6 +278,54 @@ export default function ProjectWorkspacePageV2() {
       }
       if (context?.previousServiceReviews) {
         queryClient.setQueryData(['serviceReviews', projectId, review.service_id], context.previousServiceReviews);
+      }
+    },
+    onSettled: (_data, _error, { review }) => {
+      queryClient.invalidateQueries({ queryKey: ['projectReviews', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, review.service_id] });
+    },
+  });
+
+  // Generic mutation for deliverables field updates
+  const updateDeliverableField = useMutation<
+    ProjectReviewItem,
+    Error,
+    { review: ProjectReviewItem; fieldName: string; value: unknown },
+    { previousProjectReviews: Array<[unknown, ProjectReviewsResponse | undefined]> }
+  >({
+    mutationFn: async ({ review, fieldName, value }) => {
+      const payload = { [fieldName]: value };
+      return projectReviewsApi.patchProjectReview(projectId, review.review_id, review.service_id, payload as any);
+    },
+    onMutate: async ({ review, fieldName, value }) => {
+      setReviewUpdateError(null);
+      await queryClient.cancelQueries({ queryKey: ['projectReviews', projectId] });
+
+      const previousProjectReviews = queryClient.getQueriesData<ProjectReviewsResponse>({
+        queryKey: ['projectReviews', projectId],
+      });
+
+      queryClient.setQueriesData<ProjectReviewsResponse>(
+        { queryKey: ['projectReviews', projectId] },
+        (existing) => {
+          if (!existing) return existing;
+          return {
+            ...existing,
+            items: existing.items.map((item) =>
+              item.review_id === review.review_id ? { ...item, [fieldName]: value } : item,
+            ),
+          };
+        },
+      );
+
+      return { previousProjectReviews };
+    },
+    onError: (error, _variables, context) => {
+      setReviewUpdateError(error.message || 'Failed to update review.');
+      if (context?.previousProjectReviews) {
+        context.previousProjectReviews.forEach(([key, data]) => {
+          queryClient.setQueryData(key as unknown[], data);
+        });
       }
     },
     onSettled: (_data, _error, { review }) => {
@@ -462,7 +514,7 @@ export default function ProjectWorkspacePageV2() {
             )}
           </Box>
         )}
-        {activeLabel === 'Reviews' && (
+        {activeLabel === 'Deliverables' && (
           <Box data-testid="project-workspace-v2-reviews">
             {reviewUpdateError && (
               <Alert severity="error" sx={{ mb: 2 }} data-testid="project-workspace-v2-reviews-error">
@@ -478,7 +530,7 @@ export default function ProjectWorkspacePageV2() {
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: '2fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
+                  gridTemplateColumns: { xs: '1fr', md: '2fr 0.6fr 0.9fr 0.9fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
                   gap: 2,
                   mb: 1,
                 }}
@@ -497,6 +549,15 @@ export default function ProjectWorkspacePageV2() {
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Status
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Invoice Number
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Invoice Date
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Billing Status
                 </Typography>
                 {featureFlags.anchorLinks && (
                   <Typography variant="caption" color="text.secondary">
@@ -518,10 +579,10 @@ export default function ProjectWorkspacePageV2() {
                     return (
                       <Box
                         key={review.review_id}
-                        data-testid={`project-workspace-v2-review-row-${review.review_id}`}
+                        data-testid={`deliverable-row-${review.review_id}`}
                         sx={{
                           display: 'grid',
-                          gridTemplateColumns: { xs: '1fr', md: '2fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
+                          gridTemplateColumns: { xs: '1fr', md: '2fr 0.6fr 0.9fr 0.9fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
                           gap: 2,
                           alignItems: 'center',
                           p: 1,
@@ -541,7 +602,23 @@ export default function ProjectWorkspacePageV2() {
                         </Box>
                         <Typography variant="body2">#{review.cycle_no}</Typography>
                         <Typography variant="body2">{formatDate(review.planned_date)}</Typography>
-                        <Typography variant="body2">{formatDate(review.due_date)}</Typography>
+                        
+                        {/* Due Date - Editable */}
+                        <EditableCell
+                          value={review.due_date}
+                          type="date"
+                          testId={`cell-due-${review.review_id}`}
+                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
+                          onSave={async (newValue) => {
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'due_date',
+                              value: newValue,
+                            });
+                          }}
+                        />
+                        
+                        {/* Status - ReviewStatusInline */}
                         <ReviewStatusInline
                           value={review.status ?? null}
                           onChange={(nextStatus) =>
@@ -549,6 +626,50 @@ export default function ProjectWorkspacePageV2() {
                           }
                           isSaving={isSaving}
                           disabled={updateReviewStatus.isPending}
+                        />
+                        
+                        {/* Invoice Number - Editable */}
+                        <EditableCell
+                          value={review.invoice_reference}
+                          type="text"
+                          testId={`cell-invoice-number-${review.review_id}`}
+                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_reference'}
+                          onSave={async (newValue) => {
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'invoice_reference',
+                              value: newValue,
+                            });
+                          }}
+                        />
+                        
+                        {/* Invoice Date - Editable */}
+                        <EditableCell
+                          value={review.invoice_date}
+                          type="date"
+                          testId={`cell-invoice-date-${review.review_id}`}
+                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_date'}
+                          onSave={async (newValue) => {
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'invoice_date',
+                              value: newValue,
+                            });
+                          }}
+                        />
+                        
+                        {/* Billing Status - Toggleable */}
+                        <ToggleCell
+                          value={review.is_billed}
+                          testId={`cell-billing-status-${review.review_id}`}
+                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'is_billed'}
+                          onSave={async (newValue) => {
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'is_billed',
+                              value: newValue,
+                            });
+                          }}
                         />
                         {featureFlags.anchorLinks && (
                           <BlockerBadge
@@ -570,13 +691,22 @@ export default function ProjectWorkspacePageV2() {
             </Paper>
           </Box>
         )}
+        {activeLabel === 'Issues' && (
+          <Box data-testid="project-workspace-v2-issues">
+            {Number.isFinite(projectId) ? (
+              <IssuesTabContent projectId={projectId} />
+            ) : (
+              <Typography color="text.secondary">Select a project to view issues.</Typography>
+            )}
+          </Box>
+        )}
         {activeLabel === 'Tasks' && (
           <Box data-testid="project-workspace-v2-tasks">
             <TasksNotesView
               initialProjectId={Number.isFinite(projectId) ? projectId : undefined}
               hideFilters
               hideHeader
-              onTaskCreated={(task) => {
+              onTaskCreated={(task: any) => {
                 const label = task?.task_name || 'task';
                 setActivityEvents((prev) => [
                   {

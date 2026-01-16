@@ -773,6 +773,7 @@ export interface ServiceReview {
   status: string;
   weight_factor?: number | null;
   invoice_reference?: string;
+  invoice_date?: string | null;
   evidence_links?: string;
   actual_issued_at?: string;
   source_phase?: string | null;
@@ -797,6 +798,7 @@ export interface ProjectReviewItem {
   is_billed?: boolean | null;
   billing_amount?: number | null;
   invoice_reference?: string | null;
+  invoice_date?: string | null;
   service_name?: string | null;
   service_code?: string | null;
   phase?: string | null;

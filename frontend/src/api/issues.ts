@@ -50,4 +50,48 @@ export const issuesApi = {
     }
     return response.json();
   },
+
+  // Get paginated issues table for a specific project
+  getProjectIssuesTable: async (projectId: number, params?: {
+    page?: number;
+    page_size?: number;
+    sort_by?: string;
+    sort_dir?: 'asc' | 'desc';
+    search?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+    }
+    
+    const queryString = searchParams.toString();
+    const url = `/api/projects/${projectId}/issues/table${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Failed to fetch project issues table');
+    }
+    return response.json();
+  },
+
+  // Get detailed information for a specific issue
+  getIssueDetail: async (issueKey: string, projectId?: number) => {
+    const searchParams = new URLSearchParams();
+    if (projectId !== undefined) {
+      searchParams.append('project_id', String(projectId));
+    }
+    
+    const queryString = searchParams.toString();
+    const url = `/api/issues/${encodeURIComponent(issueKey)}/detail${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Failed to fetch issue detail');
+    }
+    return response.json();
+  },
 };

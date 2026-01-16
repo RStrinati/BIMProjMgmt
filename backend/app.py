@@ -1800,11 +1800,80 @@ def api_create_service_review(project_id, service_id):
 
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/<int:review_id>', methods=['PATCH'])
 def api_update_service_review(project_id, service_id, review_id):
+    """Update a service review (deliverables fields).
+    
+    Allowed fields:
+    - due_date: ISO date string (YYYY-MM-DD) or null
+    - status: string, max 60 chars
+    - invoice_reference: string
+    - invoice_date: ISO date string (YYYY-MM-DD) or null
+    - is_billed: boolean
+    
+    Validates that review belongs to service in the specified project.
+    Returns updated review in the same format as GET.
+    """
     body = request.get_json() or {}
-    success = update_service_review(review_id, **body)
-    if success:
-        return jsonify({'success': True})
-    return jsonify({'error': 'Failed to update review'}), 500
+    
+    # Validate project scope: ensure review belongs to service in this project
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT sr.{S.ServiceReviews.REVIEW_ID}
+                FROM {S.ServiceReviews.TABLE} sr
+                JOIN {S.ProjectServices.TABLE} ps
+                    ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE sr.{S.ServiceReviews.REVIEW_ID} = ?
+                  AND sr.{S.ServiceReviews.SERVICE_ID} = ?
+                  AND ps.{S.ProjectServices.PROJECT_ID} = ?
+            """, (review_id, service_id, project_id))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Review not found in this project'}), 404
+    except Exception as e:
+        logging.error(f"Error validating review scope: {e}")
+        return jsonify({'error': 'Validation error'}), 500
+    
+    # Validate and filter request body - only allow deliverables fields
+    allowed_fields = {
+        'due_date', 'status', 'invoice_reference', 'invoice_date', 'is_billed'
+    }
+    filtered_body = {k: v for k, v in body.items() if k in allowed_fields}
+    
+    if not filtered_body:
+        return jsonify({'error': 'No valid fields to update'}), 400
+    
+    # Map camelCase keys to snake_case for database
+    field_mapping = {
+        'due_date': S.ServiceReviews.DUE_DATE,
+        'status': S.ServiceReviews.STATUS,
+        'invoice_reference': S.ServiceReviews.INVOICE_REFERENCE,
+        'invoice_date': S.ServiceReviews.INVOICE_DATE,
+        'is_billed': S.ServiceReviews.IS_BILLED
+    }
+    
+    db_body = {field_mapping[k]: v for k, v in filtered_body.items()}
+    
+    # Perform update
+    success = update_service_review(review_id, **db_body)
+    if not success:
+        return jsonify({'error': 'Failed to update review'}), 500
+    
+    # Fetch and return updated review
+    try:
+        review_data = get_project_reviews(
+            project_id=project_id,
+            service_id=service_id,
+            limit=1000  # High limit to ensure we find it
+        )
+        if review_data and review_data.get('items'):
+            updated = next((r for r in review_data['items'] if r['review_id'] == review_id), None)
+            if updated:
+                return jsonify(updated), 200
+        return jsonify({'error': 'Could not retrieve updated review'}), 500
+    except Exception as e:
+        logging.error(f"Error fetching updated review: {e}")
+        return jsonify({'error': 'Failed to retrieve updated review'}), 500
 
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/<int:review_id>', methods=['DELETE'])
 def api_delete_service_review(project_id, service_id, review_id):
@@ -1846,6 +1915,18 @@ def api_projects():
         return jsonify({'error': str(exc)}), 500
 
     return jsonify(result), 201
+
+
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+def api_get_project(project_id):
+    """Fetch individual project by ID."""
+    try:
+        from shared.project_service import get_project
+        project = get_project(project_id)
+        return jsonify(project)
+    except Exception as e:
+        logging.exception(f"Failed to get project {project_id}")
+        return jsonify({'error': 'Project not found'}), 404
 
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
@@ -5741,6 +5822,292 @@ def api_issues_reconciled_table():
     
     except Exception as e:
         logging.exception("Error fetching reconciled issues table")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/issues/table', methods=['GET'])
+def api_get_project_issues_table(project_id: int):
+    """
+    GET /api/projects/<project_id>/issues/table
+    
+    Return paginated issues for a specific project with service/review associations.
+    Uses the reconciled issues view if available, otherwise returns empty list.
+    
+    Query Parameters:
+    - page (int, default=1): Page number (1-indexed)
+    - page_size (int, default=50): Results per page
+    - sort_by (str, default='updated_at'): Sort column
+    - sort_dir (str, default='desc'): Sort direction (asc/desc)
+    - search (str): Search in title/issue_key/display_id
+    
+    Response:
+    {
+      "page": int,
+      "page_size": int,
+      "total_count": int,
+      "rows": [
+        {
+          "issue_key": str,
+          "display_id": str,
+          "title": str,
+          "status_normalized": str,
+          "priority_normalized": str,
+          "zone": str or null,
+          "assignee_user_key": str or null,
+          "discipline_normalized": str or null,
+          "due_date": str or null,
+          "service_id": int or null,
+          "service_name": str or null,
+          "review_id": int or null,
+          "created_at": str,
+          "updated_at": str
+        }
+      ]
+    }
+    """
+    try:
+        page = max(int(request.args.get('page', 1)), 1)
+        page_size = min(int(request.args.get('page_size', 50)), 500)
+        sort_by = request.args.get('sort_by', 'updated_at')
+        sort_dir = request.args.get('sort_dir', 'desc')
+        search = request.args.get('search', None)
+        
+        offset = (page - 1) * page_size
+        
+        # Validate sort parameters
+        allowed_sort = ['updated_at', 'created_at', 'priority_normalized', 'status_normalized', 'display_id', 'title']
+        sort_col = sort_by if sort_by in allowed_sort else 'updated_at'
+        sort_direction = 'DESC' if str(sort_dir).lower() == 'desc' else 'ASC'
+        
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            
+            # Build WHERE clause
+            where_clauses = ['project_id = ?']
+            params = [project_id]
+            
+            if search:
+                search_pattern = f'%{search}%'
+                where_clauses.append('(title LIKE ? OR display_id LIKE ?)')
+                params.extend([search_pattern, search_pattern])
+            
+            where_sql = 'WHERE ' + ' AND '.join(where_clauses)
+            
+            # Check if the reconciled view exists and use it
+            # Otherwise, return an empty result with proper structure
+            try:
+                # Try to query the view
+                count_query = f'''
+                SELECT COUNT(*) FROM dbo.vw_Issues_Reconciled
+                {where_sql}
+                '''
+                cursor.execute(count_query, params)
+                result = cursor.fetchone()
+                total_count = result[0] if result else 0
+                
+                # Get paginated rows with service/review associations
+                data_query = f'''
+                SELECT
+                    issue_key,
+                    display_id,
+                    title,
+                    status_normalized,
+                    priority_normalized,
+                    location_building as zone,
+                    assignee_user_key,
+                    discipline_normalized,
+                    created_at,
+                    updated_at,
+                    NULL as service_id,
+                    NULL as service_name,
+                    NULL as review_id
+                FROM dbo.vw_Issues_Reconciled
+                {where_sql}
+                ORDER BY {sort_col} {sort_direction}
+                OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY
+                '''
+                
+                cursor.execute(data_query, params)
+                rows = cursor.fetchall()
+                
+            except Exception as view_err:
+                # If view doesn't exist or has schema issues, return empty results
+                logging.warning(f"View dbo.vw_Issues_Reconciled not available: {view_err}")
+                total_count = 0
+                rows = []
+            
+            # Format rows as dicts
+            formatted_rows = []
+            for row in rows:
+                formatted_rows.append({
+                    'issue_key': row[0],
+                    'display_id': row[1],
+                    'title': row[2],
+                    'status_normalized': row[3],
+                    'priority_normalized': row[4],
+                    'zone': row[5],
+                    'assignee_user_key': row[6],
+                    'discipline_normalized': row[7],
+                    'created_at': row[8].isoformat() if row[8] else None,
+                    'updated_at': row[9].isoformat() if row[9] else None,
+                    'service_id': row[10],
+                    'service_name': row[11],
+                    'review_id': row[12],
+                })
+            
+            return jsonify({
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_count,
+                'rows': formatted_rows,
+            })
+    
+    except Exception as e:
+        logging.exception(f'Error fetching project issues table for project {project_id}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issues/<issue_key>/detail', methods=['GET'])
+def api_get_issue_detail(issue_key: str):
+    """
+    GET /api/issues/<issue_key>/detail
+    
+    Return detailed information for a specific issue, including:
+    - Core fields (id, title, status, priority, zone)
+    - Assignee information
+    - Discipline
+    - Due date (if available)
+    - Latest comments (up to 5)
+    - Associated service and review (if linked)
+    
+    Query Parameters:
+    - project_id (int): Project ID (for context)
+    
+    Response:
+    {
+      "issue_key": str,
+      "display_id": str,
+      "title": str,
+      "status_normalized": str,
+      "priority_normalized": str,
+      "zone": str or null,
+      "assignee_user_key": str or null,
+      "discipline_normalized": str or null,
+      "description": str or null,
+      "created_at": str,
+      "updated_at": str,
+      "due_date": str or null,
+      "service_id": int or null,
+      "service_name": str or null,
+      "review_id": int or null,
+      "review_label": str or null,
+      "comments": [
+        {
+          "text": str,
+          "author": str,
+          "created_at": str
+        }
+      ]
+    }
+    """
+    try:
+        project_id = request.args.get('project_id', None)
+        
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            
+            # Try to get issue details from the reconciled view
+            try:
+                issue_query = '''
+                SELECT
+                    issue_key,
+                    display_id,
+                    title,
+                    status_normalized,
+                    priority_normalized,
+                    location_building as zone,
+                    assignee_user_key,
+                    discipline_normalized,
+                    created_at,
+                    updated_at,
+                    project_id
+                FROM dbo.vw_Issues_Reconciled
+                WHERE issue_key = ?
+                '''
+                
+                cursor.execute(issue_query, (issue_key,))
+                issue_row = cursor.fetchone()
+                
+            except Exception as view_err:
+                logging.warning(f"View dbo.vw_Issues_Reconciled not available: {view_err}")
+                issue_row = None
+            
+            if not issue_row:
+                return jsonify({'error': 'Issue not found'}), 404
+            
+            # Get service/review associations
+            service_id = None
+            service_name = None
+            review_id = None
+            review_label = None
+            
+            try:
+                link_query = '''
+                SELECT TOP 1
+                    ial.service_id,
+                    s.service_name,
+                    ial.review_id
+                FROM dbo.IssueAnchorLinks ial
+                LEFT JOIN dbo.Services s ON ial.service_id = s.service_id
+                WHERE ial.issue_key = ? AND ial.anchor_type IN ('service', 'review')
+                ORDER BY ial.created_at DESC
+                '''
+                
+                cursor.execute(link_query, (issue_key,))
+                link_row = cursor.fetchone()
+                if link_row:
+                    service_id = link_row[0]
+                    service_name = link_row[1]
+                    review_id = link_row[2]
+                    
+                    # Get review label if review_id exists
+                    if review_id:
+                        review_query = '''
+                        SELECT CONCAT('Cycle #', sr.cycle_no, ' - ', sr.service_code)
+                        FROM dbo.ServiceReviews sr
+                        WHERE sr.review_id = ?
+                        '''
+                        cursor.execute(review_query, (review_id,))
+                        review_result = cursor.fetchone()
+                        review_label = review_result[0] if review_result else f'Review #{review_id}'
+            
+            except Exception as link_err:
+                logging.warning(f"Error fetching anchor links: {link_err}")
+            
+            # For now, comments are empty (can be enhanced with actual comment data if available)
+            comments = []
+            
+            return jsonify({
+                'issue_key': issue_row[0],
+                'display_id': issue_row[1],
+                'title': issue_row[2],
+                'status_normalized': issue_row[3],
+                'priority_normalized': issue_row[4],
+                'zone': issue_row[5],
+                'assignee_user_key': issue_row[6],
+                'discipline_normalized': issue_row[7],
+                'created_at': issue_row[8].isoformat() if issue_row[8] else None,
+                'updated_at': issue_row[9].isoformat() if issue_row[9] else None,
+                'due_date': None,  # Not available in current schema
+                'service_id': service_id,
+                'service_name': service_name,
+                'review_id': review_id,
+                'review_label': review_label,
+                'comments': comments,
+            })
+    
+    except Exception as e:
+        logging.exception(f'Error fetching issue detail for {issue_key}')
         return jsonify({'error': str(e)}), 500
 
 

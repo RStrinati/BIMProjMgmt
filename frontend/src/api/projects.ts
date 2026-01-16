@@ -14,6 +14,12 @@ export const projectsApi = {
     return response.data;
   },
 
+  // Get project by ID
+  getById: async (id: number): Promise<Project> => {
+    const response = await apiClient.get<Project>(`/projects/${id}`);
+    return response.data;
+  },
+
   // Update project
   update: async (id: number, project: Partial<Project>): Promise<Project> => {
     const response = await apiClient.put<Project>(`/projects/${id}`, project);

@@ -585,6 +585,7 @@ def get_project_reviews(
                     sr.{S.ServiceReviews.IS_BILLED},
                     sr.{S.ServiceReviews.BILLING_AMOUNT},
                     sr.{S.ServiceReviews.INVOICE_REFERENCE},
+                    sr.{S.ServiceReviews.INVOICE_DATE},
                     ps.{S.ProjectServices.SERVICE_NAME},
                     ps.{S.ProjectServices.SERVICE_CODE},
                     ps.{S.ProjectServices.PHASE}
@@ -616,9 +617,10 @@ def get_project_reviews(
                     is_billed=bool(row[9]) if row[9] is not None else None,
                     billing_amount=float(row[10]) if row[10] is not None else None,
                     invoice_reference=row[11],
-                    service_name=row[12],
-                    service_code=row[13],
-                    phase=row[14],
+                    invoice_date=row[12],
+                    service_name=row[13],
+                    service_code=row[14],
+                    phase=row[15],
                 )
                 for row in rows
             ]
@@ -832,8 +834,32 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
         return None
 
 
+def _parse_iso_date(value):
+    """Parse ISO date string (YYYY-MM-DD) or return None. Raises ValueError if invalid."""
+    if value is None or value == '':
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value.strip(), '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError(f"Invalid date format '{value}'. Expected YYYY-MM-DD.")
+    raise ValueError(f"Invalid date value: {value!r}")
+
+
 def update_service_review(review_id, **kwargs):
-    """Update an existing service review."""
+    """Update an existing service review with validation for deliverables fields.
+    
+    Supported fields:
+    - due_date: DATE/nullable (ISO format YYYY-MM-DD)
+    - status: nvarchar (max 60 chars)
+    - invoice_reference: nvarchar
+    - invoice_date: DATE/nullable (ISO format YYYY-MM-DD)
+    - is_billed: boolean
+    """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -844,7 +870,8 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.DUE_DATE, S.ServiceReviews.DISCIPLINES, 
                 S.ServiceReviews.DELIVERABLES, S.ServiceReviews.STATUS, 
                 S.ServiceReviews.WEIGHT_FACTOR, S.ServiceReviews.EVIDENCE_LINKS, 
-                S.ServiceReviews.INVOICE_REFERENCE, S.ServiceReviews.ACTUAL_ISSUED_AT, 
+                S.ServiceReviews.INVOICE_REFERENCE, S.ServiceReviews.INVOICE_DATE,
+                S.ServiceReviews.ACTUAL_ISSUED_AT, 
                 S.ServiceReviews.IS_BILLED
             ]
             if supports_billing:
@@ -858,9 +885,21 @@ def update_service_review(review_id, **kwargs):
                 if key in allowed_fields:
                     if key == S.ServiceReviews.STATUS:
                         status_update = (value or '').lower()
-                        update_fields[key] = value
+                        # Trim to max 60 chars
+                        trimmed = (value or '').strip()[:60]
+                        update_fields[key] = trimmed
                     elif key == S.ServiceReviews.IS_BILLED:
-                        update_fields[key] = int(bool(value))
+                        # Convert to boolean int (0 or 1)
+                        update_fields[key] = 1 if value else 0
+                    elif key in (S.ServiceReviews.DUE_DATE, S.ServiceReviews.INVOICE_DATE):
+                        # Parse and validate ISO dates
+                        try:
+                            parsed_date = _parse_iso_date(value)
+                            update_fields[key] = parsed_date.strftime('%Y-%m-%d') if parsed_date else None
+                        except ValueError as e:
+                            logger.error(f"Invalid date for {key}: {e}")
+                            # Skip invalid date but don't fail the update
+                            continue
                     elif supports_billing and key in (S.ServiceReviews.BILLING_RATE, S.ServiceReviews.BILLING_AMOUNT, S.ServiceReviews.WEIGHT_FACTOR):
                         try:
                             update_fields[key] = float(value) if value is not None else None
