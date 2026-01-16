@@ -5386,6 +5386,48 @@ def get_project_health_files_endpoint(project_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/projects/<int:project_id>/quality/register', methods=['GET'])
+def get_project_quality_register(project_id):
+    """
+    Get quality register for a project.
+    
+    Returns list of Revit models with freshness status, validation, and control flags.
+    
+    Query params:
+    - page: Page number (default: 1)
+    - page_size: Results per page (default: 50)
+    - sort_by: Sort column (default: lastVersionDate)
+    - sort_dir: Sort direction - asc or desc (default: desc)
+    - filter_attention: If true, show only models needing attention (default: false)
+    - mode: "observed" (default, existing behavior) or "expected" (Phase 1C, new expected-first mode)
+    """
+    try:
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 50))
+        sort_by = request.args.get('sort_by', 'lastVersionDate')
+        sort_dir = request.args.get('sort_dir', 'desc')
+        filter_attention = request.args.get('filter_attention', 'false').lower() == 'true'
+        mode = request.args.get('mode', 'observed')  # Phase 1C: NEW parameter
+        
+        # Validate pagination
+        page = max(1, page)
+        page_size = max(1, min(page_size, 500))  # Cap at 500
+        
+        data = get_model_register(
+            project_id=project_id,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            filter_attention=filter_attention,
+            mode=mode,  # Phase 1C: Pass mode to database layer
+        )
+        return jsonify(data)
+    except Exception as e:
+        logging.exception(f"Error fetching quality register for project {project_id}")
+        return jsonify({'error': 'Failed to fetch quality register', 'details': str(e)}), 500
+
+
 @app.route('/api/projects/<int:project_id>/health-summary', methods=['GET'])
 def get_health_summary(project_id):
     """Get health check summary statistics"""
@@ -5427,6 +5469,103 @@ def get_health_summary(project_id):
     except Exception as e:
         logging.exception(f"Error getting health summary for project {project_id}")
         return jsonify({'error': str(e)}), 500
+
+
+# ===================== Phase 1E: Expected Models & Aliases Endpoints =====================
+
+@app.route('/api/projects/<int:project_id>/quality/expected-models', methods=['GET'])
+def list_expected_models(project_id):
+    """Get all expected models for a project"""
+    try:
+        from services.expected_model_alias_service import get_expected_model_alias_manager
+        manager = get_expected_model_alias_manager()
+        models = manager.get_all_expected_models(project_id)
+        return jsonify({'expected_models': models})
+    except Exception as e:
+        logging.exception(f"Error listing expected models for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/expected-models', methods=['POST'])
+def create_expected_model_endpoint(project_id):
+    """Create a new expected model"""
+    try:
+        from services.expected_model_alias_service import get_expected_model_alias_manager
+        
+        data = request.get_json() or {}
+        manager = get_expected_model_alias_manager()
+        
+        model_id = manager.add_expected_model(
+            project_id=project_id,
+            expected_model_key=data.get('expected_model_key'),
+            display_name=data.get('display_name'),
+            discipline=data.get('discipline'),
+            company_id=data.get('company_id'),
+            is_required=data.get('is_required', True)
+        )
+        
+        if model_id:
+            return jsonify({'expected_model_id': model_id}), 201
+        else:
+            return jsonify({'error': 'Failed to create expected model'}), 500
+    
+    except Exception as e:
+        logging.exception(f"Error creating expected model for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/expected-model-aliases', methods=['GET'])
+def list_expected_model_aliases(project_id):
+    """Get all aliases for expected models in a project"""
+    try:
+        from services.expected_model_alias_service import get_expected_model_alias_manager
+        manager = get_expected_model_alias_manager()
+        aliases = manager.get_all_aliases(project_id)
+        return jsonify({'aliases': aliases})
+    except Exception as e:
+        logging.exception(f"Error listing aliases for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/expected-model-aliases', methods=['POST'])
+def create_expected_model_alias_endpoint(project_id):
+    """Create a new alias mapping observed file to expected model"""
+    try:
+        from services.expected_model_alias_service import get_expected_model_alias_manager
+        
+        data = request.get_json() or {}
+        manager = get_expected_model_alias_manager()
+        
+        # Validate pattern
+        is_valid, error_msg = manager.validate_alias_pattern(
+            data.get('alias_pattern'),
+            data.get('match_type', 'exact')
+        )
+        if not is_valid:
+            return jsonify({'error': f'Invalid pattern: {error_msg}'}), 400
+        
+        alias_id = manager.add_alias(
+            expected_model_id=data.get('expected_model_id'),
+            project_id=project_id,
+            alias_pattern=data.get('alias_pattern'),
+            match_type=data.get('match_type', 'exact'),
+            target_field=data.get('target_field', 'filename'),
+            is_active=data.get('is_active', True)
+        )
+        
+        if alias_id:
+            return jsonify({'expected_model_alias_id': alias_id}), 201
+        else:
+            return jsonify({'error': 'Failed to create alias'}), 500
+    
+    except Exception as e:
+        logging.exception(f"Error creating alias for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# END EXPECTED MODELS ENDPOINTS
+# ============================================================================
 
 
 # ============================================================================

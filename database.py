@@ -2690,21 +2690,681 @@ def get_control_models(project_id) -> List[Dict[str, Any]]:
         return []
 
 
-def get_model_register(
-    project_ids: Optional[List[int]] = None,
-    discipline: Optional[str] = None,
+def _get_model_register_expected_mode(
+    project_id: int,
     page: int = 1,
     page_size: int = 50,
-    sort_by: str = "last_seen_at",
+    sort_by: str = "lastVersionDate",
     sort_dir: str = "desc",
+    filter_attention: bool = False,
 ) -> Dict[str, Any]:
-    """Return model register rows (placeholder)."""
-    return {
-        "items": [],
-        "total": 0,
-        "page": page,
-        "page_size": page_size,
-    }
+    """
+    Phase 1C: Get quality register in expected-first mode.
+    
+    Returns authoritative expected models with decorated observed data and unmatched list.
+    
+    Args:
+        project_id: Project ID
+        page, page_size: Pagination for expected_rows
+        sort_by, sort_dir: Sorting for expected_rows
+        filter_attention: Filter to attention items only
+    
+    Returns:
+        Dict with expected_rows, unmatched_observed, counts
+    """
+    from datetime import datetime
+    import re
+    
+    try:
+        # Validate sort direction
+        sort_dir = sort_dir.upper()
+        if sort_dir not in ('ASC', 'DESC'):
+            sort_dir = 'DESC'
+        
+        # Step 1: Get expected models
+        expected_models = get_expected_models(project_id)
+        
+        if not expected_models:
+            # No expected models yet - return empty expected-mode response
+            logger.warning(f"No expected models found for project {project_id} (expected mode)")
+            return {
+                'expected_rows': [],
+                'unmatched_observed': [],
+                'counts': {
+                    'expected_total': 0,
+                    'expected_missing': 0,
+                    'unmatched_total': 0,
+                    'attention_count': 0,
+                }
+            }
+        
+        # Step 2: Get aliases for the project
+        aliases = get_expected_model_aliases(project_id)
+        
+        # Step 3: Get observed files (reuse existing observed logic)
+        observed_data = _get_observed_data(project_id)
+        observed_files_dict = {f['modelKey']: f for f in observed_data}
+        
+        # Step 4: Match observed files to expected models
+        expected_rows = []
+        matched_observed_filenames = set()
+        
+        for expected in expected_models:
+            expected_model_id = expected['expected_model_id']
+            expected_model_key = expected['expected_model_key']
+            
+            # Try to find matching observed file
+            matched_expected_id = None
+            matched_observed = None
+            
+            for filename, observed_row in observed_files_dict.items():
+                # Use alias resolution
+                resolved_id = match_observed_to_expected(
+                    observed_filename=filename,
+                    observed_rvt_model_key=observed_row.get('logicalModelKey'),
+                    aliases=aliases
+                )
+                
+                if resolved_id == expected_model_id:
+                    matched_expected_id = expected_model_id
+                    matched_observed = observed_row
+                    matched_observed_filenames.add(filename)
+                    break
+            
+            # Build expected row (with optional observed decoration)
+            expected_row = {
+                'expected_model_id': expected_model_id,
+                'expected_model_key': expected_model_key,
+                'display_name': expected['display_name'],
+                'discipline': expected['discipline'],
+                'is_required': expected['is_required'],
+                'observed_filename': matched_observed['modelKey'] if matched_observed else None,
+                'lastVersionDateISO': matched_observed['lastVersionDateISO'] if matched_observed else None,
+                'observed_discipline': matched_observed['discipline'] if matched_observed else None,
+                'validationOverall': matched_observed['validationOverall'] if matched_observed else 'UNKNOWN',
+                'namingStatus': matched_observed['namingStatus'] if matched_observed else None,
+                'isControlModel': matched_observed['isControlModel'] if matched_observed else False,
+                'freshnessStatus': matched_observed['freshnessStatus'] if matched_observed else 'UNKNOWN',
+                'mappingStatus': 'MAPPED' if matched_observed else 'UNMAPPED',
+            }
+            
+            expected_rows.append(expected_row)
+        
+        # Step 5: Build unmatched observed list
+        unmatched_observed = []
+        for filename, observed_row in observed_files_dict.items():
+            if filename not in matched_observed_filenames:
+                unmatched_observed.append({
+                    'observed_filename': filename,
+                    'discipline': observed_row.get('discipline'),
+                    'lastVersionDateISO': observed_row.get('lastVersionDateISO'),
+                    'validationOverall': observed_row.get('validationOverall'),
+                    'namingStatus': observed_row.get('namingStatus'),
+                    'note': 'No matching expected model via aliases'
+                })
+        
+        # Step 6: Count attention items
+        attention_count = sum(1 for row in expected_rows if (
+            row['freshnessStatus'] == 'OUT_OF_DATE'
+            or row['validationOverall'] in ('FAIL', 'WARN')
+            or row['mappingStatus'] == 'UNMAPPED'
+        ))
+        attention_count += len(unmatched_observed)  # Unmatched files are attention items
+        
+        # Step 7: Sort and paginate expected rows
+        if sort_by not in ('lastVersionDate', 'expected_model_key', 'freshnessStatus', 'validationOverall', 'mappingStatus'):
+            sort_by = 'expected_model_key'
+        
+        # Sort expected_rows
+        reverse = (sort_dir == 'DESC')
+        if sort_by == 'lastVersionDate':
+            expected_rows.sort(key=lambda r: r['lastVersionDateISO'] or '', reverse=reverse)
+        elif sort_by == 'expected_model_key':
+            expected_rows.sort(key=lambda r: r['expected_model_key'], reverse=reverse)
+        elif sort_by == 'freshnessStatus':
+            expected_rows.sort(key=lambda r: r['freshnessStatus'], reverse=reverse)
+        elif sort_by == 'validationOverall':
+            expected_rows.sort(key=lambda r: r['validationOverall'], reverse=reverse)
+        elif sort_by == 'mappingStatus':
+            expected_rows.sort(key=lambda r: r['mappingStatus'], reverse=reverse)
+        
+        # Paginate
+        total_expected = len(expected_rows)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_expected = expected_rows[start_idx:end_idx]
+        
+        logger.info(f"Quality register (expected mode): {len(paginated_expected)} expected rows, {len(unmatched_observed)} unmatched observed")
+        
+        return {
+            'expected_rows': paginated_expected,
+            'unmatched_observed': unmatched_observed,
+            'counts': {
+                'expected_total': total_expected,
+                'expected_missing': sum(1 for r in expected_rows if r['mappingStatus'] == 'UNMAPPED'),
+                'unmatched_total': len(unmatched_observed),
+                'attention_count': attention_count,
+            },
+            'page': page,
+            'page_size': page_size,
+        }
+    
+    except Exception as e:
+        logger.error(f"Error fetching model register (expected mode) for project {project_id}: {e}", exc_info=True)
+        return {
+            'expected_rows': [],
+            'unmatched_observed': [],
+            'counts': {
+                'expected_total': 0,
+                'expected_missing': 0,
+                'unmatched_total': 0,
+                'attention_count': 0,
+            }
+        }
+
+
+def _get_observed_data(project_id: int) -> List[Dict[str, Any]]:
+    """
+    Helper function to get observed files from health data.
+    This is the same logic as the observed-mode query.
+    
+    Returns list of observed file dicts with all health fields.
+    """
+    from datetime import datetime
+    
+    try:
+        # Get control models and next review date (ProjectManagement)
+        with get_db_connection() as pm_conn:
+            pm_cursor = pm_conn.cursor()
+            
+            pm_cursor.execute(f"""
+                SELECT {S.ControlModels.ID}, {S.ControlModels.CONTROL_FILE_NAME}, {S.ControlModels.IS_ACTIVE}
+                FROM ProjectManagement.dbo.{S.ControlModels.TABLE}
+                WHERE {S.ControlModels.PROJECT_ID} = ?
+            """, (project_id,))
+            
+            control_models = {}
+            for row in pm_cursor.fetchall():
+                control_models[row[1].strip()] = {
+                    'id': row[0],
+                    'is_active': bool(row[2]) if row[2] is not None else False
+                }
+            
+            pm_cursor.execute(f"""
+                SELECT MIN({S.ReviewSchedule.REVIEW_DATE})
+                FROM ProjectManagement.dbo.{S.ReviewSchedule.TABLE}
+                WHERE {S.ReviewSchedule.PROJECT_ID} = ?
+                  AND {S.ReviewSchedule.REVIEW_DATE} > GETDATE()
+            """, (project_id,))
+            next_review_row = pm_cursor.fetchone()
+            next_review_date = next_review_row[0] if next_review_row and next_review_row[0] else None
+            pm_cursor.close()
+        
+        # Query observed files (RevitHealthCheckDB)
+        with get_db_connection("RevitHealthCheckDB") as health_conn:
+            health_cursor = health_conn.cursor()
+            
+            query = f"""
+            SELECT 
+                h.[nId],
+                h.[strRvtFileName],
+                h.[project_name],
+                h.[discipline_full_name],
+                h.[ConvertedExportedDate],
+                h.[pm_project_id],
+                h.[rvt_model_key],
+                hp.[validation_status],
+                hp.[validation_reason],
+                hp.[validated_date],
+                hp.[strClientName]
+            FROM dbo.vw_LatestRvtFiles h
+            LEFT JOIN (
+                SELECT 
+                    strRvtFileName,
+                    validation_status,
+                    validation_reason,
+                    validated_date,
+                    strClientName,
+                    ROW_NUMBER() OVER (PARTITION BY strRvtFileName ORDER BY validated_date DESC, nId DESC) as rn
+                FROM dbo.tblRvtProjHealth
+            ) hp
+                ON h.[strRvtFileName] = hp.[strRvtFileName]
+                AND hp.rn = 1
+            WHERE h.[pm_project_id] = ?
+            ORDER BY h.[ConvertedExportedDate] DESC
+            """
+            
+            health_cursor.execute(query, (project_id,))
+            all_rows = health_cursor.fetchall()
+            health_cursor.close()
+        
+        # Process rows (same as observed-mode logic)
+        def normalize_model_key(filename: str) -> Optional[str]:
+            if not filename:
+                return None
+            filename_clean = filename.strip()
+            misname_indicators = ['_detached', '_OLD', '_old', '__', '_001', '_0001']
+            if any(ind in filename_clean for ind in misname_indicators):
+                return None
+            if filename != filename_clean:
+                return None
+            if '-' not in filename_clean:
+                return None
+            base = filename_clean.split('.')[0] if '.' in filename_clean else filename_clean
+            parts = base.split('-')
+            if len(parts) >= 3:
+                key = '-'.join(parts[:3])
+                return key
+            return None
+        
+        raw_rows = []
+        for row in all_rows:
+            model_filename = row[1]
+            last_version_date = row[4]
+            model_key = row[6]
+            validation_status_raw = row[7]
+            
+            is_control = model_filename in control_models and control_models[model_filename]['is_active']
+            
+            if last_version_date and next_review_date:
+                days_until_review = (next_review_date - last_version_date).days
+                if days_until_review < 0:
+                    freshness_status = 'OUT_OF_DATE'
+                elif days_until_review <= 7:
+                    freshness_status = 'DUE_SOON'
+                else:
+                    freshness_status = 'CURRENT'
+            elif last_version_date and not next_review_date:
+                freshness_status = 'UNKNOWN'
+            elif not last_version_date:
+                freshness_status = 'UNKNOWN'
+            else:
+                freshness_status = 'UNKNOWN'
+            
+            if validation_status_raw:
+                validation_status_raw_upper = str(validation_status_raw).upper()
+                if validation_status_raw_upper in ('VALID', 'PASS'):
+                    validation_status = 'PASS'
+                elif validation_status_raw_upper in ('INVALID', 'FAIL'):
+                    validation_status = 'FAIL'
+                elif validation_status_raw_upper == 'WARN':
+                    validation_status = 'WARN'
+                else:
+                    validation_status = 'UNKNOWN'
+            else:
+                validation_status = 'UNKNOWN'
+            
+            normalized_key = normalize_model_key(model_filename)
+            
+            raw_rows.append({
+                'modelKey': model_filename,
+                'modelName': model_filename,
+                'logicalModelKey': model_key,
+                'normalizedKey': normalized_key,
+                'discipline': row[3],
+                'company': row[10],
+                'lastVersionDate': last_version_date,
+                'lastVersionDateISO': last_version_date.isoformat() if last_version_date else None,
+                'source': 'REVIT_HEALTH',
+                'isControlModel': is_control,
+                'freshnessStatus': freshness_status,
+                'validationOverall': validation_status,
+                'primaryServiceId': None,
+                'mappingStatus': 'UNMAPPED',
+                'namingStatus': 'CORRECT' if normalized_key else 'MISNAMED',
+            })
+        
+        # Phase B deduplication
+        processed_rows = []
+        by_normalized_key = {}
+        
+        for row in raw_rows:
+            if row['normalizedKey']:
+                nk = row['normalizedKey']
+                if nk not in by_normalized_key:
+                    by_normalized_key[nk] = []
+                by_normalized_key[nk].append(row)
+            else:
+                row['namingStatus'] = 'MISNAMED'
+                processed_rows.append(row)
+        
+        for normalized_key, rows_group in by_normalized_key.items():
+            latest = max(rows_group, key=lambda r: r['lastVersionDate'] or datetime.min)
+            latest['namingStatus'] = 'CORRECT'
+            processed_rows.append(latest)
+        
+        return processed_rows
+    
+    except Exception as e:
+        logger.error(f"Error fetching observed data for project {project_id}: {e}", exc_info=True)
+        return []
+
+
+def get_model_register(
+    project_id: int,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "lastVersionDate",
+    sort_dir: str = "desc",
+    filter_attention: bool = False,
+    mode: str = "observed",  # Phase 1C: NEW - "observed" or "expected"
+) -> Dict[str, Any]:
+    """
+    Fetch quality register rows for a project.
+    
+    PHASE A FIX (Jan 2026):
+    - Root cause was querying non-existent VALIDATION_STATUS in vw_LatestRvtFiles
+    - Solution: LEFT JOIN vw_LatestRvtFiles to tblRvtProjHealth for validation data
+    - Result: Actual data (12 rows for project 2) now returned instead of empty
+    
+    PHASE B FIX:
+    - Normalizes model names to deduplicate misnamed files
+    - Groups by canonical model key; keeps latest version
+    - Marks misnamed files with namingStatus='MISNAMED' for audit trail
+    
+    PHASE 1C (NEW):
+    - Supports mode parameter: "observed" (default, existing behavior) or "expected" (new)
+    - Expected mode requires ExpectedModels table and alias resolution
+    - Integrates with ExpectedModelAliases for observed→expected mapping
+    
+    Args:
+        project_id: Project ID
+        page: Page number (1-indexed)
+        page_size: Results per page
+        sort_by: Sort column (lastVersionDate, modelName, freshnessStatus, validationOverall)
+        sort_dir: Sort direction (asc, desc)
+        filter_attention: If true, only return rows needing attention
+        mode: "observed" (default - current behavior) or "expected" (Phase 1C - new)
+    
+    Returns:
+        Dict with rows, pagination info, and attention_count
+        For mode="expected", returns expected_rows, unmatched_observed, counts
+    """
+    import re
+    from datetime import datetime
+    
+    # Phase 1C: Validate mode parameter
+    mode = mode.lower() if mode else "observed"
+    if mode not in ("observed", "expected"):
+        mode = "observed"
+    
+    # If mode is "expected", delegate to new handler
+    if mode == "expected":
+        return _get_model_register_expected_mode(
+            project_id=project_id,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            filter_attention=filter_attention,
+        )
+    
+    # Otherwise, continue with existing observed-mode logic
+    try:
+        # Validate sort direction
+        sort_dir = sort_dir.upper()
+        if sort_dir not in ('ASC', 'DESC'):
+            sort_dir = 'DESC'
+        
+        # Naming pattern for model key extraction (Phase B)
+        # Format: Project-Discipline-Zone-Zone-M3-Type-Number (flexible to match actual data)
+        # Examples: NFPS-ACO-00-00-M3-C-0001, MEL071-A-AR-M-0010
+        # Detect MISNAMED: files with unusual patterns like spaces, underscores, duplicate names
+        
+        def normalize_model_key(filename: str) -> Optional[str]:
+            """
+            Extract canonical model key from filename.
+            A file is MISNAMED if:
+            - Contains trailing/leading spaces
+            - Has '_detached', '_OLD', '_old', duplicate keywords
+            - Doesn't follow basic dash-separated structure
+            """
+            if not filename:
+                return None
+            
+            filename_clean = filename.strip()
+            
+            # Check for obvious misname indicators
+            misname_indicators = ['_detached', '_OLD', '_old', '__', '_001', '_0001']
+            if any(ind in filename_clean for ind in misname_indicators):
+                return None  # Misnamed
+            
+            # Check if filename has leading/trailing spaces (indicating import issues)
+            if filename != filename_clean:
+                return None  # Misnamed
+            
+            # Basic structure check: should have dashes
+            if '-' not in filename_clean:
+                return None  # Misnamed
+            
+            # Extract the base model key (everything before .rvt or last extension)
+            # Handle files like "NFPS-ACO-00-00-M3-C-0001.rvt" or "CWPS-BAT-ZZ-ZZ-M3-A-0001"
+            base = filename_clean.split('.')[0] if '.' in filename_clean else filename_clean
+            
+            # For canonical key, use first N components before file number
+            # Examples:
+            #   "NFPS-ACO-00-00-M3-C-0001" → "NFPS-ACO-00"
+            #   "MEL071-A-AR-M-0010" → "MEL071-A-AR"
+            parts = base.split('-')
+            if len(parts) >= 3:
+                # Use first 3 components as the model key
+                key = '-'.join(parts[:3])
+                return key
+            
+            return None  # Can't extract key
+        
+        # Step 1 & 2: Get control models and next review date from ProjectManagement
+        with get_db_connection() as pm_conn:
+            pm_cursor = pm_conn.cursor()
+            
+            pm_cursor.execute(f"""
+                SELECT {S.ControlModels.ID}, {S.ControlModels.CONTROL_FILE_NAME}, {S.ControlModels.IS_ACTIVE}
+                FROM ProjectManagement.dbo.{S.ControlModels.TABLE}
+                WHERE {S.ControlModels.PROJECT_ID} = ?
+            """, (project_id,))
+            
+            control_models = {}
+            for row in pm_cursor.fetchall():
+                control_models[row[1].strip()] = {
+                    'id': row[0],
+                    'is_active': bool(row[2]) if row[2] is not None else False
+                }
+            
+            # Get next review date from ProjectManagement
+            pm_cursor.execute(f"""
+                SELECT MIN({S.ReviewSchedule.REVIEW_DATE})
+                FROM ProjectManagement.dbo.{S.ReviewSchedule.TABLE}
+                WHERE {S.ReviewSchedule.PROJECT_ID} = ?
+                  AND {S.ReviewSchedule.REVIEW_DATE} > GETDATE()
+            """, (project_id,))
+            next_review_row = pm_cursor.fetchone()
+            next_review_date = next_review_row[0] if next_review_row and next_review_row[0] else None
+            pm_cursor.close()
+        
+        # Step 3: Query latest files with validation data (PHASE A FIX: LEFT JOIN to tblRvtProjHealth)
+        with get_db_connection("RevitHealthCheckDB") as health_conn:
+            health_cursor = health_conn.cursor()
+            
+            # CRITICAL FIX: vw_LatestRvtFiles does NOT have VALIDATION_STATUS column
+            # Must LEFT JOIN to tblRvtProjHealth where validation data actually lives
+            # Note: Must ensure we only join to LATEST record in tblRvtProjHealth per filename
+            query = f"""
+            SELECT 
+                h.[nId],
+                h.[strRvtFileName],
+                h.[project_name],
+                h.[discipline_full_name],
+                h.[ConvertedExportedDate],
+                h.[pm_project_id],
+                h.[rvt_model_key],
+                hp.[validation_status],
+                hp.[validation_reason],
+                hp.[validated_date],
+                hp.[strClientName]
+            FROM dbo.vw_LatestRvtFiles h
+            LEFT JOIN (
+                -- Get LATEST validation record per filename
+                SELECT 
+                    strRvtFileName,
+                    validation_status,
+                    validation_reason,
+                    validated_date,
+                    strClientName,
+                    ROW_NUMBER() OVER (PARTITION BY strRvtFileName ORDER BY validated_date DESC, nId DESC) as rn
+                FROM dbo.tblRvtProjHealth
+            ) hp
+                ON h.[strRvtFileName] = hp.[strRvtFileName]
+                AND hp.rn = 1
+            WHERE h.[pm_project_id] = ?
+            ORDER BY h.[ConvertedExportedDate] DESC
+            """
+            
+            health_cursor.execute(query, (project_id,))
+            all_rows = health_cursor.fetchall()
+            logger.info(f"Quality register: Loaded {len(all_rows)} rows from vw_LatestRvtFiles (with deduped validation JOIN)")
+            health_cursor.close()
+        
+        # Step 4: Process rows with Phase B deduplication
+        raw_rows = []
+        
+        for row in all_rows:
+            model_filename = row[1]  # strRvtFileName
+            last_version_date = row[4]  # ConvertedExportedDate
+            model_key = row[6]  # rvt_model_key (from vw_LatestRvtFiles)
+            validation_status_raw = row[7]  # validation_status from tblRvtProjHealth
+            
+            # Check if this is a control model
+            is_control = model_filename in control_models and control_models[model_filename]['is_active']
+            
+            # Compute freshness status
+            if last_version_date and next_review_date:
+                days_until_review = (next_review_date - last_version_date).days
+                if days_until_review < 0:
+                    freshness_status = 'OUT_OF_DATE'
+                elif days_until_review <= 7:  # DUE_SOON_WINDOW_DAYS
+                    freshness_status = 'DUE_SOON'
+                else:
+                    freshness_status = 'CURRENT'
+            elif last_version_date and not next_review_date:
+                freshness_status = 'UNKNOWN'
+            elif not last_version_date:
+                freshness_status = 'UNKNOWN'
+            else:
+                freshness_status = 'UNKNOWN'
+            
+            # Map validation status
+            # Database values: "Valid", "Invalid" (note capitalization)
+            if validation_status_raw:
+                validation_status_raw_upper = str(validation_status_raw).upper()
+                if validation_status_raw_upper in ('VALID', 'PASS'):
+                    validation_status = 'PASS'
+                elif validation_status_raw_upper in ('INVALID', 'FAIL'):
+                    validation_status = 'FAIL'
+                elif validation_status_raw_upper == 'WARN':
+                    validation_status = 'WARN'
+                else:
+                    validation_status = 'UNKNOWN'
+            else:
+                validation_status = 'UNKNOWN'
+            
+            # Phase B: Normalize model name and compute naming status
+            normalized_key = normalize_model_key(model_filename)
+            
+            raw_rows.append({
+                'modelKey': model_filename,
+                'modelName': model_filename,
+                'logicalModelKey': model_key,
+                'normalizedKey': normalized_key,
+                'discipline': row[3],  # discipline_full_name
+                'company': row[10],  # strClientName
+                'lastVersionDate': last_version_date,
+                'lastVersionDateISO': last_version_date.isoformat() if last_version_date else None,
+                'source': 'REVIT_HEALTH',
+                'isControlModel': is_control,
+                'freshnessStatus': freshness_status,
+                'validationOverall': validation_status,
+                'primaryServiceId': None,  # TODO: Phase C - service mapping
+                'mappingStatus': 'UNMAPPED',
+                'namingStatus': 'CORRECT' if normalized_key else 'MISNAMED',
+            })
+        
+        # Phase B: Deduplicate by normalized key
+        # For correctly-named models, keep only latest version per normalized key
+        # For misnamed models, keep all (marked separately)
+        
+        processed_rows = []
+        by_normalized_key = {}
+        
+        for row in raw_rows:
+            if row['normalizedKey']:
+                # Correctly-named: group by normalized key
+                nk = row['normalizedKey']
+                if nk not in by_normalized_key:
+                    by_normalized_key[nk] = []
+                by_normalized_key[nk].append(row)
+            else:
+                # Misnamed: keep separate, mark explicitly
+                row['namingStatus'] = 'MISNAMED'
+                processed_rows.append(row)
+        
+        # For each normalized group, keep only latest version date
+        for normalized_key, rows_group in by_normalized_key.items():
+            latest = max(rows_group, key=lambda r: r['lastVersionDate'] or datetime.min)
+            latest['namingStatus'] = 'CORRECT'
+            processed_rows.append(latest)
+        
+        # Apply attention filter
+        if filter_attention:
+            filtered_rows = []
+            for row in processed_rows:
+                is_attention = (
+                    row['freshnessStatus'] == 'OUT_OF_DATE'
+                    or row['validationOverall'] in ('FAIL', 'WARN')
+                    or row['namingStatus'] == 'MISNAMED'
+                    or row['mappingStatus'] == 'UNMAPPED'
+                )
+                if is_attention:
+                    filtered_rows.append(row)
+            processed_rows = filtered_rows
+        
+        # Count attention items (total, before pagination)
+        attention_count = sum(1 for row in processed_rows if (
+            row['freshnessStatus'] == 'OUT_OF_DATE'
+            or row['validationOverall'] in ('FAIL', 'WARN')
+            or row['namingStatus'] == 'MISNAMED'
+            or row['mappingStatus'] == 'UNMAPPED'
+        ))
+        
+        # Pagination
+        total = len(processed_rows)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_rows = processed_rows[start_idx:end_idx]
+        
+        # Remove internal fields before returning
+        for row in paginated_rows:
+            del row['logicalModelKey']
+            del row['normalizedKey']
+            del row['lastVersionDate']
+        
+        logger.info(f"Quality register: Returning {len(paginated_rows)} rows (total: {total}, attention: {attention_count})")
+        
+        return {
+            'rows': paginated_rows,
+            'page': page,
+            'page_size': page_size,
+            'total': total,
+            'attention_count': attention_count,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching model register for project {project_id}: {e}", exc_info=True)
+        return {
+            'rows': [],
+            'page': page,
+            'page_size': page_size,
+            'total': 0,
+            'attention_count': 0,
+        }
 
 
 def get_revizto_project_mappings(active_only: bool = True) -> List[Dict[str, Any]]:
@@ -9152,3 +9812,308 @@ def get_reconciled_issues_table(
             "rows": [],
             "error": str(e),
         }
+
+
+# ===================== Phase 1: Expected Models (Quality Register) =====================
+
+def get_expected_models(project_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch all expected models for a project.
+    
+    Args:
+        project_id: Project ID
+    
+    Returns:
+        List of expected model records
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT 
+                    {S.ExpectedModels.EXPECTED_MODEL_ID},
+                    {S.ExpectedModels.PROJECT_ID},
+                    {S.ExpectedModels.EXPECTED_MODEL_KEY},
+                    {S.ExpectedModels.DISPLAY_NAME},
+                    {S.ExpectedModels.DISCIPLINE},
+                    {S.ExpectedModels.COMPANY_ID},
+                    {S.ExpectedModels.IS_REQUIRED},
+                    {S.ExpectedModels.CREATED_AT},
+                    {S.ExpectedModels.UPDATED_AT}
+                FROM ProjectManagement.dbo.{S.ExpectedModels.TABLE}
+                WHERE {S.ExpectedModels.PROJECT_ID} = ?
+                ORDER BY {S.ExpectedModels.EXPECTED_MODEL_KEY}
+            """, (project_id,))
+            
+            rows = []
+            for row in cursor.fetchall():
+                rows.append({
+                    'expected_model_id': row[0],
+                    'project_id': row[1],
+                    'expected_model_key': row[2],
+                    'display_name': row[3],
+                    'discipline': row[4],
+                    'company_id': row[5],
+                    'is_required': bool(row[6]) if row[6] is not None else True,
+                    'created_at': row[7],
+                    'updated_at': row[8],
+                })
+            
+            logger.info(f"Fetched {len(rows)} expected models for project {project_id}")
+            return rows
+    
+    except Exception as e:
+        logger.error(f"Error fetching expected models for project {project_id}: {e}", exc_info=True)
+        return []
+
+
+def create_expected_model(
+    project_id: int,
+    expected_model_key: str,
+    display_name: Optional[str] = None,
+    discipline: Optional[str] = None,
+    company_id: Optional[int] = None,
+    is_required: bool = True
+) -> Optional[int]:
+    """
+    Create a new expected model.
+    
+    Args:
+        project_id: Project ID
+        expected_model_key: Canonical model key (must be unique per project)
+        display_name: User-friendly name
+        discipline: Model discipline
+        company_id: Optional company/client ID
+        is_required: Whether this is a required model
+    
+    Returns:
+        ID of created expected model, or None if error
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO ProjectManagement.dbo.{S.ExpectedModels.TABLE}
+                (
+                    {S.ExpectedModels.PROJECT_ID},
+                    {S.ExpectedModels.EXPECTED_MODEL_KEY},
+                    {S.ExpectedModels.DISPLAY_NAME},
+                    {S.ExpectedModels.DISCIPLINE},
+                    {S.ExpectedModels.COMPANY_ID},
+                    {S.ExpectedModels.IS_REQUIRED}
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (project_id, expected_model_key, display_name, discipline, company_id, 1 if is_required else 0))
+            
+            conn.commit()
+            
+            # Get the ID of the inserted row
+            cursor.execute(f"SELECT @@IDENTITY")
+            new_id = cursor.fetchone()[0]
+            
+            logger.info(f"Created expected model {new_id}: {expected_model_key} for project {project_id}")
+            return int(new_id)
+    
+    except Exception as e:
+        logger.error(f"Error creating expected model: {e}", exc_info=True)
+        return None
+
+
+def get_expected_model_aliases(project_id: int, expected_model_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Fetch expected model aliases for a project or specific expected model.
+    
+    Args:
+        project_id: Project ID (required for scoping)
+        expected_model_id: Optional filter by expected model
+    
+    Returns:
+        List of alias records
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            where_clause = f"{S.ExpectedModelAliases.PROJECT_ID} = ?"
+            params = [project_id]
+            
+            if expected_model_id:
+                where_clause += f" AND {S.ExpectedModelAliases.EXPECTED_MODEL_ID} = ?"
+                params.append(expected_model_id)
+            
+            cursor.execute(f"""
+                SELECT 
+                    {S.ExpectedModelAliases.EXPECTED_MODEL_ALIAS_ID},
+                    {S.ExpectedModelAliases.EXPECTED_MODEL_ID},
+                    {S.ExpectedModelAliases.PROJECT_ID},
+                    {S.ExpectedModelAliases.ALIAS_PATTERN},
+                    {S.ExpectedModelAliases.MATCH_TYPE},
+                    {S.ExpectedModelAliases.TARGET_FIELD},
+                    {S.ExpectedModelAliases.IS_ACTIVE},
+                    {S.ExpectedModelAliases.CREATED_AT}
+                FROM ProjectManagement.dbo.{S.ExpectedModelAliases.TABLE}
+                WHERE {where_clause}
+                ORDER BY {S.ExpectedModelAliases.CREATED_AT} DESC
+            """, params)
+            
+            rows = []
+            for row in cursor.fetchall():
+                rows.append({
+                    'expected_model_alias_id': row[0],
+                    'expected_model_id': row[1],
+                    'project_id': row[2],
+                    'alias_pattern': row[3],
+                    'match_type': row[4],
+                    'target_field': row[5],
+                    'is_active': bool(row[6]) if row[6] is not None else True,
+                    'created_at': row[7],
+                })
+            
+            logger.info(f"Fetched {len(rows)} aliases for project {project_id}")
+            return rows
+    
+    except Exception as e:
+        logger.error(f"Error fetching expected model aliases: {e}", exc_info=True)
+        return []
+
+
+def create_expected_model_alias(
+    expected_model_id: int,
+    project_id: int,
+    alias_pattern: str,
+    match_type: str = 'exact',
+    target_field: str = 'filename',
+    is_active: bool = True
+) -> Optional[int]:
+    """
+    Create a new expected model alias.
+    
+    Args:
+        expected_model_id: Expected model ID
+        project_id: Project ID (for scoping)
+        alias_pattern: Pattern to match (filename, model key, regex)
+        match_type: Matching strategy (exact, contains, regex)
+        target_field: Field to match against (filename, rvt_model_key)
+        is_active: Whether alias is enabled
+    
+    Returns:
+        ID of created alias, or None if error
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO ProjectManagement.dbo.{S.ExpectedModelAliases.TABLE}
+                (
+                    {S.ExpectedModelAliases.EXPECTED_MODEL_ID},
+                    {S.ExpectedModelAliases.PROJECT_ID},
+                    {S.ExpectedModelAliases.ALIAS_PATTERN},
+                    {S.ExpectedModelAliases.MATCH_TYPE},
+                    {S.ExpectedModelAliases.TARGET_FIELD},
+                    {S.ExpectedModelAliases.IS_ACTIVE}
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (expected_model_id, project_id, alias_pattern, match_type, target_field, 1 if is_active else 0))
+            
+            conn.commit()
+            
+            # Get the ID of the inserted row
+            cursor.execute(f"SELECT @@IDENTITY")
+            new_id = cursor.fetchone()[0]
+            
+            logger.info(f"Created alias {new_id}: {alias_pattern} ({match_type}) for expected model {expected_model_id}")
+            return int(new_id)
+    
+    except Exception as e:
+        logger.error(f"Error creating expected model alias: {e}", exc_info=True)
+        return None
+
+
+def match_observed_to_expected(
+    observed_filename: str,
+    observed_rvt_model_key: Optional[str],
+    aliases: List[Dict[str, Any]]
+) -> Optional[int]:
+    """
+    Match an observed file to an expected model ID using alias patterns.
+    
+    Args:
+        observed_filename: Observed filename from health data
+        observed_rvt_model_key: Optional RVT model key from health data
+        aliases: List of alias records to check
+    
+    Returns:
+        expected_model_id if match found, None otherwise
+    """
+    import re
+    
+    if not aliases:
+        return None
+    
+    # Build match results by priority
+    matches = {
+        'exact_filename': [],
+        'exact_rvt_key': [],
+        'contains': [],
+        'regex': [],
+    }
+    
+    for alias in aliases:
+        if not alias['is_active']:
+            continue
+        
+        pattern = alias['alias_pattern']
+        match_type = alias['match_type']
+        target_field = alias['target_field']
+        expected_model_id = alias['expected_model_id']
+        
+        try:
+            # Determine which field to match against
+            if target_field == 'filename':
+                field_value = observed_filename
+            elif target_field == 'rvt_model_key':
+                field_value = observed_rvt_model_key
+            else:
+                continue
+            
+            if not field_value:
+                continue
+            
+            # Apply match logic
+            matched = False
+            priority_key = None
+            
+            if match_type == 'exact':
+                if field_value.lower() == pattern.lower():
+                    matched = True
+                    priority_key = 'exact_filename' if target_field == 'filename' else 'exact_rvt_key'
+            
+            elif match_type == 'contains':
+                if pattern.lower() in field_value.lower():
+                    matched = True
+                    priority_key = 'contains'
+            
+            elif match_type == 'regex':
+                if re.search(pattern, field_value, re.IGNORECASE):
+                    matched = True
+                    priority_key = 'regex'
+            
+            if matched and priority_key:
+                matches[priority_key].append({
+                    'expected_model_id': expected_model_id,
+                    'created_at': alias['created_at']
+                })
+        
+        except Exception as e:
+            logger.warning(f"Error matching alias pattern '{pattern}': {e}")
+            continue
+    
+    # Return best match by priority
+    for priority_key in ['exact_filename', 'exact_rvt_key', 'contains', 'regex']:
+        if matches[priority_key]:
+            # Sort by created_at DESC to get newest
+            best_match = sorted(matches[priority_key], key=lambda x: x['created_at'], reverse=True)[0]
+            return best_match['expected_model_id']
+    
+    return None
+

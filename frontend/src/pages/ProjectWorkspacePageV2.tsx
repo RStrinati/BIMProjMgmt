@@ -24,6 +24,7 @@ import type { Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview,
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
 import { IssuesTabContent } from '@/components/ProjectManagement/IssuesTabContent';
+import { ProjectQualityRegisterTab } from '@/components/ProjectManagement/ProjectQualityRegisterTab';
 import { featureFlags } from '@/config/featureFlags';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import { ReviewStatusInline } from '@/components/projects/ReviewStatusInline';
@@ -33,10 +34,12 @@ import { toApiReviewStatus } from '@/utils/reviewStatus';
 import { ProjectServicesList } from '@/features/projects/services/ProjectServicesList';
 import { BlockerBadge } from '@/components/ui/BlockerBadge';
 import { LinkedIssuesList } from '@/components/ui/LinkedIssuesList';
+import { LinearListContainer, LinearListHeaderRow, LinearListRow, LinearListCell } from '@/components/ui/LinearList';
 import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { ProjectServicesTab as ProjectServicesTabLinear } from '@/components/ProjectServicesTab_Linear';
 
-const BASE_TABS = ['Overview', 'Services', 'Deliverables', 'Issues', 'Tasks'] as const;
+const BASE_TABS = ['Overview', 'Services', 'Deliverables', 'Issues', 'Tasks', 'Quality'] as const;
 const DISPLAY_MODES = ['Comfortable', 'Compact'] as const;
 
 type DisplayMode = (typeof DISPLAY_MODES)[number];
@@ -75,6 +78,9 @@ export default function ProjectWorkspacePageV2() {
   const [reviewUpdateError, setReviewUpdateError] = useState<string | null>(null);
   const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
   const [isReviewDetailOpen, setIsReviewDetailOpen] = useState(false);
+  const [isServicesLinearUIEnabled, setIsServicesLinearUIEnabled] = useState(() => {
+    return localStorage.getItem('servicesLinearUI') === 'true';
+  });
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([{
     id: 1,
     label: 'Workspace opened',
@@ -87,6 +93,29 @@ export default function ProjectWorkspacePageV2() {
     setSelectedReviewId(reviewId);
     setIsReviewDetailOpen(true);
     console.debug('[ProjectWorkspaceV2] State should be updated', { reviewId, isReviewDetailOpen: true });
+  }, []);
+
+  // Listen for localStorage changes (for feature flag updates)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'servicesLinearUI') {
+        const newValue = e.newValue === 'true';
+        setIsServicesLinearUIEnabled(newValue);
+      }
+    };
+
+    const handleFocus = () => {
+      // Check localStorage on window focus (in case it was changed via dev tools)
+      const newValue = localStorage.getItem('servicesLinearUI') === 'true';
+      setIsServicesLinearUIEnabled(newValue);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Log state changes for debugging
@@ -505,10 +534,14 @@ export default function ProjectWorkspacePageV2() {
         {activeLabel === 'Services' && (
           <Box data-testid="project-workspace-v2-services">
             {Number.isFinite(projectId) ? (
-              <ProjectServicesList
-                projectId={projectId}
-                testIdPrefix="project-workspace-v2"
-              />
+              isServicesLinearUIEnabled ? (
+                <ProjectServicesTabLinear projectId={projectId} />
+              ) : (
+                <ProjectServicesList
+                  projectId={projectId}
+                  testIdPrefix="project-workspace-v2"
+                />
+              )
             ) : (
               <Typography color="text.secondary">Select a project to view services.</Typography>
             )}
@@ -526,169 +559,120 @@ export default function ProjectWorkspacePageV2() {
                 Failed to load project reviews.
               </Alert>
             )}
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: '2fr 0.6fr 0.9fr 0.9fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
-                  gap: 2,
-                  mb: 1,
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Service
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Cycle
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Planned
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Due
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Status
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Invoice Number
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Invoice Date
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Billing Status
-                </Typography>
-                {featureFlags.anchorLinks && (
-                  <Typography variant="caption" color="text.secondary">
-                    Blockers
-                  </Typography>
-                )}
-              </Box>
-              {projectReviewsLoading ? (
-                <Typography color="text.secondary">Loading reviews...</Typography>
-              ) : reviewItems.length ? (
-                <Stack spacing={1}>
-                  {reviewItems.map((review) => {
-                    const isSaving =
-                      updateReviewStatus.isPending &&
-                      updateReviewStatus.variables?.review.review_id === review.review_id;
-                    const serviceLabel = [review.service_code, review.service_name]
-                      .filter(Boolean)
-                      .join(' | ');
-                    return (
-                      <Box
-                        key={review.review_id}
-                        data-testid={`deliverable-row-${review.review_id}`}
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: { xs: '1fr', md: '2fr 0.6fr 0.9fr 0.9fr 0.7fr 0.9fr 0.9fr 0.8fr 0.6fr' },
-                          gap: 2,
-                          alignItems: 'center',
-                          p: 1,
-                          borderRadius: 1,
-                          border: (theme) => `1px solid ${theme.palette.divider}`,
-                        }}
-                      >
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>
-                            {serviceLabel || 'Service'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {[review.phase, review.disciplines, review.deliverables]
-                              .filter(Boolean)
-                              .join(' | ') || 'No metadata'}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2">#{review.cycle_no}</Typography>
-                        <Typography variant="body2">{formatDate(review.planned_date)}</Typography>
-                        
-                        {/* Due Date - Editable */}
-                        <EditableCell
-                          value={review.due_date}
-                          type="date"
-                          testId={`cell-due-${review.review_id}`}
-                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
-                          onSave={async (newValue) => {
-                            await updateDeliverableField.mutateAsync({
-                              review,
-                              fieldName: 'due_date',
-                              value: newValue,
-                            });
-                          }}
-                        />
-                        
-                        {/* Status - ReviewStatusInline */}
-                        <ReviewStatusInline
-                          value={review.status ?? null}
-                          onChange={(nextStatus) =>
-                            updateReviewStatus.mutate({ review, status: nextStatus })
-                          }
-                          isSaving={isSaving}
-                          disabled={updateReviewStatus.isPending}
-                        />
-                        
-                        {/* Invoice Number - Editable */}
-                        <EditableCell
-                          value={review.invoice_reference}
-                          type="text"
-                          testId={`cell-invoice-number-${review.review_id}`}
-                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_reference'}
-                          onSave={async (newValue) => {
-                            await updateDeliverableField.mutateAsync({
-                              review,
-                              fieldName: 'invoice_reference',
-                              value: newValue,
-                            });
-                          }}
-                        />
-                        
-                        {/* Invoice Date - Editable */}
-                        <EditableCell
-                          value={review.invoice_date}
-                          type="date"
-                          testId={`cell-invoice-date-${review.review_id}`}
-                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_date'}
-                          onSave={async (newValue) => {
-                            await updateDeliverableField.mutateAsync({
-                              review,
-                              fieldName: 'invoice_date',
-                              value: newValue,
-                            });
-                          }}
-                        />
-                        
-                        {/* Billing Status - Toggleable */}
-                        <ToggleCell
-                          value={review.is_billed}
-                          testId={`cell-billing-status-${review.review_id}`}
-                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'is_billed'}
-                          onSave={async (newValue) => {
-                            await updateDeliverableField.mutateAsync({
-                              review,
-                              fieldName: 'is_billed',
-                              value: newValue,
-                            });
-                          }}
-                        />
-                        {featureFlags.anchorLinks && (
-                          <BlockerBadge
-                            projectId={projectId}
-                            anchorType="review"
-                            anchorId={review.review_id}
-                            enabled={true}
-                            onClick={() => handleOpenReviewDetail(review.review_id)}
-                            data-testid={`project-workspace-v2-review-blockers-${review.review_id}`}
-                          />
-                        )}
+            {projectReviewsLoading ? (
+              <Typography color="text.secondary">Loading deliverables...</Typography>
+            ) : reviewItems.length ? (
+              <LinearListContainer>
+                <LinearListHeaderRow
+                  columns={featureFlags.anchorLinks ? ['Service', 'Planned', 'Due', 'Invoice #', 'Invoice Date', 'Billed', 'Blockers'] : ['Service', 'Planned', 'Due', 'Invoice #', 'Invoice Date', 'Billed']}
+                />
+                {reviewItems.map((review) => {
+                  const serviceLabel = [review.service_code, review.service_name]
+                    .filter(Boolean)
+                    .join(' | ');
+                  const metadataLabel = [review.phase, review.cycle_no ? `Cycle ${review.cycle_no}` : null]
+                    .filter(Boolean)
+                    .join(' | ');
+
+                  return (
+                    <LinearListRow
+                      key={review.review_id}
+                      testId={`deliverable-row-${review.review_id}`}
+                      columns={featureFlags.anchorLinks ? 7 : 6}
+                      hoverable
+                    >
+                      {/* Service + metadata (primary) */}
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>
+                          {serviceLabel || 'Service'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {metadataLabel}
+                        </Typography>
                       </Box>
-                    );
-                  })}
-                </Stack>
-              ) : (
-                <Typography color="text.secondary">No reviews found for this project.</Typography>
-              )}
-            </Paper>
+
+                      {/* Planned Date (read-only) */}
+                      <LinearListCell variant="secondary">
+                        {formatDate(review.planned_date)}
+                      </LinearListCell>
+
+                      {/* Due Date - Editable */}
+                      <EditableCell
+                        value={review.due_date}
+                        type="date"
+                        testId={`cell-due-${review.review_id}`}
+                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
+                        onSave={async (newValue) => {
+                          await updateDeliverableField.mutateAsync({
+                            review,
+                            fieldName: 'due_date',
+                            value: newValue,
+                          });
+                        }}
+                      />
+
+                      {/* Invoice Number - Editable */}
+                      <EditableCell
+                        value={review.invoice_reference}
+                        type="text"
+                        testId={`cell-invoice-number-${review.review_id}`}
+                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_reference'}
+                        onSave={async (newValue) => {
+                          await updateDeliverableField.mutateAsync({
+                            review,
+                            fieldName: 'invoice_reference',
+                            value: newValue,
+                          });
+                        }}
+                      />
+
+                      {/* Invoice Date - Editable */}
+                      <EditableCell
+                        value={review.invoice_date}
+                        type="date"
+                        testId={`cell-invoice-date-${review.review_id}`}
+                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_date'}
+                        onSave={async (newValue) => {
+                          await updateDeliverableField.mutateAsync({
+                            review,
+                            fieldName: 'invoice_date',
+                            value: newValue,
+                          });
+                        }}
+                      />
+
+                      {/* Billing Status - Toggleable */}
+                      <ToggleCell
+                        value={review.is_billed}
+                        testId={`cell-billing-status-${review.review_id}`}
+                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'is_billed'}
+                        onSave={async (newValue) => {
+                          await updateDeliverableField.mutateAsync({
+                            review,
+                            fieldName: 'is_billed',
+                            value: newValue,
+                          });
+                        }}
+                      />
+
+                      {/* Blockers Badge (conditional) */}
+                      {featureFlags.anchorLinks && (
+                        <BlockerBadge
+                          projectId={projectId}
+                          anchorType="review"
+                          anchorId={review.review_id}
+                          enabled={false}
+                          onClick={() => handleOpenReviewDetail(review.review_id)}
+                          data-testid={`project-workspace-v2-review-blockers-${review.review_id}`}
+                        />
+                      )}
+                    </LinearListRow>
+                  );
+                })}
+              </LinearListContainer>
+            ) : (
+              <Typography color="text.secondary">No deliverables found for this project.</Typography>
+            )}
           </Box>
         )}
         {activeLabel === 'Issues' && (
@@ -721,6 +705,15 @@ export default function ProjectWorkspacePageV2() {
                 }
               }}
             />
+          </Box>
+        )}
+        {activeLabel === 'Quality' && (
+          <Box data-testid="project-workspace-v2-quality">
+            {Number.isFinite(projectId) ? (
+              <ProjectQualityRegisterTab projectId={projectId} />
+            ) : (
+              <Typography color="text.secondary">Select a project to view quality register.</Typography>
+            )}
           </Box>
         )}
         {showTimeline && activeLabel === 'Timeline' && (

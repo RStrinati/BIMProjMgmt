@@ -7,7 +7,17 @@ const itemId = 201;
 const projectPayload = {
   project_id: projectId,
   project_name: 'Delta Hub',
+  project_number: 'PROJ-001',
   status: 'active',
+  client: 'Test Client',
+  project_type: 'Commercial',
+  manager: 'Test Manager',
+  start_date: '2024-01-01',
+  target_date: '2024-12-31',
+  description: 'Test project description',
+  agreed_fee: 100000,
+  billed_amount: 50000,
+  progress_pct: 50,
 };
 
 const blockerCountsPayload = {
@@ -364,7 +374,7 @@ test.describe('Anchor Linking Feature', () => {
       const debugFlagAfterClick = await page.getByTestId('debug-anchor-links-flag').textContent().catch(() => 'not found');
       console.log('[CRITICAL] Debug flag AFTER badge click:', debugFlagAfterClick);
     } catch(e) {
-      console.log('[CRITICAL] Error getting debug flag:', e.message);
+      console.log('[CRITICAL] Error getting debug flag:', e instanceof Error ? e.message : String(e));
     }
     
     const pageAfterClick = await page.content();

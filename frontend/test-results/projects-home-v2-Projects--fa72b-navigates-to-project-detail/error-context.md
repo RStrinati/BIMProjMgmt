@@ -1,0 +1,104 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]:
+              - paragraph [ref=e14]: Projects
+      - generic [ref=e17]:
+        - img [ref=e19]
+        - textbox "Global search (projects, services)" [ref=e21]
+        - group
+  - navigation [ref=e22]:
+    - generic [ref=e24]:
+      - generic [ref=e26]: BIM Manager
+      - separator [ref=e27]
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - button "Dashboard" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - generic [ref=e35]: Dashboard
+        - listitem [ref=e36]:
+          - button "Projects & Services" [ref=e37] [cursor=pointer]:
+            - img [ref=e39]
+            - generic [ref=e42]: Projects & Services
+        - listitem [ref=e43]:
+          - button "Bids" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: Bids
+        - listitem [ref=e50]:
+          - button "Data Imports" [ref=e51] [cursor=pointer]:
+            - img [ref=e53]
+            - generic [ref=e56]: Data Imports
+        - listitem [ref=e57]:
+          - button "Reviews (redirect)" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+            - generic [ref=e63]: Reviews (redirect)
+        - listitem [ref=e64]:
+          - button "Tasks" [ref=e65] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Tasks
+      - separator [ref=e71]
+      - list [ref=e72]:
+        - listitem [ref=e73]:
+          - button "Settings" [ref=e74] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: Settings
+  - main [ref=e80]:
+    - generic [ref=e82]:
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - heading "Projects" [level=4] [ref=e85]
+          - paragraph [ref=e86]: Track project status across list, board, and timeline.
+        - generic [ref=e87]:
+          - button "Create Project" [ref=e88] [cursor=pointer]:
+            - img [ref=e90]
+            - text: Create Project
+          - generic [ref=e92]:
+            - generic [ref=e93]: View
+            - generic [ref=e94]:
+              - combobox "View All projects" [ref=e95] [cursor=pointer]: All projects
+              - textbox: all
+              - img
+              - group:
+                - generic: View
+          - generic [ref=e97]:
+            - textbox "Search projects" [active] [ref=e98]: Alpha
+            - group
+          - group [ref=e99]:
+            - button "List" [pressed] [ref=e100] [cursor=pointer]: List
+            - button "Board" [ref=e101] [cursor=pointer]: Board
+            - button "Timeline" [ref=e102] [cursor=pointer]: Timeline
+      - table [ref=e104]:
+        - rowgroup [ref=e105]:
+          - row "Project Name Health % Priority Lead Target Date Status" [ref=e106]:
+            - columnheader "Project Name" [ref=e107]:
+              - button "Project Name" [ref=e108] [cursor=pointer]:
+                - text: Project Name
+                - img [ref=e109]
+            - columnheader "Health %" [ref=e111]:
+              - button "Health %" [ref=e112] [cursor=pointer]:
+                - text: Health %
+                - img [ref=e113]
+            - columnheader "Priority" [ref=e115]
+            - columnheader "Lead" [ref=e116]
+            - columnheader "Target Date" [ref=e117]:
+              - button "Target Date" [ref=e118] [cursor=pointer]:
+                - text: Target Date
+                - img [ref=e119]
+            - columnheader "Status" [ref=e121]:
+              - button "Status" [ref=e122] [cursor=pointer]:
+                - text: Status
+                - img [ref=e123]
+        - rowgroup [ref=e125]:
+          - row "No projects found" [ref=e126]:
+            - cell "No projects found" [ref=e127]:
+              - paragraph [ref=e128]: No projects found
+```

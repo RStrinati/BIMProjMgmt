@@ -1,4 +1,4 @@
-import React, { Profiler, useMemo, useState } from 'react';
+import React, { Profiler, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -34,7 +34,8 @@ import { issuesApi } from '@/api';
 import { projectServicesApi } from '@/api/services';
 import type { ProjectService, ProjectServicesListResponse } from '@/api/services';
 import type { Project, User } from '@/types/api';
-import { ProjectServicesTab } from '@/components/ProjectServicesTab_Linear';
+import { ProjectServicesTab as ProjectServicesTabLinear } from '@/components/ProjectServicesTab_Linear';
+import { ProjectServicesTab as ProjectServicesTabAccordion } from '@/components/ProjectServicesTab';
 import { profilerLog } from '@/utils/perfLogger';
 
 interface TabPanelProps {
@@ -107,7 +108,7 @@ const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tabValue, setTabValue] = useState(1);
+  const [tabValue, setTabValue] = useState(0); // Start on Services tab for easier testing
 
   const projectId = Number(id);
   const { data: project, isLoading, error } = useQuery<Project>({
@@ -115,6 +116,34 @@ const ProjectDetailPage: React.FC = () => {
     queryFn: () => projectsApi.getById(projectId),
     enabled: Number.isFinite(projectId),
   });
+
+  // Feature flag for Services Linear UI (dark-launch)
+  const [isServicesLinearUIEnabled, setIsServicesLinearUIEnabled] = useState(() => {
+    return localStorage.getItem('servicesLinearUI') === 'true';
+  });
+
+  // Listen for localStorage changes (for feature flag updates)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'servicesLinearUI') {
+        const newValue = e.newValue === 'true';
+        setIsServicesLinearUIEnabled(newValue);
+      }
+    };
+
+    const handleFocus = () => {
+      // Check localStorage on window focus (in case it was changed via dev tools)
+      const newValue = localStorage.getItem('servicesLinearUI') === 'true';
+      setIsServicesLinearUIEnabled(newValue);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const { data: users } = useQuery<User[]>({
     queryKey: ['users'],
@@ -426,7 +455,11 @@ const ProjectDetailPage: React.FC = () => {
 
             {/* Services Tab */}
             <TabPanel value={tabValue} index={0}>
-              <ProjectServicesTab projectId={projectId} />
+              {isServicesLinearUIEnabled ? (
+                <ProjectServicesTabLinear projectId={projectId} />
+              ) : (
+                <ProjectServicesTabAccordion projectId={projectId} />
+              )}
             </TabPanel>
 
             {/* Details Tab */}

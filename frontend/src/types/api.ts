@@ -956,3 +956,102 @@ export interface ProjectAliasValidationResult {
   total_aliases: number;
   total_projects_with_aliases: number;
 }
+
+// ===================== Quality Register =====================
+
+export type FreshnessStatus = 'CURRENT' | 'DUE_SOON' | 'OUT_OF_DATE' | 'UNKNOWN';
+export type ValidationStatus = 'PASS' | 'WARN' | 'FAIL' | 'UNKNOWN';
+export type MappingStatus = 'MAPPED' | 'UNMAPPED';
+
+export interface QualityRegisterRow {
+  modelKey: string; // stable per logical model (e.g., "STR_M.rvt")
+  modelName: string; // human-readable model name (typically same as modelKey)
+
+  discipline?: string; // e.g., "Structural"
+  company?: string; // e.g., "Structural Contractor Inc."
+
+  lastVersionDate?: string; // ISO 8601 date (ConvertedExportedDate from tblRvtProjHealth)
+  source?: string; // e.g., "REVIT_HEALTH"
+
+  isControlModel: boolean; // true if designated as control model
+
+  freshnessStatus: FreshnessStatus; // computed from review schedule
+  validationOverall: ValidationStatus; // from tblRvtProjHealth.validation_status
+  namingStatus: 'CORRECT' | 'MISNAMED' | 'UNKNOWN'; // file naming compliance (Phase B deduplication)
+
+  primaryServiceId?: number | null; // FK → Services; null means UNMAPPED
+  mappingStatus: MappingStatus; // "MAPPED" or "UNMAPPED"
+}
+
+export interface QualityRegisterResponse {
+  rows: QualityRegisterRow[];
+  page: number;
+  page_size: number;
+  total: number;
+  attention_count: number; // count of rows that need attention (freshnessStatus OUT_OF_DATE, validationOverall FAIL/WARN, or UNMAPPED)
+}
+// ===================== Expected Register (Phase 1D) =====================
+
+export interface QualityRegisterExpectedRow {
+  expected_model_id: number;
+  expected_model_key: string;
+  display_name?: string | null;
+  discipline?: string | null;
+  company?: string | null;
+
+  observed_file_name?: string | null;
+  lastVersionDateISO?: string | null;
+
+  freshnessStatus: 'MISSING' | 'CURRENT' | 'DUE_SOON' | 'OUT_OF_DATE' | 'UNKNOWN';
+  validationOverall: 'PASS' | 'FAIL' | 'WARN' | 'UNKNOWN';
+
+  isControlModel: boolean;
+  mappingStatus: 'MAPPED' | 'UNMAPPED';
+
+  namingStatus?: 'CORRECT' | 'MISNAMED' | 'UNKNOWN';
+}
+
+export interface QualityRegisterUnmatchedObservedRow {
+  observed_file_name: string;
+  rvt_model_key?: string | null;
+  discipline?: string | null;
+  company?: string | null;
+  lastVersionDateISO?: string | null;
+  validationOverall: 'PASS' | 'FAIL' | 'WARN' | 'UNKNOWN';
+  namingStatus?: 'CORRECT' | 'MISNAMED' | 'UNKNOWN';
+}
+
+export interface QualityRegisterExpectedResponse {
+  expected_rows: QualityRegisterExpectedRow[];
+  unmatched_observed: QualityRegisterUnmatchedObservedRow[];
+  counts: {
+    expected_total: number;
+    expected_missing: number;
+    unmatched_total: number;
+    attention_count: number;
+  };
+}
+
+export interface ExpectedModel {
+  expected_model_id: number;
+  project_id: number;
+  expected_model_key: string;
+  display_name?: string | null;
+  discipline?: string | null;
+  company_id?: number | null;
+  is_required: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ExpectedModelAlias {
+  expected_model_alias_id: number;
+  expected_model_id: number;
+  project_id: number;
+  alias_pattern: string;
+  match_type: 'exact' | 'contains' | 'regex';
+  target_field: 'filename' | 'rvt_model_key';
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}

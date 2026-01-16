@@ -102,7 +102,23 @@ export async function getAnchorLinkedIssues(
       }
     );
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    // Handle 400/404 gracefully - return empty issues list instead of throwing
+    if (error.response?.status === 400 || error.response?.status === 404) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(
+          `Anchor linked issues unavailable (${error.response?.status}) for ${anchorType}:${anchorId}`,
+          'Returning empty issues list.'
+        );
+      }
+      return {
+        page: 1,
+        page_size: pageSize || 20,
+        total_count: 0,
+        issues: [],
+      };
+    }
+    // For other errors, log and re-throw
     console.error('Error fetching anchor linked issues:', error);
     throw error;
   }
@@ -121,7 +137,25 @@ export async function getAnchorBlockerCounts(
       `${API_BASE}/projects/${projectId}/anchors/${anchorType}/${anchorId}/counts`
     );
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    // Handle 400/404 gracefully - return empty counts instead of throwing
+    if (error.response?.status === 400 || error.response?.status === 404) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(
+          `Anchor blocker counts unavailable (${error.response?.status}) for ${anchorType}:${anchorId}`,
+          'Returning empty counts.'
+        );
+      }
+      return {
+        total_linked: 0,
+        open_count: 0,
+        closed_count: 0,
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 0,
+      };
+    }
+    // For other errors, log and re-throw
     console.error('Error fetching anchor blocker counts:', error);
     throw error;
   }

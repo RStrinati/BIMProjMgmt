@@ -1,0 +1,180 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]: BIM Project Management System
+      - generic [ref=e11]:
+        - img [ref=e13]
+        - textbox "Global search (projects, services)" [ref=e15]
+        - group
+  - navigation [ref=e16]:
+    - generic [ref=e18]:
+      - generic [ref=e20]: BIM Manager
+      - separator [ref=e21]
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - button "Dashboard" [ref=e24] [cursor=pointer]:
+            - img [ref=e26]
+            - generic [ref=e29]: Dashboard
+        - listitem [ref=e30]:
+          - button "Projects & Services" [ref=e31] [cursor=pointer]:
+            - img [ref=e33]
+            - generic [ref=e36]: Projects & Services
+        - listitem [ref=e37]:
+          - button "Bids" [ref=e38] [cursor=pointer]:
+            - img [ref=e40]
+            - generic [ref=e43]: Bids
+        - listitem [ref=e44]:
+          - button "Data Imports" [ref=e45] [cursor=pointer]:
+            - img [ref=e47]
+            - generic [ref=e50]: Data Imports
+        - listitem [ref=e51]:
+          - button "Issues" [ref=e52] [cursor=pointer]:
+            - img [ref=e54]
+            - generic [ref=e57]: Issues
+        - listitem [ref=e58]:
+          - button "Reviews (redirect)" [ref=e59] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e64]: Reviews (redirect)
+        - listitem [ref=e65]:
+          - button "Tasks" [ref=e66] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e71]: Tasks
+      - separator [ref=e72]
+      - list [ref=e73]:
+        - listitem [ref=e74]:
+          - button "Settings" [ref=e75] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Settings
+  - main [ref=e81]:
+    - generic [ref=e83]:
+      - heading "BIM Project Management Dashboard" [level=4] [ref=e84]
+      - paragraph [ref=e85]: Slice live warehouse metrics across issues, reviews, and services.
+      - generic [ref=e86]:
+        - heading "Filters" [level=6] [ref=e87]
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic: Save current view
+            - generic [ref=e90]:
+              - textbox "Save current view" [ref=e91]
+              - group:
+                - generic: Save current view
+          - button "Save View" [disabled]
+          - generic [ref=e94]: No saved views yet
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: Project Manager
+            - generic [ref=e98]:
+              - combobox "Project Manager" [disabled] [ref=e99]: All
+              - textbox [disabled]: all
+              - img
+              - group:
+                - generic: Project Manager
+          - generic [ref=e100]:
+            - generic [ref=e101]: Project Type
+            - generic [ref=e102]:
+              - combobox "Project Type" [disabled] [ref=e103]: All
+              - textbox [disabled]: all
+              - img
+              - group:
+                - generic: Project Type
+          - generic [ref=e104]:
+            - generic [ref=e105]: Discipline
+            - generic [ref=e106]:
+              - combobox "Discipline" [ref=e107] [cursor=pointer]: All
+              - textbox: all
+              - img
+              - group:
+                - generic: Discipline
+          - generic [ref=e108]:
+            - generic [ref=e109]: Client
+            - generic [ref=e110]:
+              - combobox "Client" [disabled] [ref=e111]: All
+              - textbox [disabled]: all
+              - img
+              - group:
+                - generic: Client
+          - generic [ref=e112]:
+            - generic: Projects
+            - generic [ref=e113]:
+              - combobox "Projects" [disabled] [ref=e114]
+              - textbox [disabled]
+              - img
+              - group:
+                - generic: Projects
+          - generic [ref=e116]: Showing 0 of 0 projects
+      - generic [ref=e117]:
+        - paragraph [ref=e118]: Last refreshed 1/17/2026, 7:14:10 AM
+        - button "Refresh data" [ref=e119] [cursor=pointer]: Refresh data
+      - tablist [ref=e122]:
+        - tab "Overview" [selected] [ref=e123] [cursor=pointer]: Overview
+        - tab "Issues" [ref=e124] [cursor=pointer]: Issues
+        - tab "Health Metrics" [ref=e125] [cursor=pointer]: Health Metrics
+      - tabpanel "Overview" [ref=e127]:
+        - heading "Health Overview" [level=5] [ref=e128]
+        - generic [ref=e129]:
+          - generic [ref=e132] [cursor=pointer]:
+            - heading "Open Issues" [level=6] [ref=e133]
+            - heading "2,181" [level=3] [ref=e134]
+            - paragraph [ref=e135]: Current month (warehouse)
+          - generic [ref=e138]:
+            - heading "High Priority" [level=6] [ref=e139]
+            - heading "101" [level=3] [ref=e140]
+            - paragraph [ref=e141]: Issues flagged critical
+          - generic [ref=e144] [cursor=pointer]:
+            - heading "Overdue Reviews" [level=6] [ref=e145]
+            - heading "13" [level=3] [ref=e146]
+            - paragraph [ref=e147]: Review cycles past due
+          - generic [ref=e150] [cursor=pointer]:
+            - heading "Services In Progress" [level=6] [ref=e151]
+            - heading "5" [level=3] [ref=e152]
+            - paragraph [ref=e153]: Active services this month
+        - heading "Workload & Risk" [level=5] [ref=e154]
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - heading "Review Performance" [level=6] [ref=e160]
+            - button "See projects" [ref=e161] [cursor=pointer]
+          - generic [ref=e162]:
+            - heading "66 completed" [level=4] [ref=e163]
+            - paragraph [ref=e164]: "On-time rate: 100%"
+            - paragraph [ref=e165]: "Overdue: 0"
+            - paragraph [ref=e166]: "Avg plan vs actual: -- days"
+        - heading "Data Health" [level=5] [ref=e170]
+        - generic [ref=e171]:
+          - generic [ref=e174]:
+            - heading "Data Freshness" [level=6] [ref=e175]
+            - generic [ref=e176]:
+              - paragraph [ref=e177]: "ACC last import: 1/13/2026, 5:13:34 PM"
+              - paragraph [ref=e178]: "Revizto last run: Sep 24 2025 5:29AM"
+              - paragraph [ref=e179]: "Revizto projects extracted: 5"
+          - generic [ref=e182]:
+            - heading "Data Quality" [level=6] [ref=e183]
+            - generic [ref=e184]:
+              - generic [ref=e186]: Issues found (high)
+              - paragraph [ref=e187]: "Last run: 69 (success)"
+              - paragraph [ref=e188]: "Completed: 1/12/2026, 9:33:18 AM"
+              - paragraph [ref=e189]: "Checks: 5 • Failed: 2"
+        - heading "Financials & Delivery" [level=5] [ref=e190]
+        - generic [ref=e191]:
+          - generic [ref=e194]:
+            - heading "Services & Financials" [level=6] [ref=e195]
+            - generic [ref=e196]:
+              - generic [ref=e197]:
+                - img [ref=e198]
+                - heading "92%" [level=6] [ref=e202]
+              - generic [ref=e203]:
+                - heading "$615,006 earned value" [level=5] [ref=e204]
+                - paragraph [ref=e205]: "Claimed to date: $220,500"
+                - paragraph [ref=e206]: "Variance fee: $394,506"
+                - button "Go to services" [ref=e207] [cursor=pointer]
+          - generic [ref=e210]:
+            - heading "Drill-down" [level=6] [ref=e211]
+            - generic [ref=e212]:
+              - button "Data Imports health" [ref=e213] [cursor=pointer]
+              - button "View Services Board" [ref=e214] [cursor=pointer]
+        - heading "Project Timeline" [level=5] [ref=e215]
+        - progressbar [ref=e218]:
+          - img [ref=e219]
+```

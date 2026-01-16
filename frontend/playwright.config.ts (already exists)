@@ -1,0 +1,6 @@
+testDir: 'frontend/tests/e2e'
+use: {
+  actionTimeout: 0,
+  navigationTimeout: 0
+}
+reporter: [['list'], ['html', { output: 'test-results/report.html' }]]

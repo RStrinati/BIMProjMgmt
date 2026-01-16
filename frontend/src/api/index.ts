@@ -23,3 +23,5 @@ export { usersApi } from './users';
 export { projectAliasesApi } from './projectAliases';
 export { mappingsApi } from './mappings';
 export { projectReviewsApi } from './projectReviews';
+export { qualityApi } from './quality';
+

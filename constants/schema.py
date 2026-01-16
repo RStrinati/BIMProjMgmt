@@ -1158,3 +1158,31 @@ class DynamoBatchJobFiles:
     ERROR_MESSAGE = "error_message"
     OUTPUT_FILE_PATH = "output_file_path"
     REVIT_VERSION = "revit_version"
+
+
+# ===================== Quality Register: Expected Models =====================
+class ExpectedModels:
+    """Authoritative registry of expected Revit models for a project (Phase 1)"""
+    TABLE = "ExpectedModels"
+    EXPECTED_MODEL_ID = "expected_model_id"
+    PROJECT_ID = "project_id"
+    EXPECTED_MODEL_KEY = "expected_model_key"
+    DISPLAY_NAME = "display_name"
+    DISCIPLINE = "discipline"
+    COMPANY_ID = "company_id"
+    IS_REQUIRED = "is_required"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class ExpectedModelAliases:
+    """Map observed filenames/keys to expected models (Phase 1)"""
+    TABLE = "ExpectedModelAliases"
+    EXPECTED_MODEL_ALIAS_ID = "expected_model_alias_id"
+    EXPECTED_MODEL_ID = "expected_model_id"
+    PROJECT_ID = "project_id"
+    ALIAS_PATTERN = "alias_pattern"
+    MATCH_TYPE = "match_type"  # exact, contains, regex
+    TARGET_FIELD = "target_field"  # filename, rvt_model_key
+    IS_ACTIVE = "is_active"
+    CREATED_AT = "created_at"
