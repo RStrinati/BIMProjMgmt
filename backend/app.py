@@ -5399,7 +5399,7 @@ def get_project_quality_register(project_id):
     - sort_by: Sort column (default: lastVersionDate)
     - sort_dir: Sort direction - asc or desc (default: desc)
     - filter_attention: If true, show only models needing attention (default: false)
-    - mode: "observed" (default, existing behavior) or "expected" (Phase 1C, new expected-first mode)
+    - mode: "observed" (default), "expected" (Phase 1C), or "phase1d" (Phase 1D UI-friendly)
     """
     try:
         page = int(request.args.get('page', 1))
@@ -5407,9 +5407,15 @@ def get_project_quality_register(project_id):
         sort_by = request.args.get('sort_by', 'lastVersionDate')
         sort_dir = request.args.get('sort_dir', 'desc')
         filter_attention = request.args.get('filter_attention', 'false').lower() == 'true'
-        mode = request.args.get('mode', 'observed')  # Phase 1C: NEW parameter
+        mode = request.args.get('mode', 'observed')
         
-        # Validate pagination
+        # Phase 1D: Simple expected model list with enrichment
+        if mode == 'phase1d':
+            from database import _get_quality_register_phase1d
+            data = _get_quality_register_phase1d(project_id)
+            return jsonify(data)
+        
+        # Validate pagination for other modes
         page = max(1, page)
         page_size = max(1, min(page_size, 500))  # Cap at 500
         
@@ -5420,7 +5426,7 @@ def get_project_quality_register(project_id):
             sort_by=sort_by,
             sort_dir=sort_dir,
             filter_attention=filter_attention,
-            mode=mode,  # Phase 1C: Pass mode to database layer
+            mode=mode,
         )
         return jsonify(data)
     except Exception as e:
@@ -5497,7 +5503,7 @@ def create_expected_model_endpoint(project_id):
         
         model_id = manager.add_expected_model(
             project_id=project_id,
-            expected_model_key=data.get('expected_model_key'),
+            expected_model_key=data.get('expected_model_key', 'UNNAMED-MODEL'),
             display_name=data.get('display_name'),
             discipline=data.get('discipline'),
             company_id=data.get('company_id'),
@@ -5560,6 +5566,270 @@ def create_expected_model_alias_endpoint(project_id):
     
     except Exception as e:
         logging.exception(f"Error creating alias for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/models/<int:expected_model_id>', methods=['GET'])
+def get_quality_model_detail(project_id, expected_model_id):
+    """Get detailed view of a quality register model for side panel (Phase 1D)"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get model details with all Phase 1D fields
+            cursor.execute("""
+                SELECT 
+                    expected_model_id,
+                    abv,
+                    registered_model_name,
+                    company,
+                    discipline,
+                    description,
+                    bim_contact,
+                    notes,
+                    notes_updated_at,
+                    created_at,
+                    updated_at,
+                    service_id,
+                    review_cycle_id,
+                    expected_delivery_date,
+                    actual_delivery_date,
+                    delivery_status
+                FROM ExpectedModels
+                WHERE expected_model_id = ? AND project_id = ?
+            """, (expected_model_id, project_id))
+            
+            model = cursor.fetchone()
+            if not model:
+                return jsonify({'error': 'Model not found'}), 404
+            
+            # Get aliases
+            cursor.execute("""
+                SELECT expected_model_alias_id, match_type, alias_pattern, created_at
+                FROM ExpectedModelAliases
+                WHERE expected_model_id = ?
+                ORDER BY created_at DESC
+            """, (expected_model_id,))
+            
+            aliases = [
+                {
+                    'id': row[0],
+                    'matchType': row[1],
+                    'pattern': row[2],
+                    'createdAt': row[3].isoformat() if row[3] else None
+                }
+                for row in cursor.fetchall()
+            ]
+            
+            # Get current observed match from ACC
+            observed_match = None
+            if model[2]:  # registered_model_name
+                with get_db_connection(Config.ACC_DB) as acc_conn:
+                    acc_cursor = acc_conn.cursor()
+                    acc_cursor.execute("""
+                        SELECT TOP 1
+                            file_name,
+                            folder_path,
+                            last_modified_date,
+                            file_size
+                        FROM vw_files_expanded_pm
+                        WHERE file_name LIKE ?
+                        ORDER BY last_modified_date DESC
+                    """, (f'%{model[2]}%',))
+                    
+                    obs = acc_cursor.fetchone()
+                    if obs:
+                        observed_match = {
+                            'fileName': obs[0],
+                            'folderPath': obs[1],
+                            'lastModified': obs[2].isoformat() if obs[2] else None,
+                            'fileSize': obs[3]
+                        }
+            
+            result = {
+                'id': model[0],
+                'abv': model[1],
+                'registeredModelName': model[2],
+                'company': model[3],
+                'discipline': model[4],
+                'description': model[5],
+                'bimContact': model[6],
+                'notes': model[7],
+                'notesUpdatedAt': model[8].isoformat() if model[8] else None,
+                'createdAt': model[9].isoformat() if model[9] else None,
+                'updatedAt': model[10].isoformat() if model[10] else None,
+                'serviceId': model[11],
+                'reviewCycleId': model[12],
+                'expectedDeliveryDate': model[13].isoformat() if model[13] else None,
+                'actualDeliveryDate': model[14].isoformat() if model[14] else None,
+                'deliveryStatus': model[15],
+                'aliases': aliases,
+                'observedMatch': observed_match,
+                'health': {
+                    'validationStatus': 'UNKNOWN',
+                    'freshnessStatus': 'UNKNOWN',
+                    'metrics': {}
+                },
+                'activity': []
+            }
+            
+            return jsonify(result)
+            
+    except Exception as e:
+        logging.exception(f"Error fetching model detail: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/expected-models/<int:expected_model_id>', methods=['PATCH'])
+def update_expected_model(project_id, expected_model_id):
+    """Update expected model fields (Phase 1D)"""
+    try:
+        data = request.get_json() or {}
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build dynamic UPDATE statement based on provided fields
+            update_fields = []
+            params = []
+            
+            field_mapping = {
+                'abv': 'abv',
+                'registeredModelName': 'registered_model_name',
+                'company': 'company',
+                'discipline': 'discipline',
+                'description': 'description',
+                'bimContact': 'bim_contact',
+                'notes': 'notes',
+                'serviceId': 'service_id',
+                'reviewCycleId': 'review_cycle_id',
+                'expectedDeliveryDate': 'expected_delivery_date',
+                'actualDeliveryDate': 'actual_delivery_date',
+                'deliveryStatus': 'delivery_status'
+            }
+            
+            for json_field, db_field in field_mapping.items():
+                if json_field in data:
+                    update_fields.append(f"{db_field} = ?")
+                    params.append(data[json_field])
+            
+            # Always update notes_updated_at if notes changed
+            if 'notes' in data:
+                update_fields.append("notes_updated_at = GETDATE()")
+            
+            # Always update updated_at
+            update_fields.append("updated_at = GETDATE()")
+            
+            if not update_fields:
+                return jsonify({'message': 'No fields to update'}), 200
+            
+            # Add WHERE clause params
+            params.extend([expected_model_id, project_id])
+            
+            query = f"""
+                UPDATE ExpectedModels
+                SET {', '.join(update_fields)}
+                WHERE expected_model_id = ? AND project_id = ?
+            """
+            
+            cursor.execute(query, params)
+            conn.commit()
+            
+            return jsonify({'message': 'Model updated successfully'}), 200
+            
+    except Exception as e:
+        logging.exception(f"Error updating model: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/expected-models/<int:expected_model_id>', methods=['DELETE'])
+def delete_expected_model(project_id, expected_model_id):
+    """Delete an expected model (Phase 1F)"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if model exists and belongs to this project
+            cursor.execute("""
+                SELECT expected_model_id 
+                FROM ExpectedModels 
+                WHERE expected_model_id = ? AND project_id = ?
+            """, (expected_model_id, project_id))
+            
+            if not cursor.fetchone():
+                return jsonify({'error': 'Model not found'}), 404
+            
+            # Delete aliases first (foreign key constraint)
+            cursor.execute("""
+                DELETE FROM ExpectedModelAliases 
+                WHERE expected_model_id = ?
+            """, (expected_model_id,))
+            
+            # Delete the model
+            cursor.execute("""
+                DELETE FROM ExpectedModels 
+                WHERE expected_model_id = ? AND project_id = ?
+            """, (expected_model_id, project_id))
+            
+            conn.commit()
+            
+            return jsonify({'message': 'Model deleted successfully'}), 200
+            
+    except Exception as e:
+        logging.exception(f"Error deleting model: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/quality/models/<int:expected_model_id>/history', methods=['GET'])
+def get_model_history(project_id, expected_model_id):
+    """Get version history / audit trail for an expected model (Phase 2)"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT 
+                    history_id,
+                    change_type,
+                    changed_fields,
+                    abv,
+                    registered_model_name,
+                    company,
+                    discipline,
+                    description,
+                    bim_contact,
+                    notes,
+                    changed_by,
+                    changed_at
+                FROM ExpectedModelsHistory
+                WHERE expected_model_id = ? AND project_id = ?
+                ORDER BY changed_at DESC
+            """, (expected_model_id, project_id))
+            
+            history = [
+                {
+                    'historyId': row[0],
+                    'changeType': row[1],
+                    'changedFields': row[2],
+                    'snapshot': {
+                        'abv': row[3],
+                        'registeredModelName': row[4],
+                        'company': row[5],
+                        'discipline': row[6],
+                        'description': row[7],
+                        'bimContact': row[8],
+                        'notes': row[9]
+                    },
+                    'changedBy': row[10],
+                    'changedAt': row[11].isoformat() if row[11] else None
+                }
+                for row in cursor.fetchall()
+            ]
+            
+            return jsonify({'history': history}), 200
+            
+    except Exception as e:
+        logging.exception(f"Error fetching model history: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 

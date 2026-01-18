@@ -24,7 +24,7 @@ import type { Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview,
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
 import { IssuesTabContent } from '@/components/ProjectManagement/IssuesTabContent';
-import { ProjectQualityRegisterTab } from '@/components/ProjectManagement/ProjectQualityRegisterTab';
+import { QualityTab } from './QualityTab';
 import { featureFlags } from '@/config/featureFlags';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import { ReviewStatusInline } from '@/components/projects/ReviewStatusInline';
@@ -710,7 +710,7 @@ export default function ProjectWorkspacePageV2() {
         {activeLabel === 'Quality' && (
           <Box data-testid="project-workspace-v2-quality">
             {Number.isFinite(projectId) ? (
-              <ProjectQualityRegisterTab projectId={projectId} />
+              <QualityTab projectId={projectId} />
             ) : (
               <Typography color="text.secondary">Select a project to view quality register.</Typography>
             )}

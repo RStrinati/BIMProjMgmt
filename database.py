@@ -2690,6 +2690,92 @@ def get_control_models(project_id) -> List[Dict[str, Any]]:
         return []
 
 
+def _get_quality_register_phase1d(project_id: int) -> Dict[str, Any]:
+    """
+    Phase 1D: Get quality register as enriched expected models.
+    Returns simple list of rows with manual + observed fields.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get expected models with observed enrichment
+            query = """
+            SELECT 
+                em.expected_model_id,
+                em.abv,
+                em.registered_model_name,
+                em.company,
+                em.discipline,
+                em.description,
+                em.bim_contact,
+                em.notes,
+                em.notes_updated_at,
+                
+                -- ACC enrichment (placeholder for now)
+                NULL as folder_path,
+                CAST(0 as BIT) as acc_present,
+                NULL as acc_date,
+                
+                -- Revizto enrichment (placeholder)
+                CAST(0 as BIT) as revizto_present,
+                NULL as revizto_date,
+                
+                -- Mapping status
+                'UNMAPPED' as mapping_status,
+                NULL as matched_observed_file,
+                
+                -- Health enrichment (placeholder)
+                'UNKNOWN' as validation_overall,
+                'UNKNOWN' as freshness_status
+                
+            FROM ExpectedModels em
+            WHERE em.project_id = ?
+            ORDER BY em.abv, em.registered_model_name
+            """
+            
+            cursor.execute(query, (project_id,))
+            rows = cursor.fetchall()
+            
+            # Column mapping (0-indexed):
+            # 0=expected_model_id, 1=abv, 2=registered_model_name, 3=company, 4=discipline,
+            # 5=description, 6=bim_contact, 7=notes, 8=notes_updated_at, 9=folder_path,
+            # 10=acc_present, 11=acc_date, 12=revizto_present, 13=revizto_date,
+            # 14=mapping_status, 15=matched_observed_file, 16=validation_overall, 17=freshness_status
+            
+            result = {
+                "rows": [
+                    {
+                        "expected_model_id": row[0],
+                        "abv": row[1],
+                        "modelName": row[2],
+                        "company": row[3],
+                        "discipline": row[4],
+                        "description": row[5],
+                        "bimContact": row[6],
+                        "notes": row[7],
+                        "notesUpdatedAt": row[8] if isinstance(row[8], str) else (row[8].isoformat() if row[8] else None),
+                        "folderPath": row[9],
+                        "accPresent": bool(row[10]),
+                        "accDate": row[11] if isinstance(row[11], str) else (row[11].isoformat() if row[11] else None),
+                        "reviztoPresent": bool(row[12]),
+                        "reviztoDate": row[13] if isinstance(row[13], str) else (row[13].isoformat() if row[13] else None),
+                        "mappingStatus": row[14],
+                        "matchedObservedFile": row[15],
+                        "validationOverall": row[16],
+                        "freshnessStatus": row[17]
+                    }
+                    for row in rows
+                ]
+            }
+            
+            return result
+            
+    except Exception as e:
+        logger.error(f"Error fetching Phase 1D quality register for project {project_id}: {e}", exc_info=True)
+        return {"rows": []}
+
+
 def _get_model_register_expected_mode(
     project_id: int,
     page: int = 1,
