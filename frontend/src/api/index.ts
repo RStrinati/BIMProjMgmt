@@ -26,3 +26,4 @@ export { projectAliasesApi } from './projectAliases';
 export { mappingsApi } from './mappings';
 export { projectReviewsApi } from './projectReviews';
 export { qualityApi } from './quality';
+export { invoiceBatchesApi } from './invoiceBatches';

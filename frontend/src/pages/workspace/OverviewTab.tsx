@@ -21,8 +21,8 @@ import {
   Typography,
   Chip,
 } from '@mui/material';
-import { tasksApi, updatesApi } from '@/api';
-import type { Project, TaskPayload } from '@/types/api';
+import { projectsApi, tasksApi, updatesApi } from '@/api';
+import type { Project, ProjectFinanceGrid, TaskPayload } from '@/types/api';
 
 type OutletContext = {
   projectId: number;
@@ -70,6 +70,19 @@ export default function OverviewTab() {
     queryFn: () => updatesApi.getProjectUpdates(projectId, { limit: 1 }),
     enabled: Number.isFinite(projectId),
   });
+
+  const { data: financeGrid } = useQuery<ProjectFinanceGrid>({
+    queryKey: ['projectFinanceGrid', projectId],
+    queryFn: () => projectsApi.getFinanceGrid(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const formatCurrency = (value?: number | null) => {
+    if (value == null || Number.isNaN(Number(value))) {
+      return '--';
+    }
+    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
+  };
 
   const latestUpdate = useMemo(
     () => (latestUpdateResult?.updates && latestUpdateResult.updates.length > 0 
@@ -135,6 +148,34 @@ export default function OverviewTab() {
           <Typography color="text.secondary">
             {project?.description || 'Add a description to summarize scope and outcomes.'}
           </Typography>
+        </Paper>
+
+        {/* Invoice Pipeline */}
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+            Invoice pipeline
+          </Typography>
+          {financeGrid ? (
+            <Stack spacing={1} data-testid="workspace-invoice-pipeline">
+              <Typography variant="body2">
+                Ready this month: {financeGrid.ready_this_month.ready_count} · {formatCurrency(financeGrid.ready_this_month.ready_amount)}
+              </Typography>
+              <Stack spacing={0.5}>
+                {financeGrid.invoice_pipeline.map((item) => (
+                  <Box key={item.month} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {item.month}
+                    </Typography>
+                    <Typography variant="caption">
+                      {item.deliverables_count} · {formatCurrency(item.total_amount)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Stack>
+          ) : (
+            <Typography color="text.secondary">Loading invoice pipeline...</Typography>
+          )}
         </Paper>
 
         {/* Update Composer */}

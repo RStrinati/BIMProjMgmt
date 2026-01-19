@@ -98,6 +98,8 @@ from database import (  # noqa: E402
     complete_revizto_extraction_run,
     get_service_reviews,
     get_project_reviews,
+    get_invoice_pipeline_by_project_month,
+    get_project_finance_rollup,
     get_service_review_billing,
     get_service_templates,
     get_update_comments,
@@ -130,6 +132,9 @@ from database import (  # noqa: E402
     update_review_task_assignee,
     update_service_review,
     update_service_template,
+    list_invoice_batches,
+    create_invoice_batch,
+    update_invoice_batch,
     set_control_models,
     upsert_bep_section,
     update_bep_status,
@@ -1925,6 +1930,8 @@ def api_update_service_review(project_id, service_id, review_id):
     - invoice_reference: string
     - invoice_date: ISO date string (YYYY-MM-DD) or null
     - is_billed: boolean
+    - invoice_month_override: YYYY-MM string or null
+    - invoice_batch_id: integer or null
     
     Validates that review belongs to service in the specified project.
     Returns updated review in the same format as GET.
@@ -1953,7 +1960,8 @@ def api_update_service_review(project_id, service_id, review_id):
     
     # Validate and filter request body - only allow deliverables fields
     allowed_fields = {
-        'due_date', 'status', 'invoice_reference', 'invoice_date', 'is_billed'
+        'due_date', 'status', 'invoice_reference', 'invoice_date', 'is_billed',
+        'invoice_month_override', 'invoice_batch_id'
     }
     filtered_body = {k: v for k, v in body.items() if k in allowed_fields}
     
@@ -1966,7 +1974,9 @@ def api_update_service_review(project_id, service_id, review_id):
         'status': S.ServiceReviews.STATUS,
         'invoice_reference': S.ServiceReviews.INVOICE_REFERENCE,
         'invoice_date': S.ServiceReviews.INVOICE_DATE,
-        'is_billed': S.ServiceReviews.IS_BILLED
+        'is_billed': S.ServiceReviews.IS_BILLED,
+        'invoice_month_override': S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
+        'invoice_batch_id': S.ServiceReviews.INVOICE_BATCH_ID,
     }
     
     db_body = {field_mapping[k]: v for k, v in filtered_body.items()}
@@ -1998,6 +2008,71 @@ def api_delete_service_review(project_id, service_id, review_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'error': 'Failed to delete review'}), 500
+
+
+# --- Invoice Batches API ---
+@app.route('/api/invoice_batches', methods=['GET', 'POST'])
+def api_invoice_batches():
+    if request.method == 'GET':
+        project_id = request.args.get('project_id', type=int)
+        if not project_id:
+            return jsonify({'error': 'project_id is required'}), 400
+        invoice_month = request.args.get('month')
+        service_id = request.args.get('service_id', type=int)
+        batches = list_invoice_batches(project_id, invoice_month=invoice_month, service_id=service_id)
+        return jsonify(batches)
+
+    body = request.get_json() or {}
+    project_id = body.get('project_id')
+    invoice_month = body.get('invoice_month')
+    service_id = body.get('service_id')
+    status = body.get('status', 'draft')
+    title = body.get('title')
+    notes = body.get('notes')
+
+    if not project_id or not invoice_month:
+        return jsonify({'error': 'project_id and invoice_month are required'}), 400
+    if not re.match(r'^\d{4}-\d{2}$', str(invoice_month)):
+        return jsonify({'error': 'invoice_month must be YYYY-MM'}), 400
+
+    invoice_batch_id = create_invoice_batch(
+        project_id=project_id,
+        service_id=service_id,
+        invoice_month=invoice_month,
+        status=status,
+        title=title,
+        notes=notes,
+    )
+    if not invoice_batch_id:
+        return jsonify({'error': 'Failed to create invoice batch'}), 500
+
+    return jsonify({'invoice_batch_id': invoice_batch_id}), 201
+
+
+@app.route('/api/invoice_batches/<int:invoice_batch_id>', methods=['PATCH'])
+def api_update_invoice_batch(invoice_batch_id):
+    body = request.get_json() or {}
+    allowed_fields = {'status', 'title', 'notes', 'invoice_month', 'service_id'}
+    filtered_body = {k: v for k, v in body.items() if k in allowed_fields}
+    if not filtered_body:
+        return jsonify({'error': 'No valid fields to update'}), 400
+
+    if 'invoice_month' in filtered_body and not re.match(r'^\d{4}-\d{2}$', str(filtered_body['invoice_month'])):
+        return jsonify({'error': 'invoice_month must be YYYY-MM'}), 400
+
+    field_mapping = {
+        'status': S.InvoiceBatches.STATUS,
+        'title': S.InvoiceBatches.TITLE,
+        'notes': S.InvoiceBatches.NOTES,
+        'invoice_month': S.InvoiceBatches.INVOICE_MONTH,
+        'service_id': S.InvoiceBatches.SERVICE_ID,
+    }
+    db_body = {field_mapping[k]: v for k, v in filtered_body.items()}
+
+    success = update_invoice_batch(invoice_batch_id, **db_body)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to update invoice batch'}), 500
 
 
 # Serve React app
@@ -2116,6 +2191,68 @@ def api_projects_overview():
     except Exception as e:
         logging.exception("Failed to get projects overview with health")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/finance_grid', methods=['GET'])
+def api_projects_finance_grid():
+    project_id = request.args.get('project_id', type=int)
+    if not project_id:
+        return jsonify({'error': 'project_id is required'}), 400
+
+    finance_rollup = get_project_finance_rollup(project_id)
+    if finance_rollup is None:
+        return jsonify({'error': 'Project finance not found'}), 404
+
+    now = datetime.utcnow().date()
+    start_month = now.replace(day=1)
+
+    def _add_months(base_date, months):
+        month = base_date.month - 1 + months
+        year = base_date.year + month // 12
+        month = month % 12 + 1
+        return base_date.replace(year=year, month=month, day=1)
+
+    month_labels = [
+        _add_months(start_month, offset).strftime('%Y-%m')
+        for offset in range(6)
+    ]
+    start_label = month_labels[0]
+    end_label = month_labels[-1]
+
+    pipeline_rows = get_invoice_pipeline_by_project_month(
+        project_id,
+        start_month=start_label,
+        end_month=end_label,
+    )
+    pipeline_by_month = {row['invoice_month']: row for row in pipeline_rows}
+
+    invoice_pipeline = []
+    for month in month_labels:
+        row = pipeline_by_month.get(month)
+        invoice_pipeline.append({
+            'month': month,
+            'deliverables_count': row['deliverables_count'] if row else 0,
+            'total_amount': row['total_amount'] if row else 0.0,
+            'ready_count': row['ready_count'] if row else 0,
+            'ready_amount': row['ready_amount'] if row else 0.0,
+            'issued_count': row['issued_count'] if row else 0,
+        })
+
+    ready_this_month = next((item for item in invoice_pipeline if item['month'] == start_label), None)
+
+    response = {
+        **finance_rollup,
+        'invoice_pipeline': invoice_pipeline,
+        'ready_this_month': ready_this_month or {
+            'month': start_label,
+            'deliverables_count': 0,
+            'total_amount': 0.0,
+            'ready_count': 0,
+            'ready_amount': 0.0,
+            'issued_count': 0,
+        },
+    }
+    return jsonify(response)
 
 
 @app.route('/api/users', methods=['GET'])

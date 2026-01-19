@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Project, ProjectFilters, DashboardTimelineResponse } from '@/types/api';
+import type { Project, ProjectFilters, DashboardTimelineResponse, ProjectFinanceGrid } from '@/types/api';
 
 export const projectsApi = {
   // Get all projects
@@ -83,6 +83,13 @@ export const projectsApi = {
     if (options?.manager) params.manager = options.manager;
     const response = await apiClient.get<DashboardTimelineResponse>('/dashboard/timeline', {
       params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
+  getFinanceGrid: async (projectId: number): Promise<ProjectFinanceGrid> => {
+    const response = await apiClient.get<ProjectFinanceGrid>('/projects/finance_grid', {
+      params: { project_id: projectId },
     });
     return response.data;
   },

@@ -1068,6 +1068,10 @@ class ServiceReviews:
     CYCLE_NO = "cycle_no"
     PLANNED_DATE = "planned_date"
     DUE_DATE = "due_date"
+    INVOICE_MONTH_OVERRIDE = "invoice_month_override"
+    INVOICE_MONTH_AUTO = "invoice_month_auto"
+    INVOICE_MONTH_FINAL = "invoice_month_final"
+    INVOICE_BATCH_ID = "invoice_batch_id"
     DISCIPLINES = "disciplines"
     DELIVERABLES = "deliverables"
     STATUS = "status"
@@ -1088,6 +1092,18 @@ class ServiceReviews:
     GENERATED_KEY = "generated_key"
     ORIGIN = "origin"
     IS_TEMPLATE_MANAGED = "is_template_managed"
+
+class InvoiceBatches:
+    TABLE = "InvoiceBatches"
+    INVOICE_BATCH_ID = "invoice_batch_id"
+    PROJECT_ID = "project_id"
+    SERVICE_ID = "service_id"
+    INVOICE_MONTH = "invoice_month"
+    STATUS = "status"
+    TITLE = "title"
+    NOTES = "notes"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"

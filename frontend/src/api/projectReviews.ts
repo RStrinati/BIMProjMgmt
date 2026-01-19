@@ -18,6 +18,8 @@ export type PatchProjectReviewPayload = {
   invoice_reference?: string | null;
   invoice_date?: string | null;
   is_billed?: boolean | null;
+  invoice_month_override?: string | null;
+  invoice_batch_id?: number | null;
 };
 
 export const projectReviewsApi = {

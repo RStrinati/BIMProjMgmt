@@ -9,6 +9,7 @@ import {
   Chip,
   Divider,
   Link as MuiLink,
+  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -18,9 +19,9 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { projectsApi, projectReviewsApi, tasksApi, usersApi } from '@/api';
+import { invoiceBatchesApi, projectsApi, projectReviewsApi, tasksApi, usersApi } from '@/api';
 import { serviceReviewsApi } from '@/api/services';
-import type { Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview, TaskPayload, User } from '@/types/api';
+import type { InvoiceBatch, Project, ProjectFinanceGrid, ProjectReviewItem, ProjectReviewsResponse, ServiceReview, TaskPayload, User } from '@/types/api';
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
 import { IssuesTabContent } from '@/components/ProjectManagement/IssuesTabContent';
@@ -65,6 +66,21 @@ const formatCurrency = (value?: number | null) => {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 };
 
+const toMonthString = (date: Date) => {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}`;
+};
+
+const formatInvoiceMonth = (value?: string | null) => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toMonthString(parsed);
+};
+
 export default function ProjectWorkspacePageV2() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -78,6 +94,11 @@ export default function ProjectWorkspacePageV2() {
   const [reviewUpdateError, setReviewUpdateError] = useState<string | null>(null);
   const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
   const [isReviewDetailOpen, setIsReviewDetailOpen] = useState(false);
+  const [deliverableFilters, setDeliverableFilters] = useState({
+    dueThisMonth: false,
+    unbatched: false,
+    readyToInvoice: false,
+  });
   const [isServicesLinearUIEnabled, setIsServicesLinearUIEnabled] = useState(() => {
     return localStorage.getItem('servicesLinearUI') === 'true';
   });
@@ -136,6 +157,12 @@ export default function ProjectWorkspacePageV2() {
   const { data: project, isLoading, error } = useQuery<Project>({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.getById(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const { data: financeGrid } = useQuery<ProjectFinanceGrid>({
+    queryKey: ['projectFinanceGrid', projectId],
+    queryFn: () => projectsApi.getFinanceGrid(projectId),
     enabled: Number.isFinite(projectId),
   });
 
@@ -251,6 +278,35 @@ export default function ProjectWorkspacePageV2() {
     () => projectReviews?.items ?? [],
     [projectReviews],
   );
+
+  const { data: invoiceBatches = [] } = useQuery<InvoiceBatch[]>({
+    queryKey: ['invoiceBatches', projectId],
+    queryFn: () => invoiceBatchesApi.getAll(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const createInvoiceBatch = useMutation({
+    mutationFn: (payload: Parameters<typeof invoiceBatchesApi.create>[0]) => invoiceBatchesApi.create(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoiceBatches', projectId] });
+    },
+  });
+
+  const filteredReviewItems = useMemo(() => {
+    if (!deliverableFilters.dueThisMonth && !deliverableFilters.unbatched && !deliverableFilters.readyToInvoice) {
+      return reviewItems;
+    }
+    const currentMonth = toMonthString(new Date());
+    return reviewItems.filter((review) => {
+      const dueMonth = formatInvoiceMonth(review.due_date) ?? '';
+      const matchesDueThisMonth = !deliverableFilters.dueThisMonth || dueMonth === currentMonth;
+      const matchesUnbatched = !deliverableFilters.unbatched || review.invoice_batch_id == null;
+      const matchesReady =
+        !deliverableFilters.readyToInvoice
+        || ((review.status || '').toLowerCase() === 'completed' && !review.is_billed);
+      return matchesDueThisMonth && matchesUnbatched && matchesReady;
+    });
+  }, [deliverableFilters, reviewItems]);
 
   const updateReviewStatus = useMutation<
     Awaited<ReturnType<typeof serviceReviewsApi.update>>,
@@ -513,7 +569,38 @@ export default function ProjectWorkspacePageV2() {
                   <InlineField label="Agreed fee" value={formatCurrency(progressSummary.totalAgreed)} />
                   <InlineField label="Billed" value={formatCurrency(progressSummary.totalBilled)} />
                   <InlineField label="Billed %" value={`${Math.round(progressSummary.billedPct)}%`} />
+                  <InlineField
+                    label="Earned value %"
+                    value={financeGrid ? `${Math.round(financeGrid.earned_value_pct)}%` : '--'}
+                  />
                 </Stack>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  Invoice pipeline
+                </Typography>
+                {financeGrid ? (
+                  <Stack spacing={1} data-testid="project-workspace-v2-invoice-pipeline">
+                    <InlineField
+                      label="Ready this month"
+                      value={`${financeGrid.ready_this_month.ready_count} items · ${formatCurrency(financeGrid.ready_this_month.ready_amount)}`}
+                    />
+                    <Stack spacing={0.5}>
+                      {financeGrid.invoice_pipeline.map((item) => (
+                        <Box key={item.month} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.month}
+                          </Typography>
+                          <Typography variant="caption">
+                            {item.deliverables_count} · {formatCurrency(item.total_amount)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary">Loading invoice pipeline...</Typography>
+                )}
               </Paper>
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>
@@ -562,23 +649,65 @@ export default function ProjectWorkspacePageV2() {
             {projectReviewsLoading ? (
               <Typography color="text.secondary">Loading deliverables...</Typography>
             ) : reviewItems.length ? (
+              <>
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }} data-testid="deliverables-filters">
+                  <Chip
+                    label="Due this month"
+                    color={deliverableFilters.dueThisMonth ? 'primary' : 'default'}
+                    variant={deliverableFilters.dueThisMonth ? 'filled' : 'outlined'}
+                    onClick={() => setDeliverableFilters((prev) => ({ ...prev, dueThisMonth: !prev.dueThisMonth }))}
+                    size="small"
+                  />
+                  <Chip
+                    label="Unbatched"
+                    color={deliverableFilters.unbatched ? 'primary' : 'default'}
+                    variant={deliverableFilters.unbatched ? 'filled' : 'outlined'}
+                    onClick={() => setDeliverableFilters((prev) => ({ ...prev, unbatched: !prev.unbatched }))}
+                    size="small"
+                  />
+                  <Chip
+                    label="Ready to invoice"
+                    color={deliverableFilters.readyToInvoice ? 'primary' : 'default'}
+                    variant={deliverableFilters.readyToInvoice ? 'filled' : 'outlined'}
+                    onClick={() => setDeliverableFilters((prev) => ({ ...prev, readyToInvoice: !prev.readyToInvoice }))}
+                    size="small"
+                  />
+                </Stack>
               <LinearListContainer>
                 <LinearListHeaderRow
-                  columns={featureFlags.anchorLinks ? ['Service', 'Planned', 'Due', 'Invoice #', 'Invoice Date', 'Billed', 'Blockers'] : ['Service', 'Planned', 'Due', 'Invoice #', 'Invoice Date', 'Billed']}
+                  columns={featureFlags.anchorLinks
+                    ? ['Service', 'Planned', 'Due', 'Invoice Month', 'Batch', 'Invoice #', 'Invoice Date', 'Billed', 'Blockers']
+                    : ['Service', 'Planned', 'Due', 'Invoice Month', 'Batch', 'Invoice #', 'Invoice Date', 'Billed']}
                 />
-                {reviewItems.map((review) => {
+                {filteredReviewItems.map((review) => {
                   const serviceLabel = [review.service_code, review.service_name]
                     .filter(Boolean)
                     .join(' | ');
                   const metadataLabel = [review.phase, review.cycle_no ? `Cycle ${review.cycle_no}` : null]
                     .filter(Boolean)
                     .join(' | ');
+                  const invoiceMonth = review.invoice_month_final
+                    || review.invoice_month_override
+                    || review.invoice_month_auto
+                    || formatInvoiceMonth(review.due_date);
+                  const plannedMonth = formatInvoiceMonth(review.planned_date);
+                  const dueMonth = formatInvoiceMonth(review.due_date);
+                  const isSlipped = plannedMonth && dueMonth && plannedMonth !== dueMonth;
+                  const batchOptions = invoiceMonth
+                    ? invoiceBatches.filter((batch) =>
+                        batch.invoice_month === invoiceMonth
+                        && (batch.service_id == null || batch.service_id === review.service_id),
+                      )
+                    : [];
+                  const isBatchSaving = updateDeliverableField.isPending
+                    && updateDeliverableField.variables?.review.review_id === review.review_id
+                    && updateDeliverableField.variables?.fieldName === 'invoice_batch_id';
 
                   return (
                     <LinearListRow
                       key={review.review_id}
                       testId={`deliverable-row-${review.review_id}`}
-                      columns={featureFlags.anchorLinks ? 7 : 6}
+                      columns={featureFlags.anchorLinks ? 9 : 8}
                       hoverable
                     >
                       {/* Service + metadata (primary) */}
@@ -597,19 +726,101 @@ export default function ProjectWorkspacePageV2() {
                       </LinearListCell>
 
                       {/* Due Date - Editable */}
+                      <Box>
+                        <EditableCell
+                          value={review.due_date}
+                          type="date"
+                          testId={`cell-due-${review.review_id}`}
+                          isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
+                          onSave={async (newValue) => {
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'due_date',
+                              value: newValue,
+                            });
+                          }}
+                        />
+                        {isSlipped && (
+                          <Typography variant="caption" color="warning.main" sx={{ ml: 1 }}>
+                            Slipped
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Invoice Month - Editable override */}
                       <EditableCell
-                        value={review.due_date}
-                        type="date"
-                        testId={`cell-due-${review.review_id}`}
-                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
+                        value={invoiceMonth}
+                        type="month"
+                        testId={`cell-invoice-month-${review.review_id}`}
+                        isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_month_override'}
                         onSave={async (newValue) => {
                           await updateDeliverableField.mutateAsync({
                             review,
-                            fieldName: 'due_date',
+                            fieldName: 'invoice_month_override',
                             value: newValue,
                           });
                         }}
                       />
+
+                      {/* Invoice Batch - Select */}
+                      <Box sx={{ minWidth: 160 }}>
+                        <TextField
+                          select
+                          size="small"
+                          fullWidth
+                          value={review.invoice_batch_id ? String(review.invoice_batch_id) : ''}
+                          disabled={!invoiceMonth || isBatchSaving || createInvoiceBatch.isPending}
+                          SelectProps={{
+                            displayEmpty: true,
+                            renderValue: (selected) => {
+                              if (!invoiceMonth) {
+                                return 'Set invoice month';
+                              }
+                              if (!selected) {
+                                return 'Unbatched';
+                              }
+                              const match = batchOptions.find((batch) => String(batch.invoice_batch_id) === selected);
+                              return match?.title || `Batch #${selected}`;
+                            },
+                            inputProps: {
+                              'data-testid': `cell-invoice-batch-${review.review_id}`,
+                            },
+                          }}
+                          onChange={async (event) => {
+                            const value = event.target.value;
+                            if (value === '__create__' && invoiceMonth) {
+                              const title = window.prompt('Batch title (optional)') || null;
+                              const result = await createInvoiceBatch.mutateAsync({
+                                project_id: projectId,
+                                service_id: review.service_id,
+                                invoice_month: invoiceMonth,
+                                title,
+                              });
+                              if (result?.invoice_batch_id) {
+                                await updateDeliverableField.mutateAsync({
+                                  review,
+                                  fieldName: 'invoice_batch_id',
+                                  value: result.invoice_batch_id,
+                                });
+                              }
+                              return;
+                            }
+                            await updateDeliverableField.mutateAsync({
+                              review,
+                              fieldName: 'invoice_batch_id',
+                              value: value ? Number(value) : null,
+                            });
+                          }}
+                        >
+                          <MenuItem value="">Unbatched</MenuItem>
+                          {batchOptions.map((batch) => (
+                            <MenuItem key={batch.invoice_batch_id} value={String(batch.invoice_batch_id)}>
+                              {batch.title || `Batch #${batch.invoice_batch_id}`}
+                            </MenuItem>
+                          ))}
+                          <MenuItem value="__create__">Create new batch</MenuItem>
+                        </TextField>
+                      </Box>
 
                       {/* Invoice Number - Editable */}
                       <EditableCell
@@ -670,6 +881,7 @@ export default function ProjectWorkspacePageV2() {
                   );
                 })}
               </LinearListContainer>
+              </>
             ) : (
               <Typography color="text.secondary">No deliverables found for this project.</Typography>
             )}

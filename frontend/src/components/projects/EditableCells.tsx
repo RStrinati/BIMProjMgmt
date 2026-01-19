@@ -14,7 +14,7 @@ type EditableCellProps = {
   value: string | null | undefined;
   onSave: (value: string | null) => void | Promise<void>;
   isSaving?: boolean;
-  type?: 'text' | 'date';
+  type?: 'text' | 'date' | 'month';
   placeholder?: string;
   testId?: string;
   onClick?: () => void;

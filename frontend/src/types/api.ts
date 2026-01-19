@@ -919,6 +919,10 @@ export interface ServiceReview {
   cycle_no: number;
   planned_date: string;
   due_date?: string;
+  invoice_month_override?: string | null;
+  invoice_month_auto?: string | null;
+  invoice_month_final?: string | null;
+  invoice_batch_id?: number | null;
   disciplines?: string;
   deliverables?: string;
   status: string;
@@ -946,6 +950,10 @@ export interface ProjectReviewItem {
   cycle_no: number;
   planned_date?: string | null;
   due_date?: string | null;
+  invoice_month_override?: string | null;
+  invoice_month_auto?: string | null;
+  invoice_month_final?: string | null;
+  invoice_batch_id?: number | null;
   status?: string | null;
   disciplines?: string | null;
   deliverables?: string | null;
@@ -961,6 +969,37 @@ export interface ProjectReviewItem {
 export interface ProjectReviewsResponse {
   items: ProjectReviewItem[];
   total: number;
+}
+
+export interface InvoiceBatch {
+  invoice_batch_id: number;
+  project_id: number;
+  service_id?: number | null;
+  invoice_month: string;
+  status: string;
+  title?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InvoicePipelineItem {
+  month: string;
+  deliverables_count: number;
+  total_amount: number;
+  ready_count: number;
+  ready_amount: number;
+  issued_count: number;
+}
+
+export interface ProjectFinanceGrid {
+  project_id: number;
+  agreed_fee: number;
+  billed_to_date: number;
+  earned_value: number;
+  earned_value_pct: number;
+  invoice_pipeline: InvoicePipelineItem[];
+  ready_this_month: InvoicePipelineItem;
 }
 
 export interface ReviewBillingRecord extends ServiceReview {

@@ -482,7 +482,9 @@ def get_service_reviews(service_id):
                     f"""
                     SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
                            {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
-                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
+                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.INVOICE_MONTH_OVERRIDE},
+                           {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL},
+                           {S.ServiceReviews.INVOICE_BATCH_ID}, {S.ServiceReviews.DISCIPLINES}, 
                            {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
                            {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
                            {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
@@ -501,21 +503,25 @@ def get_service_reviews(service_id):
                     cycle_no=row[2],
                     planned_date=row[3],
                     due_date=row[4],
-                    disciplines=row[5],
-                    deliverables=row[6],
-                    status=row[7],
-                    weight_factor=float(row[8]) if row[8] is not None else None,
-                    evidence_links=row[9],
-                    invoice_reference=row[10],
-                    actual_issued_at=row[11],
+                    invoice_month_override=row[5],
+                    invoice_month_auto=row[6],
+                    invoice_month_final=row[7],
+                    invoice_batch_id=row[8],
+                    disciplines=row[9],
+                    deliverables=row[10],
+                    status=row[11],
+                    weight_factor=float(row[12]) if row[12] is not None else None,
+                    evidence_links=row[13],
+                    invoice_reference=row[14],
+                    actual_issued_at=row[15],
                     source_phase=None,
                     billing_phase=None,
                     billing_rate=None,
                     billing_amount=None,
-                    is_billed=bool(row[12]) if row[12] is not None else False,
-                    origin=row[13],
-                    is_template_managed=bool(row[14]) if row[14] is not None else None,
-                    sort_order=row[15],
+                    is_billed=bool(row[16]) if row[16] is not None else False,
+                    origin=row[17],
+                    is_template_managed=bool(row[18]) if row[18] is not None else None,
+                    sort_order=row[19],
                 ) for row in rows]
             return reviews
     except Exception as e:
@@ -592,6 +598,10 @@ def get_project_reviews(
                     sr.{S.ServiceReviews.CYCLE_NO},
                     sr.{S.ServiceReviews.PLANNED_DATE},
                     sr.{S.ServiceReviews.DUE_DATE},
+                    sr.{S.ServiceReviews.INVOICE_MONTH_OVERRIDE},
+                    sr.{S.ServiceReviews.INVOICE_MONTH_AUTO},
+                    sr.{S.ServiceReviews.INVOICE_MONTH_FINAL},
+                    sr.{S.ServiceReviews.INVOICE_BATCH_ID},
                     sr.{S.ServiceReviews.STATUS},
                     sr.{S.ServiceReviews.DISCIPLINES},
                     sr.{S.ServiceReviews.DELIVERABLES},
@@ -624,16 +634,20 @@ def get_project_reviews(
                     cycle_no=row[3],
                     planned_date=row[4],
                     due_date=row[5],
-                    status=row[6],
-                    disciplines=row[7],
-                    deliverables=row[8],
-                    is_billed=bool(row[9]) if row[9] is not None else None,
-                    billing_amount=float(row[10]) if row[10] is not None else None,
-                    invoice_reference=row[11],
-                    invoice_date=row[12],
-                    service_name=row[13],
-                    service_code=row[14],
-                    phase=row[15],
+                    invoice_month_override=row[6],
+                    invoice_month_auto=row[7],
+                    invoice_month_final=row[8],
+                    invoice_batch_id=row[9],
+                    status=row[10],
+                    disciplines=row[11],
+                    deliverables=row[12],
+                    is_billed=bool(row[13]) if row[13] is not None else None,
+                    billing_amount=float(row[14]) if row[14] is not None else None,
+                    invoice_reference=row[15],
+                    invoice_date=row[16],
+                    service_name=row[17],
+                    service_code=row[18],
+                    phase=row[19],
                 )
                 for row in rows
             ]
@@ -641,6 +655,203 @@ def get_project_reviews(
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"Error fetching project reviews: {e}")
+        return None
+
+
+def list_invoice_batches(project_id, invoice_month=None, service_id=None):
+    """List invoice batches for a project (optionally filtered by month/service)."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filters = [f"{S.InvoiceBatches.PROJECT_ID} = ?"]
+            params = [project_id]
+
+            if invoice_month:
+                filters.append(f"{S.InvoiceBatches.INVOICE_MONTH} = ?")
+                params.append(invoice_month)
+
+            if service_id:
+                filters.append(f"{S.InvoiceBatches.SERVICE_ID} = ?")
+                params.append(service_id)
+
+            where_clause = " AND ".join(filters)
+            cursor.execute(
+                f"""
+                SELECT {S.InvoiceBatches.INVOICE_BATCH_ID},
+                       {S.InvoiceBatches.PROJECT_ID},
+                       {S.InvoiceBatches.SERVICE_ID},
+                       {S.InvoiceBatches.INVOICE_MONTH},
+                       {S.InvoiceBatches.STATUS},
+                       {S.InvoiceBatches.TITLE},
+                       {S.InvoiceBatches.NOTES},
+                       {S.InvoiceBatches.CREATED_AT},
+                       {S.InvoiceBatches.UPDATED_AT}
+                FROM {S.InvoiceBatches.TABLE}
+                WHERE {where_clause}
+                ORDER BY {S.InvoiceBatches.INVOICE_MONTH}, {S.InvoiceBatches.INVOICE_BATCH_ID}
+                """,
+                params,
+            )
+            rows = cursor.fetchall()
+            return [
+                dict(
+                    invoice_batch_id=row[0],
+                    project_id=row[1],
+                    service_id=row[2],
+                    invoice_month=row[3],
+                    status=row[4],
+                    title=row[5],
+                    notes=row[6],
+                    created_at=row[7],
+                    updated_at=row[8],
+                )
+                for row in rows
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching invoice batches: {e}")
+        return []
+
+
+def create_invoice_batch(project_id, invoice_month, service_id=None, status='draft', title=None, notes=None):
+    """Create an invoice batch for a project/service/month."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.InvoiceBatches.TABLE} (
+                    {S.InvoiceBatches.PROJECT_ID},
+                    {S.InvoiceBatches.SERVICE_ID},
+                    {S.InvoiceBatches.INVOICE_MONTH},
+                    {S.InvoiceBatches.STATUS},
+                    {S.InvoiceBatches.TITLE},
+                    {S.InvoiceBatches.NOTES}
+                )
+                OUTPUT INSERTED.{S.InvoiceBatches.INVOICE_BATCH_ID}
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (project_id, service_id, invoice_month, status, title, notes),
+            )
+            invoice_batch_id = cursor.fetchone()[0]
+            conn.commit()
+            return invoice_batch_id
+    except Exception as e:
+        logger.error(f"Error creating invoice batch: {e}")
+        return None
+
+
+def update_invoice_batch(invoice_batch_id, **kwargs):
+    """Update invoice batch fields (status/title/notes)."""
+    try:
+        allowed_fields = {
+            S.InvoiceBatches.STATUS,
+            S.InvoiceBatches.TITLE,
+            S.InvoiceBatches.NOTES,
+            S.InvoiceBatches.INVOICE_MONTH,
+            S.InvoiceBatches.SERVICE_ID,
+        }
+        update_fields = {k: v for k, v in kwargs.items() if k in allowed_fields}
+        if not update_fields:
+            return False
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            update_fields[S.InvoiceBatches.UPDATED_AT] = "SYSUTCDATETIME()"
+
+            set_clause_parts = []
+            values = []
+            for key, value in update_fields.items():
+                if key == S.InvoiceBatches.UPDATED_AT:
+                    set_clause_parts.append(f"{key} = {value}")
+                else:
+                    set_clause_parts.append(f"{key} = ?")
+                    values.append(value)
+
+            values.append(invoice_batch_id)
+            set_clause = ", ".join(set_clause_parts)
+            cursor.execute(
+                f"UPDATE {S.InvoiceBatches.TABLE} SET {set_clause} WHERE {S.InvoiceBatches.INVOICE_BATCH_ID} = ?",
+                values,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating invoice batch: {e}")
+        return False
+
+
+def get_invoice_pipeline_by_project_month(project_id, start_month=None, end_month=None):
+    """Return invoice pipeline totals by project/month."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filters = ["project_id = ?"]
+            params = [project_id]
+
+            if start_month:
+                filters.append("invoice_month >= ?")
+                params.append(start_month)
+            if end_month:
+                filters.append("invoice_month <= ?")
+                params.append(end_month)
+
+            where_clause = " AND ".join(filters)
+            cursor.execute(
+                f"""
+                SELECT invoice_month,
+                       deliverables_count,
+                       total_amount,
+                       ready_count,
+                       ready_amount,
+                       issued_count
+                FROM vw_invoice_pipeline_by_project_month
+                WHERE {where_clause}
+                ORDER BY invoice_month
+                """,
+                params,
+            )
+            rows = cursor.fetchall()
+            return [
+                dict(
+                    invoice_month=row[0],
+                    deliverables_count=int(row[1] or 0),
+                    total_amount=float(row[2] or 0),
+                    ready_count=int(row[3] or 0),
+                    ready_amount=float(row[4] or 0),
+                    issued_count=int(row[5] or 0),
+                )
+                for row in rows
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching invoice pipeline: {e}")
+        return []
+
+
+def get_project_finance_rollup(project_id):
+    """Return finance rollup metrics for a project."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT project_id, agreed_fee, billed_to_date, earned_value, earned_value_pct
+                FROM vw_projects_finance_rollup
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return dict(
+                project_id=row[0],
+                agreed_fee=float(row[1] or 0),
+                billed_to_date=float(row[2] or 0),
+                earned_value=float(row[3] or 0),
+                earned_value_pct=float(row[4] or 0),
+            )
+    except Exception as e:
+        logger.error(f"Error fetching project finance rollup: {e}")
         return None
 
 
@@ -739,12 +950,40 @@ def _ensure_service_review_billing_columns(cursor) -> bool:
     return True
 
 
+_service_review_invoice_columns_ready = None
+
+
+def _ensure_service_review_invoice_columns(cursor) -> bool:
+    """Check whether invoice month/batch columns exist on ServiceReviews."""
+    global _service_review_invoice_columns_ready
+    if _service_review_invoice_columns_ready is not None:
+        return bool(_service_review_invoice_columns_ready)
+
+    table = S.ServiceReviews.TABLE
+    required = [
+        S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
+        S.ServiceReviews.INVOICE_MONTH_AUTO,
+        S.ServiceReviews.INVOICE_MONTH_FINAL,
+        S.ServiceReviews.INVOICE_BATCH_ID,
+    ]
+
+    try:
+        for column in required:
+            cursor.execute(f"SELECT {column} FROM {table} WHERE 1 = 0")
+        _service_review_invoice_columns_ready = True
+        return True
+    except Exception:
+        _service_review_invoice_columns_ready = False
+        return False
+
+
 def create_service_review(service_id, cycle_no, planned_date, due_date=None, 
                          disciplines=None, deliverables=None, status='planned', 
                          weight_factor=1.0, evidence_links=None, invoice_reference=None,
                          source_phase=None, billing_phase=None, billing_rate=None,
                          billing_amount=None, is_billed=None, origin=None,
-                         is_template_managed=None, sort_order=None):
+                         is_template_managed=None, sort_order=None,
+                         invoice_month_override=None, invoice_batch_id=None):
     """Create a new review for a service."""
     try:
         with get_db_connection() as conn:
@@ -767,6 +1006,7 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
 
             # Derive default billing metadata from the service record
             supports_billing = _ensure_service_review_billing_columns(cursor)
+            supports_invoice_month = _ensure_service_review_invoice_columns(cursor)
             cursor.execute(
                 f"""
                 SELECT {S.ProjectServices.PHASE}, {S.ProjectServices.UNIT_TYPE}, 
@@ -806,7 +1046,15 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                 except (ValueError, TypeError):
                     effective_amount = float(effective_rate or 0) * float(final_weight or 1)
 
+            invoice_month_auto = _format_invoice_month(due_date)
+            invoice_month_final = invoice_month_override or invoice_month_auto
+
             if supports_billing:
+                extra_columns = ""
+                extra_values = []
+                if supports_invoice_month:
+                    extra_columns = f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
+                    extra_values = [invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id]
                 cursor.execute(
                     f"""
                     INSERT INTO {S.ServiceReviews.TABLE} (
@@ -818,18 +1066,24 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
                         {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT},
                         {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
-                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}{extra_columns}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?, ?, ?, ?' if supports_invoice_month else ''})
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
                         deliverables, status, final_weight, evidence_links, invoice_reference,
                         final_source_phase, final_billing_phase, effective_rate, effective_amount,
                         int(bool(effective_is_billed)), origin_value,
-                        int(bool(is_template_managed)), sort_order
+                        int(bool(is_template_managed)), sort_order,
+                        *extra_values
                     )
                 )
             else:
+                extra_columns = ""
+                extra_values = []
+                if supports_invoice_month:
+                    extra_columns = f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
+                    extra_values = [invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id]
                 cursor.execute(
                     f"""
                     INSERT INTO {S.ServiceReviews.TABLE} (
@@ -839,14 +1093,15 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
                         {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
                         {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
-                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}{extra_columns}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?, ?, ?, ?' if supports_invoice_month else ''})
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
                         deliverables, status, final_weight, evidence_links, invoice_reference,
                         int(bool(effective_is_billed)), origin_value,
-                        int(bool(is_template_managed)), sort_order
+                        int(bool(is_template_managed)), sort_order,
+                        *extra_values
                     )
                 )
             conn.commit()
@@ -872,6 +1127,16 @@ def _parse_iso_date(value):
     raise ValueError(f"Invalid date value: {value!r}")
 
 
+def _format_invoice_month(value):
+    """Return YYYY-MM string for a date/datetime/string (YYYY-MM-DD)."""
+    if value is None or value == '':
+        return None
+    parsed = _parse_iso_date(value)
+    if not parsed:
+        return None
+    return parsed.strftime('%Y-%m')
+
+
 def update_service_review(review_id, **kwargs):
     """Update an existing service review with validation for deliverables fields.
     
@@ -886,6 +1151,7 @@ def update_service_review(review_id, **kwargs):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             supports_billing = _ensure_service_review_billing_columns(cursor)
+            supports_invoice_month = _ensure_service_review_invoice_columns(cursor)
             update_fields = {}
             allowed_fields = [
                 S.ServiceReviews.CYCLE_NO, S.ServiceReviews.PLANNED_DATE, 
@@ -904,6 +1170,13 @@ def update_service_review(review_id, **kwargs):
                     S.ServiceReviews.SOURCE_PHASE, S.ServiceReviews.BILLING_PHASE,
                     S.ServiceReviews.BILLING_RATE, S.ServiceReviews.BILLING_AMOUNT
                 ])
+            if supports_invoice_month:
+                allowed_fields.extend([
+                    S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
+                    S.ServiceReviews.INVOICE_MONTH_AUTO,
+                    S.ServiceReviews.INVOICE_MONTH_FINAL,
+                    S.ServiceReviews.INVOICE_BATCH_ID,
+                ])
             
             manual_fields = {
                 S.ServiceReviews.CYCLE_NO,
@@ -915,11 +1188,38 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.INVOICE_REFERENCE,
                 S.ServiceReviews.INVOICE_DATE,
                 S.ServiceReviews.ACTUAL_ISSUED_AT,
+                S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
+                S.ServiceReviews.INVOICE_BATCH_ID,
                 S.ServiceReviews.SORT_ORDER,
             }
             should_unmanage = any(key in manual_fields for key in kwargs)
 
             status_update = None
+            invoice_month_override_value = None
+            invoice_month_override_in_payload = False
+            existing_override = None
+            existing_auto = None
+            existing_due_date = None
+
+            if supports_invoice_month and (
+                S.ServiceReviews.DUE_DATE in kwargs or S.ServiceReviews.INVOICE_MONTH_OVERRIDE in kwargs
+            ):
+                cursor.execute(
+                    f"""
+                    SELECT {S.ServiceReviews.INVOICE_MONTH_OVERRIDE},
+                           {S.ServiceReviews.INVOICE_MONTH_AUTO},
+                           {S.ServiceReviews.DUE_DATE}
+                    FROM {S.ServiceReviews.TABLE}
+                    WHERE {S.ServiceReviews.REVIEW_ID} = ?
+                    """,
+                    (review_id,)
+                )
+                existing_row = cursor.fetchone()
+                if existing_row:
+                    existing_override = existing_row[0]
+                    existing_auto = existing_row[1]
+                    existing_due_date = existing_row[2]
+
             for key, value in kwargs.items():
                 if key in allowed_fields:
                     if key == S.ServiceReviews.STATUS:
@@ -930,6 +1230,12 @@ def update_service_review(review_id, **kwargs):
                     elif key == S.ServiceReviews.IS_BILLED:
                         # Convert to boolean int (0 or 1)
                         update_fields[key] = 1 if value else 0
+                    elif key == S.ServiceReviews.INVOICE_MONTH_OVERRIDE:
+                        invoice_month_override_in_payload = True
+                        invoice_month_override_value = (value or '').strip() if value else None
+                        update_fields[key] = invoice_month_override_value
+                    elif key == S.ServiceReviews.INVOICE_BATCH_ID:
+                        update_fields[key] = value
                     elif key in (S.ServiceReviews.DUE_DATE, S.ServiceReviews.INVOICE_DATE):
                         # Parse and validate ISO dates
                         try:
@@ -951,6 +1257,25 @@ def update_service_review(review_id, **kwargs):
                             update_fields[key] = None
                     else:
                         update_fields[key] = value
+
+            if supports_invoice_month:
+                invoice_month_auto = existing_auto
+                if S.ServiceReviews.DUE_DATE in update_fields:
+                    invoice_month_auto = _format_invoice_month(update_fields.get(S.ServiceReviews.DUE_DATE))
+                    update_fields[S.ServiceReviews.INVOICE_MONTH_AUTO] = invoice_month_auto
+
+                if invoice_month_override_in_payload:
+                    if invoice_month_override_value:
+                        update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_override_value
+                    else:
+                        if invoice_month_auto is None:
+                            invoice_month_auto = existing_auto or _format_invoice_month(existing_due_date)
+                        update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_auto
+                elif S.ServiceReviews.DUE_DATE in update_fields:
+                    if existing_override:
+                        update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = existing_override
+                    else:
+                        update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_auto
             
             if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
                 # Auto-align billed flag with completed status if not explicitly provided.
