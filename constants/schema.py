@@ -358,6 +358,32 @@ class Tasks:
     PROGRESS = "progress"
     PROGRESS_PERCENTAGE = "progress_percentage"
     ESTIMATED_HOURS = "estimated_hours"
+    TASK_ITEMS = "task_items"
+    NOTES = "notes"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class ProjectUpdates:
+    TABLE = "project_updates"
+    UPDATE_ID = "update_id"
+    PROJECT_ID = "project_id"
+    BODY = "body"
+    CREATED_BY = "created_by"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    IS_DELETED = "is_deleted"
+
+
+class ProjectUpdateComments:
+    TABLE = "project_update_comments"
+    COMMENT_ID = "comment_id"
+    UPDATE_ID = "update_id"
+    BODY = "body"
+    CREATED_BY = "created_by"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    IS_DELETED = "is_deleted"
     ACTUAL_HOURS = "actual_hours"
     DEPENDENCIES = "dependencies"
     PREDECESSOR_TASK_ID = "predecessor_task_id"
@@ -1021,9 +1047,23 @@ class ProjectServices:
     CLAIMED_TO_DATE = "claimed_to_date"
     ASSIGNED_USER_ID = "assigned_user_id"
 
+class ProjectServiceTemplateBindings:
+    TABLE = "ProjectServiceTemplateBindings"
+    BINDING_ID = "binding_id"
+    PROJECT_ID = "project_id"
+    SERVICE_ID = "service_id"
+    TEMPLATE_ID = "template_id"
+    TEMPLATE_VERSION = "template_version"
+    TEMPLATE_HASH = "template_hash"
+    OPTIONS_ENABLED = "options_enabled"
+    OPTIONS_ENABLED_JSON = "options_enabled_json"
+    APPLIED_AT = "applied_at"
+    APPLIED_BY_USER_ID = "applied_by_user_id"
+
 class ServiceReviews:
     TABLE = "ServiceReviews"
     REVIEW_ID = "review_id"
+    PROJECT_ID = "project_id"
     SERVICE_ID = "service_id"
     CYCLE_NO = "cycle_no"
     PLANNED_DATE = "planned_date"
@@ -1042,6 +1082,12 @@ class ServiceReviews:
     BILLING_RATE = "billing_rate"
     BILLING_AMOUNT = "billing_amount"
     ASSIGNED_USER_ID = "assigned_user_id"
+    SORT_ORDER = "sort_order"
+    GENERATED_FROM_TEMPLATE_ID = "generated_from_template_id"
+    GENERATED_FROM_TEMPLATE_VERSION = "generated_from_template_version"
+    GENERATED_KEY = "generated_key"
+    ORIGIN = "origin"
+    IS_TEMPLATE_MANAGED = "is_template_managed"
 
 class ServiceScheduleSettings:
     TABLE = "ServiceScheduleSettings"
@@ -1076,6 +1122,7 @@ class ServiceTemplates:
 class ServiceItems:
     TABLE = "ServiceItems"
     ITEM_ID = "item_id"
+    PROJECT_ID = "project_id"
     SERVICE_ID = "service_id"
     ITEM_TYPE = "item_type"  # 'review', 'audit', 'deliverable', 'milestone', etc.
     TITLE = "title"
@@ -1094,6 +1141,12 @@ class ServiceItems:
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
     IS_BILLED = "is_billed"
+    GENERATED_FROM_TEMPLATE_ID = "generated_from_template_id"
+    GENERATED_FROM_TEMPLATE_VERSION = "generated_from_template_version"
+    GENERATED_KEY = "generated_key"
+    SORT_ORDER = "sort_order"
+    ORIGIN = "origin"
+    IS_TEMPLATE_MANAGED = "is_template_managed"
 
 
 class ProjectBookmarks:

@@ -20,6 +20,12 @@ export const projectsApi = {
     return response.data;
   },
 
+  // Create new project
+  create: async (project: Partial<Project>): Promise<Project> => {
+    const response = await apiClient.post<Project>('/projects', project);
+    return response.data;
+  },
+
   // Update project
   update: async (id: number, project: Partial<Project>): Promise<Project> => {
     const response = await apiClient.put<Project>(`/projects/${id}`, project);

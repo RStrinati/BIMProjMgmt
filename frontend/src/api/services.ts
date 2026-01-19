@@ -8,6 +8,9 @@ import type {
   ApplyTemplateResult,
   ServiceReview,
   ReviewBillingResponse,
+  ServiceTemplateCatalogResponse,
+  GeneratedServiceStructure,
+  ServiceTemplateResyncResult,
 } from '@/types/api';
 
 export interface ServiceTemplate {
@@ -42,6 +45,8 @@ export interface ProjectService {
   billing_progress_pct?: number;
   billed_amount?: number;
   agreed_fee_remaining?: number;
+  assigned_user_id?: number | null;
+  assigned_user_name?: string | null;
 }
 
 export type ProjectServicesListResponse =
@@ -78,6 +83,10 @@ export const serviceTemplatesApi = {
 
   delete: (id: number) =>
     apiClient.delete<{ success: boolean }>(`/service_templates/${id}`),
+};
+
+export const serviceTemplateCatalogApi = {
+  getAll: () => apiClient.get<ServiceTemplateCatalogResponse>('/service-templates'),
 };
 
 export const fileServiceTemplatesApi = {
@@ -122,6 +131,7 @@ export const projectServicesApi = {
     agreed_fee?: number;
     bill_rule?: string;
     notes?: string;
+    assigned_user_id?: number | null;
   }) => apiClient.post<{ service_id: number }>(`/projects/${projectId}/services`, data),
 
   update: (projectId: number, serviceId: number, data: Partial<ProjectService>) =>
@@ -129,6 +139,44 @@ export const projectServicesApi = {
 
   delete: (projectId: number, serviceId: number) =>
     apiClient.delete<{ success: boolean }>(`/projects/${projectId}/services/${serviceId}`),
+
+  createFromTemplate: (
+    projectId: number,
+    data: {
+      template_id: string;
+      options_enabled?: string[];
+      overrides?: {
+        service_code?: string;
+        service_name?: string;
+        phase?: string;
+        assigned_user_id?: number | null;
+        agreed_fee?: number;
+        unit_type?: string;
+        unit_qty?: number;
+        unit_rate?: number;
+        lump_sum_fee?: number;
+        bill_rule?: string;
+        notes?: string;
+      };
+    },
+  ) => apiClient.post(`/projects/${projectId}/services/from-template`, data),
+
+  applyTemplateToService: (
+    projectId: number,
+    serviceId: number,
+    data: {
+      template_id: string;
+      options_enabled?: string[];
+      overrides?: Record<string, unknown>;
+      dry_run?: boolean;
+      mode?: 'sync_missing_only' | 'sync_and_update_managed';
+    },
+  ) => apiClient.post<ServiceTemplateResyncResult>(`/projects/${projectId}/services/${serviceId}/apply-template`, data),
+
+  getGeneratedStructure: (projectId: number, serviceId: number) =>
+    apiClient
+      .get<GeneratedServiceStructure>(`/projects/${projectId}/services/${serviceId}/generated-structure`)
+      .then((response) => response.data),
 };
 
 // Service Reviews API
@@ -151,6 +199,9 @@ export const serviceReviewsApi = {
     billing_rate?: number;
     billing_amount?: number;
     is_billed?: boolean;
+    origin?: string;
+    is_template_managed?: boolean;
+    sort_order?: number;
   }) => apiClient.post<{ review_id: number }>(`/projects/${projectId}/services/${serviceId}/reviews`, data),
 
   update: (projectId: number, serviceId: number, reviewId: number, data: Partial<ServiceReview>) =>
@@ -187,6 +238,13 @@ export const serviceItemsApi = {
     evidence_links?: string;
     notes?: string;
     is_billed?: boolean;
+    project_id?: number;
+    generated_from_template_id?: string;
+    generated_from_template_version?: string;
+    generated_key?: string;
+    origin?: string;
+    is_template_managed?: boolean;
+    sort_order?: number;
   }) => apiClient.post<{ item_id: number }>(`/projects/${projectId}/services/${serviceId}/items`, data),
 
   update: (projectId: number, serviceId: number, itemId: number, data: Partial<ServiceItem>) =>

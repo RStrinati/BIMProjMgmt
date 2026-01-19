@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { qualityApi, QualityPhase1DRegisterResponse } from '../api/quality';
+import { qualityApi, QualityPhase1DRegisterResponse, QualityPhase1DRow } from '../api/quality';
 import { QualityRegisterTable, EditableFields } from '../components/quality/QualityRegisterTable';
 import { QualityModelSidePanel } from '../components/quality/QualityModelSidePanel';
+import { generateModelKey } from '../utils/modelKeyGenerator';
 
 interface QualityTabProps {
   projectId: number;
@@ -14,8 +15,78 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [draftById, setDraftById] = useState<Record<number, Partial<EditableFields>>>({});
+  const [nextTempId, setNextTempId] = useState(-1);
 
   const queryClient = useQueryClient();
+
+  // Helper: Check if row is a draft (negative ID)
+  const isDraftRow = (rowId: number): boolean => rowId < 0;
+
+  // Guardrail 2: Replace temp draft row with server-returned row
+  const replaceTempRowId = (
+    tempId: number,
+    newId: number,
+    rowData: Partial<QualityPhase1DRow>
+  ) => {
+    // 1. Update cache: replace temp row with server row
+    queryClient.setQueryData<QualityPhase1DRegisterResponse>(
+      ['quality-register-phase1d', projectId],
+      (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          rows: old.rows.map(row =>
+            row.expected_model_id === tempId
+              ? { ...row, expected_model_id: newId, ...rowData }
+              : row
+          )
+        };
+      }
+    );
+
+    // 2. Clear draft buffer (temp ID no longer exists)
+    setDraftById(prev => {
+      const { [tempId]: _, ...rest } = prev;
+      return rest;
+    });
+
+    // 3. Exit edit mode (avoids remapping complexity)
+    setEditingRowId(null);
+
+    // 4. If selection state exists, update it
+    if (selectedModelId === tempId) {
+      setSelectedModelId(newId);
+    }
+  };
+
+  // Guardrail 3: Safe invalidation wrappers
+  const safeInvalidateQualityRegister = () => {
+    // QUALITY_REGISTER_SAFE_INVALIDATE_ONLY
+    if (editingRowId !== null) {
+      console.warn(
+        '[QualityTab] Skipping invalidate: row is being edited',
+        { editingRowId, projectId }
+      );
+      return;
+    }
+    queryClient.invalidateQueries({
+      queryKey: ['quality-register-phase1d', projectId]
+    });
+  };
+
+  const safeRefetchQualityRegister = () => {
+    if (editingRowId !== null) {
+      console.warn(
+        '[QualityTab] Skipping refetch: row is being edited',
+        { editingRowId, projectId }
+      );
+      return;
+    }
+    queryClient.refetchQueries({
+      queryKey: ['quality-register-phase1d', projectId],
+      type: 'active'
+    });
+  };
 
   const { data, isLoading, error } = useQuery<QualityPhase1DRegisterResponse>({
     queryKey: ['quality-register-phase1d', projectId],
@@ -26,61 +97,6 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
         return result as QualityPhase1DRegisterResponse;
       }
       throw new Error('Invalid response format');
-    }
-  });
-
-  const createModelMutation = useMutation({
-    mutationFn: () => qualityApi.createEmptyModel(projectId),
-    onSuccess: (data) => {
-      // Optimistically add the new row to the table
-      queryClient.setQueryData<QualityPhase1DRegisterResponse>(
-        ['quality-register-phase1d', projectId],
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            rows: [
-              ...old.rows,
-              {
-                expected_model_id: data.id,
-                abv: null,
-                modelName: null,
-                company: null,
-                discipline: null,
-                description: null,
-                bimContact: null,
-                folderPath: null,
-                accPresent: false,
-                accDate: null,
-                reviztoPresent: false,
-                reviztoDate: null,
-                notes: null,
-                notesUpdatedAt: null,
-                mappingStatus: 'UNMAPPED',
-                matchedObservedFile: null,
-                validationOverall: 'UNKNOWN',
-                freshnessStatus: 'UNKNOWN'
-              }
-            ]
-          };
-        }
-      );
-      // Enter edit mode for the new row
-      setEditingRowId(data.id);
-      setDraftById((prev) => ({
-        ...prev,
-        [data.id]: {
-          abv: '',
-          registeredModelName: '',
-          company: '',
-          discipline: '',
-          description: '',
-          bimContact: '',
-          notes: ''
-        }
-      }));
-      // Invalidate in background
-      queryClient.invalidateQueries({ queryKey: ['quality-register-phase1d', projectId] });
     }
   });
 
@@ -118,8 +134,7 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
           };
         }
       );
-      // Background invalidate
-      queryClient.invalidateQueries({ queryKey: ['quality-register-phase1d', projectId] });
+      // Removed invalidation to prevent flicker during edit
     }
   });
 
@@ -151,8 +166,7 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
           };
         }
       );
-      // Background invalidate
-      queryClient.invalidateQueries({ queryKey: ['quality-register-phase1d', projectId] });
+      // Removed invalidation to prevent flicker during edit
     }
   });
 
@@ -209,10 +223,105 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
     if (draft.bimContact !== undefined) trimmedDraft.bimContact = draft.bimContact.trim();
     if (draft.notes !== undefined) trimmedDraft.notes = draft.notes.trim();
 
-    await updateModelMutation.mutateAsync({ rowId, draft: trimmedDraft });
+    // Check if this is a draft row (negative ID)
+    if (isDraftRow(rowId)) {
+      // Validate required field
+      if (!trimmedDraft.registeredModelName || trimmedDraft.registeredModelName === '') {
+        alert('Model Name is required');
+        return;
+      }
+
+      try {
+        // Step 1: Create skeleton row (POST)
+        const createResponse = await qualityApi.createEmptyModel(projectId);
+        const newId = createResponse.id;
+
+        // Step 2: Always update with full fields (PATCH)
+        try {
+          await qualityApi.updateExpectedModel(projectId, newId, trimmedDraft);
+
+          // Both calls succeeded - replace draft with saved row
+          replaceTempRowId(rowId, newId, {
+            expected_model_id: newId,
+            abv: trimmedDraft.abv || null,
+            modelName: trimmedDraft.registeredModelName || null,
+            registeredModelName: trimmedDraft.registeredModelName || null,
+            company: trimmedDraft.company || null,
+            discipline: trimmedDraft.discipline || null,
+            description: trimmedDraft.description || null,
+            bimContact: trimmedDraft.bimContact || null,
+            notes: trimmedDraft.notes || null,
+            folderPath: null,
+            accPresent: false,
+            accDate: null,
+            reviztoPresent: false,
+            reviztoDate: null,
+            notesUpdatedAt: null,
+            mappingStatus: 'UNMAPPED',
+            matchedObservedFile: null,
+            validationOverall: 'UNKNOWN',
+            freshnessStatus: 'UNKNOWN',
+            needsSync: false
+          });
+        } catch (patchError) {
+          // Create succeeded, update failed (partial success)
+          console.warn('Row created but update failed', { newId, error: patchError });
+
+          // Still replace draft with new ID (row exists in DB)
+          replaceTempRowId(rowId, newId, {
+            expected_model_id: newId,
+            abv: null,
+            modelName: trimmedDraft.registeredModelName || 'New Model',
+            registeredModelName: trimmedDraft.registeredModelName || 'New Model',
+            company: null,
+            discipline: null,
+            description: null,
+            bimContact: null,
+            notes: null,
+            folderPath: null,
+            accPresent: false,
+            accDate: null,
+            reviztoPresent: false,
+            reviztoDate: null,
+            notesUpdatedAt: null,
+            mappingStatus: 'UNMAPPED',
+            matchedObservedFile: null,
+            validationOverall: 'UNKNOWN',
+            freshnessStatus: 'UNKNOWN',
+            needsSync: true  // Flag for partial success
+          });
+
+          // Show warning toast (non-blocking)
+          alert('Row created but some fields not saved. Click the row to edit and retry.');
+        }
+      } catch (createError) {
+        // Create failed - show error and keep draft for retry
+        console.error('Failed to create row', { error: createError });
+        alert(`Failed to create row: ${(createError as Error).message}`);
+        // Keep draft in edit mode for retry
+      }
+    } else {
+      // Existing row - use update mutation
+      await updateModelMutation.mutateAsync({ rowId, draft: trimmedDraft });
+    }
   };
 
   const handleCancelEdit = (rowId: number) => {
+    // If draft, remove from cache entirely
+    if (isDraftRow(rowId)) {
+      queryClient.setQueryData<QualityPhase1DRegisterResponse>(
+        ['quality-register-phase1d', projectId],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            rows: old.rows.filter(row => row.expected_model_id !== rowId)
+          };
+        }
+      );
+    }
+
+    // Clear edit state
     setEditingRowId(null);
     setDraftById((prev) => {
       const { [rowId]: _, ...rest } = prev;
@@ -221,7 +330,58 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
   };
 
   const handleAddRow = () => {
-    createModelMutation.mutate();
+    // Create draft row with temp ID (no API call)
+    const tempId = nextTempId;
+    setNextTempId(prev => prev - 1); // Decrement for next draft
+
+    // Add draft to cache
+    queryClient.setQueryData<QualityPhase1DRegisterResponse>(
+      ['quality-register-phase1d', projectId],
+      (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          rows: [
+            ...old.rows,
+            {
+              expected_model_id: tempId,
+              abv: null,
+              modelName: null,
+              company: null,
+              discipline: null,
+              description: null,
+              bimContact: null,
+              folderPath: null,
+              accPresent: false,
+              accDate: null,
+              reviztoPresent: false,
+              reviztoDate: null,
+              notes: null,
+              notesUpdatedAt: null,
+              mappingStatus: 'UNMAPPED',
+              matchedObservedFile: null,
+              validationOverall: 'UNKNOWN',
+              freshnessStatus: 'UNKNOWN'
+            }
+          ]
+        };
+      }
+    );
+
+    // Enter edit mode immediately
+    setEditingRowId(tempId);
+    setDraftById((prev) => ({
+      ...prev,
+      [tempId]: {
+        abv: '',
+        registeredModelName: '',
+        company: '',
+        discipline: '',
+        description: '',
+        bimContact: '',
+        notes: ''
+      }
+    }));
   };
 
   const handleDraftChange = (rowId: number, field: keyof EditableFields, value: string) => {
@@ -235,6 +395,31 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
   };
 
   const handleDeleteRow = async (rowId: number) => {
+    // If draft, just remove from cache (no API call)
+    if (isDraftRow(rowId)) {
+      queryClient.setQueryData<QualityPhase1DRegisterResponse>(
+        ['quality-register-phase1d', projectId],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            rows: old.rows.filter(row => row.expected_model_id !== rowId)
+          };
+        }
+      );
+
+      // Clear edit state if this draft was being edited
+      if (editingRowId === rowId) {
+        setEditingRowId(null);
+        setDraftById((prev) => {
+          const { [rowId]: _, ...rest } = prev;
+          return rest;
+        });
+      }
+      return;
+    }
+
+    // Existing row - call API
     await deleteModelMutation.mutateAsync(rowId);
   };
 
@@ -275,7 +460,7 @@ export const QualityTab: React.FC<QualityTabProps> = ({ projectId }) => {
         onCancelEdit={handleCancelEdit}
         onDeleteRow={handleDeleteRow}
         onAddRow={handleAddRow}
-        isAddingRow={createModelMutation.isPending}
+        isAddingRow={false}
         draftById={draftById}
         onDraftChange={handleDraftChange}
       />

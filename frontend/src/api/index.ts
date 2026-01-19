@@ -3,8 +3,10 @@ export { projectsApi } from './projects';
 export { reviewsApi } from './reviews';
 export { tasksApi } from './tasks';
 export { issuesApi } from './issues';
+export { updatesApi } from './updates';
 export {
   serviceTemplatesApi,
+  serviceTemplateCatalogApi,
   fileServiceTemplatesApi,
   projectServicesApi,
   serviceReviewsApi,
@@ -24,4 +26,3 @@ export { projectAliasesApi } from './projectAliases';
 export { mappingsApi } from './mappings';
 export { projectReviewsApi } from './projectReviews';
 export { qualityApi } from './quality';
-

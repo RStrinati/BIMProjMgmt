@@ -30,6 +30,7 @@ export function LinearListContainer({
       variant={variant}
       elevation={elevation}
       component={Box}
+      data-testid="linear-list-container"
       sx={{
         borderRadius: 1,
         border: variant === 'outlined' ? '1px solid' : 'none',

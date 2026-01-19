@@ -116,6 +116,7 @@ def get_project_services(project_id):
                 (project_id,)
             )
             rows = cursor.fetchall()
+            logging.info(f"[get_project_services] Project {project_id}: fetched {len(rows)} rows from database")
             services = [dict(
                 service_id=row[0],
                 project_id=row[1],
@@ -331,9 +332,9 @@ def get_project_services(project_id):
         return []
 
 
-def create_project_service(project_id, service_code, service_name, phase=None, unit_type=None, 
-                          unit_qty=None, unit_rate=None, lump_sum_fee=None, agreed_fee=None, 
-                          bill_rule=None, notes=None):
+def create_project_service(project_id, service_code, service_name, phase=None, unit_type=None,
+                          unit_qty=None, unit_rate=None, lump_sum_fee=None, agreed_fee=None,
+                          bill_rule=None, notes=None, assigned_user_id=None):
     """Create a new service for a project."""
     try:
         with get_db_connection() as conn:
@@ -346,14 +347,18 @@ def create_project_service(project_id, service_code, service_name, phase=None, u
                     {S.ProjectServices.UNIT_TYPE}, {S.ProjectServices.UNIT_QTY}, 
                     {S.ProjectServices.UNIT_RATE}, {S.ProjectServices.LUMP_SUM_FEE}, 
                     {S.ProjectServices.AGREED_FEE}, {S.ProjectServices.BILL_RULE}, 
-                    {S.ProjectServices.NOTES}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    {S.ProjectServices.NOTES}, {S.ProjectServices.ASSIGNED_USER_ID}
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (project_id, service_code, service_name, phase, unit_type, unit_qty, 
-                 unit_rate, lump_sum_fee, agreed_fee, bill_rule, notes)
+                 unit_rate, lump_sum_fee, agreed_fee, bill_rule, notes, assigned_user_id)
             )
+            cursor.execute("SELECT SCOPE_IDENTITY()")
+            row = cursor.fetchone()
             conn.commit()
-            return cursor.lastrowid
+            if row and row[0] is not None:
+                return int(row[0])
+            return None
     except Exception as e:
         logger.error(f"Error creating project service: {e}")
         return None
@@ -372,7 +377,7 @@ def update_project_service(service_id, **kwargs):
                 S.ProjectServices.LUMP_SUM_FEE, S.ProjectServices.AGREED_FEE, 
                 S.ProjectServices.BILL_RULE, S.ProjectServices.NOTES, 
                 S.ProjectServices.STATUS, S.ProjectServices.PROGRESS_PCT, 
-                S.ProjectServices.CLAIMED_TO_DATE
+                S.ProjectServices.CLAIMED_TO_DATE, S.ProjectServices.ASSIGNED_USER_ID
             ]
             
             for key, value in kwargs.items():
@@ -441,10 +446,11 @@ def get_service_reviews(service_id):
                            {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
                            {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
                            {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT}, 
-                           {S.ServiceReviews.IS_BILLED}
+                           {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
+                           {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
                     FROM {S.ServiceReviews.TABLE} 
                     WHERE {S.ServiceReviews.SERVICE_ID} = ?
-                    ORDER BY {S.ServiceReviews.CYCLE_NO}
+                    ORDER BY ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}), {S.ServiceReviews.CYCLE_NO}
                     """,
                     (service_id,)
                 )
@@ -466,7 +472,10 @@ def get_service_reviews(service_id):
                     billing_phase=row[13],
                     billing_rate=float(row[14]) if row[14] is not None else None,
                     billing_amount=float(row[15]) if row[15] is not None else None,
-                    is_billed=bool(row[16]) if row[16] is not None else False
+                    is_billed=bool(row[16]) if row[16] is not None else False,
+                    origin=row[17],
+                    is_template_managed=bool(row[18]) if row[18] is not None else None,
+                    sort_order=row[19],
                 ) for row in rows]
             else:
                 cursor.execute(
@@ -477,10 +486,11 @@ def get_service_reviews(service_id):
                            {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
                            {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
                            {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
-                           {S.ServiceReviews.IS_BILLED}
+                           {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
+                           {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
                     FROM {S.ServiceReviews.TABLE} 
                     WHERE {S.ServiceReviews.SERVICE_ID} = ?
-                    ORDER BY {S.ServiceReviews.CYCLE_NO}
+                    ORDER BY ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}), {S.ServiceReviews.CYCLE_NO}
                     """,
                     (service_id,)
                 )
@@ -502,7 +512,10 @@ def get_service_reviews(service_id):
                     billing_phase=None,
                     billing_rate=None,
                     billing_amount=None,
-                    is_billed=bool(row[12]) if row[12] is not None else False
+                    is_billed=bool(row[12]) if row[12] is not None else False,
+                    origin=row[13],
+                    is_template_managed=bool(row[14]) if row[14] is not None else None,
+                    sort_order=row[15],
                 ) for row in rows]
             return reviews
     except Exception as e:
@@ -730,11 +743,16 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                          disciplines=None, deliverables=None, status='planned', 
                          weight_factor=1.0, evidence_links=None, invoice_reference=None,
                          source_phase=None, billing_phase=None, billing_rate=None,
-                         billing_amount=None, is_billed=None):
+                         billing_amount=None, is_billed=None, origin=None,
+                         is_template_managed=None, sort_order=None):
     """Create a new review for a service."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
+            origin_value = origin or 'user_created'
+            if is_template_managed is None:
+                is_template_managed = 1 if origin_value == 'template_generated' else 0
 
             status = (status or 'planned')
             final_weight = weight_factor if weight_factor is not None else 1.0
@@ -799,14 +817,16 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
                         {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
                         {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT},
-                        {S.ServiceReviews.IS_BILLED}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
+                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
                         deliverables, status, final_weight, evidence_links, invoice_reference,
                         final_source_phase, final_billing_phase, effective_rate, effective_amount,
-                        int(bool(effective_is_billed))
+                        int(bool(effective_is_billed)), origin_value,
+                        int(bool(is_template_managed)), sort_order
                     )
                 )
             else:
@@ -818,13 +838,15 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.DISCIPLINES}, {S.ServiceReviews.DELIVERABLES}, 
                         {S.ServiceReviews.STATUS}, {S.ServiceReviews.WEIGHT_FACTOR}, 
                         {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
-                        {S.ServiceReviews.IS_BILLED}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
+                        {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
                         deliverables, status, final_weight, evidence_links, invoice_reference,
-                        int(bool(effective_is_billed))
+                        int(bool(effective_is_billed)), origin_value,
+                        int(bool(is_template_managed)), sort_order
                     )
                 )
             conn.commit()
@@ -872,7 +894,10 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.WEIGHT_FACTOR, S.ServiceReviews.EVIDENCE_LINKS, 
                 S.ServiceReviews.INVOICE_REFERENCE, S.ServiceReviews.INVOICE_DATE,
                 S.ServiceReviews.ACTUAL_ISSUED_AT, 
-                S.ServiceReviews.IS_BILLED
+                S.ServiceReviews.IS_BILLED,
+                S.ServiceReviews.ORIGIN,
+                S.ServiceReviews.IS_TEMPLATE_MANAGED,
+                S.ServiceReviews.SORT_ORDER,
             ]
             if supports_billing:
                 allowed_fields.extend([
@@ -880,6 +905,20 @@ def update_service_review(review_id, **kwargs):
                     S.ServiceReviews.BILLING_RATE, S.ServiceReviews.BILLING_AMOUNT
                 ])
             
+            manual_fields = {
+                S.ServiceReviews.CYCLE_NO,
+                S.ServiceReviews.PLANNED_DATE,
+                S.ServiceReviews.DUE_DATE,
+                S.ServiceReviews.DISCIPLINES,
+                S.ServiceReviews.DELIVERABLES,
+                S.ServiceReviews.EVIDENCE_LINKS,
+                S.ServiceReviews.INVOICE_REFERENCE,
+                S.ServiceReviews.INVOICE_DATE,
+                S.ServiceReviews.ACTUAL_ISSUED_AT,
+                S.ServiceReviews.SORT_ORDER,
+            }
+            should_unmanage = any(key in manual_fields for key in kwargs)
+
             status_update = None
             for key, value in kwargs.items():
                 if key in allowed_fields:
@@ -916,6 +955,9 @@ def update_service_review(review_id, **kwargs):
             if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
                 # Auto-align billed flag with completed status if not explicitly provided.
                 update_fields[S.ServiceReviews.IS_BILLED] = 1 if status_update == 'completed' else 0
+
+            if should_unmanage and S.ServiceReviews.IS_TEMPLATE_MANAGED not in update_fields:
+                update_fields[S.ServiceReviews.IS_TEMPLATE_MANAGED] = 0
 
             if supports_billing:
                 needs_recalc_amount = False
@@ -1171,6 +1213,9 @@ def get_service_items(service_id, item_type=None):
                 S.ServiceItems.CREATED_AT,
                 S.ServiceItems.UPDATED_AT,
                 S.ServiceItems.IS_BILLED,
+                S.ServiceItems.ORIGIN,
+                S.ServiceItems.IS_TEMPLATE_MANAGED,
+                S.ServiceItems.SORT_ORDER,
             ])
 
             query = f"""
@@ -1184,7 +1229,7 @@ def get_service_items(service_id, item_type=None):
                 query += f" AND {S.ServiceItems.ITEM_TYPE} = ?"
                 params.append(item_type)
             
-            query += f" ORDER BY {S.ServiceItems.PLANNED_DATE} ASC"
+            query += f" ORDER BY ISNULL({S.ServiceItems.SORT_ORDER}, 9999), {S.ServiceItems.PLANNED_DATE} ASC"
             
             cursor.execute(query, params)
             rows = cursor.fetchall()
@@ -1213,7 +1258,10 @@ def get_service_items(service_id, item_type=None):
                 notes = row[idx]; idx += 1
                 created_at = row[idx]; idx += 1
                 updated_at = row[idx]; idx += 1
-                is_billed_val = row[idx] if idx < len(row) else None
+                is_billed_val = row[idx]; idx += 1
+                origin = row[idx] if idx < len(row) else None; idx += 1
+                is_template_managed = row[idx] if idx < len(row) else None; idx += 1
+                sort_order = row[idx] if idx < len(row) else None
 
                 items.append({
                     'item_id': item_id,
@@ -1233,6 +1281,9 @@ def get_service_items(service_id, item_type=None):
                     'created_at': created_at.isoformat() if created_at else None,
                     'updated_at': updated_at.isoformat() if updated_at else None,
                     'is_billed': bool(is_billed_val) if is_billed_val is not None else False,
+                    'origin': origin,
+                    'is_template_managed': bool(is_template_managed) if is_template_managed is not None else None,
+                    'sort_order': sort_order,
                 })
             
             return items
@@ -1248,7 +1299,12 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             invoice_supported = _ensure_service_item_invoice_column(cursor)
-            
+
+            origin = kwargs.get('origin') or 'user_created'
+            kwargs['origin'] = origin
+            if 'is_template_managed' not in kwargs or kwargs.get('is_template_managed') is None:
+                kwargs['is_template_managed'] = 1 if origin == 'template_generated' else 0
+
             # Build dynamic insert query
             columns = [S.ServiceItems.SERVICE_ID, S.ServiceItems.ITEM_TYPE, S.ServiceItems.TITLE, 
                       S.ServiceItems.PLANNED_DATE, S.ServiceItems.CREATED_AT, S.ServiceItems.UPDATED_AT]
@@ -1264,6 +1320,7 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
             
             # Add optional fields
             optional_fields = {
+                'project_id': S.ServiceItems.PROJECT_ID,
                 'description': S.ServiceItems.DESCRIPTION,
                 'due_date': S.ServiceItems.DUE_DATE,
                 'actual_date': S.ServiceItems.ACTUAL_DATE,
@@ -1272,7 +1329,13 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
                 'notes': S.ServiceItems.NOTES,
-                'is_billed': S.ServiceItems.IS_BILLED
+                'is_billed': S.ServiceItems.IS_BILLED,
+                'generated_from_template_id': S.ServiceItems.GENERATED_FROM_TEMPLATE_ID,
+                'generated_from_template_version': S.ServiceItems.GENERATED_FROM_TEMPLATE_VERSION,
+                'generated_key': S.ServiceItems.GENERATED_KEY,
+                'origin': S.ServiceItems.ORIGIN,
+                'is_template_managed': S.ServiceItems.IS_TEMPLATE_MANAGED,
+                'sort_order': S.ServiceItems.SORT_ORDER,
             }
             if invoice_supported:
                 optional_fields['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
@@ -1318,6 +1381,7 @@ def update_service_item(item_id, **kwargs):
             status_update = None
             
             field_mappings = {
+                'project_id': S.ServiceItems.PROJECT_ID,
                 'item_type': S.ServiceItems.ITEM_TYPE,
                 'title': S.ServiceItems.TITLE,
                 'description': S.ServiceItems.DESCRIPTION,
@@ -1329,10 +1393,32 @@ def update_service_item(item_id, **kwargs):
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
                 'notes': S.ServiceItems.NOTES,
-                'is_billed': S.ServiceItems.IS_BILLED
+                'is_billed': S.ServiceItems.IS_BILLED,
+                'generated_from_template_id': S.ServiceItems.GENERATED_FROM_TEMPLATE_ID,
+                'generated_from_template_version': S.ServiceItems.GENERATED_FROM_TEMPLATE_VERSION,
+                'generated_key': S.ServiceItems.GENERATED_KEY,
+                'origin': S.ServiceItems.ORIGIN,
+                'is_template_managed': S.ServiceItems.IS_TEMPLATE_MANAGED,
+                'sort_order': S.ServiceItems.SORT_ORDER,
             }
             if invoice_supported:
                 field_mappings['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
+
+            manual_fields = {
+                'title',
+                'description',
+                'planned_date',
+                'due_date',
+                'actual_date',
+                'priority',
+                'assigned_to',
+                'evidence_links',
+                'notes',
+                'invoice_reference',
+                'item_type',
+                'sort_order',
+            }
+            should_unmanage = any(field in kwargs for field in manual_fields)
             
             for field, column in field_mappings.items():
                 if field in kwargs:
@@ -1347,6 +1433,10 @@ def update_service_item(item_id, **kwargs):
             if status_update is not None and 'is_billed' not in kwargs:
                 updates.append(f"{S.ServiceItems.IS_BILLED} = ?")
                 values.append(1 if status_update == 'completed' else 0)
+
+            if should_unmanage and 'is_template_managed' not in kwargs:
+                updates.append(f"{S.ServiceItems.IS_TEMPLATE_MANAGED} = ?")
+                values.append(0)
             
             if not updates:
                 return False
@@ -2748,7 +2838,8 @@ def _get_quality_register_phase1d(project_id: int) -> Dict[str, Any]:
                     {
                         "expected_model_id": row[0],
                         "abv": row[1],
-                        "modelName": row[2],
+                        "modelName": row[2],  # Display field for UI
+                        "registeredModelName": row[2],  # Canonical field for edits
                         "company": row[3],
                         "discipline": row[4],
                         "description": row[5],
@@ -10202,4 +10293,199 @@ def match_observed_to_expected(
             return best_match['expected_model_id']
     
     return None
+
+
+# ===================== Project Updates Functions =====================
+
+def get_project_updates(project_id, limit=50, offset=0):
+    """
+    Get project updates for a project, ordered by newest first.
+    
+    Args:
+        project_id: Project ID
+        limit: Maximum number of updates to return
+        offset: Offset for pagination
+    
+    Returns:
+        List of update dictionaries with user information
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT 
+                    u.{S.ProjectUpdates.UPDATE_ID},
+                    u.{S.ProjectUpdates.PROJECT_ID},
+                    u.{S.ProjectUpdates.BODY},
+                    u.{S.ProjectUpdates.CREATED_BY},
+                    u.{S.ProjectUpdates.CREATED_AT},
+                    u.{S.ProjectUpdates.UPDATED_AT},
+                    usr.{S.Users.NAME} as created_by_name,
+                    usr.{S.Users.FULL_NAME} as created_by_full_name,
+                    (
+                        SELECT COUNT(*)
+                        FROM {S.ProjectUpdateComments.TABLE} c
+                        WHERE c.{S.ProjectUpdateComments.UPDATE_ID} = u.{S.ProjectUpdates.UPDATE_ID}
+                          AND c.{S.ProjectUpdateComments.IS_DELETED} = 0
+                    ) as comment_count
+                FROM {S.ProjectUpdates.TABLE} u
+                LEFT JOIN {S.Users.TABLE} usr 
+                    ON u.{S.ProjectUpdates.CREATED_BY} = usr.{S.Users.ID}
+                WHERE u.{S.ProjectUpdates.PROJECT_ID} = ?
+                  AND u.{S.ProjectUpdates.IS_DELETED} = 0
+                ORDER BY u.{S.ProjectUpdates.CREATED_AT} DESC
+                OFFSET ? ROWS
+                FETCH NEXT ? ROWS ONLY
+            """, (project_id, offset, limit))
+            
+            columns = [col[0] for col in cursor.description]
+            updates = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return updates
+    except Exception as e:
+        logger.error(f"Error fetching project updates for project {project_id}: {e}")
+        return []
+
+
+def get_project_update_by_id(update_id):
+    """
+    Get a single project update by ID with user information.
+    
+    Args:
+        update_id: Update ID
+    
+    Returns:
+        Update dictionary or None if not found
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT 
+                    u.{S.ProjectUpdates.UPDATE_ID},
+                    u.{S.ProjectUpdates.PROJECT_ID},
+                    u.{S.ProjectUpdates.BODY},
+                    u.{S.ProjectUpdates.CREATED_BY},
+                    u.{S.ProjectUpdates.CREATED_AT},
+                    u.{S.ProjectUpdates.UPDATED_AT},
+                    usr.{S.Users.NAME} as created_by_name,
+                    usr.{S.Users.FULL_NAME} as created_by_full_name
+                FROM {S.ProjectUpdates.TABLE} u
+                LEFT JOIN {S.Users.TABLE} usr 
+                    ON u.{S.ProjectUpdates.CREATED_BY} = usr.{S.Users.ID}
+                WHERE u.{S.ProjectUpdates.UPDATE_ID} = ?
+                  AND u.{S.ProjectUpdates.IS_DELETED} = 0
+            """, (update_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            columns = [col[0] for col in cursor.description]
+            return dict(zip(columns, row))
+    except Exception as e:
+        logger.error(f"Error fetching project update {update_id}: {e}")
+        return None
+
+
+def create_project_update(project_id, body, created_by=None):
+    """
+    Create a new project update.
+    
+    Args:
+        project_id: Project ID
+        body: Update content
+        created_by: User ID of creator (optional)
+    
+    Returns:
+        New update ID or None on error
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO {S.ProjectUpdates.TABLE} (
+                    {S.ProjectUpdates.PROJECT_ID},
+                    {S.ProjectUpdates.BODY},
+                    {S.ProjectUpdates.CREATED_BY}
+                ) VALUES (?, ?, ?);
+                SELECT SCOPE_IDENTITY() as update_id;
+            """, (project_id, body, created_by))
+            
+            result = cursor.fetchone()
+            conn.commit()
+            return int(result[0]) if result else None
+    except Exception as e:
+        logger.error(f"Error creating project update: {e}")
+        return None
+
+
+def get_update_comments(update_id):
+    """
+    Get all comments for a specific update.
+    
+    Args:
+        update_id: Update ID
+    
+    Returns:
+        List of comment dictionaries with user information
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT 
+                    c.{S.ProjectUpdateComments.COMMENT_ID},
+                    c.{S.ProjectUpdateComments.UPDATE_ID},
+                    c.{S.ProjectUpdateComments.BODY},
+                    c.{S.ProjectUpdateComments.CREATED_BY},
+                    c.{S.ProjectUpdateComments.CREATED_AT},
+                    c.{S.ProjectUpdateComments.UPDATED_AT},
+                    usr.{S.Users.NAME} as created_by_name,
+                    usr.{S.Users.FULL_NAME} as created_by_full_name
+                FROM {S.ProjectUpdateComments.TABLE} c
+                LEFT JOIN {S.Users.TABLE} usr 
+                    ON c.{S.ProjectUpdateComments.CREATED_BY} = usr.{S.Users.ID}
+                WHERE c.{S.ProjectUpdateComments.UPDATE_ID} = ?
+                  AND c.{S.ProjectUpdateComments.IS_DELETED} = 0
+                ORDER BY c.{S.ProjectUpdateComments.CREATED_AT} ASC
+            """, (update_id,))
+            
+            columns = [col[0] for col in cursor.description]
+            comments = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return comments
+    except Exception as e:
+        logger.error(f"Error fetching comments for update {update_id}: {e}")
+        return []
+
+
+def create_update_comment(update_id, body, created_by=None):
+    """
+    Create a new comment on an update.
+    
+    Args:
+        update_id: Update ID
+        body: Comment content
+        created_by: User ID of creator (optional)
+    
+    Returns:
+        New comment ID or None on error
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO {S.ProjectUpdateComments.TABLE} (
+                    {S.ProjectUpdateComments.UPDATE_ID},
+                    {S.ProjectUpdateComments.BODY},
+                    {S.ProjectUpdateComments.CREATED_BY}
+                ) VALUES (?, ?, ?);
+                SELECT SCOPE_IDENTITY() as comment_id;
+            """, (update_id, body, created_by))
+            
+            result = cursor.fetchone()
+            conn.commit()
+            return int(result[0]) if result else None
+    except Exception as e:
+        logger.error(f"Error creating update comment: {e}")
+        return None
 

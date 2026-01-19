@@ -13,6 +13,16 @@ import TasksNotesPage from './pages/TasksNotesPage';
 import { BidsListPage } from './pages/BidsListPage';
 import BidDetailPage from './pages/BidDetailPage';
 import ProjectWorkspacePageV2 from './pages/ProjectWorkspacePageV2';
+import WorkspaceShell from './pages/WorkspaceShell';
+import OverviewTab from './pages/workspace/OverviewTab';
+import ServicesTab from './pages/workspace/ServicesTab';
+import ServiceEditView from './pages/workspace/ServiceEditView';
+import DeliverablesTab from './pages/workspace/DeliverablesTab';
+import UpdatesTab from './pages/workspace/UpdatesTab';
+import IssuesTab from './pages/workspace/IssuesTab';
+import TasksTab from './pages/workspace/TasksTab';
+import QualityTab from './pages/workspace/QualityTab';
+import ServiceCreateView from './pages/workspace/ServiceCreateView';
 import { IssuesPage } from './pages/IssuesPage';
 import { featureFlags } from './config/featureFlags';
 
@@ -42,10 +52,27 @@ function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
-              <Route
-                path="/projects/:id"
-                element={featureFlags.projectWorkspaceV2 ? <ProjectWorkspacePageV2 /> : <ProjectDetailPage />}
+              
+              {/* Workspace with nested routes */}
+              <Route path="/projects/:id/workspace" element={<WorkspaceShell />}>
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<OverviewTab />} />
+                <Route path="services" element={<ServicesTab />} />
+                <Route path="services/new" element={<ServiceCreateView />} />
+                <Route path="services/:serviceId" element={<ServiceEditView />} />
+                <Route path="deliverables" element={<DeliverablesTab />} />
+                <Route path="updates" element={<UpdatesTab />} />
+                <Route path="issues" element={<IssuesTab />} />
+                <Route path="tasks" element={<TasksTab />} />
+                <Route path="quality" element={<QualityTab />} />
+              </Route>
+              
+              {/* Legacy route - redirect to workspace */}
+              <Route 
+                path="/projects/:id" 
+                element={<Navigate to="workspace/overview" replace />} 
               />
+              
               <Route path="/projects/:id/data-imports" element={<DataImportsPage />} />
               <Route path="/data-imports" element={<DataImportsPage />} />
               <Route path="/bids" element={<BidsListPage />} />

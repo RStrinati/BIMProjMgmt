@@ -739,6 +739,155 @@ export interface ServiceTemplate {
   is_active: boolean;
 }
 
+export interface ServiceTemplateCatalogValues {
+  bill_rules: string[];
+  unit_types: string[];
+  phases: string[];
+}
+
+export interface ServiceTemplateIntent {
+  delivery_model?: string;
+  commercial_model?: string;
+  primary_output?: string;
+  is_recurring?: boolean;
+}
+
+export interface ServiceTemplatePricing {
+  model?: string;
+  unit_type?: string;
+  unit_qty?: number;
+  unit_rate?: number;
+  lump_sum_fee?: number;
+  agreed_fee?: number;
+  derive_agreed_fee?: boolean;
+}
+
+export interface ServiceTemplateReviewDefinition {
+  review_template_id: string;
+  name?: string;
+  count?: number;
+  status?: string;
+  interval_days?: number;
+  planned_offset_days?: number;
+  due_offset_days?: number;
+}
+
+export interface ServiceTemplateItemDefinition {
+  item_template_id: string;
+  template_id?: string;
+  title: string;
+  item_type: string;
+  status?: string;
+  priority?: string;
+  description?: string;
+  notes?: string;
+  planned_date?: string;
+  planned_offset_days?: number;
+  due_date?: string;
+  due_offset_days?: number;
+  sort_order?: number;
+}
+
+export interface ServiceTemplateOptionDefinition {
+  option_id: string;
+  name: string;
+  description?: string;
+  items?: ServiceTemplateItemDefinition[];
+  reviews?: ServiceTemplateReviewDefinition[];
+}
+
+export interface ServiceTemplateDefinition {
+  template_id: string;
+  name: string;
+  category?: string;
+  version: string;
+  tags?: string[];
+  intent?: ServiceTemplateIntent;
+  pricing?: ServiceTemplatePricing;
+  defaults?: {
+    service_code?: string;
+    service_name?: string;
+    phase?: string;
+    unit_type?: string;
+    unit_qty?: number;
+    unit_rate?: number;
+    lump_sum_fee?: number;
+    agreed_fee?: number;
+    bill_rule?: string;
+    notes?: string;
+    assigned_user_id?: number;
+    status?: string;
+    progress_pct?: number;
+    claimed_to_date?: number;
+  };
+  options?: ServiceTemplateOptionDefinition[];
+  reviews?: ServiceTemplateReviewDefinition[];
+  items?: ServiceTemplateItemDefinition[];
+  template_hash: string;
+}
+
+export interface ServiceTemplateCatalogResponse {
+  templates: ServiceTemplateDefinition[];
+  catalog: ServiceTemplateCatalogValues;
+}
+
+export interface ServiceTemplateBinding {
+  binding_id: number;
+  template_id: string;
+  template_version: string;
+  template_hash: string;
+  options_enabled: string[];
+  applied_at?: string;
+  applied_by_user_id?: number | null;
+}
+
+export interface GeneratedServiceStructure {
+  service: ProjectService;
+  binding: ServiceTemplateBinding | null;
+  template: ServiceTemplateDefinition | null;
+  options_enabled: string[];
+  generated_reviews: Array<{
+    review_id: number;
+    generated_key: string;
+    cycle_no?: number;
+    planned_date?: string;
+    status?: string;
+  }>;
+  generated_items: Array<{
+    item_id: number;
+    generated_key: string;
+    title: string;
+    item_type?: string;
+    status?: string;
+  }>;
+}
+
+export interface ServiceTemplateResyncEntry {
+  generated_key: string;
+  review_id?: number | null;
+  item_id?: number | null;
+}
+
+export interface ServiceTemplateResyncResult {
+  service_id: number;
+  project_id: number;
+  template: {
+    template_id: string;
+    name?: string;
+    version?: string;
+    template_hash?: string;
+  };
+  binding: ServiceTemplateBinding;
+  added_reviews: ServiceTemplateResyncEntry[];
+  updated_reviews: ServiceTemplateResyncEntry[];
+  skipped_reviews: ServiceTemplateResyncEntry[];
+  added_items: ServiceTemplateResyncEntry[];
+  updated_items: ServiceTemplateResyncEntry[];
+  skipped_items: ServiceTemplateResyncEntry[];
+  dry_run: boolean;
+  mode: string;
+}
+
 export interface ProjectService {
   service_id: number;
   project_id: number;
@@ -760,6 +909,8 @@ export interface ProjectService {
   billing_progress_pct?: number;
   billed_amount?: number;
   agreed_fee_remaining?: number;
+  assigned_user_id?: number | null;
+  assigned_user_name?: string | null;
 }
 
 export interface ServiceReview {
@@ -783,6 +934,9 @@ export interface ServiceReview {
   service_name?: string;
   service_phase?: string;
   is_billed?: boolean;
+  origin?: string | null;
+  is_template_managed?: boolean | null;
+  sort_order?: number | null;
 }
 
 export interface ProjectReviewItem {
@@ -838,6 +992,7 @@ export interface ReviewBillingResponse {
 
 export interface ServiceItem {
   item_id: number;
+  project_id?: number | null;
   service_id: number;
   item_type: 'review' | 'audit' | 'deliverable' | 'milestone' | 'inspection' | 'meeting' | string;
   title: string;
@@ -854,6 +1009,12 @@ export interface ServiceItem {
   created_at: string;
   updated_at: string;
   is_billed?: boolean;
+  generated_from_template_id?: string;
+  generated_from_template_version?: string;
+  generated_key?: string;
+  origin?: string | null;
+  is_template_managed?: boolean | null;
+  sort_order?: number | null;
 }
 
 export interface FileServiceTemplateSummary {

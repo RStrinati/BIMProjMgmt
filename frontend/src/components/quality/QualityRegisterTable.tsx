@@ -18,7 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Tooltip
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -26,6 +27,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import WarningIcon from '@mui/icons-material/Warning';
 
 interface QualityRegisterRow {
   expected_model_id: number;
@@ -248,6 +250,7 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
           ) : (
             rows.map((row) => {
               const isEditing = editingRowId === row.expected_model_id;
+              const isDraft = row.expected_model_id < 0;
               return (
                 <TableRow
                   key={row.expected_model_id}
@@ -256,7 +259,12 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
                   selected={selectedRowId === row.expected_model_id || isEditing}
                   sx={{ 
                     cursor: isEditing ? 'default' : 'pointer',
-                    backgroundColor: isEditing ? 'action.selected' : undefined
+                    backgroundColor: isDraft 
+                      ? '#fff3cd' // Yellow background for drafts
+                      : isEditing 
+                      ? 'action.selected' 
+                      : undefined,
+                    borderLeft: isDraft ? '4px solid #fd7e14' : undefined // Orange left border for drafts
                   }}
                 >
                   <TableCell onClick={() => !isEditing && onEditRow(row.expected_model_id)}>
@@ -268,6 +276,15 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
                     ) : (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {row.modelName || '—'}
+                        {row.needsSync && (
+                          <Tooltip title="Some fields not saved. Edit row to retry.">
+                            <WarningIcon 
+                              fontSize="small" 
+                              color="warning" 
+                              sx={{ ml: 0.5 }} 
+                            />
+                          </Tooltip>
+                        )}
                         <Chip
                           label={row.mappingStatus}
                           size="small"

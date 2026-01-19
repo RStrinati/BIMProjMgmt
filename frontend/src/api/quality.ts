@@ -11,6 +11,7 @@ export type QualityPhase1DRow = {
   expected_model_id: number;
   abv: string | null;
   modelName: string | null;
+  registeredModelName?: string | null; // Canonical field name (matches backend)
   company: string | null;
   discipline: string | null;
   description: string | null;
@@ -26,6 +27,7 @@ export type QualityPhase1DRow = {
   matchedObservedFile: string | null;
   validationOverall: string;
   freshnessStatus: string;
+  needsSync?: boolean; // True if POST ok but PATCH failed
 };
 
 export type QualityPhase1DRegisterResponse = {

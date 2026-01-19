@@ -42,9 +42,11 @@ from database import (  # noqa: E402
     create_bid_scope_item,
     create_bid_variation,
     create_project_service,
+    create_project_update,
     create_review_cycle,
     create_service_review,
     create_service_template,
+    create_update_comment,
     delete_bookmark,
     delete_bid_billing_line,
     delete_bid_program_stage,
@@ -69,6 +71,8 @@ from database import (  # noqa: E402
     get_project_details,
     get_project_folders,
     get_project_health_files,
+    get_project_update_by_id,
+    get_project_updates,
     get_projects_full,
     get_projects_with_health,
     get_warehouse_dashboard_metrics,
@@ -96,6 +100,7 @@ from database import (  # noqa: E402
     get_project_reviews,
     get_service_review_billing,
     get_service_templates,
+    get_update_comments,
     get_users_list,
     get_control_points_dashboard,
     get_coordinate_alignment_dashboard,
@@ -1622,11 +1627,99 @@ def api_delete_file_service_template():
 
     return jsonify({'deleted': template_name})
 
+@app.route('/api/service-templates', methods=['GET'])
+def api_get_service_template_catalog():
+    try:
+        from services.service_template_engine import get_service_template_catalog
+        payload = get_service_template_catalog()
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to load service template catalog")
+        return jsonify({'error': 'Failed to load service templates', 'details': str(exc)}), 500
+
+@app.route('/api/projects/<int:project_id>/services/from-template', methods=['POST'])
+def api_create_service_from_template(project_id):
+    body = request.get_json() or {}
+    template_id = (body.get('template_id') or '').strip()
+    if not template_id:
+        return jsonify({'error': 'template_id is required'}), 400
+
+    options_enabled = body.get('options_enabled') or []
+    overrides = body.get('overrides') or {}
+    applied_by_user_id = body.get('applied_by_user_id')
+
+    try:
+        from services.service_template_engine import create_service_from_template
+        result = create_service_from_template(
+            project_id=project_id,
+            template_id=template_id,
+            options_enabled=options_enabled,
+            overrides=overrides,
+            applied_by_user_id=applied_by_user_id,
+        )
+        return jsonify(result), 201
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to create service from template")
+        return jsonify({'error': 'Failed to create service from template', 'details': str(exc)}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/apply-template', methods=['POST'])
+def api_apply_service_template_to_service(project_id, service_id):
+    body = request.get_json() or {}
+    template_id = (body.get('template_id') or '').strip()
+    if not template_id:
+        return jsonify({'error': 'template_id is required'}), 400
+
+    options_enabled = body.get('options_enabled') or []
+    overrides = body.get('overrides') or {}
+    applied_by_user_id = body.get('applied_by_user_id')
+    dry_run = bool(body.get('dry_run', False))
+    mode = body.get('mode') or 'sync_and_update_managed'
+
+    try:
+        from services.service_template_engine import apply_template_to_service
+        result = apply_template_to_service(
+            project_id=project_id,
+            service_id=service_id,
+            template_id=template_id,
+            options_enabled=options_enabled,
+            overrides=overrides,
+            applied_by_user_id=applied_by_user_id,
+            mode=mode,
+            dry_run=dry_run,
+        )
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to apply service template")
+        return jsonify({'error': 'Failed to apply service template', 'details': str(exc)}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/generated-structure', methods=['GET'])
+def api_get_generated_service_structure(project_id, service_id):
+    try:
+        from services.service_template_engine import get_generated_structure
+        result = get_generated_structure(project_id=project_id, service_id=service_id)
+        if not result:
+            return jsonify({'error': 'Service not found'}), 404
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to load generated service structure")
+        return jsonify({'error': 'Failed to load generated structure', 'details': str(exc)}), 500
+
 
 # --- Project Services API ---
 @app.route('/api/projects/<int:project_id>/services', methods=['GET'])
 def api_get_project_services(project_id):
     services = get_project_services(project_id)
+    logging.info(f"[api_get_project_services] Project {project_id}: returning {len(services)} services")
+    if services:
+        logging.info(f"[api_get_project_services] First 5 service codes: {[s.get('service_code') for s in services[:5]]}")
     return jsonify(services)
 
 @app.route('/api/projects/<int:project_id>/services/apply-template', methods=['POST'])
@@ -1679,7 +1772,8 @@ def api_create_project_service(project_id):
         lump_sum_fee=body.get('lump_sum_fee'),
         agreed_fee=body.get('agreed_fee'),
         bill_rule=body.get('bill_rule'),
-        notes=body.get('notes')
+        notes=body.get('notes'),
+        assigned_user_id=body.get('assigned_user_id')
     )
     if service_id:
         return jsonify({'service_id': service_id}), 201
@@ -1688,7 +1782,27 @@ def api_create_project_service(project_id):
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>', methods=['PATCH'])
 def api_update_project_service(project_id, service_id):
     body = request.get_json() or {}
-    success = update_project_service(service_id, **body)
+    # Map frontend field names to database column names
+    field_map = {
+        'serviceCode': 'service_code',
+        'serviceName': 'service_name',
+        'serviceDescription': 'notes',  # Frontend uses serviceDescription, DB stores in notes
+        'assignedUserId': 'assigned_user_id',
+        'unitType': 'unit_type',
+        'unitQty': 'unit_qty',
+        'unitRate': 'unit_rate',
+        'lumpSumFee': 'lump_sum_fee',
+        'agreedFee': 'agreed_fee',
+        'billRule': 'bill_rule',
+        'progressPct': 'progress_pct',
+        'claimedToDate': 'claimed_to_date',
+    }
+    mapped_body = {}
+    for frontend_key, value in body.items():
+        db_key = field_map.get(frontend_key, frontend_key)
+        mapped_body[db_key] = value
+    
+    success = update_project_service(service_id, **mapped_body)
     if success:
         return jsonify({'success': True})
     return jsonify({'error': 'Failed to update service'}), 500
@@ -1792,7 +1906,10 @@ def api_create_service_review(project_id, service_id):
         billing_phase=body.get('billing_phase'),
         billing_rate=body.get('billing_rate'),
         billing_amount=body.get('billing_amount'),
-        is_billed=body.get('is_billed')
+        is_billed=body.get('is_billed'),
+        origin=body.get('origin'),
+        is_template_managed=body.get('is_template_managed'),
+        sort_order=body.get('sort_order'),
     )
     if review_id:
         return jsonify({'review_id': review_id}), 201
@@ -3992,6 +4109,231 @@ def api_toggle_task_item(task_id, item_index):
         return jsonify({'error': str(exc)}), 500
 
 
+# ===================== Project Updates Endpoints =====================
+
+@app.route('/api/projects/<int:project_id>/updates', methods=['GET'])
+def api_get_project_updates(project_id):
+    """
+    GET /api/projects/<project_id>/updates
+    
+    Get project updates for a project, ordered by newest first.
+    
+    Query Parameters:
+    - limit (int): Maximum number of updates to return (default: 50)
+    - offset (int): Offset for pagination (default: 0)
+    
+    Response:
+    {
+      "updates": [
+        {
+          "update_id": int,
+          "project_id": int,
+          "body": str,
+          "created_by": int,
+          "created_at": str,
+          "updated_at": str,
+          "created_by_name": str,
+          "created_by_full_name": str,
+          "comment_count": int
+        }
+      ],
+      "count": int
+    }
+    """
+    try:
+        limit = _parse_int(request.args.get('limit')) or 50
+        offset = _parse_int(request.args.get('offset')) or 0
+        
+        # Validate limits
+        if limit < 1 or limit > 100:
+            limit = 50
+        if offset < 0:
+            offset = 0
+        
+        updates = get_project_updates(project_id, limit=limit, offset=offset)
+        
+        return jsonify({
+            'updates': updates,
+            'count': len(updates)
+        })
+    except Exception as exc:
+        logging.exception(f"Error fetching project updates for project {project_id}")
+        return jsonify({'error': 'Failed to fetch project updates', 'details': str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/updates', methods=['POST'])
+def api_create_project_update(project_id):
+    """
+    POST /api/projects/<project_id>/updates
+    
+    Create a new project update.
+    
+    Request Body:
+    {
+      "body": str (required),
+      "created_by": int (optional)
+    }
+    
+    Response:
+    {
+      "update_id": int,
+      "project_id": int,
+      "body": str,
+      "created_by": int,
+      "created_at": str,
+      "updated_at": str,
+      "created_by_name": str,
+      "created_by_full_name": str
+    }
+    """
+    try:
+        body_data = request.get_json(silent=True) or {}
+        
+        body = body_data.get('body', '').strip()
+        if not body:
+            return jsonify({'error': 'body is required'}), 400
+        
+        created_by = _parse_int(body_data.get('created_by'))
+        
+        # Create update
+        update_id = create_project_update(project_id, body, created_by)
+        if not update_id:
+            return jsonify({'error': 'Failed to create project update'}), 500
+        
+        # Fetch and return the created update
+        update = get_project_update_by_id(update_id)
+        if not update:
+            return jsonify({'error': 'Failed to retrieve created update'}), 500
+        
+        return jsonify(update), 201
+    except Exception as exc:
+        logging.exception(f"Error creating project update for project {project_id}")
+        return jsonify({'error': 'Failed to create project update', 'details': str(exc)}), 500
+
+
+@app.route('/api/updates/<int:update_id>', methods=['GET'])
+def api_get_update(update_id):
+    """
+    GET /api/updates/<update_id>
+    
+    Get a single project update by ID with comment count.
+    
+    Response:
+    {
+      "update_id": int,
+      "project_id": int,
+      "body": str,
+      "created_by": int,
+      "created_at": str,
+      "updated_at": str,
+      "created_by_name": str,
+      "created_by_full_name": str
+    }
+    """
+    try:
+        update = get_project_update_by_id(update_id)
+        if not update:
+            return jsonify({'error': 'Update not found'}), 404
+        
+        return jsonify(update)
+    except Exception as exc:
+        logging.exception(f"Error fetching update {update_id}")
+        return jsonify({'error': 'Failed to fetch update', 'details': str(exc)}), 500
+
+
+@app.route('/api/updates/<int:update_id>/comments', methods=['GET'])
+def api_get_update_comments(update_id):
+    """
+    GET /api/updates/<update_id>/comments
+    
+    Get all comments for a specific update.
+    
+    Response:
+    {
+      "comments": [
+        {
+          "comment_id": int,
+          "update_id": int,
+          "body": str,
+          "created_by": int,
+          "created_at": str,
+          "updated_at": str,
+          "created_by_name": str,
+          "created_by_full_name": str
+        }
+      ],
+      "count": int
+    }
+    """
+    try:
+        comments = get_update_comments(update_id)
+        
+        return jsonify({
+            'comments': comments,
+            'count': len(comments)
+        })
+    except Exception as exc:
+        logging.exception(f"Error fetching comments for update {update_id}")
+        return jsonify({'error': 'Failed to fetch comments', 'details': str(exc)}), 500
+
+
+@app.route('/api/updates/<int:update_id>/comments', methods=['POST'])
+def api_create_update_comment(update_id):
+    """
+    POST /api/updates/<update_id>/comments
+    
+    Create a new comment on an update.
+    
+    Request Body:
+    {
+      "body": str (required),
+      "created_by": int (optional)
+    }
+    
+    Response:
+    {
+      "comment_id": int,
+      "update_id": int,
+      "body": str,
+      "created_by": int,
+      "created_at": str,
+      "updated_at": str,
+      "created_by_name": str,
+      "created_by_full_name": str
+    }
+    """
+    try:
+        body_data = request.get_json(silent=True) or {}
+        
+        body = body_data.get('body', '').strip()
+        if not body:
+            return jsonify({'error': 'body is required'}), 400
+        
+        created_by = _parse_int(body_data.get('created_by'))
+        
+        # Verify update exists
+        update = get_project_update_by_id(update_id)
+        if not update:
+            return jsonify({'error': 'Update not found'}), 404
+        
+        # Create comment
+        comment_id = create_update_comment(update_id, body, created_by)
+        if not comment_id:
+            return jsonify({'error': 'Failed to create comment'}), 500
+        
+        # Fetch and return all comments to simplify frontend refresh
+        comments = get_update_comments(update_id)
+        new_comment = next((c for c in comments if c['comment_id'] == comment_id), None)
+        
+        if not new_comment:
+            return jsonify({'error': 'Failed to retrieve created comment'}), 500
+        
+        return jsonify(new_comment), 201
+    except Exception as exc:
+        logging.exception(f"Error creating comment for update {update_id}")
+        return jsonify({'error': 'Failed to create comment', 'details': str(exc)}), 500
+
+
 @app.route('/api/task_dependencies/<int:task_id>', methods=['GET'])
 def api_get_task_dependencies(task_id):
     """Get task dependencies"""
@@ -5624,27 +5966,33 @@ def get_quality_model_detail(project_id, expected_model_id):
             # Get current observed match from ACC
             observed_match = None
             if model[2]:  # registered_model_name
-                with get_db_connection(Config.ACC_DB) as acc_conn:
-                    acc_cursor = acc_conn.cursor()
-                    acc_cursor.execute("""
-                        SELECT TOP 1
-                            file_name,
-                            folder_path,
-                            last_modified_date,
-                            file_size
-                        FROM vw_files_expanded_pm
-                        WHERE file_name LIKE ?
-                        ORDER BY last_modified_date DESC
-                    """, (f'%{model[2]}%',))
-                    
-                    obs = acc_cursor.fetchone()
-                    if obs:
-                        observed_match = {
-                            'fileName': obs[0],
-                            'folderPath': obs[1],
-                            'lastModified': obs[2].isoformat() if obs[2] else None,
-                            'fileSize': obs[3]
-                        }
+                try:
+                    from config import Config
+                    with get_db_connection(Config.ACC_DB) as acc_conn:
+                        acc_cursor = acc_conn.cursor()
+                        acc_cursor.execute("""
+                            SELECT TOP 1
+                                file_name,
+                                folder_path,
+                                last_modified_date,
+                                file_size
+                            FROM vw_files_expanded_pm
+                            WHERE file_name LIKE ?
+                            ORDER BY last_modified_date DESC
+                        """, (f'%{model[2]}%',))
+                        
+                        obs = acc_cursor.fetchone()
+                        if obs:
+                            observed_match = {
+                                'fileName': obs[0],
+                                'folderPath': obs[1],
+                                'lastModified': obs[2].isoformat() if obs[2] else None,
+                                'fileSize': obs[3]
+                            }
+                except Exception as e:
+                    # Log ACC query error but don't fail the entire request
+                    logging.warning(f"Failed to fetch ACC observed match for model {expected_model_id}: {str(e)}")
+                    observed_match = None
             
             result = {
                 'id': model[0],
@@ -6030,15 +6378,18 @@ def api_create_service_item(project_id, service_id):
         from database import create_service_item
         data = request.get_json() or {}
         
-        required = ['item_type', 'title', 'planned_date']
+        required = ['item_type', 'title']
         if not all(k in data for k in required):
             return jsonify({'error': 'Missing required fields'}), 400
-        
+
+        planned_date = data.get('planned_date') or date.today().isoformat()
+
         item_id = create_service_item(
             service_id=service_id,
             item_type=data['item_type'],
             title=data['title'],
-            planned_date=data['planned_date'],
+            planned_date=planned_date,
+            project_id=data.get('project_id'),
             description=data.get('description'),
             due_date=data.get('due_date'),
             actual_date=data.get('actual_date'),
@@ -6048,7 +6399,13 @@ def api_create_service_item(project_id, service_id):
             invoice_reference=data.get('invoice_reference'),
             evidence_links=data.get('evidence_links'),
             notes=data.get('notes'),
-            is_billed=data.get('is_billed')
+            is_billed=data.get('is_billed'),
+            generated_from_template_id=data.get('generated_from_template_id'),
+            generated_from_template_version=data.get('generated_from_template_version'),
+            generated_key=data.get('generated_key'),
+            origin=data.get('origin'),
+            is_template_managed=data.get('is_template_managed'),
+            sort_order=data.get('sort_order'),
         )
         
         if item_id:

@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.1",
+  "catalog": {
+    "bill_rules": [
+      "on_completion",
+      "on_report_issue",
+      "on_setup",
+      "per_unit_complete"
+    ],
+    "unit_types": [
+      "deliverable",
+      "license",
+      "lump_sum",
+      "review"
+    ],
+    "phases": [
+      "Construction",
+      "Design",
+      "Handover"
+    ]
+  },
+  "templates": [
+    {
+      "template_id": "bim-coordination",
+      "name": "BIM Coordination",
+      "category": "Coordination",
+      "version": "1.1",
+      "tags": ["review", "coordination"],
+      "intent": {
+        "delivery_model": "coordination",
+        "commercial_model": "per_review",
+        "primary_output": "coordination_reviews",
+        "is_recurring": true
+      },
+      "pricing": {
+        "model": "per_unit",
+        "unit_type": "review",
+        "unit_qty": 4,
+        "unit_rate": 5500,
+        "derive_agreed_fee": true
+      },
+      "defaults": {
+        "service_code": "BIM_COORD",
+        "service_name": "BIM Coordination Review",
+        "phase": "Construction",
+        "bill_rule": "per_unit_complete"
+      },
+      "reviews": [
+        {
+          "review_template_id": "coord-review",
+          "name": "Coordination Review",
+          "count": 4,
+          "status": "planned",
+          "interval_days": 7
+        }
+      ],
+      "items": [
+        {
+          "item_template_id": "progress-report",
+          "title": "Progress Report",
+          "item_type": "deliverable",
+          "status": "planned",
+          "priority": "medium"
+        }
+      ],
+      "options": [
+        {
+          "option_id": "revizto_licensing",
+          "name": "Revizto Licensing",
+          "items": [
+            {
+              "item_template_id": "revizto-lic",
+              "title": "Revizto Licensing",
+              "item_type": "license",
+              "status": "planned",
+              "priority": "medium"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

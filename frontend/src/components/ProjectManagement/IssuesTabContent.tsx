@@ -13,16 +13,12 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  Drawer,
-  Card,
-  CardContent,
   Stack,
   Chip,
-  IconButton,
-  Divider,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import { issuesApi } from '@/api';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import type { Selection } from '@/hooks/useWorkspaceSelection';
 
 interface IssueRow {
   issue_key: string;
@@ -105,13 +101,13 @@ const formatDate = (dateStr?: string | null): string => {
 
 interface IssuesTabContentProps {
   projectId: number;
+  selection: Selection | null;
 }
 
-export function IssuesTabContent({ projectId }: IssuesTabContentProps) {
+export function IssuesTabContent({ projectId, selection }: IssuesTabContentProps) {
   const [sortField, setSortField] = useState<SortField>('updated_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { setSelection } = useWorkspaceSelection();
 
   const {
     data: issuesData,
@@ -129,16 +125,6 @@ export function IssuesTabContent({ projectId }: IssuesTabContentProps) {
     enabled: Number.isFinite(projectId),
   });
 
-  const {
-    data: issueDetail,
-    isLoading: isDetailLoading,
-  } = useQuery({
-    queryKey: ['issueDetail', projectId, selectedIssueKey],
-    queryFn: () =>
-      issuesApi.getIssueDetail(selectedIssueKey!, projectId),
-    enabled: selectedIssueKey !== null,
-  });
-
   const issues = useMemo(() => (Array.isArray(issuesData?.rows) ? issuesData.rows : []), [issuesData]);
 
   const handleSortClick = (field: SortField) => {
@@ -151,14 +137,8 @@ export function IssuesTabContent({ projectId }: IssuesTabContentProps) {
   };
 
   const handleRowClick = useCallback((issueKey: string) => {
-    setSelectedIssueKey(issueKey);
-    setIsDetailOpen(true);
-  }, []);
-
-  const handleDetailClose = () => {
-    setIsDetailOpen(false);
-    setSelectedIssueKey(null);
-  };
+    setSelection({ type: 'issue', id: issueKey });
+  }, [setSelection]);
 
   return (
     <Box data-testid="project-issues-tab" sx={{ display: 'grid', gap: 2 }}>
@@ -233,6 +213,7 @@ export function IssuesTabContent({ projectId }: IssuesTabContentProps) {
                   data-testid={`issue-row-${issue.display_id}`}
                   hover
                   onClick={() => handleRowClick(issue.issue_key)}
+                  selected={selection?.type === 'issue' && selection.id === issue.issue_key}
                   sx={{ cursor: 'pointer' }}
                 >
                   <TableCell sx={{ fontWeight: 600 }}>
@@ -274,211 +255,6 @@ export function IssuesTabContent({ projectId }: IssuesTabContentProps) {
           </TableBody>
         </Table>
       </TableContainer>
-
-      {/* Issue Detail Drawer */}
-      <Drawer
-        anchor="right"
-        open={isDetailOpen}
-        onClose={handleDetailClose}
-        data-testid="issue-detail-drawer"
-        PaperProps={{
-          sx: { width: { xs: '100%', sm: 400 } },
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            p: 2,
-          }}
-        >
-          {/* Close Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <IconButton
-              onClick={handleDetailClose}
-              size="small"
-              data-testid="issue-detail-close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </Box>
-
-          {/* Detail Content */}
-          {isDetailLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-              <CircularProgress size={40} />
-            </Box>
-          ) : issueDetail ? (
-            <Stack spacing={2} sx={{ flex: 1, overflow: 'auto' }}>
-              <Card data-testid="issue-detail-card" variant="outlined">
-                <CardContent>
-                  <Stack spacing={2}>
-                    {/* Header */}
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {issueDetail.display_id}
-                      </Typography>
-                      <Typography variant="h6" sx={{ mt: 0.5 }}>
-                        {issueDetail.title}
-                      </Typography>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Status & Priority */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Status
-                        </Typography>
-                        <Chip
-                          label={issueDetail.status_normalized || '—'}
-                          size="small"
-                          color={getStatusColor(issueDetail.status_normalized)}
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Priority
-                        </Typography>
-                        <Chip
-                          label={issueDetail.priority_normalized || '—'}
-                          size="small"
-                          color={getPriorityColor(issueDetail.priority_normalized)}
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                    </Box>
-
-                    {/* Assignee & Discipline */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Assignee
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {issueDetail.assignee_user_key || 'Unmapped'}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Discipline
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {issueDetail.discipline_normalized || '—'}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Zone & Due Date */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Zone
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {issueDetail.zone || '—'}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Due Date
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {formatDate(issueDetail.due_date)}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Service & Review Association */}
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                        Associated Service
-                      </Typography>
-                      <Typography variant="body2">
-                        {issueDetail.service_name ? (
-                          <Chip
-                            label={issueDetail.service_name}
-                            size="small"
-                            variant="outlined"
-                          />
-                        ) : (
-                          'Unmapped'
-                        )}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                        Associated Review
-                      </Typography>
-                      <Typography variant="body2">
-                        {issueDetail.review_label ? (
-                          <Chip
-                            label={issueDetail.review_label}
-                            size="small"
-                            variant="outlined"
-                          />
-                        ) : (
-                          'Unmapped'
-                        )}
-                      </Typography>
-                    </Box>
-
-                    {/* Dates */}
-                    <Divider />
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Created
-                        </Typography>
-                        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                          {formatDate(issueDetail.created_at)}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Updated
-                        </Typography>
-                        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                          {formatDate(issueDetail.updated_at)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-
-              {/* Comments Section */}
-              {issueDetail.comments && issueDetail.comments.length > 0 && (
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Latest Comments
-                    </Typography>
-                    <Stack spacing={1}>
-                      {issueDetail.comments.map((comment, idx) => (
-                        <Box key={idx} sx={{ pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary">
-                            {comment.author} · {formatDate(comment.created_at)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {comment.text}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              )}
-            </Stack>
-          ) : null}
-        </Box>
-      </Drawer>
     </Box>
   );
 }

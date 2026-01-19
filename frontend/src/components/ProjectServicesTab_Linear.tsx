@@ -25,9 +25,9 @@ import {
   Stack,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
-import { projectServicesApi, serviceReviewsApi, serviceItemsApi, fileServiceTemplatesApi } from '@/api';
+import { projectServicesApi, serviceReviewsApi, serviceItemsApi, serviceTemplateCatalogApi } from '@/api';
 import type { ProjectServicesListResponse } from '@/api/services';
-import type { ProjectService, ServiceReview, ServiceItem, FileServiceTemplate, ApplyTemplateResult } from '@/types/api';
+import type { ProjectService, ServiceReview, ServiceItem } from '@/types/api';
 import { profilerLog } from '@/utils/perfLogger';
 import { ServicesSummaryStrip } from './ProjectServices/ServicesSummaryStrip';
 import { ServicesListRow } from './ProjectServices/ServicesListRow';
@@ -37,13 +37,11 @@ interface ProjectServicesTabProps {
   projectId: number;
 }
 
-const BILL_RULES = [
-  'Fixed Fee',
-  'Time & Materials',
-  'Percentage of Construction Cost',
-  'Milestone Based',
-  'Other'
-];
+const formatBillRuleLabel = (value: string) =>
+  value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 const REVIEW_STATUSES = [
   'planned',
@@ -274,15 +272,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     is_billed: false,
   });
 
-  // Template dialog
-  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const [templateSelection, setTemplateSelection] = useState({
-    templateName: '',
-    replaceExisting: false,
-  });
-  const [templateDialogError, setTemplateDialogError] = useState('');
-  const [templateFeedback, setTemplateFeedback] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
-
   // Fetch services
   const {
     data: servicesPayload,
@@ -298,14 +287,15 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     placeholderData: (previousData) => previousData,
   });
 
-  // Fetch templates
-  const { data: fileTemplates, isLoading: fileTemplatesLoading } = useQuery({
-    queryKey: ['fileServiceTemplates'],
+  const { data: templateCatalog } = useQuery({
+    queryKey: ['serviceTemplateCatalog'],
     queryFn: async () => {
-      const response = await fileServiceTemplatesApi.getAll();
+      const response = await serviceTemplateCatalogApi.getAll();
       return response.data;
     },
   });
+
+  const billRules = templateCatalog?.catalog?.bill_rules ?? [];
 
   const normalizedServices = useMemo(
     () =>
@@ -326,8 +316,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   } = normalizedServices;
 
   const serverPageIndex = Math.max(0, serverPage - 1);
-  const fileTemplateOptions: FileServiceTemplate[] = fileTemplates ?? [];
-
   useEffect(() => {
     setServicesPage(0);
   }, [projectId]);
@@ -484,43 +472,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
     },
   });
 
-  const applyTemplateMutation = useMutation<ApplyTemplateResult, any, { template_name: string; replace_existing: boolean; skip_duplicates: boolean }>({
-    mutationFn: (payload) =>
-      projectServicesApi.applyTemplate(projectId, payload).then((res) => res.data),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['projectServices', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId] });
-      setSelectedService(null);
-
-      const createdCount = result.created?.length ?? 0;
-      const skippedCount = result.skipped?.length ?? 0;
-      const replacedCount = result.replaced_services ?? 0;
-
-      const summaryParts = [`created ${createdCount} service${createdCount === 1 ? '' : 's'}`];
-      if (skippedCount) {
-        summaryParts.push(`skipped ${skippedCount} duplicate${skippedCount === 1 ? '' : 's'}`);
-      }
-      if (replacedCount) {
-        summaryParts.push(`replaced ${replacedCount} existing service${replacedCount === 1 ? '' : 's'}`);
-      }
-
-      setTemplateFeedback({
-        message: `Template '${result.template_name}' applied: ${summaryParts.join(', ')}.`,
-        severity: 'success',
-      });
-      setTemplateSelection({
-        templateName: '',
-        replaceExisting: false,
-      });
-      setTemplateDialogError('');
-      setTemplateDialogOpen(false);
-    },
-    onError: (err: any) => {
-      setTemplateDialogError(err?.response?.data?.error || 'Failed to apply template');
-    },
-  });
-
   const createReviewMutation = useMutation({
     mutationFn: ({ serviceId, data }: { serviceId: number; data: typeof reviewFormData }) =>
       serviceReviewsApi.create(projectId, serviceId, data),
@@ -588,39 +539,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
   });
 
   // Handlers
-  const handleOpenTemplateDialog = () => {
-    if (fileTemplateOptions.length > 0) {
-      const firstName = fileTemplateOptions[0].name;
-      const currentExists = fileTemplateOptions.some(
-        (template) => template.name === templateSelection.templateName,
-      );
-      setTemplateSelection((prev) => ({
-        templateName: currentExists && prev.templateName ? prev.templateName : firstName,
-        replaceExisting: prev.replaceExisting,
-      }));
-    }
-    setTemplateDialogError('');
-    setTemplateDialogOpen(true);
-  };
-
-  const handleCloseTemplateDialog = () => {
-    setTemplateDialogOpen(false);
-    setTemplateDialogError('');
-  };
-
-  const handleApplyTemplate = () => {
-    if (!templateSelection.templateName) {
-      setTemplateDialogError('Please select a template');
-      return;
-    }
-    setTemplateDialogError('');
-    applyTemplateMutation.mutate({
-      template_name: templateSelection.templateName,
-      replace_existing: templateSelection.replaceExisting,
-      skip_duplicates: !templateSelection.replaceExisting,
-    });
-  };
-
   const handleOpenServiceDialog = (service?: ProjectService) => {
     if (service) {
       setSelectedService(service);
@@ -880,25 +798,8 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
             >
               Add Service
             </Button>
-            <Button
-              variant="outlined"
-              onClick={handleOpenTemplateDialog}
-              disabled={fileTemplatesLoading}
-            >
-              Add From Template
-            </Button>
           </Stack>
         </Box>
-
-        {templateFeedback && (
-          <Alert
-            severity={templateFeedback.severity}
-            sx={{ mb: 2 }}
-            onClose={() => setTemplateFeedback(null)}
-          >
-            {templateFeedback.message}
-          </Alert>
-        )}
 
         {/* Phase A: Summary Strip (minimal, discreet) */}
         <ServicesSummaryStrip
@@ -997,80 +898,6 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
 
         {/* ===== DIALOGS ===== */}
 
-        {/* Apply Template Dialog */}
-        <Dialog open={templateDialogOpen} onClose={handleCloseTemplateDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>Apply Service Template</DialogTitle>
-          <DialogContent dividers>
-            {templateDialogError && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setTemplateDialogError('')}>
-                {templateDialogError}
-              </Alert>
-            )}
-            {fileTemplatesLoading ? (
-              <Box display="flex" justifyContent="center" py={2}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : fileTemplateOptions.length === 0 ? (
-              <Alert severity="info">
-                No file-based templates available. Create one in Settings → Service Templates.
-              </Alert>
-            ) : (
-              <Stack spacing={2} mt={1}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Template"
-                  value={templateSelection.templateName}
-                  onChange={(e) =>
-                    setTemplateSelection((prev) => ({
-                      ...prev,
-                      templateName: e.target.value,
-                    }))
-                  }
-                  required
-                >
-                  {fileTemplateOptions.map((template) => (
-                    <MenuItem key={template.key} value={template.name}>
-                      {template.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <FormControlLabel
-                  control={(
-                    <Checkbox
-                      checked={templateSelection.replaceExisting}
-                      onChange={(e) =>
-                        setTemplateSelection((prev) => ({
-                          ...prev,
-                          replaceExisting: e.target.checked,
-                        }))
-                      }
-                    />
-                  )}
-                  label="Replace existing services for this project"
-                />
-                <Typography variant="body2" color="text.secondary">
-                  When unchecked, the template will add new services and skip any duplicates that already exist.
-                </Typography>
-              </Stack>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseTemplateDialog}>Cancel</Button>
-            <Button
-              variant="contained"
-              onClick={handleApplyTemplate}
-              disabled={
-                applyTemplateMutation.isPending ||
-                fileTemplatesLoading ||
-                fileTemplateOptions.length === 0
-              }
-            >
-              {applyTemplateMutation.isPending ? 'Applying...' : 'Apply Template'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
         {/* Service Dialog */}
         <Dialog open={serviceDialogOpen} onClose={handleCloseServiceDialog} maxWidth="md" fullWidth>
           <DialogTitle>
@@ -1109,9 +936,9 @@ export function ProjectServicesTab({ projectId }: ProjectServicesTabProps) {
                 onChange={(e) => setServiceFormData(prev => ({ ...prev, bill_rule: e.target.value }))}
                 margin="normal"
               >
-                {BILL_RULES.map((rule) => (
+                {billRules.map((rule: string) => (
                   <MenuItem key={rule} value={rule}>
-                    {rule}
+                    {formatBillRuleLabel(rule)}
                   </MenuItem>
                 ))}
               </TextField>
