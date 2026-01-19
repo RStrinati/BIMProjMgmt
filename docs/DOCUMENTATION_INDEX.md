@@ -70,6 +70,8 @@
 | [enhanced_review_management_overview.md](./enhanced_review_management_overview.md) | Review management system | ✅ Complete |
 | [SERVICE_TEMPLATE_SYSTEM.md](./SERVICE_TEMPLATE_SYSTEM.md) | Service template functionality | ✅ Complete |
 | [PROJECT_ALIAS_MANAGEMENT.md](./PROJECT_ALIAS_MANAGEMENT.md) | Project alias system | ✅ Complete |
+| **[features/monthly_billing_discovery.md](./features/monthly_billing_discovery.md)** ⭐ | **Monthly billing discovery document** | ✅ Complete |
+| **[features/monthly-billing-implementation-summary.md](./features/monthly-billing-implementation-summary.md)** ⭐ | **Monthly billing implementation summary** | ✅ Complete |
 
 ### 🔧 Implementation Reports
 | Document | Topic | Status |
@@ -119,6 +121,8 @@
 | [COMPREHENSIVE_TEST_REPORT.md](./COMPREHENSIVE_TEST_REPORT.md) | Detailed test report |
 | [ISSUE_ANALYTICS_TESTING_REPORT.md](./ISSUE_ANALYTICS_TESTING_REPORT.md) | Analytics testing report |
 | [STATUS_UPDATE_TESTING_GUIDE.md](./archive/desktop-ui/STATUS_UPDATE_TESTING_GUIDE.md) | Status update testing |
+| **[testing/monthly-billing-test-suite.md](./testing/monthly-billing-test-suite.md)** ⭐ | **Monthly billing Playwright test suite reference** |
+| **[testing/monthly-billing-smoke-test-checklist.md](./testing/monthly-billing-smoke-test-checklist.md)** ⭐ | **Monthly billing smoke test checklist** |
 
 ### 📋 Quick References
 | Document | Content |

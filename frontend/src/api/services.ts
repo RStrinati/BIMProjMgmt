@@ -221,6 +221,10 @@ export const serviceReviewsApi = {
 
 // Service Items API
 export const serviceItemsApi = {
+  getProjectItems: (projectId: number, type?: string) =>
+    apiClient
+      .get<{ items: ServiceItem[]; total: number }>(`/projects/${projectId}/items${type ? `?type=${type}` : ''}`)
+      .then((response) => response.data),
   getAll: (projectId: number, serviceId: number, type?: string) =>
     apiClient.get<ServiceItem[]>(`/projects/${projectId}/services/${serviceId}/items${type ? `?type=${type}` : ''}`),
 

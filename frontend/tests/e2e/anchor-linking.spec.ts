@@ -176,6 +176,14 @@ const setupReviewMocks = async (page: any) => {
     });
   });
 
+  await page.route('**/api/projects/1/items**', async (route: any) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0 }),
+    });
+  });
+
   // Mock blocker counts endpoint
   await page.route(
     '**/api/projects/1/anchors/review/101/counts',
@@ -638,6 +646,14 @@ test.describe('Anchor Linking Feature', () => {
           ],
           total: 1,
         }),
+      });
+    });
+
+    await page.route('**/api/projects/1/items**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [], total: 0 }),
       });
     });
 

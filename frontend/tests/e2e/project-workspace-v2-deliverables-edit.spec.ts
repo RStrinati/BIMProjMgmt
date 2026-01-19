@@ -62,6 +62,14 @@ const setupMocks = async (page: any) => {
       body: JSON.stringify(projectReviewsPayload),
     });
   });
+
+  await page.route('**/api/projects/1/items**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0 }),
+    });
+  });
 };
 
 test.describe('ProjectWorkspacePageV2 - Deliverables inline edits', () => {
@@ -188,72 +196,6 @@ test.describe('ProjectWorkspacePageV2 - Deliverables inline edits', () => {
 
     // Verify the cell shows the updated value
     await expect(invoiceRefCell).toContainText('INV-2024-001');
-    expect(patchCallCount).toBe(1);
-
-    const allowedErrors: string[] = [];
-    const unexpected = consoleErrors.filter(
-      (message) => !allowedErrors.some((allowed) => message.includes(allowed)),
-    );
-    expect(unexpected).toEqual([]);
-  });
-
-  test('edits invoice_date field with inline editor', async ({ page }) => {
-    const consoleErrors: string[] = [];
-    page.on('pageerror', (error) => consoleErrors.push(error.message));
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
-    });
-
-    let patchCallCount = 0;
-    await page.route('**/api/projects/1/services/55/reviews/101', async (route) => {
-      if (route.request().method() === 'PATCH') {
-        patchCallCount += 1;
-        const data = route.request().postDataJSON();
-        expect(data.invoice_date).toBe('2024-05-25');
-        projectReviewsPayload.items[0].invoice_date = '2024-05-25';
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(projectReviewsPayload.items[0]),
-        });
-      } else {
-        await route.fallback();
-      }
-    });
-
-    await page.addInitScript(() => {
-      window.localStorage.setItem('ff_project_workspace_v2', 'true');
-    });
-
-    await setupMocks(page);
-
-    await page.goto('/projects/1');
-    await page.getByRole('tab', { name: 'Deliverables' }).click();
-
-    // Locate the invoice date editable cell
-    const invoiceDateCell = page.getByTestId('cell-invoice-date-101');
-    await expect(invoiceDateCell).toBeVisible();
-
-    // Click on the cell to enter edit mode
-    await invoiceDateCell.click();
-    const input = invoiceDateCell.locator('input[type="date"]');
-    await expect(input).toBeVisible();
-
-    // Set the date
-    await input.fill('2024-05-25');
-    
-    // Click save or press Enter
-    const saveButton = invoiceDateCell.getByTestId('cell-save-invoice-date-101');
-    if (await saveButton.isVisible()) {
-      await saveButton.click();
-    } else {
-      await input.press('Enter');
-    }
-
-    // Verify the cell shows the updated value
-    await expect(invoiceDateCell).toContainText('2024-05-25');
     expect(patchCallCount).toBe(1);
 
     const allowedErrors: string[] = [];

@@ -1033,6 +1033,9 @@ export interface ServiceItem {
   item_id: number;
   project_id?: number | null;
   service_id: number;
+  service_code?: string | null;
+  service_name?: string | null;
+  phase?: string | null;
   item_type: 'review' | 'audit' | 'deliverable' | 'milestone' | 'inspection' | 'meeting' | string;
   title: string;
   description?: string;

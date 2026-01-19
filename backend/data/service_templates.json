@@ -78,6 +78,84 @@
           ]
         }
       ]
+    },
+    {
+      "template_id": "audit-service",
+      "name": "Audit Service",
+      "category": "Audit",
+      "version": "1.0",
+      "tags": ["audit", "item"],
+      "intent": {
+        "delivery_model": "milestone",
+        "commercial_model": "on_completion",
+        "primary_output": "audit_report",
+        "is_recurring": false
+      },
+      "pricing": {
+        "model": "lump_sum",
+        "unit_type": "lump_sum",
+        "lump_sum_fee": 0,
+        "derive_agreed_fee": true
+      },
+      "defaults": {
+        "service_code": "AUDIT",
+        "service_name": "Audit Service",
+        "phase": "Design",
+        "bill_rule": "on_completion",
+        "unit_type": "lump_sum",
+        "unit_qty": 1
+      },
+      "items": [
+        {
+          "item_template_id": "audit-report",
+          "title": "Audit Report",
+          "item_type": "audit",
+          "status": "planned",
+          "priority": "high",
+          "planned_offset_days": 0,
+          "due_offset_days": 14,
+          "notes": "Single audit deliverable billed on completion."
+        }
+      ]
+    },
+    {
+      "template_id": "revit-licensing",
+      "name": "Revit Licensing",
+      "category": "Licensing",
+      "version": "1.0",
+      "tags": ["license"],
+      "intent": {
+        "delivery_model": "license_term",
+        "commercial_model": "time_bound",
+        "primary_output": "license",
+        "is_recurring": false
+      },
+      "pricing": {
+        "model": "lump_sum",
+        "unit_type": "lump_sum",
+        "lump_sum_fee": 0,
+        "derive_agreed_fee": true
+      },
+      "defaults": {
+        "service_code": "REVIT_LIC",
+        "service_name": "Revit Licensing",
+        "phase": "Design",
+        "bill_rule": "on_setup",
+        "unit_type": "lump_sum",
+        "unit_qty": 1
+      },
+      "items": [
+        {
+          "item_template_id": "revit-license-term",
+          "title": "Revit License Term",
+          "item_type": "license",
+          "status": "in_progress",
+          "priority": "medium",
+          "planned_offset_days": 0,
+          "due_offset_days": 365,
+          "notes": "Adjust planned/due dates to match the license period."
+        }
+      ]
     }
   ]
 }

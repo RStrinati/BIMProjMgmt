@@ -79,6 +79,12 @@ export default function ServiceCreateView() {
     phase: '',
     assigned_user_id: '' as number | '',
     agreed_fee: '' as number | '',
+    unit_type: '',
+    unit_qty: '' as number | '',
+    unit_rate: '' as number | '',
+    lump_sum_fee: '' as number | '',
+    bill_rule: '',
+    notes: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -136,12 +142,19 @@ export default function ServiceCreateView() {
       return;
     }
     const defaults = selectedTemplate.defaults || {};
+    const pricing = selectedTemplate.pricing || {};
     setTemplateOverrides({
       service_code: defaults.service_code || '',
       service_name: defaults.service_name || '',
       phase: defaults.phase || '',
       assigned_user_id: defaults.assigned_user_id ?? '',
       agreed_fee: defaults.agreed_fee ?? '',
+      unit_type: defaults.unit_type || pricing.unit_type || '',
+      unit_qty: pricing.unit_qty ?? defaults.unit_qty ?? '',
+      unit_rate: pricing.unit_rate ?? defaults.unit_rate ?? '',
+      lump_sum_fee: pricing.lump_sum_fee ?? defaults.lump_sum_fee ?? '',
+      bill_rule: defaults.bill_rule || '',
+      notes: defaults.notes || '',
     });
     setOptionsEnabled([]);
   }, [selectedTemplate]);
@@ -192,6 +205,18 @@ export default function ServiceCreateView() {
           agreed_fee: templateOverrides.agreed_fee === ''
             ? undefined
             : Number(templateOverrides.agreed_fee),
+          unit_type: templateOverrides.unit_type || undefined,
+          unit_qty: templateOverrides.unit_qty === ''
+            ? undefined
+            : Number(templateOverrides.unit_qty),
+          unit_rate: templateOverrides.unit_rate === ''
+            ? undefined
+            : Number(templateOverrides.unit_rate),
+          lump_sum_fee: templateOverrides.lump_sum_fee === ''
+            ? undefined
+            : Number(templateOverrides.lump_sum_fee),
+          bill_rule: templateOverrides.bill_rule || undefined,
+          notes: templateOverrides.notes || undefined,
         },
       });
     },
@@ -399,6 +424,80 @@ export default function ServiceCreateView() {
                     </AccordionSummary>
                     <AccordionDetails>
                       <Stack spacing={2}>
+                        <TextField
+                          fullWidth
+                          select
+                          label="Billing Rule Override"
+                          value={templateOverrides.bill_rule}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              bill_rule: event.target.value,
+                            }))
+                          }
+                        >
+                          <MenuItem value="">None</MenuItem>
+                          {catalog?.bill_rules?.map((rule) => (
+                            <MenuItem key={rule} value={rule}>
+                              {formatBillRuleLabel(rule)}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <TextField
+                          fullWidth
+                          select
+                          label="Unit Type Override"
+                          value={templateOverrides.unit_type}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              unit_type: event.target.value,
+                            }))
+                          }
+                        >
+                          <MenuItem value="">Default</MenuItem>
+                          {catalog?.unit_types?.map((unitType) => (
+                            <MenuItem key={unitType} value={unitType}>
+                              {unitType}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="Unit Quantity Override"
+                          value={templateOverrides.unit_qty}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              unit_qty: event.target.value === '' ? '' : Number(event.target.value),
+                            }))
+                          }
+                        />
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="Unit Rate Override"
+                          value={templateOverrides.unit_rate}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              unit_rate: event.target.value === '' ? '' : Number(event.target.value),
+                            }))
+                          }
+                        />
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="Lump Sum Fee Override"
+                          value={templateOverrides.lump_sum_fee}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              lump_sum_fee: event.target.value === '' ? '' : Number(event.target.value),
+                            }))
+                          }
+                        />
                         <FormControl fullWidth>
                           <InputLabel id="service-template-assignee-label">Assigned User</InputLabel>
                           <Select
@@ -429,6 +528,19 @@ export default function ServiceCreateView() {
                             setTemplateOverrides((prev) => ({
                               ...prev,
                               agreed_fee: event.target.value === '' ? '' : Number(event.target.value),
+                            }))
+                          }
+                        />
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={2}
+                          label="Notes Override"
+                          value={templateOverrides.notes}
+                          onChange={(event) =>
+                            setTemplateOverrides((prev) => ({
+                              ...prev,
+                              notes: event.target.value,
                             }))
                           }
                         />

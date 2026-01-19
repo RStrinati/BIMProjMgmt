@@ -17,8 +17,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { invoiceBatchesApi, serviceReviewsApi } from '@/api';
-import type { InvoiceBatch, Project, ProjectReviewItem, ProjectReviewsResponse, ServiceReview } from '@/types/api';
+import { invoiceBatchesApi, serviceItemsApi, serviceReviewsApi } from '@/api';
+import type { InvoiceBatch, Project, ProjectReviewItem, ProjectReviewsResponse, ServiceItem, ServiceReview } from '@/types/api';
 import { useProjectReviews } from '@/hooks/useProjectReviews';
 import { toApiReviewStatus } from '@/utils/reviewStatus';
 import { EditableCell, ToggleCell } from '@/components/projects/EditableCells';
@@ -79,6 +79,20 @@ export default function DeliverablesTab() {
     [projectReviews],
   );
 
+  const { data: projectItems, isLoading: projectItemsLoading, error: projectItemsError } = useQuery<{
+    items: ServiceItem[];
+    total: number;
+  }>({
+    queryKey: ['projectItems', projectId],
+    queryFn: () => serviceItemsApi.getProjectItems(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const serviceItems = useMemo<ServiceItem[]>(
+    () => projectItems?.items ?? [],
+    [projectItems],
+  );
+
   const { data: invoiceBatches = [] } = useQuery<InvoiceBatch[]>({
     queryKey: ['invoiceBatches', projectId],
     queryFn: () => invoiceBatchesApi.getAll(projectId),
@@ -98,8 +112,13 @@ export default function DeliverablesTab() {
     }
     const currentMonth = toMonthString(new Date());
     return reviewItems.filter((review) => {
-      const dueMonth = formatInvoiceMonth(review.due_date) ?? '';
-      const matchesDueThisMonth = !deliverableFilters.dueThisMonth || dueMonth === currentMonth;
+      const invoiceMonth = formatInvoiceMonth(
+        review.invoice_month_final
+          || review.invoice_month_override
+          || review.invoice_month_auto
+          || review.due_date,
+      ) ?? '';
+      const matchesDueThisMonth = !deliverableFilters.dueThisMonth || invoiceMonth === currentMonth;
       const matchesUnbatched = !deliverableFilters.unbatched || review.invoice_batch_id == null;
       const matchesReady =
         !deliverableFilters.readyToInvoice
@@ -107,6 +126,21 @@ export default function DeliverablesTab() {
       return matchesDueThisMonth && matchesUnbatched && matchesReady;
     });
   }, [deliverableFilters, reviewItems]);
+
+  const filteredServiceItems = useMemo(() => {
+    if (!deliverableFilters.dueThisMonth && !deliverableFilters.readyToInvoice) {
+      return serviceItems;
+    }
+    const currentMonth = toMonthString(new Date());
+    return serviceItems.filter((item) => {
+      const dueMonth = formatInvoiceMonth(item.due_date) ?? '';
+      const matchesDueThisMonth = !deliverableFilters.dueThisMonth || dueMonth === currentMonth;
+      const matchesReady =
+        !deliverableFilters.readyToInvoice
+        || ((item.status || '').toLowerCase() === 'completed' && !item.is_billed);
+      return matchesDueThisMonth && matchesReady;
+    });
+  }, [deliverableFilters, serviceItems]);
 
   const updateDeliverableField = useMutation<
     ProjectReviewItem,
@@ -170,7 +204,7 @@ export default function DeliverablesTab() {
       )}
       {projectReviewsLoading ? (
         <Typography color="text.secondary">Loading deliverables...</Typography>
-      ) : reviewItems.length ? (
+      ) : (reviewItems.length || serviceItems.length) ? (
         <>
           <Stack direction="row" spacing={1} sx={{ mb: 2 }} data-testid="deliverables-filters">
             <Chip
@@ -196,7 +230,7 @@ export default function DeliverablesTab() {
             />
           </Stack>
           <LinearListContainer>
-            <LinearListHeaderRow columns={['Service', 'Planned', 'Due', 'Invoice Month', 'Batch', 'Invoice #', 'Invoice Date', 'Billed']} />
+            <LinearListHeaderRow columns={['Service', 'Planned', 'Due', 'Invoice Month', 'Batch', 'Invoice #', 'Billed']} />
             {filteredReviewItems.map((review) => {
               const serviceLabel = [review.service_code, review.service_name]
                 .filter(Boolean)
@@ -225,7 +259,7 @@ export default function DeliverablesTab() {
                 <LinearListRow
                   key={review.review_id}
                   testId={`deliverable-row-${review.review_id}`}
-                  columns={8}
+                  columns={7}
                   hoverable
                 >
                   {/* Service + metadata */}
@@ -355,21 +389,6 @@ export default function DeliverablesTab() {
                     }}
                   />
 
-                  {/* Invoice Date - Editable */}
-                  <EditableCell
-                    value={review.invoice_date}
-                    type="date"
-                    testId={`cell-invoice-date-${review.review_id}`}
-                    isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_date'}
-                    onSave={async (newValue) => {
-                      await updateDeliverableField.mutateAsync({
-                        review,
-                        fieldName: 'invoice_date',
-                        value: newValue,
-                      });
-                    }}
-                  />
-
                   {/* Billing Status - Toggleable */}
                   <ToggleCell
                     value={review.is_billed}
@@ -387,6 +406,69 @@ export default function DeliverablesTab() {
               );
             })}
           </LinearListContainer>
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              Items
+            </Typography>
+            {projectItemsError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                Failed to load service items.
+              </Alert>
+            )}
+            {projectItemsLoading ? (
+              <Typography color="text.secondary">Loading items...</Typography>
+            ) : filteredServiceItems.length ? (
+              <LinearListContainer>
+                <LinearListHeaderRow columns={['Service', 'Planned', 'Due', 'Item', 'Type', 'Status', 'Invoice #', 'Billed']} />
+                {filteredServiceItems.map((item) => {
+                  const serviceLabel = [item.service_code, item.service_name]
+                    .filter(Boolean)
+                    .join(' | ');
+                  const metadataLabel = item.phase || '';
+                  return (
+                    <LinearListRow
+                      key={`item-${item.item_id}`}
+                      testId={`deliverable-item-row-${item.item_id}`}
+                      columns={8}
+                      hoverable
+                    >
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>
+                          {serviceLabel || `Service ${item.service_id}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {metadataLabel}
+                        </Typography>
+                      </Box>
+                      <LinearListCell variant="secondary">
+                        {formatDate(item.planned_date)}
+                      </LinearListCell>
+                      <LinearListCell variant="secondary">
+                        {formatDate(item.due_date)}
+                      </LinearListCell>
+                      <Typography variant="body2">
+                        {item.title}
+                      </Typography>
+                      <Typography variant="body2">
+                        {item.item_type || '--'}
+                      </Typography>
+                      <Typography variant="body2">
+                        {item.status || '--'}
+                      </Typography>
+                      <Typography variant="body2">
+                        {item.invoice_reference || '--'}
+                      </Typography>
+                      <Typography variant="body2">
+                        {item.is_billed ? 'Billed' : 'Not billed'}
+                      </Typography>
+                    </LinearListRow>
+                  );
+                })}
+              </LinearListContainer>
+            ) : (
+              <Typography color="text.secondary">No service items found for this project.</Typography>
+            )}
+          </Box>
         </>
       ) : (
         <Typography color="text.secondary">No deliverables found for this project.</Typography>

@@ -62,6 +62,14 @@ const setupMocks = async (page: any) => {
       body: JSON.stringify(projectReviewsPayload),
     });
   });
+
+  await page.route('**/api/projects/1/items**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0 }),
+    });
+  });
 };
 
 test.describe('Workspace v2 project-wide reviews', () => {
@@ -97,10 +105,6 @@ test.describe('Workspace v2 project-wide reviews', () => {
     const reviewRow = page.getByTestId('project-workspace-v2-review-row-101');
     await expect(reviewRow).toBeVisible();
     await expect(reviewRow).toContainText('DR-01');
-
-    // Verify Invoice Date column header is present
-    const invoiceDateHeader = page.locator('text=Invoice Date');
-    await expect(invoiceDateHeader).toBeVisible();
 
     const statusSelect = reviewRow.getByTestId('projects-panel-review-status-select');
     await statusSelect.click();

@@ -1261,21 +1261,44 @@ def update_service_review(review_id, **kwargs):
             if supports_invoice_month:
                 invoice_month_auto = existing_auto
                 if S.ServiceReviews.DUE_DATE in update_fields:
-                    invoice_month_auto = _format_invoice_month(update_fields.get(S.ServiceReviews.DUE_DATE))
+                    new_due_date = update_fields.get(S.ServiceReviews.DUE_DATE)
+                    invoice_month_auto = _format_invoice_month(new_due_date)
                     update_fields[S.ServiceReviews.INVOICE_MONTH_AUTO] = invoice_month_auto
+                    logger.info(
+                        f"[Invoice Month] review_id={review_id}: due_date changed to {new_due_date}, "
+                        f"invoice_month_auto updated to {invoice_month_auto}"
+                    )
 
                 if invoice_month_override_in_payload:
                     if invoice_month_override_value:
                         update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_override_value
+                        logger.info(
+                            f"[Invoice Month] review_id={review_id}: invoice_month_override set to {invoice_month_override_value}, "
+                            f"invoice_month_final={invoice_month_override_value}"
+                        )
                     else:
+                        # Override cleared, fall back to auto
                         if invoice_month_auto is None:
                             invoice_month_auto = existing_auto or _format_invoice_month(existing_due_date)
                         update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_auto
+                        logger.info(
+                            f"[Invoice Month] review_id={review_id}: invoice_month_override cleared, "
+                            f"invoice_month_final falls back to auto={invoice_month_auto}"
+                        )
                 elif S.ServiceReviews.DUE_DATE in update_fields:
+                    # Due date changed but override not in payload - preserve existing override
                     if existing_override:
                         update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = existing_override
+                        logger.info(
+                            f"[Invoice Month] review_id={review_id}: due_date changed but override preserved, "
+                            f"invoice_month_final={existing_override} (override), invoice_month_auto={invoice_month_auto}"
+                        )
                     else:
                         update_fields[S.ServiceReviews.INVOICE_MONTH_FINAL] = invoice_month_auto
+                        logger.info(
+                            f"[Invoice Month] review_id={review_id}: due_date changed, no override, "
+                            f"invoice_month_final={invoice_month_auto}"
+                        )
             
             if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
                 # Auto-align billed flag with completed status if not explicitly provided.
@@ -1615,6 +1638,128 @@ def get_service_items(service_id, item_type=None):
             
     except Exception as e:
         logger.error(f"Error fetching service items: {e}")
+        return []
+
+
+def get_project_items(project_id, item_type=None):
+    """Get all service items for a project, optionally filtered by type."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            invoice_supported = _ensure_service_item_invoice_column(cursor)
+
+            columns = [
+                f"si.{S.ServiceItems.ITEM_ID}",
+                f"si.{S.ServiceItems.SERVICE_ID}",
+                f"ps.{S.ProjectServices.PROJECT_ID}",
+                f"ps.{S.ProjectServices.SERVICE_CODE}",
+                f"ps.{S.ProjectServices.SERVICE_NAME}",
+                f"ps.{S.ProjectServices.PHASE}",
+                f"si.{S.ServiceItems.ITEM_TYPE}",
+                f"si.{S.ServiceItems.TITLE}",
+                f"si.{S.ServiceItems.DESCRIPTION}",
+                f"si.{S.ServiceItems.PLANNED_DATE}",
+                f"si.{S.ServiceItems.DUE_DATE}",
+                f"si.{S.ServiceItems.ACTUAL_DATE}",
+                f"si.{S.ServiceItems.STATUS}",
+                f"si.{S.ServiceItems.PRIORITY}",
+                f"si.{S.ServiceItems.ASSIGNED_TO}",
+            ]
+            if invoice_supported:
+                columns.append(f"si.{S.ServiceItems.INVOICE_REFERENCE}")
+            columns.extend([
+                f"si.{S.ServiceItems.EVIDENCE_LINKS}",
+                f"si.{S.ServiceItems.NOTES}",
+                f"si.{S.ServiceItems.CREATED_AT}",
+                f"si.{S.ServiceItems.UPDATED_AT}",
+                f"si.{S.ServiceItems.IS_BILLED}",
+                f"si.{S.ServiceItems.ORIGIN}",
+                f"si.{S.ServiceItems.IS_TEMPLATE_MANAGED}",
+                f"si.{S.ServiceItems.SORT_ORDER}",
+            ])
+
+            query = f"""
+                SELECT {', '.join(columns)}
+                FROM {S.ServiceItems.TABLE} si
+                JOIN {S.ProjectServices.TABLE} ps
+                  ON si.{S.ServiceItems.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+            """
+            params = [project_id]
+
+            if item_type:
+                query += f" AND si.{S.ServiceItems.ITEM_TYPE} = ?"
+                params.append(item_type)
+
+            query += f" ORDER BY ISNULL(si.{S.ServiceItems.SORT_ORDER}, 9999), si.{S.ServiceItems.PLANNED_DATE} ASC"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            items = []
+            for row in rows:
+                idx = 0
+                item_id = row[idx]; idx += 1
+                service_id = row[idx]; idx += 1
+                project_id = row[idx]; idx += 1
+                service_code = row[idx]; idx += 1
+                service_name = row[idx]; idx += 1
+                phase = row[idx]; idx += 1
+                item_type = row[idx]; idx += 1
+                title = row[idx]; idx += 1
+                description = row[idx]; idx += 1
+                planned_date = row[idx]; idx += 1
+                due_date = row[idx]; idx += 1
+                actual_date = row[idx]; idx += 1
+                status = row[idx]; idx += 1
+                priority = row[idx]; idx += 1
+                assigned_to = row[idx]; idx += 1
+
+                invoice_reference = None
+                if invoice_supported:
+                    invoice_reference = row[idx]
+                    idx += 1
+
+                evidence_links = row[idx]; idx += 1
+                notes = row[idx]; idx += 1
+                created_at = row[idx]; idx += 1
+                updated_at = row[idx]; idx += 1
+                is_billed_val = row[idx]; idx += 1
+                origin = row[idx] if idx < len(row) else None; idx += 1
+                is_template_managed = row[idx] if idx < len(row) else None; idx += 1
+                sort_order = row[idx] if idx < len(row) else None
+
+                items.append({
+                    'item_id': item_id,
+                    'project_id': project_id,
+                    'service_id': service_id,
+                    'service_code': service_code,
+                    'service_name': service_name,
+                    'phase': phase,
+                    'item_type': item_type,
+                    'title': title,
+                    'description': description,
+                    'planned_date': planned_date.isoformat() if planned_date else None,
+                    'due_date': due_date.isoformat() if due_date else None,
+                    'actual_date': actual_date.isoformat() if actual_date else None,
+                    'status': status,
+                    'priority': priority,
+                    'assigned_to': assigned_to,
+                    'invoice_reference': invoice_reference,
+                    'evidence_links': evidence_links,
+                    'notes': notes,
+                    'created_at': created_at.isoformat() if created_at else None,
+                    'updated_at': updated_at.isoformat() if updated_at else None,
+                    'is_billed': bool(is_billed_val) if is_billed_val is not None else False,
+                    'origin': origin,
+                    'is_template_managed': bool(is_template_managed) if is_template_managed is not None else None,
+                    'sort_order': sort_order,
+                })
+
+            return items
+
+    except Exception as e:
+        logger.error(f"Error fetching project items: {e}")
         return []
 
 
@@ -10646,7 +10791,7 @@ def get_project_updates(project_id, limit=50, offset=0):
                     u.{S.ProjectUpdates.CREATED_AT},
                     u.{S.ProjectUpdates.UPDATED_AT},
                     usr.{S.Users.NAME} as created_by_name,
-                    usr.{S.Users.FULL_NAME} as created_by_full_name,
+                    usr.{S.Users.NAME} as created_by_full_name,
                     (
                         SELECT COUNT(*)
                         FROM {S.ProjectUpdateComments.TABLE} c
@@ -10693,7 +10838,7 @@ def get_project_update_by_id(update_id):
                     u.{S.ProjectUpdates.CREATED_AT},
                     u.{S.ProjectUpdates.UPDATED_AT},
                     usr.{S.Users.NAME} as created_by_name,
-                    usr.{S.Users.FULL_NAME} as created_by_full_name
+                    usr.{S.Users.NAME} as created_by_full_name
                 FROM {S.ProjectUpdates.TABLE} u
                 LEFT JOIN {S.Users.TABLE} usr 
                     ON u.{S.ProjectUpdates.CREATED_BY} = usr.{S.Users.ID}
@@ -10732,13 +10877,19 @@ def create_project_update(project_id, body, created_by=None):
                     {S.ProjectUpdates.PROJECT_ID},
                     {S.ProjectUpdates.BODY},
                     {S.ProjectUpdates.CREATED_BY}
-                ) VALUES (?, ?, ?);
-                SELECT SCOPE_IDENTITY() as update_id;
+                ) VALUES (?, ?, ?)
             """, (project_id, body, created_by))
             
+            cursor.execute("SELECT SCOPE_IDENTITY() as update_id")
             result = cursor.fetchone()
-            conn.commit()
-            return int(result[0]) if result else None
+            
+            if result and result[0] is not None:
+                update_id = int(result[0])
+                conn.commit()
+                return update_id
+            else:
+                logger.error(f"Failed to get update_id after insert, result: {result}")
+                return None
     except Exception as e:
         logger.error(f"Error creating project update: {e}")
         return None
@@ -10766,7 +10917,7 @@ def get_update_comments(update_id):
                     c.{S.ProjectUpdateComments.CREATED_AT},
                     c.{S.ProjectUpdateComments.UPDATED_AT},
                     usr.{S.Users.NAME} as created_by_name,
-                    usr.{S.Users.FULL_NAME} as created_by_full_name
+                    usr.{S.Users.NAME} as created_by_full_name
                 FROM {S.ProjectUpdateComments.TABLE} c
                 LEFT JOIN {S.Users.TABLE} usr 
                     ON c.{S.ProjectUpdateComments.CREATED_BY} = usr.{S.Users.ID}

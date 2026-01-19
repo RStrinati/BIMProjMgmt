@@ -6495,6 +6495,18 @@ def run_health_importer():
 
 # ===================== Service Items API =====================
 
+@app.route('/api/projects/<int:project_id>/items', methods=['GET'])
+def api_get_project_items(project_id):
+    """Get all service items for a project."""
+    try:
+        from database import get_project_items
+        item_type = request.args.get('type')
+        items = get_project_items(project_id, item_type)
+        return jsonify({'items': items, 'total': len(items)})
+    except Exception as e:
+        logging.exception("Error fetching project items")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/items', methods=['GET'])
 def api_get_service_items(project_id, service_id):
     """Get service items for a specific service."""
