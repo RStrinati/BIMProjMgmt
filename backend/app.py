@@ -1964,9 +1964,15 @@ def api_update_service_review(project_id, service_id, review_id):
         'invoice_month_override', 'invoice_batch_id'
     }
     filtered_body = {k: v for k, v in body.items() if k in allowed_fields}
-    
+
     if not filtered_body:
         return jsonify({'error': 'No valid fields to update'}), 400
+
+    if 'invoice_month_override' in filtered_body:
+        invoice_month_override = filtered_body.get('invoice_month_override')
+        if invoice_month_override:
+            if not re.match(r'^\d{4}-\d{2}$', str(invoice_month_override).strip()):
+                return jsonify({'error': 'invoice_month_override must be YYYY-MM'}), 400
     
     # Map camelCase keys to snake_case for database
     field_mapping = {
