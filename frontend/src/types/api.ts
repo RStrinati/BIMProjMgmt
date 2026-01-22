@@ -35,6 +35,53 @@ export interface Project {
   agreed_fee?: number;
 }
 
+export interface ProjectSummary {
+  project_id: number;
+  project_name: string;
+  project_number?: string | null;
+  contract_number?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  project_manager?: string | null;
+  internal_lead?: number | null;
+  internal_lead_name?: string | null;
+  status?: string | null;
+  priority?: string | number | null;
+  priority_label?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  type_id?: number | null;
+  project_type?: string | null;
+  health_pct?: number | null;
+  total_services?: number | null;
+  completed_services?: number | null;
+  total_reviews?: number | null;
+  completed_reviews?: number | null;
+  agreed_fee?: number | null;
+  billed_to_date?: number | null;
+  earned_value?: number | null;
+  earned_value_pct?: number | null;
+  unbilled_amount?: number | null;
+  total_service_agreed_fee?: number | null;
+  total_service_billed_amount?: number | null;
+  service_billed_pct?: number | null;
+  invoice_pipeline_this_month?: number | null;
+  ready_to_invoice_this_month?: number | null;
+  invoice_pipeline_next_month?: number | null;
+  ready_to_invoice_next_month?: number | null;
+}
+
+export interface ProjectAggregates {
+  project_count: number;
+  sum_agreed_fee: number;
+  sum_billed_to_date: number;
+  sum_unbilled_amount: number;
+  sum_earned_value: number;
+  weighted_earned_value_pct: number;
+}
+
 export interface Bid {
   bid_id: number;
   project_id?: number | null;
@@ -911,6 +958,15 @@ export interface ProjectService {
   agreed_fee_remaining?: number;
   assigned_user_id?: number | null;
   assigned_user_name?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  review_anchor_date?: string | null;
+  review_interval_days?: number | null;
+  review_count_planned?: number | null;
+  source_template_id?: string | null;
+  source_template_version?: string | null;
+  source_template_hash?: string | null;
+  template_mode?: string | null;
 }
 
 export interface ServiceReview {
@@ -941,6 +997,9 @@ export interface ServiceReview {
   origin?: string | null;
   is_template_managed?: boolean | null;
   sort_order?: number | null;
+  template_node_key?: string | null;
+  is_user_modified?: boolean | null;
+  user_modified_at?: string | null;
 }
 
 export interface ProjectReviewItem {
@@ -1057,6 +1116,24 @@ export interface ServiceItem {
   origin?: string | null;
   is_template_managed?: boolean | null;
   sort_order?: number | null;
+  template_node_key?: string | null;
+  is_user_modified?: boolean | null;
+  user_modified_at?: string | null;
+}
+
+export interface ProjectFinanceSummaryService {
+  service_id: number;
+  service_name?: string | null;
+  agreed_fee: number;
+  claimed: number;
+  progress_pct: number;
+}
+
+export interface ProjectFinanceSummary {
+  total_agreed_fee: number;
+  total_claimed_or_billed: number;
+  progress_pct: number;
+  by_service: ProjectFinanceSummaryService[];
 }
 
 export interface FileServiceTemplateSummary {

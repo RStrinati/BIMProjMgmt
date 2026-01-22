@@ -96,7 +96,7 @@ test.describe('Workspace Services - Panel Integration', () => {
     });
 
     // Mock service items API
-    await page.route(/.*\/api\/service_items/, async (route) => {
+    await page.route(/.*\/api\/projects\/\d+\/services\/\d+\/items/, async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -157,12 +157,13 @@ test.describe('Workspace Services - Panel Integration', () => {
     const panel = page.getByTestId('workspace-right-panel');
 
     // Verify finance section
-    await expect(panel.getByText('Agreed Fee')).toBeVisible();
-    await expect(panel.getByText('$50,000.00')).toBeVisible();
-    await expect(panel.getByText('Billed')).toBeVisible();
-    await expect(panel.getByText('$15,000.00')).toBeVisible();
-    await expect(panel.getByText('Remaining')).toBeVisible();
-    await expect(panel.getByText('$35,000.00')).toBeVisible();
+    const financeSection = panel.getByRole('heading', { name: 'Finance' }).locator('..');
+    await expect(financeSection.getByText('Agreed Fee')).toBeVisible();
+    await expect(financeSection.getByText('$50,000.00')).toBeVisible();
+    await expect(financeSection.getByText('Billed')).toBeVisible();
+    await expect(financeSection.getByText('$15,000.00')).toBeVisible();
+    await expect(financeSection.getByText('Remaining')).toBeVisible();
+    await expect(financeSection.getByText('$35,000.00')).toBeVisible();
   });
 
   test('service detail panel has Reviews and Items tabs', async ({ page }) => {

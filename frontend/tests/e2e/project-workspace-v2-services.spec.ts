@@ -32,7 +32,7 @@ const seedServices = [
 const setupMocks = async (page: any, options?: { forcePatchFailure?: boolean }) => {
   const services = seedServices.map((service) => ({ ...service }));
 
-  await page.route('**/api/project/1', async (route) => {
+  await page.route('**/api/projects/1', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense, useCallback } from 'react';
+import type { MouseEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -16,19 +17,27 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
   TableRow,
   TableSortLabel,
   Card,
   CardContent,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, ViewColumn } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { projectsApi } from '@/api';
-import type { Project } from '@/types/api';
-import { ListView } from '@/components/ui/ListView';
+import { projectsApi, usersApi } from '@/api';
+import type { ProjectSummary, ProjectAggregates, User } from '@/types/api';
 import { TimelinePanel } from '@/components/timeline_v2/TimelinePanel';
 import { featureFlags } from '@/config/featureFlags';
+import {
+  PROJECT_FIELD_MAP,
+  renderBoardSnippet,
+  renderFieldValue,
+  type ProjectFieldDefinition,
+} from '@/features/projects/fields/ProjectFieldRegistry';
+import { useProjectViewLayout } from '@/features/projects/fields/useProjectViewLayout';
+import { ProjectColumnsPopover } from '@/features/projects/fields/ProjectColumnsPopover';
 
 const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
@@ -41,7 +50,7 @@ type ViewState = {
   searchTerm: string;
 };
 
-type SortField = 'name' | 'status' | 'target_date' | 'health';
+type SortField = string;
 type SortOrder = 'asc' | 'desc';
 
 const VIEW_STORAGE_KEY = 'projects_panel_view_state';
@@ -90,9 +99,6 @@ const readDisplayMode = (): DisplayMode => {
   return 'list';
 };
 
-const normaliseStatus = (value?: string | null) =>
-  value ? value.trim().toLowerCase().replace(/\s+/g, '_') : '';
-
 const parseDateValue = (value?: string | null) => {
   if (!value) {
     return 0;
@@ -101,17 +107,134 @@ const parseDateValue = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
-const getStatusColor = (status?: string): 'success' | 'warning' | 'error' | 'default' => {
-  switch (status?.toLowerCase()) {
-    case 'active':
-      return 'success';
-    case 'on hold':
-      return 'warning';
-    case 'completed':
-      return 'default';
-    default:
-      return 'default';
+const useDebouncedValue = <T,>(value: T, delayMs: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(handle);
+  }, [value, delayMs]);
+  return debouncedValue;
+};
+
+const STATUS_OPTIONS = [
+  { label: 'Active', value: 'Active' },
+  { label: 'On Hold', value: 'On Hold' },
+  { label: 'Completed', value: 'Completed' },
+];
+
+const PRIORITY_OPTIONS = [
+  { label: 'Low', value: 1 },
+  { label: 'Medium', value: 2 },
+  { label: 'High', value: 3 },
+  { label: 'Critical', value: 4 },
+];
+
+const toDateInputValue = (value?: string | null) => {
+  if (!value) {
+    return '';
   }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return parsed.toISOString().slice(0, 10);
+};
+
+type EditableTextCellProps = {
+  value: string;
+  onCommit: (nextValue: string) => void;
+  type?: 'text' | 'date';
+};
+
+const EditableTextCell = ({ value, onCommit, type = 'text' }: EditableTextCellProps) => {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const handleBlur = () => {
+    if (draft !== value) {
+      onCommit(draft);
+    }
+  };
+
+  return (
+    <TextField
+      variant="standard"
+      size="small"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={handleBlur}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+          setDraft(value);
+          event.currentTarget.blur();
+        }
+      }}
+      type={type}
+      inputProps={{ style: { fontSize: 13 } }}
+    />
+  );
+};
+
+type EditableSelectCellProps<T extends string | number> = {
+  value: T | '';
+  options: Array<{ label: string; value: T | '' }>;
+  onCommit: (nextValue: T | '') => void;
+};
+
+const EditableSelectCell = <T extends string | number>({
+  value,
+  options,
+  onCommit,
+}: EditableSelectCellProps<T>) => (
+  <TextField
+    select
+    variant="standard"
+    size="small"
+    value={value}
+    onChange={(event) => onCommit(event.target.value as T)}
+    onClick={(event) => event.stopPropagation()}
+    inputProps={{ style: { fontSize: 13 } }}
+    sx={{ minWidth: 120 }}
+  >
+    {options.map((option) => (
+      <MenuItem key={option.label} value={option.value}>
+        {option.label}
+      </MenuItem>
+    ))}
+  </TextField>
+);
+
+const normalizeStatusValue = (status?: string | null) => {
+  const normalized = (status ?? '').toLowerCase().replace(/\s+/g, '_');
+  if (normalized === 'active') return 'Active';
+  if (normalized === 'on_hold') return 'On Hold';
+  if (normalized === 'completed') return 'Completed';
+  return status ?? '';
+};
+
+const resolvePriorityValue = (value: ProjectSummary['priority']) => {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  const trimmed = value.toString().trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (/^\d+$/.test(trimmed)) {
+    return Number(trimmed);
+  }
+  const match = PRIORITY_OPTIONS.find((option) => option.label.toLowerCase() === trimmed.toLowerCase());
+  return match ? match.value : '';
 };
 
 export default function ProjectsHomePageV2() {
@@ -121,10 +244,10 @@ export default function ProjectsHomePageV2() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>(readDisplayMode);
   const [viewId, setViewId] = useState<ViewId>(storedViewState.viewId);
   const [searchTerm, setSearchTerm] = useState(storedViewState.searchTerm);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('project_name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [columnsAnchorEl, setColumnsAnchorEl] = useState<HTMLElement | null>(null);
 
   const currentUserId = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -138,6 +261,10 @@ export default function ProjectsHomePageV2() {
     return Number.isFinite(parsed) ? parsed : null;
   }, []);
 
+  const listLayout = useProjectViewLayout('list');
+  const boardLayout = useProjectViewLayout('board');
+  const timelineLayout = useProjectViewLayout('timeline');
+
   useEffect(() => {
     if (viewId === 'my_work' && currentUserId == null) {
       setViewId('all');
@@ -146,32 +273,15 @@ export default function ProjectsHomePageV2() {
 
   const viewDefinitions = useMemo(
     () => [
-      { id: 'all' as const, label: 'All projects', filter: (_: Project) => true },
-      {
-        id: 'active' as const,
-        label: 'Active',
-        filter: (project: Project) => normaliseStatus(project.status) === 'active',
-      },
-      {
-        id: 'on_hold' as const,
-        label: 'On Hold',
-        filter: (project: Project) => normaliseStatus(project.status) === 'on_hold',
-      },
-      {
-        id: 'completed' as const,
-        label: 'Completed',
-        filter: (project: Project) => normaliseStatus(project.status) === 'completed',
-      },
-      {
-        id: 'my_work' as const,
-        label: 'My Work',
-        filter: (project: Project) => (currentUserId != null ? project.internal_lead === currentUserId : false),
-      },
+      { id: 'all' as const, label: 'All projects', sort: undefined },
+      { id: 'active' as const, label: 'Active', sort: undefined },
+      { id: 'on_hold' as const, label: 'On Hold', sort: undefined },
+      { id: 'completed' as const, label: 'Completed', sort: undefined },
+      { id: 'my_work' as const, label: 'My Work', sort: undefined },
       {
         id: 'recently_updated' as const,
         label: 'Recently Updated',
-        filter: (_: Project) => true,
-        sort: (a: Project, b: Project) =>
+        sort: (a: ProjectSummary, b: ProjectSummary) =>
           parseDateValue(b.updated_at || b.created_at) - parseDateValue(a.updated_at || a.created_at),
       },
     ],
@@ -180,53 +290,98 @@ export default function ProjectsHomePageV2() {
 
   const activeView = viewDefinitions.find((view) => view.id === viewId) ?? viewDefinitions[0];
 
-  const { data: projects = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['projects-home-v2'],
-    queryFn: () => projectsApi.getAllWithHealth(),
+  const resolveSortValue = useCallback((project: ProjectSummary, fieldId: string) => {
+    const field = PROJECT_FIELD_MAP.get(fieldId);
+    if (!field) {
+      return '';
+    }
+    const raw = field.accessor(project);
+    if (field.format === 'date') {
+      return parseDateValue(raw as string);
+    }
+    if (field.format === 'currency' || field.format === 'number' || field.format === 'percent') {
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) ? numeric : 0;
+    }
+    return (raw ?? '').toString().toLowerCase();
+  }, []);
+
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+
+  const {
+    data: projects = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['projects-summary', viewId, debouncedSearchTerm, currentUserId],
+    queryFn: () =>
+      projectsApi.getSummary({
+        viewId,
+        searchTerm: debouncedSearchTerm,
+        currentUserId,
+      }),
   });
 
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
+  });
+
+  const { data: aggregates } = useQuery<ProjectAggregates>({
+    queryKey: ['projects-aggregates', viewId, debouncedSearchTerm, currentUserId],
+    queryFn: () =>
+      projectsApi.getAggregates({
+        viewId,
+        searchTerm: debouncedSearchTerm,
+        currentUserId,
+      }),
+    enabled: displayMode === 'list',
+    staleTime: 30_000,
+  });
+
+  const summaryById = useMemo(
+    () =>
+      projects.reduce<Record<number, ProjectSummary>>((acc, project) => {
+        acc[project.project_id] = project;
+        return acc;
+      }, {}),
+    [projects],
+  );
+
+  const applyProjectPatch = useCallback(
+    async (projectId: number, patch: Record<string, unknown>) => {
+      await projectsApi.patch(projectId, patch as any);
+      queryClient.invalidateQueries({ queryKey: ['projects-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['projects-aggregates'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline-v2'] });
+    },
+    [queryClient],
+  );
+
   const filteredProjects = useMemo(() => {
-    const normalized = searchTerm.trim().toLowerCase();
-    const viewFiltered = projects.filter(activeView.filter);
-    const searched = normalized
-      ? viewFiltered.filter((project) =>
-          [
-            project.project_name,
-            project.project_number,
-            project.contract_number,
-            project.client_name,
-          ]
-            .map((value) => (value ? String(value).toLowerCase() : ''))
-            .some((value) => value.includes(normalized)),
-        )
-      : viewFiltered;
-    const sorted = activeView.sort ? [...searched].sort(activeView.sort) : searched;
-    
-    // Apply table sort
-    return [...sorted].sort((a, b) => {
-      let aVal: any = '';
-      let bVal: any = '';
-      
-      if (sortField === 'name') {
-        aVal = a.project_name || '';
-        bVal = b.project_name || '';
-      } else if (sortField === 'status') {
-        aVal = a.status || '';
-        bVal = b.status || '';
-      } else if (sortField === 'target_date') {
-        aVal = parseDateValue(a.end_date);
-        bVal = parseDateValue(b.end_date);
-      } else if (sortField === 'health') {
-        aVal = a.health_pct ?? -1;
-        bVal = b.health_pct ?? -1;
+    const sorted = activeView.sort ? [...projects].sort(activeView.sort) : [...projects];
+    const viewFiltered =
+      viewId === 'my_work' && currentUserId != null
+        ? sorted.filter((project) => {
+            if (project.internal_lead == null) {
+              return false;
+            }
+            return Number(project.internal_lead) === currentUserId;
+          })
+        : sorted;
+    return [...viewFiltered].sort((a, b) => {
+      const aVal = resolveSortValue(a, sortField);
+      const bVal = resolveSortValue(b, sortField);
+
+      if (typeof aVal === 'string' || typeof bVal === 'string') {
+        return sortOrder === 'asc'
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
       }
-      
-      if (typeof aVal === 'string') {
-        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      return sortOrder === 'asc' ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
-  }, [projects, searchTerm, activeView, sortField, sortOrder]);
+  }, [projects, activeView, resolveSortValue, sortField, sortOrder, viewId, currentUserId]);
 
   const timelineProjectIds = useMemo(
     () => filteredProjects.map((project) => project.project_id),
@@ -252,6 +407,16 @@ export default function ProjectsHomePageV2() {
 
   const showMyWorkHint = activeView.id === 'my_work' && currentUserId == null;
 
+  const activeLayout = displayMode === 'list' ? listLayout : displayMode === 'board' ? boardLayout : timelineLayout;
+
+  const handleColumnsOpen = (event: MouseEvent<HTMLElement>) => {
+    setColumnsAnchorEl(event.currentTarget);
+  };
+
+  const handleColumnsClose = () => {
+    setColumnsAnchorEl(null);
+  };
+
   const handleSortClick = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -272,7 +437,8 @@ export default function ProjectsHomePageV2() {
   const handleProjectCreated = () => {
     setDialogOpen(false);
     // Invalidate and refetch projects
-    queryClient.invalidateQueries({ queryKey: ['projects-home-v2'] });
+    queryClient.invalidateQueries({ queryKey: ['projects-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['projects-aggregates'] });
     refetch();
   };
 
@@ -284,6 +450,218 @@ export default function ProjectsHomePageV2() {
     });
     return Array.from(statuses).sort();
   }, [filteredProjects]);
+
+  const listFieldIds = listLayout.orderedVisibleFieldIds;
+  const listFields = listFieldIds
+    .map((id) => PROJECT_FIELD_MAP.get(id))
+    .filter(Boolean) as ProjectFieldDefinition[];
+  const boardFieldIds = boardLayout.orderedVisibleFieldIds.filter((id) => id !== 'project_name');
+  const timelineFieldIds = timelineLayout.orderedVisibleFieldIds.filter((id) => id !== 'project_name');
+
+  const pinnedFieldIds = listLayout.pinnedFieldIds.filter((id) => listFieldIds.includes(id));
+  const pinnedOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+    let currentLeft = 0;
+    listFieldIds.forEach((id) => {
+      if (!pinnedFieldIds.includes(id)) {
+        return;
+      }
+      const field = PROJECT_FIELD_MAP.get(id);
+      const width = field?.width ?? 160;
+      offsets.set(id, currentLeft);
+      currentLeft += width;
+    });
+    return offsets;
+  }, [listFieldIds, pinnedFieldIds]);
+
+  const getStickyStyles = (fieldId: string, zIndex: number) => {
+    if (!pinnedOffsets.has(fieldId)) {
+      return {};
+    }
+    return {
+      position: 'sticky' as const,
+      left: pinnedOffsets.get(fieldId),
+      zIndex,
+    };
+  };
+
+  const buildDetailsPatch = useCallback(
+    (project: ProjectSummary, overrides: Partial<ProjectSummary>) => {
+      const resolvedPriority = resolvePriorityValue(overrides.priority ?? project.priority);
+      return {
+        start_date: overrides.start_date ?? project.start_date ?? null,
+        end_date: overrides.end_date ?? project.end_date ?? null,
+        status: normalizeStatusValue(overrides.status ?? project.status ?? null) || null,
+        priority: resolvedPriority === '' ? null : resolvedPriority,
+      };
+    },
+    [],
+  );
+
+  const renderListCellContent = useCallback(
+    (fieldId: string, project: ProjectSummary) => {
+      const field = PROJECT_FIELD_MAP.get(fieldId);
+      if (!field) {
+        return '--';
+      }
+
+      if (!field.editable) {
+        return renderFieldValue(field, project);
+      }
+
+      if (fieldId === 'status') {
+        return (
+          <EditableSelectCell
+            value={normalizeStatusValue(project.status)}
+            options={STATUS_OPTIONS}
+            onCommit={(nextValue) => {
+              applyProjectPatch(project.project_id, buildDetailsPatch(project, { status: nextValue }));
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'priority') {
+        const priorityValue = resolvePriorityValue(project.priority);
+        return (
+          <EditableSelectCell
+            value={priorityValue}
+            options={PRIORITY_OPTIONS}
+            onCommit={(nextValue) => {
+              applyProjectPatch(project.project_id, buildDetailsPatch(project, { priority: nextValue }));
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'internal_lead') {
+        const options = [{ label: 'Unassigned', value: '' }].concat(
+          users.map((user) => ({
+            label: user.name || user.full_name || user.username || `User ${user.user_id}`,
+            value: user.user_id,
+          })),
+        );
+        return (
+          <EditableSelectCell
+            value={project.internal_lead ?? ''}
+            options={options}
+            onCommit={(nextValue) => {
+              const next =
+                nextValue === '' || nextValue === null || nextValue === undefined
+                  ? null
+                  : Number(nextValue);
+              applyProjectPatch(project.project_id, { internal_lead: next });
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'start_date') {
+        return (
+          <EditableTextCell
+            type="date"
+            value={toDateInputValue(project.start_date)}
+            onCommit={(nextValue) => {
+              applyProjectPatch(
+                project.project_id,
+                buildDetailsPatch(project, { start_date: nextValue || null }),
+              );
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'end_date') {
+        return (
+          <EditableTextCell
+            type="date"
+            value={toDateInputValue(project.end_date)}
+            onCommit={(nextValue) => {
+              applyProjectPatch(
+                project.project_id,
+                buildDetailsPatch(project, { end_date: nextValue || null }),
+              );
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'project_name') {
+        return (
+          <EditableTextCell
+            value={project.project_name || ''}
+            onCommit={(nextValue) => {
+              applyProjectPatch(project.project_id, { project_name: nextValue });
+            }}
+          />
+        );
+      }
+
+      if (fieldId === 'project_number') {
+        const currentValue = project.project_number ?? project.contract_number ?? '';
+        return (
+          <EditableTextCell
+            value={currentValue}
+            onCommit={(nextValue) => {
+              applyProjectPatch(project.project_id, { project_number: nextValue });
+            }}
+          />
+        );
+      }
+
+      return renderFieldValue(field, project);
+    },
+    [applyProjectPatch, buildDetailsPatch, users],
+  );
+
+  const aggregateCurrencyFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
+    [],
+  );
+  const aggregateNumberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
+
+  const formatAggregateValue = useCallback(
+    (fieldId: string, value?: number | null) => {
+      const field = PROJECT_FIELD_MAP.get(fieldId);
+      if (!field || value == null || Number.isNaN(Number(value))) {
+        return '--';
+      }
+      if (field.format === 'currency') {
+        return aggregateCurrencyFormatter.format(Number(value));
+      }
+      if (field.format === 'percent') {
+        return `${Math.round(Number(value))}%`;
+      }
+      if (field.format === 'number') {
+        return aggregateNumberFormatter.format(Number(value));
+      }
+      return String(value);
+    },
+    [aggregateCurrencyFormatter, aggregateNumberFormatter],
+  );
+
+  const resolveAggregateValue = useCallback(
+    (fieldId: string) => {
+      if (!aggregates) {
+        return '--';
+      }
+      switch (fieldId) {
+        case 'agreed_fee':
+          return formatAggregateValue(fieldId, aggregates.sum_agreed_fee);
+        case 'billed_to_date':
+          return formatAggregateValue(fieldId, aggregates.sum_billed_to_date);
+        case 'unbilled_amount':
+          return formatAggregateValue(fieldId, aggregates.sum_unbilled_amount);
+        case 'earned_value':
+          return formatAggregateValue(fieldId, aggregates.sum_earned_value);
+        case 'earned_value_pct':
+          return formatAggregateValue(fieldId, aggregates.weighted_earned_value_pct);
+        default:
+          return '--';
+      }
+    },
+    [aggregates, formatAggregateValue],
+  );
 
   return (
     <Box data-testid="projects-home-v2-root" sx={{ display: 'grid', gap: 2 }}>
@@ -326,6 +704,15 @@ export default function ProjectsHomePageV2() {
             sx={{ minWidth: 220 }}
             inputProps={{ 'data-testid': 'projects-home-search' }}
           />
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<ViewColumn />}
+            onClick={handleColumnsOpen}
+            data-testid="projects-columns-button"
+          >
+            Columns
+          </Button>
           <ToggleButtonGroup
             exclusive
             value={displayMode}
@@ -343,6 +730,19 @@ export default function ProjectsHomePageV2() {
           </ToggleButtonGroup>
         </Stack>
       </Stack>
+
+      <ProjectColumnsPopover
+        view={displayMode}
+        anchorEl={columnsAnchorEl}
+        onClose={handleColumnsClose}
+        visibleFieldIds={activeLayout.visibleFieldIds}
+        orderedFieldIds={activeLayout.orderedFieldIds}
+        pinnedFieldIds={activeLayout.pinnedFieldIds}
+        toggleField={activeLayout.toggleField}
+        moveField={activeLayout.moveField}
+        togglePinnedField={activeLayout.togglePinnedField}
+        resetToDefaults={activeLayout.resetToDefaults}
+      />
 
       {showMyWorkHint && (
         <Alert severity="info">Set `current_user_id` in localStorage to enable My Work filtering.</Alert>
@@ -363,83 +763,57 @@ export default function ProjectsHomePageV2() {
       {/* LIST VIEW */}
       {displayMode === 'list' && !isLoading && (
         <TableContainer component={Paper} variant="outlined" data-testid="projects-list-table">
-          <Table size="small">
+          <Table size="small" stickyHeader>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.100' }}>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortField === 'name'}
-                    direction={sortField === 'name' ? sortOrder : 'asc'}
-                    onClick={() => handleSortClick('name')}
+                {listFields.map((field) => (
+                  <TableCell
+                    key={field.id}
+                    align={field.align ?? 'left'}
+                    sx={{
+                      minWidth: field.width ?? 140,
+                      backgroundColor: 'grey.100',
+                      ...getStickyStyles(field.id, 3),
+                    }}
                   >
-                    Project Name
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortField === 'health'}
-                    direction={sortField === 'health' ? sortOrder : 'asc'}
-                    onClick={() => handleSortClick('health')}
-                  >
-                    Health %
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Lead</TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortField === 'target_date'}
-                    direction={sortField === 'target_date' ? sortOrder : 'asc'}
-                    onClick={() => handleSortClick('target_date')}
-                  >
-                    Target Date
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortField === 'status'}
-                    direction={sortField === 'status' ? sortOrder : 'asc'}
-                    onClick={() => handleSortClick('status')}
-                  >
-                    Status
-                  </TableSortLabel>
-                </TableCell>
+                    <TableSortLabel
+                      active={sortField === field.id}
+                      direction={sortField === field.id ? sortOrder : 'asc'}
+                      onClick={() => handleSortClick(field.id)}
+                    >
+                      {field.label}
+                    </TableSortLabel>
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredProjects.map((project) => (
                 <TableRow
                   key={project.project_id}
-                  data-testid={`project-row-${project.project_id}`}
+                  data-testid={`projects-home-list-row-${project.project_id}`}
                   hover
                   onClick={() => navigate(`/projects/${project.project_id}`)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  <TableCell>{project.project_name || '—'}</TableCell>
-                  <TableCell>
-                    {project.health_pct != null ? `${Math.round(project.health_pct)}%` : '—'}
-                  </TableCell>
-                  <TableCell>{project.priority || '—'}</TableCell>
-                  <TableCell>{project.internal_lead || '—'}</TableCell>
-                  <TableCell>
-                    {project.end_date ? new Date(project.end_date).toLocaleDateString() : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body2"
+                  {listFields.map((field) => (
+                    <TableCell
+                      key={field.id}
+                      align={field.align ?? 'left'}
                       sx={{
-                        color: getStatusColor(project.status) === 'success' ? 'success.main' : 
-                               getStatusColor(project.status) === 'warning' ? 'warning.main' : 'inherit',
+                        minWidth: field.width ?? 140,
+                        backgroundColor: 'background.paper',
+                        ...getStickyStyles(field.id, 2),
                       }}
                     >
-                      {project.status || '—'}
-                    </Typography>
-                  </TableCell>
+                      {renderListCellContent(field.id, project)}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
               {filteredProjects.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={listFields.length || 1} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       {isLoading ? 'Loading...' : 'No projects found'}
                     </Typography>
@@ -447,6 +821,29 @@ export default function ProjectsHomePageV2() {
                 </TableRow>
               )}
             </TableBody>
+            <TableFooter>
+              <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                {listFields.map((field, index) => (
+                  <TableCell
+                    key={field.id}
+                    align={field.align ?? 'left'}
+                    sx={{
+                      fontWeight: 600,
+                      position: 'sticky',
+                      bottom: 0,
+                      backgroundColor: 'grey.50',
+                      ...getStickyStyles(field.id, 4),
+                    }}
+                  >
+                    {index === 0
+                      ? `${aggregates?.project_count ?? 0} projects`
+                      : field.aggregatable === 'none'
+                        ? ''
+                        : resolveAggregateValue(field.id)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableFooter>
           </Table>
         </TableContainer>
       )}
@@ -484,19 +881,17 @@ export default function ProjectsHomePageV2() {
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                           {project.project_name}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {project.client_name || 'Unassigned'}
-                        </Typography>
-                        {project.health_pct != null && (
-                          <Typography variant="caption" display="block" sx={{ mt: 0.5, color: 'primary.main' }}>
-                            Health: {Math.round(project.health_pct)}%
-                          </Typography>
-                        )}
-                        {project.end_date && (
-                          <Typography variant="caption" display="block" color="text.secondary">
-                            Target: {new Date(project.end_date).toLocaleDateString()}
-                          </Typography>
-                        )}
+                        <Stack spacing={0.5}>
+                          {boardFieldIds.map((fieldId) => {
+                            const field = PROJECT_FIELD_MAP.get(fieldId);
+                            if (!field) return null;
+                            return (
+                              <Box key={field.id}>
+                                {renderBoardSnippet(field, project)}
+                              </Box>
+                            );
+                          })}
+                        </Stack>
                       </CardContent>
                     </Card>
                   ))}
@@ -526,6 +921,8 @@ export default function ProjectsHomePageV2() {
                 searchText={searchTerm}
                 onSearchTextChange={setSearchTerm}
                 showSearch={false}
+                summaryById={summaryById}
+                metaFieldIds={timelineFieldIds}
               />
             </Box>
           ) : (

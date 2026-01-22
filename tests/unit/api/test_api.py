@@ -230,6 +230,7 @@ def test_update_full_project(monkeypatch):
     client = app.test_client()
     resp = client.put('/api/projects/5', json={'project_name': 'Project Z'})
     assert resp.status_code == 200
-    assert called['args'] == (5, {'name': 'Project Z'})
+    assert called['args'][0] == 5
+    assert called['args'][1]['name'] == 'Project Z'
 
 

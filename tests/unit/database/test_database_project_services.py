@@ -88,6 +88,15 @@ def test_get_project_services_updates_status(monkeypatch):
         0.0,  # claimed_to_date
         None,  # assigned_user_id
         None,  # assigned_user_name
+        None,  # start_date
+        None,  # end_date
+        None,  # review_anchor_date
+        None,  # review_interval_days
+        None,  # review_count_planned
+        None,  # source_template_id
+        None,  # source_template_version
+        None,  # source_template_hash
+        None,  # template_mode
     )
 
     results = [

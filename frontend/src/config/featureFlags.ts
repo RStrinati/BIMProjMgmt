@@ -45,7 +45,8 @@ export const featureFlags = new Proxy({}, {
       case 'linearTimeline':
         return readLocalFlag('ff_linear_timeline') ?? readEnvFlag('VITE_FF_LINEAR_TIMELINE') ?? false;
       case 'projectsHomeV2':
-        return readLocalFlag('ff_projects_home_v2') ?? readEnvFlag('VITE_FF_PROJECTS_HOME_V2') ?? false;
+        // Default ON so the V2 projects UI is the main experience; can be disabled via env/localStorage.
+        return readLocalFlag('ff_projects_home_v2') ?? readEnvFlag('VITE_FF_PROJECTS_HOME_V2') ?? true;
       case 'anchorLinks':
         return readLocalFlag('ff_anchor_links') ?? readEnvFlag('VITE_FF_ANCHOR_LINKS') ?? false;
       case 'issuesHub':

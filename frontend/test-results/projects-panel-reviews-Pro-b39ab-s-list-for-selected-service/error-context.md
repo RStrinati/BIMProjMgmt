@@ -1,0 +1,154 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]:
+              - paragraph [ref=e14]: Projects
+      - generic [ref=e17]:
+        - img [ref=e19]
+        - textbox "Global search (projects, services)" [ref=e21]
+        - group
+  - navigation [ref=e22]:
+    - generic [ref=e24]:
+      - generic [ref=e26]: BIM Manager
+      - separator [ref=e27]
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - button "Dashboard" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - generic [ref=e35]: Dashboard
+        - listitem [ref=e36]:
+          - button "Projects & Services" [ref=e37] [cursor=pointer]:
+            - img [ref=e39]
+            - generic [ref=e42]: Projects & Services
+        - listitem [ref=e43]:
+          - button "Bids" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: Bids
+        - listitem [ref=e50]:
+          - button "Data Imports" [ref=e51] [cursor=pointer]:
+            - img [ref=e53]
+            - generic [ref=e56]: Data Imports
+        - listitem [ref=e57]:
+          - button "Reviews (redirect)" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+            - generic [ref=e63]: Reviews (redirect)
+        - listitem [ref=e64]:
+          - button "Tasks" [ref=e65] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Tasks
+      - separator [ref=e71]
+      - list [ref=e72]:
+        - listitem [ref=e73]:
+          - button "Settings" [ref=e74] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: Settings
+  - main [ref=e80]:
+    - generic [ref=e82]:
+      - generic [ref=e84]:
+        - heading "Projects" [level=5] [ref=e85]
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - heading "Views" [level=6] [ref=e88]
+            - button "Reset" [ref=e89] [cursor=pointer]: Reset
+          - group [ref=e90]:
+            - button "All" [pressed] [ref=e91] [cursor=pointer]: All
+            - button "Active" [ref=e92] [cursor=pointer]: Active
+            - button "On Hold" [ref=e93] [cursor=pointer]: On Hold
+            - button "Completed" [ref=e94] [cursor=pointer]: Completed
+            - button "My Work" [ref=e95] [cursor=pointer]: My Work
+            - button "Recently Updated" [ref=e96] [cursor=pointer]: Recently Updated
+          - generic [ref=e99]: "View: All"
+        - generic [ref=e101]:
+          - textbox "Search projects..." [ref=e102]
+          - group
+        - separator [ref=e103]
+        - list [ref=e105]:
+          - button "Mock Project Alpha Mock Client" [ref=e106] [cursor=pointer]:
+            - generic [ref=e107]:
+              - generic [ref=e108]: Mock Project Alpha
+              - paragraph [ref=e109]: Mock Client
+      - generic [ref=e111]:
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - heading "Mock Project Alpha" [level=6] [ref=e114]
+            - paragraph [ref=e115]: Mock Client
+          - button "Open full project" [ref=e116] [cursor=pointer]: Open full project
+        - generic [ref=e117]:
+          - tablist [ref=e120]:
+            - tab "Details" [ref=e121] [cursor=pointer]: Details
+            - tab "Services" [selected] [ref=e122] [cursor=pointer]: Services
+          - generic [ref=e124]:
+            - list [ref=e126]:
+              - 'button "SVC-001 - Design Coordination Phase: Phase 1 | Status: Unknown (active) | Progress: 25% | Fee: $120,000.00" [active] [ref=e127] [cursor=pointer]':
+                - generic [ref=e128]:
+                  - generic [ref=e129]: SVC-001 - Design Coordination
+                  - paragraph [ref=e130]: "Phase: Phase 1 | Status: Unknown (active) | Progress: 25% | Fee: $120,000.00"
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - paragraph [ref=e133]: Service code
+                - paragraph [ref=e134]: SVC-001
+              - generic [ref=e135]:
+                - paragraph [ref=e136]: Service name
+                - paragraph [ref=e137]: Design Coordination
+              - generic [ref=e138]:
+                - paragraph [ref=e139]: Phase
+                - paragraph [ref=e140]: Phase 1
+              - generic [ref=e141]:
+                - paragraph [ref=e142]: Service status
+                - paragraph [ref=e143]: Unknown (active)
+              - generic [ref=e144]:
+                - paragraph [ref=e145]: Progress
+                - paragraph [ref=e146]: 25 %
+              - generic [ref=e147]:
+                - paragraph [ref=e148]: Agreed fee
+                - paragraph [ref=e149]: $120,000.00
+              - generic [ref=e150]:
+                - paragraph [ref=e151]: Billed
+                - paragraph [ref=e152]: "--"
+              - generic [ref=e154]:
+                - heading "Reviews" [level=6] [ref=e155]
+                - list [ref=e157]:
+                  - 'button "Cycle 1 · Planned Planned: 2/1/2024 | Due: 2/5/2024 | Disciplines: Architecture | Deliverables: Model update | Billed: No" [ref=e158] [cursor=pointer]':
+                    - generic [ref=e159]:
+                      - generic [ref=e160]: Cycle 1 · Planned
+                      - paragraph [ref=e161]: "Planned: 2/1/2024 | Due: 2/5/2024 | Disciplines: Architecture | Deliverables: Model update | Billed: No"
+                  - 'button "Cycle 2 · Completed Planned: 3/1/2024 | Due: 3/5/2024 | Disciplines: MEP | Deliverables: QA report | Billed: Yes" [ref=e162] [cursor=pointer]':
+                    - generic [ref=e163]:
+                      - generic [ref=e164]: Cycle 2 · Completed
+                      - paragraph [ref=e165]: "Planned: 3/1/2024 | Due: 3/5/2024 | Disciplines: MEP | Deliverables: QA report | Billed: Yes"
+                - generic [ref=e166]:
+                  - generic [ref=e167]:
+                    - paragraph [ref=e168]: Cycle
+                    - paragraph [ref=e169]: "1"
+                  - generic [ref=e170]:
+                    - paragraph [ref=e171]: Planned date
+                    - paragraph [ref=e172]: 2/1/2024
+                  - generic [ref=e173]:
+                    - paragraph [ref=e174]: Due date
+                    - paragraph [ref=e175]: 2/5/2024
+                  - generic [ref=e176]:
+                    - paragraph [ref=e177]: Review status
+                    - generic [ref=e180]:
+                      - combobox [ref=e181] [cursor=pointer]: Planned
+                      - textbox: planned
+                      - img
+                      - group
+                  - generic [ref=e182]:
+                    - paragraph [ref=e183]: Disciplines
+                    - paragraph [ref=e184]: Architecture
+                  - generic [ref=e185]:
+                    - paragraph [ref=e186]: Deliverables
+                    - paragraph [ref=e187]: Model update
+                  - generic [ref=e188]:
+                    - paragraph [ref=e189]: Billed
+                    - paragraph [ref=e190]: "No"
+```

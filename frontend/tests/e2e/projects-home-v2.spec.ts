@@ -6,18 +6,22 @@ const seedProjects = [
     project_name: 'Alpha Build',
     project_number: 'P-001',
     client_name: 'Client A',
-    status: 'active',
+    status: 'Active',
     internal_lead: 101,
     updated_at: '2024-05-10T10:00:00Z',
+    health_pct: 82,
+    end_date: '2024-08-01',
   },
   {
     project_id: 2,
     project_name: 'Beta Tower',
     project_number: 'P-002',
     client_name: 'Client B',
-    status: 'on_hold',
+    status: 'On Hold',
     internal_lead: 102,
     updated_at: '2024-05-15T10:00:00Z',
+    health_pct: 45,
+    end_date: '2024-12-10',
   },
 ];
 
@@ -37,7 +41,7 @@ const timelinePayload = {
 };
 
 const setupMocks = async (page: any) => {
-  await page.route('**/api/projects', async (route) => {
+  await page.route('**/api/projects/summary**', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -49,6 +53,21 @@ const setupMocks = async (page: any) => {
     await route.continue();
   });
 
+  await page.route('**/api/projects/aggregates**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        project_count: seedProjects.length,
+        sum_agreed_fee: 100000,
+        sum_billed_to_date: 25000,
+        sum_unbilled_amount: 75000,
+        sum_earned_value: 30000,
+        weighted_earned_value_pct: 30,
+      }),
+    });
+  });
+
   await page.route('**/api/dashboard/timeline**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -57,7 +76,7 @@ const setupMocks = async (page: any) => {
     });
   });
 
-  await page.route('**/api/project/1', async (route) => {
+  await page.route('**/api/projects/1', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

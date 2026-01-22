@@ -47,6 +47,20 @@ export interface ProjectService {
   agreed_fee_remaining?: number;
   assigned_user_id?: number | null;
   assigned_user_name?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  review_anchor_date?: string | null;
+  review_interval_days?: number | null;
+  review_count_planned?: number | null;
+  source_template_id?: string | null;
+  source_template_version?: string | null;
+  source_template_hash?: string | null;
+  template_mode?: string | null;
+}
+
+export interface ServiceReviewsResponse {
+  reviews: ServiceReview[];
+  summary?: Record<string, unknown>;
 }
 
 export type ProjectServicesListResponse =
@@ -132,6 +146,11 @@ export const projectServicesApi = {
     bill_rule?: string;
     notes?: string;
     assigned_user_id?: number | null;
+    start_date?: string;
+    end_date?: string | null;
+    review_anchor_date?: string | null;
+    review_interval_days?: number | null;
+    review_count_planned?: number | null;
   }) => apiClient.post<{ service_id: number }>(`/projects/${projectId}/services`, data),
 
   update: (projectId: number, serviceId: number, data: Partial<ProjectService>) =>
@@ -157,6 +176,11 @@ export const projectServicesApi = {
         lump_sum_fee?: number;
         bill_rule?: string;
         notes?: string;
+        start_date?: string;
+        review_anchor_date?: string;
+        review_interval_days?: number;
+        review_count_planned?: number;
+        template_mode?: string;
       };
     },
   ) => apiClient.post(`/projects/${projectId}/services/from-template`, data),
@@ -173,6 +197,20 @@ export const projectServicesApi = {
     },
   ) => apiClient.post<ServiceTemplateResyncResult>(`/projects/${projectId}/services/${serviceId}/apply-template`, data),
 
+  resequenceReviews: (
+    projectId: number,
+    serviceId: number,
+    data: {
+      anchor_date?: string;
+      interval_days?: number;
+      count?: number;
+      mode?: 'update_existing_planned';
+    },
+  ) => apiClient.post(
+    `/projects/${projectId}/services/${serviceId}/reviews/resequence`,
+    data,
+  ),
+
   getGeneratedStructure: (projectId: number, serviceId: number) =>
     apiClient
       .get<GeneratedServiceStructure>(`/projects/${projectId}/services/${serviceId}/generated-structure`)
@@ -182,7 +220,12 @@ export const projectServicesApi = {
 // Service Reviews API
 export const serviceReviewsApi = {
   getAll: (projectId: number, serviceId: number) =>
-    apiClient.get<ServiceReview[]>(`/projects/${projectId}/services/${serviceId}/reviews`),
+    apiClient
+      .get<ServiceReviewsResponse>(`/projects/${projectId}/services/${serviceId}/reviews`)
+      .then((response) => ({
+        ...response,
+        data: response.data.reviews ?? [],
+      })),
 
   create: (projectId: number, serviceId: number, data: {
     cycle_no: number;
@@ -193,6 +236,7 @@ export const serviceReviewsApi = {
     status?: string;
     weight_factor?: number;
     invoice_reference?: string;
+    invoice_date?: string;
     evidence_links?: string;
     source_phase?: string;
     billing_phase?: string;
@@ -239,6 +283,7 @@ export const serviceItemsApi = {
     priority?: string;
     assigned_to?: string;
     invoice_reference?: string;
+    invoice_date?: string;
     evidence_links?: string;
     notes?: string;
     is_billed?: boolean;
@@ -246,6 +291,7 @@ export const serviceItemsApi = {
     generated_from_template_id?: string;
     generated_from_template_version?: string;
     generated_key?: string;
+    template_node_key?: string;
     origin?: string;
     is_template_managed?: boolean;
     sort_order?: number;

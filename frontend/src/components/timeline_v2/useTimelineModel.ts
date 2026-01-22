@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { ReactNode } from 'react';
 import type { DashboardTimelineProject } from '@/types/api';
 
 export type TimelineZoom = 'week' | 'month' | 'quarter';
@@ -16,6 +17,7 @@ export type TimelineRowModel = {
   leadLabel?: string | null;
   leadInitials?: string | null;
   progressLabel?: string | null;
+  metaLines?: ReactNode[];
   bar: { xStart: number; xEnd: number };
   hasDates: boolean;
 };
@@ -197,6 +199,7 @@ export const useTimelineModel = ({
   searchText,
   preset = 'all',
   zoom,
+  resolveMetaLines,
 }: {
   projects: DashboardTimelineProject[];
   zoom: TimelineZoom;
@@ -206,6 +209,7 @@ export const useTimelineModel = ({
   manager?: string;
   type?: string;
   client?: string;
+  resolveMetaLines?: (project: DashboardTimelineProject) => ReactNode[];
 }): TimelineModel => {
   return useMemo(() => {
     const normalizedManager = normalizeText(manager);
@@ -325,6 +329,7 @@ export const useTimelineModel = ({
       const priorityLabel = resolvePriorityLabel(project.priority, project.priority_label);
       const leadLabel = resolveLeadLabel(project);
       const progressLabel = resolveProgressLabel(project);
+      const metaLines = resolveMetaLines ? resolveMetaLines(project) : undefined;
       return {
         id: project.project_id,
         label: project.project_name,
@@ -336,6 +341,7 @@ export const useTimelineModel = ({
         leadLabel,
         leadInitials: leadLabel ? getInitials(leadLabel) : null,
         progressLabel,
+        metaLines,
         bar: {
           xStart,
           xEnd: Math.max(xEnd, xStart + 6),
@@ -355,5 +361,5 @@ export const useTimelineModel = ({
       todayX: todayOffset,
       rangeWidth,
     };
-  }, [projects, projectIds, manager, type, client, searchText, preset, zoom]);
+  }, [projects, projectIds, manager, type, client, searchText, preset, zoom, resolveMetaLines]);
 };

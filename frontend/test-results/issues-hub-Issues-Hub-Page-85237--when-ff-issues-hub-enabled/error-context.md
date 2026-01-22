@@ -1,0 +1,121 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]: BIM Project Management System
+      - generic [ref=e11]:
+        - img [ref=e13]
+        - textbox "Global search (projects, services)" [ref=e15]
+        - group
+  - navigation [ref=e16]:
+    - generic [ref=e18]:
+      - generic [ref=e20]: BIM Manager
+      - separator [ref=e21]
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - button "Dashboard" [ref=e24] [cursor=pointer]:
+            - img [ref=e26]
+            - generic [ref=e29]: Dashboard
+        - listitem [ref=e30]:
+          - button "Projects & Services" [ref=e31] [cursor=pointer]:
+            - img [ref=e33]
+            - generic [ref=e36]: Projects & Services
+        - listitem [ref=e37]:
+          - button "Bids" [ref=e38] [cursor=pointer]:
+            - img [ref=e40]
+            - generic [ref=e43]: Bids
+        - listitem [ref=e44]:
+          - button "Data Imports" [ref=e45] [cursor=pointer]:
+            - img [ref=e47]
+            - generic [ref=e50]: Data Imports
+        - listitem [ref=e51]:
+          - button "Issues" [ref=e52] [cursor=pointer]:
+            - img [ref=e54]
+            - generic [ref=e57]: Issues
+        - listitem [ref=e58]:
+          - button "Reviews (redirect)" [ref=e59] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e64]: Reviews (redirect)
+        - listitem [ref=e65]:
+          - button "Tasks" [ref=e66] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e71]: Tasks
+      - separator [ref=e72]
+      - list [ref=e73]:
+        - listitem [ref=e74]:
+          - button "Settings" [ref=e75] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Settings
+  - main [ref=e81]:
+    - generic [ref=e83]:
+      - heading "BIM Project Management Dashboard" [level=4] [ref=e84]
+      - paragraph [ref=e85]: Slice live warehouse metrics across issues, reviews, and services.
+      - generic [ref=e86]:
+        - heading "Filters" [level=6] [ref=e87]
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic: Save current view
+            - generic [ref=e90]:
+              - textbox "Save current view" [ref=e91]
+              - group:
+                - generic: Save current view
+          - button "Save View" [disabled]
+          - generic [ref=e94]: No saved views yet
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: Project Manager
+            - generic [ref=e98]:
+              - combobox "Project Manager" [ref=e99] [cursor=pointer]: All
+              - textbox: all
+              - img
+              - group:
+                - generic: Project Manager
+          - generic [ref=e100]:
+            - generic [ref=e101]: Project Type
+            - generic [ref=e102]:
+              - combobox "Project Type" [ref=e103] [cursor=pointer]: All
+              - textbox: all
+              - img
+              - group:
+                - generic: Project Type
+          - generic [ref=e104]:
+            - generic [ref=e105]: Discipline
+            - generic [ref=e106]:
+              - combobox "Discipline" [ref=e107] [cursor=pointer]: All
+              - textbox: all
+              - img
+              - group:
+                - generic: Discipline
+          - generic [ref=e108]:
+            - generic [ref=e109]: Client
+            - generic [ref=e110]:
+              - combobox "Client" [ref=e111] [cursor=pointer]: All
+              - textbox: all
+              - img
+              - group:
+                - generic: Client
+          - generic [ref=e112]:
+            - generic: Projects
+            - generic [ref=e113]:
+              - combobox "Projects" [ref=e114] [cursor=pointer]
+              - textbox
+              - img
+              - group:
+                - generic: Projects
+          - generic [ref=e116]: Showing 0 of 24 projects
+      - generic [ref=e117]:
+        - paragraph [ref=e118]: Last refreshed 1/21/2026, 2:50:36 PM
+        - button "Refresh data" [ref=e119] [cursor=pointer]: Refresh data
+      - paragraph [ref=e120]: Loading warehouse metrics...
+      - tablist [ref=e123]:
+        - tab "Overview" [selected] [ref=e124] [cursor=pointer]: Overview
+        - tab "Issues" [ref=e125] [cursor=pointer]: Issues
+        - tab "Health Metrics" [ref=e126] [cursor=pointer]: Health Metrics
+      - tabpanel "Overview" [ref=e128]:
+        - heading "Project Timeline" [level=5] [ref=e129]
+        - generic [ref=e131]:
+          - heading "Project Timelines" [level=6] [ref=e132]
+          - paragraph [ref=e133]: Timeline data is not available yet. Add project dates or review schedules to populate this view.
+```

@@ -1,4 +1,4 @@
-ï»¿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const seedProjects = [
   {
@@ -127,8 +127,8 @@ test.describe('Projects panel reviews read-only', () => {
 
     await page.getByTestId('projects-panel-service-row-101').click();
 
-    await expect(page.getByText('Cycle 1 Â· planned')).toBeVisible();
-    await expect(page.getByText('Cycle 2 Â· completed')).toBeVisible();
+    await expect(page.getByText('Cycle 1 · planned')).toBeVisible();
+    await expect(page.getByText('Cycle 2 · completed')).toBeVisible();
     await expect(page.getByText(/Disciplines: Architecture/)).toBeVisible();
     await expect(page.getByText(/Deliverables: Model update/)).toBeVisible();
     await expect(page.getByText(/Billed: Yes/)).toBeVisible();

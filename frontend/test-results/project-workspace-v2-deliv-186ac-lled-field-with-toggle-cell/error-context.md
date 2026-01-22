@@ -1,0 +1,171 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 1
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: deliverables
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Delta Hub" [level=5] [ref=e98]
+          - generic [ref=e100]: active
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - generic [ref=e104]:
+            - generic:
+              - img
+            - tablist [ref=e107]:
+              - tab "Overview" [ref=e108] [cursor=pointer]: Overview
+              - tab "Services" [ref=e109] [cursor=pointer]: Services
+              - tab "Deliverables" [active] [selected] [ref=e110] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e111] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e112] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e113] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e114] [cursor=pointer]: Quality
+            - img [ref=e117] [cursor=pointer]
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - button "Due this month" [ref=e122] [cursor=pointer]:
+                - generic [ref=e123]: Due this month
+              - button "Unbatched" [ref=e124] [cursor=pointer]:
+                - generic [ref=e125]: Unbatched
+              - button "Ready to invoice" [ref=e126] [cursor=pointer]:
+                - generic [ref=e127]: Ready to invoice
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - generic [ref=e130]: Service
+                - generic [ref=e131]: Planned
+                - generic [ref=e132]: Due
+                - generic [ref=e133]: Invoice Month
+                - generic [ref=e134]: Batch
+                - generic [ref=e135]: "Invoice #"
+                - generic [ref=e136]: Billed
+              - generic [ref=e137]:
+                - generic [ref=e138]:
+                  - paragraph [ref=e139]: DR-01 | Design Review
+                  - text: Concept | Cycle 1
+                - paragraph [ref=e141]: 5/10/2024
+                - paragraph [ref=e144] [cursor=pointer]: 2024-05-20
+                - paragraph [ref=e146] [cursor=pointer]: 2024-05
+                - generic [ref=e149]:
+                  - combobox "Unbatched" [ref=e150] [cursor=pointer]
+                  - textbox
+                  - img
+                  - group
+                - paragraph [ref=e152] [cursor=pointer]: "--"
+                - paragraph [ref=e155] [cursor=pointer]: Not billed
+            - generic [ref=e156]:
+              - heading "Items" [level=6] [ref=e157]
+              - generic [ref=e158]:
+                - generic [ref=e159]:
+                  - generic: Service
+                  - generic [ref=e160]:
+                    - combobox "Service" [ref=e161] [cursor=pointer]
+                    - textbox
+                    - img
+                    - group:
+                      - generic: Service
+                - button "Add item" [ref=e162] [cursor=pointer]: Add item
+              - paragraph [ref=e163]: Select a service to view items.
+        - generic [ref=e166]:
+          - generic [ref=e167]:
+            - heading "Properties" [level=6] [ref=e168]
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - paragraph [ref=e171]: "Project #"
+                - paragraph [ref=e172]: "--"
+              - generic [ref=e173]:
+                - paragraph [ref=e174]: Client
+                - paragraph [ref=e175]: "--"
+              - generic [ref=e176]:
+                - paragraph [ref=e177]: Type
+                - paragraph [ref=e178]: "--"
+              - generic [ref=e179]:
+                - paragraph [ref=e180]: Manager
+                - paragraph [ref=e181]: "--"
+              - generic [ref=e182]:
+                - paragraph [ref=e183]: Start
+                - paragraph [ref=e184]: "--"
+              - generic [ref=e185]:
+                - paragraph [ref=e186]: End
+                - paragraph [ref=e187]: "--"
+          - generic [ref=e188]:
+            - heading "Progress" [level=6] [ref=e189]
+            - generic [ref=e190]:
+              - generic [ref=e191]:
+                - paragraph [ref=e192]: Agreed fee
+                - paragraph [ref=e193]: $0.00
+              - generic [ref=e194]:
+                - paragraph [ref=e195]: Billed
+                - paragraph [ref=e196]: $0.00
+              - generic [ref=e197]:
+                - paragraph [ref=e198]: Billed %
+                - paragraph [ref=e199]: 0%
+          - generic [ref=e200]:
+            - heading "Activity" [level=6] [ref=e201]
+            - paragraph [ref=e202]: Recent activity will appear here.
+          - separator [ref=e203]
+          - generic [ref=e204]:
+            - heading "Deliverables Summary" [level=6] [ref=e205]
+            - paragraph [ref=e206]: Select a deliverable to view details.
+```

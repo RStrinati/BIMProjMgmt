@@ -1,0 +1,128 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 1
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: deliverables
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Delta Hub" [level=5] [ref=e98]
+          - generic [ref=e100]: active
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - generic [ref=e104]:
+            - generic:
+              - img
+            - tablist [ref=e107]:
+              - tab "Overview" [ref=e108] [cursor=pointer]: Overview
+              - tab "Services" [ref=e109] [cursor=pointer]: Services
+              - tab "Deliverables" [active] [selected] [ref=e110] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e111] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e112] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e113] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e114] [cursor=pointer]: Quality
+            - img [ref=e117] [cursor=pointer]
+          - paragraph [ref=e121]: No deliverables found for this project.
+        - generic [ref=e124]:
+          - generic [ref=e125]:
+            - heading "Properties" [level=6] [ref=e126]
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - paragraph [ref=e129]: "Project #"
+                - paragraph [ref=e130]: "--"
+              - generic [ref=e131]:
+                - paragraph [ref=e132]: Client
+                - paragraph [ref=e133]: "--"
+              - generic [ref=e134]:
+                - paragraph [ref=e135]: Type
+                - paragraph [ref=e136]: "--"
+              - generic [ref=e137]:
+                - paragraph [ref=e138]: Manager
+                - paragraph [ref=e139]: "--"
+              - generic [ref=e140]:
+                - paragraph [ref=e141]: Start
+                - paragraph [ref=e142]: 1/5/2026
+              - generic [ref=e143]:
+                - paragraph [ref=e144]: End
+                - paragraph [ref=e145]: "--"
+          - generic [ref=e146]:
+            - heading "Progress" [level=6] [ref=e147]
+            - generic [ref=e148]:
+              - generic [ref=e149]:
+                - paragraph [ref=e150]: Agreed fee
+                - paragraph [ref=e151]: $0.00
+              - generic [ref=e152]:
+                - paragraph [ref=e153]: Billed
+                - paragraph [ref=e154]: $0.00
+              - generic [ref=e155]:
+                - paragraph [ref=e156]: Billed %
+                - paragraph [ref=e157]: 0%
+          - generic [ref=e158]:
+            - heading "Activity" [level=6] [ref=e159]
+            - paragraph [ref=e160]: Recent activity will appear here.
+          - separator [ref=e161]
+          - generic [ref=e162]:
+            - heading "Deliverables Summary" [level=6] [ref=e163]
+            - paragraph [ref=e164]: Select a deliverable to view details.
+```

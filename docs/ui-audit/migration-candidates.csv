@@ -1,0 +1,14 @@
+Area/Page,Component/Pattern,Current implementation (MUI/custom),Candidate target (shadcn/MUI wrapper/keep),Risk (Low/Med/High),Notes
+ProjectsHomePageV2,Projects list table + sticky columns,MUI Table + custom sticky styles,Keep MUI or wrap table primitives,High,Sticky header/pinned columns + tests rely on table structure
+ProjectsHomePageV2,Board cards,MUI Card,Shadcn Card wrapper,Med,Simple card layout with minimal interactions
+ProjectsHomePageV2,Columns popover,MUI Popover,Keep MUI,Med,Popover positioning and focus handling
+ProjectsPanelPage,ListView + DetailsPanel,Custom MUI patterns,MUI wrapper primitives,Med,Good candidate to wrap as reusable primitives
+WorkspaceShell,Workspace Tabs (top bar),MUI Tabs,Keep or wrap Tabs,Med,Core navigation element across workspace
+Workspace ServicesTab,LinearList table-like rows,Custom MUI LinearList,MUI wrapper or custom primitive,Med,Multiple tabs reuse; tests rely on data-testid
+Workspace DeliverablesTab,EditableCell/ToggleCell inline editors,Custom MUI patterns,MUI wrapper primitives,High,Inline editing behavior and tests are sensitive
+IssuesPage + IssuesTabContent,Issue tables,MUI Table,Keep MUI,Med,Data-heavy tables and pagination
+BidDetailPage,Bid workspace (Tabs/Accordion/Dialog),MUI components,Keep MUI,High,Large page with many overlay interactions
+SettingsPage,Admin tables + dialogs,MUI components,Keep MUI,Med,CRUD flows rely on Dialog/Table markup
+TasksNotesView,Date picker + task form,MUI X DatePicker,Keep MUI or wrapper,High,Only DatePicker usage; migration risk
+UiPlaygroundPage,Shadcn Button demo,shadcn Button,Keep (non-production),Low,Not used in production UI
+ProjectFormDialog,Project create/edit dialog,MUI Dialog,Wrap in modal primitive,Med,Used by ProjectsPage and ProjectsHomePageV2

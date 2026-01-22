@@ -6,6 +6,8 @@
  */
 
 import { Box, Paper, Stack, Typography, Divider } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
+import { projectsApi } from '@/api/projects';
 import { ReactNode } from 'react';
 import type { Selection } from '@/hooks/useWorkspaceSelection';
 import type { Project } from '@/types/api';
@@ -60,11 +62,18 @@ function PropertiesBlock({ project }: { project: Project | null }) {
 function ProgressBlock({ project }: { project: Project | null }) {
   if (!project) return null;
 
-  const totalAgreed = Number(project.total_service_agreed_fee ?? project.agreed_fee ?? 0) || 0;
-  const totalBilled = Number(project.total_service_billed_amount ?? 0) || 0;
-  const billedPctRaw = Number(project.service_billed_pct ?? 0);
-  const billedPct = Number.isFinite(billedPctRaw) 
-    ? billedPctRaw 
+  const projectId = project.project_id;
+  const { data: financeSummary } = useQuery({
+    queryKey: ['projectFinanceSummary', projectId],
+    queryFn: () => projectsApi.getFinanceSummary(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const totalAgreed = Number(financeSummary?.total_agreed_fee ?? project.total_service_agreed_fee ?? project.agreed_fee ?? 0) || 0;
+  const totalBilled = Number(financeSummary?.total_claimed_or_billed ?? project.total_service_billed_amount ?? 0) || 0;
+  const billedPctRaw = financeSummary?.progress_pct ?? project.service_billed_pct ?? 0;
+  const billedPct = Number.isFinite(Number(billedPctRaw))
+    ? Number(billedPctRaw)
     : totalAgreed > 0 ? (totalBilled / totalAgreed) * 100 : 0;
 
   return (

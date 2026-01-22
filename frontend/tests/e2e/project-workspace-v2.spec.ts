@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 test.describe('Project workspace v2', () => {
   test('overview renders and tabs switch', async ({ page }) => {

@@ -1,0 +1,151 @@
+{
+  "BlockerBadge": {
+    "import_path": "@/components/ui/BlockerBadge",
+    "used_in": [
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "DetailsPanel": {
+    "import_path": "@/components/ui/DetailsPanel",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "EditableCells": {
+    "import_path": "@/components/projects/EditableCells",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "InlineField": {
+    "import_path": "@/components/ui/InlineField",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/projects/ProjectLeadInline.tsx",
+      "frontend/src/components/projects/ProjectStatusInline.tsx",
+      "frontend/src/components/projects/ReviewStatusInline.tsx",
+      "frontend/src/components/projects/ServiceStatusInline.tsx",
+      "frontend/src/components/workspace/IssueDetailPanel.tsx",
+      "frontend/src/components/workspace/RightPanel.tsx",
+      "frontend/src/components/workspace/ServiceDetailPanel.tsx",
+      "frontend/src/components/workspace/ServiceItemDetailPanel.tsx",
+      "frontend/src/features/projects/services/ProjectServiceDetails.tsx",
+      "frontend/src/features/projects/services/ProjectServiceReviewsPanel.tsx"
+    ],
+    "used_in_count": 13
+  },
+  "IssuesTabContent": {
+    "import_path": "@/components/ProjectManagement/IssuesTabContent",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/workspace/IssuesTab.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "LinearList": {
+    "import_path": "@/components/ui/LinearList",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/ProjectManagement/ProjectQualityRegisterTab.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx",
+      "frontend/src/pages/workspace/ServicesTab.tsx"
+    ],
+    "used_in_count": 4
+  },
+  "LinkedIssuesList": {
+    "import_path": "@/components/ui/LinkedIssuesList",
+    "used_in": [
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "ListView": {
+    "import_path": "@/components/ui/ListView",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx",
+      "frontend/src/features/projects/services/ProjectServiceReviewsPanel.tsx",
+      "frontend/src/features/projects/services/ProjectServicesList.tsx"
+    ],
+    "used_in_count": 4
+  },
+  "ProjectFormDialog": {
+    "import_path": "@/components/ProjectFormDialog",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "ProjectLeadInline": {
+    "import_path": "@/components/projects/ProjectLeadInline",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ProjectServiceReviewsPanel": {
+    "import_path": "@/features/projects/services/ProjectServiceReviewsPanel",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ProjectServicesList": {
+    "import_path": "@/features/projects/services/ProjectServicesList",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "ProjectStatusInline": {
+    "import_path": "@/components/projects/ProjectStatusInline",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ReviewStatusInline": {
+    "import_path": "@/components/projects/ReviewStatusInline",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/features/projects/services/ProjectServiceReviewsPanel.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "RightPanel": {
+    "import_path": "@/components/workspace/RightPanel",
+    "used_in": [
+      "frontend/src/pages/WorkspaceShell.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ServiceDetailDrawer": {
+    "import_path": "@/components/ProjectServices/ServiceDetailDrawer",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "ServiceStatusInline": {
+    "import_path": "@/components/projects/ServiceStatusInline",
+    "used_in": [
+      "frontend/src/features/projects/services/ProjectServiceDetails.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "TasksNotesView": {
+    "import_path": "@/components/ProjectManagement/TasksNotesView",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/TasksNotesPage.tsx",
+      "frontend/src/pages/workspace/TasksTab.tsx"
+    ],
+    "used_in_count": 3
+  }
+}

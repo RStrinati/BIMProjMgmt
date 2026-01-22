@@ -35,6 +35,7 @@ import type { ProjectService } from '@/api/services';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { RightPanel } from '@/components/workspace/RightPanel';
 import { ServiceDetailPanel } from '@/components/workspace/ServiceDetailPanel';
+import { ServiceItemDetailPanel } from '@/components/workspace/ServiceItemDetailPanel';
 import { IssueDetailPanel } from '@/components/workspace/IssueDetailPanel';
 import { UpdateDetailPanel } from '@/components/workspace/UpdateDetailPanel';
 
@@ -233,6 +234,8 @@ export default function WorkspaceShell() {
             {/* Content router based on selection type */}
             {selection?.type === 'service' && selectedService ? (
               <ServiceDetailPanel projectId={projectId} service={selectedService} />
+            ) : selection?.type === 'item' && typeof selection.id === 'number' ? (
+              <ServiceItemDetailPanel projectId={projectId} itemId={selection.id} />
             ) : selection?.type === 'issue' && typeof selection.id === 'string' ? (
               <IssueDetailPanel projectId={projectId} issueKey={selection.id} />
             ) : selection?.type === 'update' && typeof selection.id === 'number' ? (

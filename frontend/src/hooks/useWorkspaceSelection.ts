@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export type SelectionType = 'service' | 'review' | 'issue' | 'task' | 'update' | 'model' | 'service_template';
+export type SelectionType = 'service' | 'review' | 'item' | 'issue' | 'task' | 'update' | 'model' | 'service_template';
 
 export type Selection = {
   type: SelectionType;
@@ -29,7 +29,7 @@ const parseSelection = (sel: string | null): Selection | null => {
   
   const [, type, idStr] = match;
   
-  const validTypes: SelectionType[] = ['service', 'review', 'issue', 'task', 'update', 'model', 'service_template'];
+  const validTypes: SelectionType[] = ['service', 'review', 'item', 'issue', 'task', 'update', 'model', 'service_template'];
   if (!validTypes.includes(type as SelectionType)) return null;
   
   // For issues, keep as string (issue_key); for others, parse as number

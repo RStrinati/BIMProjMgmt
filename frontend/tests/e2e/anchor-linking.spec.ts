@@ -118,7 +118,7 @@ const itemLinkedIssuesPayload = {
 
 const setupCommonMocks = async (page: any) => {
   // Mock project endpoint
-  await page.route('**/api/project/1', async (route: any) => {
+  await page.route('**/api/projects/1', async (route: any) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

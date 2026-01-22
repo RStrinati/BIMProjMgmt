@@ -9,6 +9,8 @@ This module provides:
 - Connection health checks
 """
 
+from __future__ import annotations
+
 import logging
 import pyodbc
 import threading
@@ -20,6 +22,31 @@ from typing import Optional, Generator
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+if not hasattr(pyodbc, "Error"):
+    class Error(Exception):
+        pass
+
+    pyodbc.Error = Error
+
+if not hasattr(pyodbc, "OperationalError"):
+    class OperationalError(pyodbc.Error):
+        pass
+
+    pyodbc.OperationalError = OperationalError
+
+if not hasattr(pyodbc, "InterfaceError"):
+    class InterfaceError(pyodbc.Error):
+        pass
+
+    pyodbc.InterfaceError = InterfaceError
+
+if not hasattr(pyodbc, "connect"):
+    def _missing_connect(*_args, **_kwargs):
+        raise pyodbc.Error("pyodbc.connect unavailable")
+
+    pyodbc.connect = _missing_connect
 
 
 class ConnectionPool:

@@ -1,0 +1,222 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 7
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: issues
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Test Project" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Lead: Test User"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [selected] [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - table [ref=e125]:
+            - rowgroup [ref=e126]:
+              - row "Issue ID Title Status Priority Zone" [ref=e127]:
+                - columnheader "Issue ID" [ref=e128]:
+                  - button "Issue ID" [ref=e129] [cursor=pointer]:
+                    - text: Issue ID
+                    - img [ref=e130]
+                - columnheader "Title" [ref=e132]:
+                  - button "Title" [ref=e133] [cursor=pointer]:
+                    - text: Title
+                    - img [ref=e134]
+                - columnheader "Status" [ref=e136]:
+                  - button "Status" [ref=e137] [cursor=pointer]:
+                    - text: Status
+                    - img [ref=e138]
+                - columnheader "Priority" [ref=e140]:
+                  - button "Priority" [ref=e141] [cursor=pointer]:
+                    - text: Priority
+                    - img [ref=e142]
+                - columnheader "Zone" [ref=e144]:
+                  - button "Zone" [ref=e145] [cursor=pointer]:
+                    - text: Zone
+                    - img [ref=e146]
+            - rowgroup [ref=e148]:
+              - row "ACC-001 Structural column misalignment Open High Level 2" [ref=e149] [cursor=pointer]:
+                - cell "ACC-001" [ref=e150]
+                - cell "Structural column misalignment" [ref=e151]:
+                  - paragraph [ref=e152]: Structural column misalignment
+                - cell "Open" [ref=e153]:
+                  - generic [ref=e155]: Open
+                - cell "High" [ref=e156]:
+                  - generic [ref=e158]: High
+                - cell "Level 2" [ref=e159]
+              - row "RVZ-042 MEP coordination issue in basement In Progress Medium Basement" [ref=e160] [cursor=pointer]:
+                - cell "RVZ-042" [ref=e161]
+                - cell "MEP coordination issue in basement" [ref=e162]:
+                  - paragraph [ref=e163]: MEP coordination issue in basement
+                - cell "In Progress" [ref=e164]:
+                  - generic [ref=e166]: In Progress
+                - cell "Medium" [ref=e167]:
+                  - generic [ref=e169]: Medium
+                - cell "Basement" [ref=e170]
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - heading "Properties" [level=6] [ref=e175]
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - paragraph [ref=e178]: "Project #"
+                - paragraph [ref=e179]: P-007
+              - generic [ref=e180]:
+                - paragraph [ref=e181]: Client
+                - paragraph [ref=e182]: Test Client
+              - generic [ref=e183]:
+                - paragraph [ref=e184]: Type
+                - paragraph [ref=e185]: "--"
+              - generic [ref=e186]:
+                - paragraph [ref=e187]: Manager
+                - paragraph [ref=e188]: "--"
+              - generic [ref=e189]:
+                - paragraph [ref=e190]: Start
+                - paragraph [ref=e191]: "--"
+              - generic [ref=e192]:
+                - paragraph [ref=e193]: End
+                - paragraph [ref=e194]: "--"
+          - generic [ref=e195]:
+            - heading "Progress" [level=6] [ref=e196]
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - paragraph [ref=e199]: Agreed fee
+                - paragraph [ref=e200]: $0.00
+              - generic [ref=e201]:
+                - paragraph [ref=e202]: Billed
+                - paragraph [ref=e203]: $0.00
+              - generic [ref=e204]:
+                - paragraph [ref=e205]: Billed %
+                - paragraph [ref=e206]: 0%
+          - generic [ref=e207]:
+            - heading "Activity" [level=6] [ref=e208]
+            - paragraph [ref=e209]: Recent activity will appear here.
+          - separator [ref=e210]
+          - generic [ref=e211]:
+            - generic [ref=e212]:
+              - text: ACC-001
+              - heading "Structural column misalignment" [level=6] [ref=e213]
+            - generic [ref=e214]:
+              - heading "Status & Priority" [level=6] [ref=e215]
+              - generic [ref=e216]:
+                - generic [ref=e217]:
+                  - generic [ref=e218]: Status
+                  - generic [ref=e220]: Open
+                - generic [ref=e221]:
+                  - generic [ref=e222]: Priority
+                  - generic [ref=e224]: High
+            - generic [ref=e225]:
+              - heading "Properties" [level=6] [ref=e226]
+              - generic [ref=e227]:
+                - generic [ref=e228]:
+                  - paragraph [ref=e229]: Assignee
+                  - paragraph [ref=e230]: user@example.com
+                - generic [ref=e231]:
+                  - paragraph [ref=e232]: Discipline
+                  - paragraph [ref=e233]: Structural
+                - generic [ref=e234]:
+                  - paragraph [ref=e235]: Zone
+                  - paragraph [ref=e236]: Level 2
+                - generic [ref=e237]:
+                  - paragraph [ref=e238]: Due Date
+                  - paragraph [ref=e239]: 2/15/2024
+            - generic [ref=e240]:
+              - heading "Associations" [level=6] [ref=e241]
+              - generic [ref=e242]:
+                - generic [ref=e243]:
+                  - generic [ref=e244]: Service
+                  - generic [ref=e246]: Structural Engineering
+                - generic [ref=e247]:
+                  - generic [ref=e248]: Review
+                  - generic [ref=e250]: "Coordination Review #5"
+            - generic [ref=e251]:
+              - heading "Timeline" [level=6] [ref=e252]
+              - generic [ref=e253]:
+                - generic [ref=e254]:
+                  - paragraph [ref=e255]: Created
+                  - paragraph [ref=e256]: 1/15/2024
+                - generic [ref=e257]:
+                  - paragraph [ref=e258]: Updated
+                  - paragraph [ref=e259]: 1/21/2024
+            - generic [ref=e260]:
+              - heading "Latest Comments" [level=6] [ref=e261]
+              - generic [ref=e262]:
+                - generic [ref=e263]:
+                  - generic [ref=e264]: Project Manager · 1/16/2024
+                  - paragraph [ref=e265]: This needs immediate attention from the structural team.
+                - generic [ref=e266]:
+                  - generic [ref=e267]: Coordinator · 1/17/2024
+                  - paragraph [ref=e268]: Structural engineer has been notified.
+```

@@ -146,7 +146,7 @@ test.describe('Workspace Updates Feature', () => {
       await expect(page.getByText('No updates yet')).toBeVisible();
 
       // Type and post update
-      const composer = page.getByTestId('workspace-update-composer');
+      const composer = page.getByTestId('workspace-update-composer').locator('textarea, input');
       await composer.fill('First project update!');
 
       const postButton = page.getByTestId('workspace-post-update-button');
@@ -333,7 +333,7 @@ test.describe('Workspace Updates Feature', () => {
       await page.waitForTimeout(200);
 
       // Verify URL updated
-      await expect(page).toHaveURL(/.*\?sel=update:1/);
+      await expect(page).toHaveURL(/.*\?sel=update%3A1/);
 
       // Verify right panel shows update detail
       const updateDetailPanel = page.getByTestId('update-detail-panel');
@@ -395,7 +395,7 @@ test.describe('Workspace Updates Feature', () => {
       await page.waitForTimeout(200);
 
       // Verify first update has selected background
-      await expect(update1).toHaveCSS('background-color', /rgb\(.*\)/); // action.selected color
+      await expect(update1).toHaveCSS('background-color', /rgba?\(.*\)/); // action.selected color
 
       // Click second update
       const update2 = page.getByTestId('update-row-1');
@@ -403,7 +403,7 @@ test.describe('Workspace Updates Feature', () => {
       await page.waitForTimeout(200);
 
       // Verify second update is now selected
-      await expect(update2).toHaveCSS('background-color', /rgb\(.*\)/);
+      await expect(update2).toHaveCSS('background-color', /rgba?\(.*\)/);
     });
 
     test('should add comment to update', async ({ page }) => {
@@ -484,7 +484,7 @@ test.describe('Workspace Updates Feature', () => {
       await expect(updateDetailPanel).toContainText('Comments (0)');
 
       // Add comment
-      const commentComposer = page.getByTestId('update-comment-composer');
+      const commentComposer = page.getByTestId('update-comment-composer').locator('textarea, input');
       await commentComposer.fill('This is a test comment!');
 
       const addCommentButton = page.getByTestId('update-add-comment-button');

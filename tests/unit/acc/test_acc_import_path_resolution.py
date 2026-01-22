@@ -4,11 +4,10 @@ This test verifies the fix for the issue where import_acc_data
 fails when called from different working directories.
 """
 
+import inspect
 import os
-import sys
-
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from importlib import import_module
+from pathlib import Path
 
 
 def test_merge_dir_path_resolution():
@@ -16,15 +15,8 @@ def test_merge_dir_path_resolution():
     Test that merge_dir is correctly resolved to absolute path
     regardless of current working directory.
     """
-    # Read the source file directly to avoid import dependencies
-    handlers_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'handlers'
-    )
-    acc_handler_path = os.path.join(handlers_dir, 'acc_handler.py')
-    
-    with open(acc_handler_path, 'r') as f:
-        source = f.read()
+    acc_handler = import_module("handlers.acc_handler")
+    source = inspect.getsource(acc_handler)
     
     # Verify the path resolution code is present
     assert "os.path.isabs" in source, "Path resolution check not found in import_acc_data"
@@ -39,15 +31,8 @@ def test_backend_app_merge_dir():
     """
     Test that backend/app.py correctly computes the merge_dir path.
     """
-    # Read the backend app.py file
-    backend_app_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'backend',
-        'app.py'
-    )
-    
-    with open(backend_app_path, 'r') as f:
-        content = f.read()
+    backend_app = import_module("backend.app")
+    content = inspect.getsource(backend_app)
     
     # Check that the endpoint computes the absolute path
     assert 'project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))' in content, \
@@ -62,14 +47,14 @@ def test_sql_directory_exists():
     """
     Verify that the sql directory exists in the project root.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sql_dir = os.path.join(project_root, 'sql')
+    project_root = Path(__file__).resolve().parents[3]
+    sql_dir = project_root / "sql"
     
-    assert os.path.exists(sql_dir), f"SQL directory not found at {sql_dir}"
-    assert os.path.isdir(sql_dir), f"SQL path exists but is not a directory: {sql_dir}"
+    assert sql_dir.exists(), f"SQL directory not found at {sql_dir}"
+    assert sql_dir.is_dir(), f"SQL path exists but is not a directory: {sql_dir}"
     
     # Check for merge SQL files
-    merge_files = [f for f in os.listdir(sql_dir) if f.startswith('merge_') and f.endswith('.sql')]
+    merge_files = [f.name for f in sql_dir.iterdir() if f.name.startswith('merge_') and f.name.endswith('.sql')]
     assert len(merge_files) > 0, f"No merge_*.sql files found in {sql_dir}"
     
     print(f"✓ SQL directory exists with {len(merge_files)} merge files")

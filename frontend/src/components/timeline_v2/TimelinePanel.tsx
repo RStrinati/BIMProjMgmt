@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Alert, Box, Chip, Divider, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api';
-import type { DashboardTimelineProject } from '@/types/api';
+import type { DashboardTimelineProject, ProjectSummary } from '@/types/api';
 import { TimelineGrid } from './TimelineGrid';
 import { type TimelinePreset, type TimelineZoom, useTimelineModel } from './useTimelineModel';
+import { PROJECT_FIELD_MAP, formatProjectValue, renderTimelineMeta } from '@/features/projects/fields/ProjectFieldRegistry';
 
 type TimelinePanelProps = {
   projectIds?: number[];
@@ -18,6 +20,8 @@ type TimelinePanelProps = {
   searchText?: string;
   onSearchTextChange?: (value: string) => void;
   showSearch?: boolean;
+  summaryById?: Record<number, ProjectSummary>;
+  metaFieldIds?: string[];
 };
 
 const TIMELINE_MONTHS = 12;
@@ -33,6 +37,8 @@ export function TimelinePanel({
   searchText,
   onSearchTextChange,
   showSearch = true,
+  summaryById,
+  metaFieldIds,
 }: TimelinePanelProps) {
   const navigate = useNavigate();
   const [internalSearchText, setInternalSearchText] = useState('');
@@ -62,11 +68,46 @@ export function TimelinePanel({
 
   const projects: DashboardTimelineProject[] = data?.projects ?? [];
 
+  const enrichedProjects = useMemo(() => {
+    if (!summaryById) {
+      return projects;
+    }
+    return projects.map((project) => ({
+      ...project,
+      ...(summaryById[project.project_id] ?? {}),
+    }));
+  }, [projects, summaryById]);
+
   const resolvedSearchText = searchText ?? internalSearchText;
   const handleSearchChange = onSearchTextChange ?? setInternalSearchText;
 
+  const resolvedMetaFieldIds = useMemo(
+    () => (metaFieldIds ?? []).filter((id) => id !== 'project_name'),
+    [metaFieldIds],
+  );
+
+  const resolveMetaLines = useMemo(() => {
+    if (!resolvedMetaFieldIds.length) {
+      return undefined;
+    }
+    return (project: DashboardTimelineProject) => {
+      return resolvedMetaFieldIds
+        .map((fieldId) => PROJECT_FIELD_MAP.get(fieldId))
+        .filter(Boolean)
+        .map((field) => {
+          if (!field) return null;
+          const value = formatProjectValue(field, project as ProjectSummary);
+          if (value === '--') {
+            return null;
+          }
+          return renderTimelineMeta(field, project as ProjectSummary);
+        })
+        .filter(Boolean) as ReactNode[];
+    };
+  }, [resolvedMetaFieldIds]);
+
   const model = useTimelineModel({
-    projects,
+    projects: enrichedProjects,
     projectIds,
     manager,
     type,
@@ -74,6 +115,7 @@ export function TimelinePanel({
     searchText: resolvedSearchText,
     preset,
     zoom,
+    resolveMetaLines,
   });
 
   const activeFilters = useMemo(() => {

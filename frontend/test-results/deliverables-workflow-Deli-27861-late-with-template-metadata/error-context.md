@@ -1,0 +1,223 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 1
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]: services
+            - listitem [ref=e20]: /
+            - listitem [ref=e21]:
+              - paragraph [ref=e22]: new
+      - generic [ref=e25]:
+        - img [ref=e27]
+        - textbox "Global search (projects, services)" [ref=e29]
+        - group
+  - navigation [ref=e30]:
+    - generic [ref=e32]:
+      - generic [ref=e34]: BIM Manager
+      - separator [ref=e35]
+      - list [ref=e36]:
+        - listitem [ref=e37]:
+          - button "Dashboard" [ref=e38] [cursor=pointer]:
+            - img [ref=e40]
+            - generic [ref=e43]: Dashboard
+        - listitem [ref=e44]:
+          - button "Projects & Services" [ref=e45] [cursor=pointer]:
+            - img [ref=e47]
+            - generic [ref=e50]: Projects & Services
+        - listitem [ref=e51]:
+          - button "Bids" [ref=e52] [cursor=pointer]:
+            - img [ref=e54]
+            - generic [ref=e57]: Bids
+        - listitem [ref=e58]:
+          - button "Data Imports" [ref=e59] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e64]: Data Imports
+        - listitem [ref=e65]:
+          - button "Reviews (redirect)" [ref=e66] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e71]: Reviews (redirect)
+        - listitem [ref=e72]:
+          - button "Tasks" [ref=e73] [cursor=pointer]:
+            - img [ref=e75]
+            - generic [ref=e78]: Tasks
+      - separator [ref=e79]
+      - list [ref=e80]:
+        - listitem [ref=e81]:
+          - button "Settings" [ref=e82] [cursor=pointer]:
+            - img [ref=e84]
+            - generic [ref=e87]: Settings
+  - main [ref=e88]:
+    - generic [ref=e90]:
+      - generic [ref=e92]:
+        - navigation "breadcrumb" [ref=e93]:
+          - list [ref=e94]:
+            - listitem [ref=e95]: Projects
+            - listitem [ref=e96]: /
+            - listitem [ref=e97]:
+              - paragraph [ref=e98]: Workspace
+        - generic [ref=e99]:
+          - heading "Delta Hub" [level=5] [ref=e100]
+          - generic [ref=e102]: active
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [selected] [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - button "Back" [ref=e124] [cursor=pointer]:
+                - img [ref=e126]
+                - text: Back
+              - heading "Create New Service" [level=6] [ref=e128]
+            - generic [ref=e130]:
+              - generic [ref=e131]:
+                - generic [ref=e132]: Creation Mode
+                - generic [ref=e133]:
+                  - combobox "Creation Mode" [ref=e134] [cursor=pointer]: From Template
+                  - textbox: template
+                  - img
+                  - group:
+                    - generic: Creation Mode
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - generic [ref=e137]:
+                    - text: Template
+                    - generic [ref=e138]: "*"
+                  - generic [ref=e139]:
+                    - combobox "Template BIM Coordination" [ref=e140] [cursor=pointer]: BIM Coordination
+                    - textbox: bim-coordination
+                    - img
+                    - group:
+                      - generic: Template *
+                - generic [ref=e141]:
+                  - heading "Pricing Summary" [level=6] [ref=e142]
+                  - paragraph [ref=e143]: 4 x $5,500.00 = $22,000.00
+                - generic [ref=e144]:
+                  - heading "Template Defaults (editable)" [level=6] [ref=e145]
+                  - generic [ref=e146]:
+                    - generic [ref=e147]:
+                      - generic [ref=e148]:
+                        - text: Service Code
+                        - generic [ref=e149]: "*"
+                      - generic [ref=e150]:
+                        - textbox "Service Code" [ref=e151]: BIM_COORD
+                        - group:
+                          - generic: Service Code *
+                    - generic [ref=e152]:
+                      - generic [ref=e153]:
+                        - text: Service Name
+                        - generic [ref=e154]: "*"
+                      - generic [ref=e155]:
+                        - textbox "Service Name" [ref=e156]: BIM Coordination Review
+                        - group:
+                          - generic: Service Name *
+                    - generic [ref=e157]:
+                      - generic [ref=e158]:
+                        - text: Start Date
+                        - generic [ref=e159]: "*"
+                      - generic [ref=e160]:
+                        - textbox "Start Date" [ref=e161]: 2026-01-15
+                        - group:
+                          - generic: Start Date *
+                    - generic [ref=e162]:
+                      - generic [ref=e163]: End Date
+                      - generic [ref=e164]:
+                        - textbox "End Date" [ref=e165]
+                        - group:
+                          - generic: End Date
+                    - generic [ref=e166]:
+                      - generic [ref=e167]: Phase
+                      - generic [ref=e168]:
+                        - combobox "Phase Construction" [ref=e169] [cursor=pointer]: Construction
+                        - textbox: Construction
+                        - img
+                        - group:
+                          - generic: Phase
+                    - generic [ref=e170]:
+                      - generic [ref=e171]: Billing Model
+                      - generic [ref=e172]:
+                        - combobox "Billing Model Unit based" [ref=e173] [cursor=pointer]: Unit based
+                        - textbox: unit_based
+                        - img
+                        - group:
+                          - generic: Billing Model
+                      - paragraph [ref=e174]: Unit billing requires unit type, qty, rate, and bill rule
+                    - generic [ref=e175]:
+                      - button "Additional overrides" [ref=e176] [cursor=pointer]:
+                        - paragraph [ref=e178]: Additional overrides
+                        - img [ref=e180]
+                      - generic: Billing Rule Override
+                      - generic: Unit Type Override
+                      - generic: Unit Quantity Override
+                      - generic: Unit Rate Override
+                      - generic: Assigned User
+                      - generic: Agreed Fee Override
+                      - generic: Notes Override
+              - generic [ref=e182]:
+                - button "Cancel" [ref=e183] [cursor=pointer]: Cancel
+                - button "Create Service" [active] [ref=e184] [cursor=pointer]: Create Service
+        - generic [ref=e187]:
+          - generic [ref=e188]:
+            - heading "Properties" [level=6] [ref=e189]
+            - generic [ref=e190]:
+              - generic [ref=e191]:
+                - paragraph [ref=e192]: "Project #"
+                - paragraph [ref=e193]: "--"
+              - generic [ref=e194]:
+                - paragraph [ref=e195]: Client
+                - paragraph [ref=e196]: "--"
+              - generic [ref=e197]:
+                - paragraph [ref=e198]: Type
+                - paragraph [ref=e199]: "--"
+              - generic [ref=e200]:
+                - paragraph [ref=e201]: Manager
+                - paragraph [ref=e202]: "--"
+              - generic [ref=e203]:
+                - paragraph [ref=e204]: Start
+                - paragraph [ref=e205]: 1/5/2026
+              - generic [ref=e206]:
+                - paragraph [ref=e207]: End
+                - paragraph [ref=e208]: "--"
+          - generic [ref=e209]:
+            - heading "Progress" [level=6] [ref=e210]
+            - generic [ref=e211]:
+              - generic [ref=e212]:
+                - paragraph [ref=e213]: Agreed fee
+                - paragraph [ref=e214]: $0.00
+              - generic [ref=e215]:
+                - paragraph [ref=e216]: Billed
+                - paragraph [ref=e217]: $0.00
+              - generic [ref=e218]:
+                - paragraph [ref=e219]: Billed %
+                - paragraph [ref=e220]: 0%
+          - generic [ref=e221]:
+            - heading "Activity" [level=6] [ref=e222]
+            - paragraph [ref=e223]: Recent activity will appear here.
+          - separator [ref=e224]
+          - generic [ref=e225]:
+            - heading "Services Summary" [level=6] [ref=e226]
+            - paragraph [ref=e227]: "Total services: 0"
+            - paragraph [ref=e228]: Select a service to view details.
+```

@@ -1,0 +1,161 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 1
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: overview
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Workspace Project" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Lead: Taylor Lead"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [selected] [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - heading "Summary" [level=6] [ref=e125]
+              - paragraph [ref=e126]: Mock project description
+            - generic [ref=e127]:
+              - heading "Invoice pipeline" [level=6] [ref=e128]
+              - paragraph [ref=e129]: Loading invoice pipeline...
+            - generic [ref=e130]:
+              - heading "Post an update" [level=6] [ref=e131]
+              - generic [ref=e132]:
+                - generic [ref=e134]:
+                  - textbox "What's the latest progress on this project?" [ref=e135]
+                  - group
+                - generic [ref=e136]:
+                  - button "Post update" [disabled]
+                  - button "View all updates →" [ref=e137] [cursor=pointer]: View all updates →
+            - generic [ref=e138]:
+              - heading "Latest update" [level=6] [ref=e139]
+              - paragraph [ref=e140]: No updates yet. Post the first one above!
+            - generic [ref=e141]:
+              - heading "Add task" [level=6] [ref=e142]
+              - generic [ref=e143]:
+                - generic [ref=e145]:
+                  - textbox "New task" [ref=e146]
+                  - group
+                - button "Add task" [ref=e147] [cursor=pointer]: Add task
+            - generic [ref=e148]:
+              - heading "Recent tasks" [level=6] [ref=e149]
+              - generic [ref=e151]:
+                - generic [ref=e152]:
+                  - paragraph [ref=e153]: Kickoff
+                  - text: Alex Coordinator
+                - generic [ref=e154]: 2/1/2024
+        - generic [ref=e157]:
+          - generic [ref=e158]:
+            - heading "Properties" [level=6] [ref=e159]
+            - generic [ref=e160]:
+              - generic [ref=e161]:
+                - paragraph [ref=e162]: "Project #"
+                - paragraph [ref=e163]: P-100
+              - generic [ref=e164]:
+                - paragraph [ref=e165]: Client
+                - paragraph [ref=e166]: Mock Client
+              - generic [ref=e167]:
+                - paragraph [ref=e168]: Type
+                - paragraph [ref=e169]: "--"
+              - generic [ref=e170]:
+                - paragraph [ref=e171]: Manager
+                - paragraph [ref=e172]: "--"
+              - generic [ref=e173]:
+                - paragraph [ref=e174]: Start
+                - paragraph [ref=e175]: "--"
+              - generic [ref=e176]:
+                - paragraph [ref=e177]: End
+                - paragraph [ref=e178]: "--"
+          - generic [ref=e179]:
+            - heading "Progress" [level=6] [ref=e180]
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - paragraph [ref=e183]: Agreed fee
+                - paragraph [ref=e184]: $0.00
+              - generic [ref=e185]:
+                - paragraph [ref=e186]: Billed
+                - paragraph [ref=e187]: $0.00
+              - generic [ref=e188]:
+                - paragraph [ref=e189]: Billed %
+                - paragraph [ref=e190]: 0%
+          - generic [ref=e191]:
+            - heading "Activity" [level=6] [ref=e192]
+            - paragraph [ref=e193]: Recent activity will appear here.
+          - separator [ref=e194]
+          - generic [ref=e195]:
+            - heading "Overview Summary" [level=6] [ref=e196]
+            - paragraph [ref=e197]: Select an item to view details, or browse the overview tab content.
+```

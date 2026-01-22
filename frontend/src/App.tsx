@@ -25,6 +25,7 @@ import QualityTab from './pages/workspace/QualityTab';
 import ServiceCreateView from './pages/workspace/ServiceCreateView';
 import { IssuesPage } from './pages/IssuesPage';
 import { featureFlags } from './config/featureFlags';
+import UiPlaygroundPage from './pages/UiPlaygroundPage';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ function App() {
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
               <Route path="/tasks" element={<TasksNotesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/ui" element={<UiPlaygroundPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>

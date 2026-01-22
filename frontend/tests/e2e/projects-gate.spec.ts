@@ -48,7 +48,7 @@ test.describe('Projects feature flag gate', () => {
     const projectRequests: string[] = [];
 
     page.on('request', (req) => {
-      if (req.url().includes('/api/project/')) {
+      if (req.url().includes('/api/projects/')) {
         projectRequests.push(req.url());
       }
     });

@@ -17,6 +17,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -33,11 +34,13 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Save as SaveIcon, Cancel as CancelIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { projectServicesApi, serviceItemsApi, serviceTemplateCatalogApi, usersApi } from '@/api';
+import { projectServicesApi, serviceItemsApi, serviceReviewsApi, serviceTemplateCatalogApi, usersApi } from '@/api';
 import type {
   ProjectService,
   ProjectServicesListResponse,
   GeneratedServiceStructure,
+  ServiceItem,
+  ServiceReview,
   ServiceTemplateItemDefinition,
   ServiceTemplateResyncResult,
   User,
@@ -98,6 +101,12 @@ export default function ServiceEditView() {
   const [resyncOptions, setResyncOptions] = useState<string[]>([]);
   const [resyncError, setResyncError] = useState<string | null>(null);
   const [resyncPreview, setResyncPreview] = useState<ServiceTemplateResyncResult | null>(null);
+  const [resequenceDialogOpen, setResequenceDialogOpen] = useState(false);
+  const [resequenceForm, setResequenceForm] = useState({
+    anchor_date: '',
+    interval_days: '',
+    count: '',
+  });
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['users'],
@@ -126,6 +135,24 @@ export default function ServiceEditView() {
     enabled: Number.isFinite(projectId) && Number.isFinite(serviceId),
   });
 
+  const { data: serviceReviews = [] } = useQuery<ServiceReview[]>({
+    queryKey: ['serviceReviews', projectId, serviceId],
+    queryFn: async () => {
+      const response = await serviceReviewsApi.getAll(projectId, serviceId);
+      return response.data;
+    },
+    enabled: Number.isFinite(projectId) && Number.isFinite(serviceId),
+  });
+
+  const { data: serviceItems = [] } = useQuery<ServiceItem[]>({
+    queryKey: ['serviceItems', projectId, serviceId],
+    queryFn: async () => {
+      const response = await serviceItemsApi.getAll(projectId, serviceId);
+      return response.data;
+    },
+    enabled: Number.isFinite(projectId) && Number.isFinite(serviceId),
+  });
+
   const service = useMemo(() => {
     if (!servicesPayload) return null;
 
@@ -144,6 +171,15 @@ export default function ServiceEditView() {
     if (service) {
       setFormData(service);
     }
+  }, [service]);
+
+  useEffect(() => {
+    if (!service) return;
+    setResequenceForm({
+      anchor_date: service.review_anchor_date || service.start_date || '',
+      interval_days: service.review_interval_days != null ? String(service.review_interval_days) : '',
+      count: service.review_count_planned != null ? String(service.review_count_planned) : '',
+    });
   }, [service]);
 
   const templateDefinition = generatedStructure?.template || null;
@@ -233,7 +269,7 @@ export default function ServiceEditView() {
         item_type: selected.item.item_type,
         title: selected.item.title,
         description: selected.item.description,
-        planned_date: selected.item.planned_date || todayIso(),
+        planned_date: selected.item.planned_date || service?.start_date || todayIso(),
         due_date: selected.item.due_date,
         status: selected.item.status || 'planned',
         priority: selected.item.priority || 'medium',
@@ -299,6 +335,24 @@ export default function ServiceEditView() {
     },
   });
 
+  const resequenceMutation = useMutation({
+    mutationFn: async () => {
+      return projectServicesApi.resequenceReviews(projectId, serviceId, {
+        anchor_date: resequenceForm.anchor_date || undefined,
+        interval_days: resequenceForm.interval_days ? Number(resequenceForm.interval_days) : undefined,
+        count: resequenceForm.count ? Number(resequenceForm.count) : undefined,
+        mode: 'update_existing_planned',
+      });
+    },
+    onSuccess: () => {
+      setResequenceDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, serviceId] });
+    },
+    onError: (err: any) => {
+      setSaveError(err?.response?.data?.error || 'Failed to resequence reviews');
+    },
+  });
+
   useEffect(() => {
     if (!resyncDialogOpen || !templateDefinition) {
       return;
@@ -331,14 +385,14 @@ export default function ServiceEditView() {
       notes: formData.notes,
       status: formData.status,
       phase: formData.phase,
+      start_date: formData.start_date,
+      end_date: formData.end_date,
       unit_type: formData.unit_type,
       unit_qty: formData.unit_qty,
       unit_rate: formData.unit_rate,
       lump_sum_fee: formData.lump_sum_fee,
       bill_rule: formData.bill_rule,
       agreed_fee: formData.agreed_fee,
-      progress_pct: formData.progress_pct,
-      claimed_to_date: formData.claimed_to_date,
       assigned_user_id: formData.assigned_user_id,
     };
     updateMutation.mutate(payload);
@@ -430,6 +484,22 @@ export default function ServiceEditView() {
                     value={formData.phase || ''}
                     onChange={(e) => handleChange('phase', e.target.value)}
                     fullWidth
+                  />
+                  <TextField
+                    label="Start Date"
+                    type="date"
+                    value={formData.start_date || ''}
+                    onChange={(e) => handleChange('start_date', e.target.value)}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    label="End Date"
+                    type="date"
+                    value={formData.end_date || ''}
+                    onChange={(e) => handleChange('end_date', e.target.value)}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
                   />
                   <TextField
                     select
@@ -546,20 +616,105 @@ export default function ServiceEditView() {
               <AccordionDetails>
                 <Stack spacing={2}>
                   <TextField
-                    label="Progress %"
+                    label="Progress % (derived)"
                     type="number"
                     value={formData.progress_pct ?? ''}
-                    onChange={(e) => handleChange('progress_pct', Number(e.target.value) || 0)}
                     fullWidth
+                    disabled
                   />
                   <TextField
-                    label="Claimed To Date"
+                    label="Claimed To Date (derived)"
                     type="number"
                     value={formData.claimed_to_date ?? ''}
-                    onChange={(e) => handleChange('claimed_to_date', Number(e.target.value) || 0)}
                     fullWidth
+                    disabled
                   />
                 </Stack>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion defaultExpanded>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Deliverables (Reviews)
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={2}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setResequenceDialogOpen(true)}
+                    data-testid="service-resequence-reviews-button"
+                  >
+                    Re-sequence planned reviews
+                  </Button>
+                  {serviceReviews.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No reviews yet.
+                    </Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {serviceReviews.map((review) => (
+                        <Box
+                          key={review.review_id}
+                          sx={{ border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}
+                        >
+                          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              Cycle #{review.cycle_no}
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              {review.is_template_managed && <Chip size="small" label="Template" />}
+                              {review.is_user_modified && <Chip size="small" color="warning" label="User-modified" />}
+                              <Chip size="small" label={review.status || 'planned'} />
+                            </Stack>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            Planned: {formatDate(review.planned_date)} · Due: {formatDate(review.due_date)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion defaultExpanded>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Items
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                {serviceItems.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No items yet.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {serviceItems.map((item) => (
+                      <Box
+                        key={item.item_id}
+                        sx={{ border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {item.title}
+                          </Typography>
+                          <Stack direction="row" spacing={1}>
+                            {item.is_template_managed && <Chip size="small" label="Template" />}
+                            {item.is_user_modified && <Chip size="small" color="warning" label="User-modified" />}
+                            <Chip size="small" label={item.status || 'planned'} />
+                          </Stack>
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          Planned: {formatDate(item.planned_date)} · Due: {formatDate(item.due_date)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
               </AccordionDetails>
             </Accordion>
 
@@ -752,6 +907,9 @@ export default function ServiceEditView() {
                 <Typography variant="body2">
                   Items: +{resyncPreview.added_items.length} / updated {resyncPreview.updated_items.length} / skipped {resyncPreview.skipped_items.length}
                 </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Updates only apply to planned, template-managed, and unmodified rows. No deletions are performed.
+                </Typography>
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
@@ -768,6 +926,56 @@ export default function ServiceEditView() {
             disabled={resyncApplyMutation.isPending || resyncPreviewMutation.isPending}
           >
             {resyncApplyMutation.isPending ? 'Re-syncing...' : 'Apply Re-sync'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={resequenceDialogOpen}
+        onClose={() => setResequenceDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Re-sequence planned reviews</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Only planned reviews that are not user-modified will be updated.
+          </Typography>
+          <TextField
+            label="Anchor date"
+            type="date"
+            value={resequenceForm.anchor_date}
+            onChange={(event) =>
+              setResequenceForm((prev) => ({ ...prev, anchor_date: event.target.value }))
+            }
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="Interval (days)"
+            type="number"
+            value={resequenceForm.interval_days}
+            onChange={(event) =>
+              setResequenceForm((prev) => ({ ...prev, interval_days: event.target.value }))
+            }
+          />
+          <TextField
+            label="Count (optional)"
+            type="number"
+            value={resequenceForm.count}
+            onChange={(event) =>
+              setResequenceForm((prev) => ({ ...prev, count: event.target.value }))
+            }
+            helperText="Leave blank to resequence existing planned reviews."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResequenceDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => resequenceMutation.mutate()}
+            disabled={resequenceMutation.isPending}
+          >
+            {resequenceMutation.isPending ? 'Re-sequencing...' : 'Apply'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,0 +1,190 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 7
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: services
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Template Project" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Lead: Test User"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [selected] [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - heading "Services" [level=6] [ref=e124]
+              - generic [ref=e125]:
+                - button "Edit service BIM_COORD" [ref=e126] [cursor=pointer]:
+                  - img [ref=e127]
+                - button "Delete service BIM_COORD" [ref=e129] [cursor=pointer]:
+                  - img [ref=e130]
+                - group "add-service-options" [ref=e132]:
+                  - button "Add Service" [ref=e133] [cursor=pointer]:
+                    - img [ref=e135]
+                    - text: Add Service
+                  - button [ref=e137] [cursor=pointer]:
+                    - img [ref=e138]
+            - generic [ref=e140]:
+              - generic [ref=e141]:
+                - generic [ref=e142]: Service
+                - generic [ref=e143]: Phase
+                - generic [ref=e144]: Status
+                - generic [ref=e145]: Agreed
+                - generic [ref=e146]: Billed
+                - generic [ref=e147]: Remaining
+                - generic [ref=e148]: Progress
+              - generic [ref=e149] [cursor=pointer]:
+                - generic [ref=e150]:
+                  - paragraph [ref=e151]: BIM_COORD
+                  - text: BIM Coordination Review
+                - paragraph [ref=e153]: Construction
+                - generic [ref=e154]: planned
+                - paragraph [ref=e156]: $22,000.00
+                - paragraph [ref=e158]: $0.00
+                - paragraph [ref=e160]: $22,000.00
+                - paragraph [ref=e162]: 0%
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - heading "Properties" [level=6] [ref=e167]
+            - generic [ref=e168]:
+              - generic [ref=e169]:
+                - paragraph [ref=e170]: "Project #"
+                - paragraph [ref=e171]: P-007
+              - generic [ref=e172]:
+                - paragraph [ref=e173]: Client
+                - paragraph [ref=e174]: Test Client
+              - generic [ref=e175]:
+                - paragraph [ref=e176]: Type
+                - paragraph [ref=e177]: "--"
+              - generic [ref=e178]:
+                - paragraph [ref=e179]: Manager
+                - paragraph [ref=e180]: "--"
+              - generic [ref=e181]:
+                - paragraph [ref=e182]: Start
+                - paragraph [ref=e183]: "--"
+              - generic [ref=e184]:
+                - paragraph [ref=e185]: End
+                - paragraph [ref=e186]: "--"
+          - generic [ref=e187]:
+            - heading "Progress" [level=6] [ref=e188]
+            - generic [ref=e189]:
+              - generic [ref=e190]:
+                - paragraph [ref=e191]: Agreed fee
+                - paragraph [ref=e192]: $0.00
+              - generic [ref=e193]:
+                - paragraph [ref=e194]: Billed
+                - paragraph [ref=e195]: $0.00
+              - generic [ref=e196]:
+                - paragraph [ref=e197]: Billed %
+                - paragraph [ref=e198]: 0%
+          - generic [ref=e199]:
+            - heading "Activity" [level=6] [ref=e200]
+            - paragraph [ref=e201]: Recent activity will appear here.
+          - separator [ref=e202]
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]: BIM_COORD
+                - generic [ref=e208]: planned
+              - heading "BIM Coordination Review" [level=6] [ref=e209]
+              - generic [ref=e210]: "Phase: Construction"
+            - generic [ref=e211]:
+              - heading "Finance" [level=6] [ref=e212]
+              - generic [ref=e213]:
+                - generic [ref=e214]:
+                  - paragraph [ref=e215]: Agreed Fee
+                  - paragraph [ref=e216]: $22,000.00
+                - generic [ref=e217]:
+                  - paragraph [ref=e218]: Billed
+                  - paragraph [ref=e219]: $0.00
+                - generic [ref=e220]:
+                  - paragraph [ref=e221]: Remaining
+                  - paragraph [ref=e222]: $22,000.00
+                - generic [ref=e223]:
+                  - generic [ref=e224]:
+                    - generic [ref=e225]: Billing Progress
+                    - generic [ref=e226]: 0%
+                  - progressbar [ref=e227]
+            - generic [ref=e229]:
+              - tablist [ref=e232]:
+                - tab "Reviews (0)" [selected] [ref=e233] [cursor=pointer]: Reviews (0)
+                - tab "Items (0)" [ref=e234] [cursor=pointer]: Items (0)
+              - generic [ref=e236]:
+                - button "Add Review" [ref=e238] [cursor=pointer]: Add Review
+                - progressbar [ref=e240]:
+                  - img [ref=e241]
+```

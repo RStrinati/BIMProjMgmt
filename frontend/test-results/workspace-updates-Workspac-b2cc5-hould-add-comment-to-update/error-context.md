@@ -1,0 +1,144 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 7
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: updates
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Test Project" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Lead: Test User"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [selected] [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]:
+              - paragraph [ref=e127]: User
+              - generic [ref=e128]: · Jan 17, 2024, 9:00 PM
+            - paragraph [ref=e129]: Test update
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - heading "Properties" [level=6] [ref=e134]
+            - generic [ref=e135]:
+              - generic [ref=e136]:
+                - paragraph [ref=e137]: "Project #"
+                - paragraph [ref=e138]: P-007
+              - generic [ref=e139]:
+                - paragraph [ref=e140]: Client
+                - paragraph [ref=e141]: Test Client
+              - generic [ref=e142]:
+                - paragraph [ref=e143]: Type
+                - paragraph [ref=e144]: "--"
+              - generic [ref=e145]:
+                - paragraph [ref=e146]: Manager
+                - paragraph [ref=e147]: "--"
+              - generic [ref=e148]:
+                - paragraph [ref=e149]: Start
+                - paragraph [ref=e150]: "--"
+              - generic [ref=e151]:
+                - paragraph [ref=e152]: End
+                - paragraph [ref=e153]: "--"
+          - generic [ref=e154]:
+            - heading "Progress" [level=6] [ref=e155]
+            - generic [ref=e156]:
+              - generic [ref=e157]:
+                - paragraph [ref=e158]: Agreed fee
+                - paragraph [ref=e159]: $0.00
+              - generic [ref=e160]:
+                - paragraph [ref=e161]: Billed
+                - paragraph [ref=e162]: $0.00
+              - generic [ref=e163]:
+                - paragraph [ref=e164]: Billed %
+                - paragraph [ref=e165]: 0%
+          - generic [ref=e166]:
+            - heading "Activity" [level=6] [ref=e167]
+            - paragraph [ref=e168]: Recent activity will appear here.
+          - separator [ref=e169]
+          - generic [ref=e170]:
+            - generic [ref=e171]:
+              - generic [ref=e172]: User
+              - generic [ref=e173]: Jan 17, 2024, 9:00 PM
+              - paragraph [ref=e174]: Test update
+            - generic [ref=e175]:
+              - heading "Comments (0)" [level=6] [ref=e176]
+              - paragraph [ref=e177]: No comments yet. Be the first to comment!
+              - generic [ref=e178]:
+                - generic [ref=e180]:
+                  - textbox "Add a comment..." [ref=e181]
+                  - group
+                - generic [ref=e182]:
+                  - button "Add comment" [disabled]
+```

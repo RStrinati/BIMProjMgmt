@@ -13,6 +13,7 @@ import unittest
 import json
 import tempfile
 import shutil
+from pathlib import Path
 from unittest.mock import Mock, patch
 from datetime import datetime
 
@@ -53,6 +54,17 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         # Save test template data
         with open(self.temp_template_file, 'w', encoding='utf-8') as f:
             json.dump(self.test_templates, f, indent=2)
+
+        self.template_path = Path(self.temp_template_file)
+        self.missing_canonical_path = Path(self.temp_dir) / "missing_canonical.json"
+
+        self._patchers = [
+            patch("review_management_service.LEGACY_TEMPLATE_PATH", self.template_path),
+            patch("services.template_loader.LEGACY_TEMPLATE_PATH", self.template_path),
+            patch("services.template_loader.CANONICAL_TEMPLATE_PATH", self.missing_canonical_path),
+        ]
+        for patcher in self._patchers:
+            patcher.start()
         
         # Create mock database connection
         self.mock_db = Mock()
@@ -67,15 +79,14 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
     
     def tearDown(self):
         """Clean up test environment"""
+        for patcher in self._patchers:
+            patcher.stop()
         shutil.rmtree(self.temp_dir)
     
-    @patch('os.path.dirname')
-    def test_get_available_templates_real_service(self, mock_dirname):
+    def test_get_available_templates_real_service(self):
         """Test get_available_templates with real service method"""
         print("\n🧪 Testing get_available_templates_real_service...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Call the actual service method
         templates = self.service.get_available_templates()
@@ -91,13 +102,10 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         
         print("✅ Get available templates test passed")
     
-    @patch('os.path.dirname')
-    def test_load_template_real_service(self, mock_dirname):
+    def test_load_template_real_service(self):
         """Test load_template with real service method"""
         print("\n🧪 Testing load_template_real_service...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Test exact name matching
         template = self.service.load_template("Service Test Template")
@@ -124,13 +132,10 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         
         print("✅ Load template test passed")
     
-    @patch('os.path.dirname')
-    def test_save_template_real_service(self, mock_dirname):
+    def test_save_template_real_service(self):
         """Test save_template with real service method"""
         print("\n🧪 Testing save_template_real_service...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Create new template data
         new_items = [
@@ -181,13 +186,10 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         
         print("✅ Save template test passed")
     
-    @patch('os.path.dirname')
-    def test_save_template_overwrite(self, mock_dirname):
+    def test_save_template_overwrite(self):
         """Test save_template overwrite functionality"""
         print("\n🧪 Testing save_template_overwrite...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Create updated template items
         updated_items = [
@@ -235,23 +237,22 @@ class TestReviewManagementServiceTemplates(unittest.TestCase):
         
         print("✅ Save template overwrite test passed")
     
-    @patch('os.path.dirname')
-    def test_template_error_handling(self, mock_dirname):
+    def test_template_error_handling(self):
         """Test template error handling scenarios"""
         print("\n🧪 Testing template_error_handling...")
         
         # Test with non-existent directory
-        mock_dirname.return_value = "/non/existent/path"
-        
-        # Methods should handle missing files gracefully
-        templates = self.service.get_available_templates()
-        self.assertEqual(len(templates), 0)
-        
-        missing_template = self.service.load_template("Any Template")
-        self.assertIsNone(missing_template)
+        missing_template_path = Path(self.temp_dir) / "missing" / "service_templates.json"
+        with patch("review_management_service.LEGACY_TEMPLATE_PATH", missing_template_path), \
+             patch("services.template_loader.LEGACY_TEMPLATE_PATH", missing_template_path), \
+             patch("services.template_loader.CANONICAL_TEMPLATE_PATH", self.missing_canonical_path):
+            templates = self.service.get_available_templates()
+            self.assertEqual(len(templates), 1)
+            
+            missing_template = self.service.load_template("Any Template")
+            self.assertIsNone(missing_template)
         
         # Test with corrupted JSON file
-        mock_dirname.return_value = self.temp_dir
         
         # Create corrupted template file
         with open(self.temp_template_file, 'w') as f:
@@ -340,6 +341,17 @@ class TestServiceTemplateIntegration(unittest.TestCase):
         # Save comprehensive template data
         with open(self.temp_template_file, 'w', encoding='utf-8') as f:
             json.dump(self.comprehensive_templates, f, indent=2)
+
+        self.template_path = Path(self.temp_template_file)
+        self.missing_canonical_path = Path(self.temp_dir) / "missing_canonical.json"
+
+        self._patchers = [
+            patch("review_management_service.LEGACY_TEMPLATE_PATH", self.template_path),
+            patch("services.template_loader.LEGACY_TEMPLATE_PATH", self.template_path),
+            patch("services.template_loader.CANONICAL_TEMPLATE_PATH", self.missing_canonical_path),
+        ]
+        for patcher in self._patchers:
+            patcher.start()
         
         # Create mock database
         self.mock_db = Mock()
@@ -354,15 +366,14 @@ class TestServiceTemplateIntegration(unittest.TestCase):
     
     def tearDown(self):
         """Clean up integration test environment"""
+        for patcher in self._patchers:
+            patcher.stop()
         shutil.rmtree(self.temp_dir)
     
-    @patch('os.path.dirname')
-    def test_template_selection_workflow(self, mock_dirname):
+    def test_template_selection_workflow(self):
         """Test complete template selection and application workflow"""
         print("\n🧪 Testing template_selection_workflow...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Step 1: Get available templates
         available_templates = self.service.get_available_templates()
@@ -398,13 +409,10 @@ class TestServiceTemplateIntegration(unittest.TestCase):
         
         print("✅ Template selection workflow test passed")
     
-    @patch('os.path.dirname')
-    def test_template_customization_workflow(self, mock_dirname):
+    def test_template_customization_workflow(self):
         """Test template customization and save-as workflow"""
         print("\n🧪 Testing template_customization_workflow...")
         
-        # Mock the dirname to point to our temp directory
-        mock_dirname.return_value = self.temp_dir
         
         # Step 1: Load existing template
         base_template = self.service.load_template("Education Standard")

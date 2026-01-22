@@ -6,12 +6,16 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
 from review_management_service import ReviewManagementService
 from database import get_db_connection
 from datetime import datetime, timedelta
 
 def test_oneoff_frequency():
     """Test that one-off frequency creates exactly one review cycle"""
+    if os.getenv("PYTEST_REAL_DB") != "1":
+        pytest.skip("Requires a real database connection.")
     print("Testing one-off frequency functionality...")
     
     # Connect to database

@@ -31,11 +31,12 @@ def _read_text(path):
             return ""
 
 
-def pytest_ignore_collect(path, config):
-    if path.ext != ".py" or not path.basename.startswith("test_"):
+def pytest_ignore_collect(collection_path, config):
+    path = Path(str(collection_path))
+    if path.suffix != ".py" or not path.name.startswith("test_"):
         return False
 
-    parts = set(Path(str(path)).parts)
+    parts = set(path.parts)
     if parts & LEGACY_DIRS and os.getenv("PYTEST_INCLUDE_LEGACY") != "1":
         return True
 

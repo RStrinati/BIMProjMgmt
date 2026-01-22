@@ -52,7 +52,7 @@ type OutletContext = {
 export default function ServiceCreateView() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { projectId } = useOutletContext<OutletContext>();
+  const { projectId, project } = useOutletContext<OutletContext>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const mode = searchParams.get('mode') === 'template' ? 'template' : 'blank';
@@ -69,6 +69,9 @@ export default function ServiceCreateView() {
     bill_rule: '',
     notes: '',
     assigned_user_id: '' as number | '',
+    start_date: '',
+    end_date: '',
+    billing_model: 'lump_sum' as 'lump_sum' | 'unit_based',
   });
 
   const [templateId, setTemplateId] = useState('');
@@ -85,6 +88,9 @@ export default function ServiceCreateView() {
     lump_sum_fee: '' as number | '',
     bill_rule: '',
     notes: '',
+    start_date: '',
+    end_date: '',
+    billing_model: 'lump_sum' as 'lump_sum' | 'unit_based',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -138,12 +144,24 @@ export default function ServiceCreateView() {
   }, [mode, templates, templateId]);
 
   useEffect(() => {
+    const defaultStart = project?.start_date || new Date().toISOString().slice(0, 10);
+    setFormData((prev) => ({
+      ...prev,
+      start_date: prev.start_date || defaultStart,
+    }));
+    setTemplateOverrides((prev) => ({
+      ...prev,
+      start_date: prev.start_date || defaultStart,
+    }));
+  }, [project?.start_date]);
+
+  useEffect(() => {
     if (!selectedTemplate) {
       return;
     }
     const defaults = selectedTemplate.defaults || {};
     const pricing = selectedTemplate.pricing || {};
-    setTemplateOverrides({
+    setTemplateOverrides((prev) => ({
       service_code: defaults.service_code || '',
       service_name: defaults.service_name || '',
       phase: defaults.phase || '',
@@ -155,24 +173,30 @@ export default function ServiceCreateView() {
       lump_sum_fee: pricing.lump_sum_fee ?? defaults.lump_sum_fee ?? '',
       bill_rule: defaults.bill_rule || '',
       notes: defaults.notes || '',
-    });
+      start_date: prev.start_date || project?.start_date || new Date().toISOString().slice(0, 10),
+      end_date: prev.end_date || '',
+      billing_model: pricing.model === 'per_unit' ? 'unit_based' : 'lump_sum',
+    }));
     setOptionsEnabled([]);
   }, [selectedTemplate]);
 
   const createMutation = useMutation({
     mutationFn: (data: typeof formData) => {
+      const billingModel = data.billing_model;
       const payload = {
         service_code: data.service_code,
         service_name: data.service_name,
         phase: data.phase || undefined,
-        unit_type: data.unit_type || undefined,
-        unit_qty: data.unit_qty ? Number(data.unit_qty) : undefined,
-        unit_rate: data.unit_rate ? Number(data.unit_rate) : undefined,
-        lump_sum_fee: data.lump_sum_fee ? Number(data.lump_sum_fee) : undefined,
+        unit_type: billingModel === 'unit_based' ? (data.unit_type || undefined) : undefined,
+        unit_qty: billingModel === 'unit_based' && data.unit_qty ? Number(data.unit_qty) : undefined,
+        unit_rate: billingModel === 'unit_based' && data.unit_rate ? Number(data.unit_rate) : undefined,
+        lump_sum_fee: billingModel === 'lump_sum' && data.lump_sum_fee ? Number(data.lump_sum_fee) : undefined,
         agreed_fee: data.agreed_fee ? Number(data.agreed_fee) : undefined,
-        bill_rule: data.bill_rule || undefined,
+        bill_rule: billingModel === 'unit_based' ? (data.bill_rule || undefined) : undefined,
         notes: data.notes || undefined,
         assigned_user_id: data.assigned_user_id === '' ? undefined : data.assigned_user_id,
+        start_date: data.start_date || undefined,
+        end_date: data.end_date || undefined,
       };
       return projectServicesApi.create(projectId, payload);
     },
@@ -192,6 +216,7 @@ export default function ServiceCreateView() {
       if (!templateId) {
         throw new Error('Select a template to continue.');
       }
+      const billingModel = templateOverrides.billing_model;
       return projectServicesApi.createFromTemplate(projectId, {
         template_id: templateId,
         options_enabled: optionsEnabled,
@@ -205,18 +230,19 @@ export default function ServiceCreateView() {
           agreed_fee: templateOverrides.agreed_fee === ''
             ? undefined
             : Number(templateOverrides.agreed_fee),
-          unit_type: templateOverrides.unit_type || undefined,
-          unit_qty: templateOverrides.unit_qty === ''
+          unit_type: billingModel === 'unit_based' ? (templateOverrides.unit_type || undefined) : undefined,
+          unit_qty: billingModel === 'unit_based' && templateOverrides.unit_qty === ''
             ? undefined
             : Number(templateOverrides.unit_qty),
-          unit_rate: templateOverrides.unit_rate === ''
+          unit_rate: billingModel === 'unit_based' && templateOverrides.unit_rate === ''
             ? undefined
             : Number(templateOverrides.unit_rate),
-          lump_sum_fee: templateOverrides.lump_sum_fee === ''
+          lump_sum_fee: billingModel === 'lump_sum' && templateOverrides.lump_sum_fee === ''
             ? undefined
             : Number(templateOverrides.lump_sum_fee),
-          bill_rule: templateOverrides.bill_rule || undefined,
+          bill_rule: billingModel === 'unit_based' ? (templateOverrides.bill_rule || undefined) : undefined,
           notes: templateOverrides.notes || undefined,
+          start_date: templateOverrides.start_date || undefined,
         },
       });
     },
@@ -241,12 +267,36 @@ export default function ServiceCreateView() {
       if (!formData.service_name.trim()) {
         newErrors.service_name = 'Service name is required';
       }
+      if (!formData.start_date) {
+        newErrors.start_date = 'Start date is required';
+      }
+      if (formData.billing_model === 'lump_sum') {
+        if (!String(formData.agreed_fee || '').trim()) {
+          newErrors.agreed_fee = 'Agreed fee is required for lump sum billing';
+        }
+      } else {
+        if (!formData.unit_type.trim() || !String(formData.unit_qty).trim() || !String(formData.unit_rate).trim() || !formData.bill_rule.trim()) {
+          newErrors.billing_model = 'Unit billing requires unit type, qty, rate, and bill rule';
+        }
+      }
     } else {
       if (!templateOverrides.service_code.trim()) {
         newErrors.service_code = 'Service code is required';
       }
       if (!templateOverrides.service_name.trim()) {
         newErrors.service_name = 'Service name is required';
+      }
+      if (!templateOverrides.start_date) {
+        newErrors.start_date = 'Start date is required';
+      }
+      if (templateOverrides.billing_model === 'lump_sum') {
+        if (!String(templateOverrides.agreed_fee || '').trim()) {
+          newErrors.agreed_fee = 'Agreed fee is required for lump sum billing';
+        }
+      } else {
+        if (!templateOverrides.unit_type.trim() || !String(templateOverrides.unit_qty).trim() || !String(templateOverrides.unit_rate).trim() || !templateOverrides.bill_rule.trim()) {
+          newErrors.billing_model = 'Unit billing requires unit type, qty, rate, and bill rule';
+        }
       }
     }
 
@@ -403,6 +453,29 @@ export default function ServiceCreateView() {
                   />
                   <TextField
                     fullWidth
+                    required
+                    type="date"
+                    label="Start Date"
+                    value={templateOverrides.start_date}
+                    onChange={(event) =>
+                      setTemplateOverrides((prev) => ({ ...prev, start_date: event.target.value }))
+                    }
+                    InputLabelProps={{ shrink: true }}
+                    error={!!errors.start_date}
+                    helperText={errors.start_date}
+                  />
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="End Date"
+                    value={templateOverrides.end_date}
+                    onChange={(event) =>
+                      setTemplateOverrides((prev) => ({ ...prev, end_date: event.target.value }))
+                    }
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    fullWidth
                     select
                     label="Phase"
                     value={templateOverrides.phase}
@@ -417,6 +490,23 @@ export default function ServiceCreateView() {
                       </MenuItem>
                     ))}
                   </TextField>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Billing Model"
+                    value={templateOverrides.billing_model}
+                    onChange={(event) =>
+                      setTemplateOverrides((prev) => ({
+                        ...prev,
+                        billing_model: event.target.value as 'lump_sum' | 'unit_based',
+                      }))
+                    }
+                    error={!!errors.billing_model}
+                    helperText={errors.billing_model}
+                  >
+                    <MenuItem value="lump_sum">Lump sum (agreed fee)</MenuItem>
+                    <MenuItem value="unit_based">Unit based</MenuItem>
+                  </TextField>
 
                   <Accordion>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -424,80 +514,86 @@ export default function ServiceCreateView() {
                     </AccordionSummary>
                     <AccordionDetails>
                       <Stack spacing={2}>
-                        <TextField
-                          fullWidth
-                          select
-                          label="Billing Rule Override"
-                          value={templateOverrides.bill_rule}
-                          onChange={(event) =>
-                            setTemplateOverrides((prev) => ({
-                              ...prev,
-                              bill_rule: event.target.value,
-                            }))
-                          }
-                        >
-                          <MenuItem value="">None</MenuItem>
-                          {catalog?.bill_rules?.map((rule) => (
-                            <MenuItem key={rule} value={rule}>
-                              {formatBillRuleLabel(rule)}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                        <TextField
-                          fullWidth
-                          select
-                          label="Unit Type Override"
-                          value={templateOverrides.unit_type}
-                          onChange={(event) =>
-                            setTemplateOverrides((prev) => ({
-                              ...prev,
-                              unit_type: event.target.value,
-                            }))
-                          }
-                        >
-                          <MenuItem value="">Default</MenuItem>
-                          {catalog?.unit_types?.map((unitType) => (
-                            <MenuItem key={unitType} value={unitType}>
-                              {unitType}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="Unit Quantity Override"
-                          value={templateOverrides.unit_qty}
-                          onChange={(event) =>
-                            setTemplateOverrides((prev) => ({
-                              ...prev,
-                              unit_qty: event.target.value === '' ? '' : Number(event.target.value),
-                            }))
-                          }
-                        />
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="Unit Rate Override"
-                          value={templateOverrides.unit_rate}
-                          onChange={(event) =>
-                            setTemplateOverrides((prev) => ({
-                              ...prev,
-                              unit_rate: event.target.value === '' ? '' : Number(event.target.value),
-                            }))
-                          }
-                        />
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="Lump Sum Fee Override"
-                          value={templateOverrides.lump_sum_fee}
-                          onChange={(event) =>
-                            setTemplateOverrides((prev) => ({
-                              ...prev,
-                              lump_sum_fee: event.target.value === '' ? '' : Number(event.target.value),
-                            }))
-                          }
-                        />
+                        {templateOverrides.billing_model === 'unit_based' && (
+                          <>
+                            <TextField
+                              fullWidth
+                              select
+                              label="Billing Rule Override"
+                              value={templateOverrides.bill_rule}
+                              onChange={(event) =>
+                                setTemplateOverrides((prev) => ({
+                                  ...prev,
+                                  bill_rule: event.target.value,
+                                }))
+                              }
+                            >
+                              <MenuItem value="">None</MenuItem>
+                              {catalog?.bill_rules?.map((rule) => (
+                                <MenuItem key={rule} value={rule}>
+                                  {formatBillRuleLabel(rule)}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                            <TextField
+                              fullWidth
+                              select
+                              label="Unit Type Override"
+                              value={templateOverrides.unit_type}
+                              onChange={(event) =>
+                                setTemplateOverrides((prev) => ({
+                                  ...prev,
+                                  unit_type: event.target.value,
+                                }))
+                              }
+                            >
+                              <MenuItem value="">Default</MenuItem>
+                              {catalog?.unit_types?.map((unitType) => (
+                                <MenuItem key={unitType} value={unitType}>
+                                  {unitType}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="Unit Quantity Override"
+                              value={templateOverrides.unit_qty}
+                              onChange={(event) =>
+                                setTemplateOverrides((prev) => ({
+                                  ...prev,
+                                  unit_qty: event.target.value === '' ? '' : Number(event.target.value),
+                                }))
+                              }
+                            />
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="Unit Rate Override"
+                              value={templateOverrides.unit_rate}
+                              onChange={(event) =>
+                                setTemplateOverrides((prev) => ({
+                                  ...prev,
+                                  unit_rate: event.target.value === '' ? '' : Number(event.target.value),
+                                }))
+                              }
+                            />
+                          </>
+                        )}
+                        {templateOverrides.billing_model === 'lump_sum' && (
+                          <TextField
+                            fullWidth
+                            type="number"
+                            label="Lump Sum Fee Override"
+                            value={templateOverrides.lump_sum_fee}
+                            onChange={(event) =>
+                              setTemplateOverrides((prev) => ({
+                                ...prev,
+                                lump_sum_fee: event.target.value === '' ? '' : Number(event.target.value),
+                              }))
+                            }
+                          />
+                        )}
                         <FormControl fullWidth>
                           <InputLabel id="service-template-assignee-label">Assigned User</InputLabel>
                           <Select
@@ -530,6 +626,8 @@ export default function ServiceCreateView() {
                               agreed_fee: event.target.value === '' ? '' : Number(event.target.value),
                             }))
                           }
+                          error={!!errors.agreed_fee}
+                          helperText={errors.agreed_fee}
                         />
                         <TextField
                           fullWidth
@@ -574,6 +672,25 @@ export default function ServiceCreateView() {
               />
               <TextField
                 fullWidth
+                required
+                type="date"
+                label="Start Date"
+                value={formData.start_date}
+                onChange={handleChange('start_date')}
+                InputLabelProps={{ shrink: true }}
+                error={!!errors.start_date}
+                helperText={errors.start_date}
+              />
+              <TextField
+                fullWidth
+                type="date"
+                label="End Date"
+                value={formData.end_date}
+                onChange={handleChange('end_date')}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                fullWidth
                 label="Phase"
                 value={formData.phase}
                 onChange={handleChange('phase')}
@@ -602,50 +719,70 @@ export default function ServiceCreateView() {
               <TextField
                 fullWidth
                 select
-                label="Billing Rule"
-                value={formData.bill_rule}
-                onChange={handleChange('bill_rule')}
+                label="Billing Model"
+                value={formData.billing_model}
+                onChange={handleChange('billing_model')}
+                error={!!errors.billing_model}
+                helperText={errors.billing_model}
               >
-                <MenuItem value="">None</MenuItem>
-                {catalog?.bill_rules?.map((rule) => (
-                  <MenuItem key={rule} value={rule}>
-                    {formatBillRuleLabel(rule)}
-                  </MenuItem>
-                ))}
+                <MenuItem value="lump_sum">Lump sum (agreed fee)</MenuItem>
+                <MenuItem value="unit_based">Unit based</MenuItem>
               </TextField>
-              <TextField
-                fullWidth
-                label="Unit Type"
-                value={formData.unit_type}
-                onChange={handleChange('unit_type')}
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Unit Quantity"
-                value={formData.unit_qty}
-                onChange={handleChange('unit_qty')}
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Unit Rate"
-                value={formData.unit_rate}
-                onChange={handleChange('unit_rate')}
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Lump Sum Fee"
-                value={formData.lump_sum_fee}
-                onChange={handleChange('lump_sum_fee')}
-              />
+              {formData.billing_model === 'unit_based' && (
+                <>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Billing Rule"
+                    value={formData.bill_rule}
+                    onChange={handleChange('bill_rule')}
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {catalog?.bill_rules?.map((rule) => (
+                      <MenuItem key={rule} value={rule}>
+                        {formatBillRuleLabel(rule)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    fullWidth
+                    label="Unit Type"
+                    value={formData.unit_type}
+                    onChange={handleChange('unit_type')}
+                  />
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Unit Quantity"
+                    value={formData.unit_qty}
+                    onChange={handleChange('unit_qty')}
+                  />
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Unit Rate"
+                    value={formData.unit_rate}
+                    onChange={handleChange('unit_rate')}
+                  />
+                </>
+              )}
+              {formData.billing_model === 'lump_sum' && (
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Lump Sum Fee"
+                  value={formData.lump_sum_fee}
+                  onChange={handleChange('lump_sum_fee')}
+                />
+              )}
               <TextField
                 fullWidth
                 type="number"
                 label="Agreed Fee"
                 value={formData.agreed_fee}
                 onChange={handleChange('agreed_fee')}
+                error={!!errors.agreed_fee}
+                helperText={errors.agreed_fee}
               />
               <TextField
                 fullWidth

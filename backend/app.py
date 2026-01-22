@@ -71,10 +71,13 @@ from database import (  # noqa: E402
     get_project_details,
     get_project_folders,
     get_project_health_files,
+    get_project_start_date,
     get_project_update_by_id,
     get_project_updates,
     get_projects_full,
+    get_projects_summary,
     get_projects_with_health,
+    get_projects_aggregates,
     get_warehouse_dashboard_metrics,
     get_warehouse_issues_history,
     get_dashboard_issues_kpis,
@@ -100,10 +103,13 @@ from database import (  # noqa: E402
     get_project_reviews,
     get_invoice_pipeline_by_project_month,
     get_project_finance_rollup,
+    get_project_finance_summary,
     get_service_review_billing,
     get_service_templates,
     get_update_comments,
     get_users_list,
+    assert_service_in_project,
+    ServiceScopeError,
     get_control_points_dashboard,
     get_coordinate_alignment_dashboard,
     get_model_register,
@@ -132,6 +138,7 @@ from database import (  # noqa: E402
     update_review_task_assignee,
     update_service_review,
     update_service_template,
+    resequence_service_reviews,
     list_invoice_batches,
     create_invoice_batch,
     update_invoice_batch,
@@ -139,6 +146,7 @@ from database import (  # noqa: E402
     upsert_bep_section,
     update_bep_status,
     update_project_details,
+    update_project_record,
     update_project_folders,
     update_client,
     get_all_users,
@@ -186,6 +194,7 @@ from backend.anchor_links import (  # noqa: E402
     delete_issue_anchor_link,
     get_issue_linked_anchors,
 )
+from services.template_loader import LEGACY_TEMPLATE_PATH  # noqa: E402
 
 
 # --- Revizto utility helpers ---
@@ -397,7 +406,7 @@ class CustomJSONProvider(DefaultJSONProvider):
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "service_templates.json"
+TEMPLATE_FILE_PATH = Path(LEGACY_TEMPLATE_PATH)
 BID_SCOPE_TEMPLATE_FILE_PATH = Path(__file__).resolve().parent.parent / "templates" / "bid_scope_templates.json"
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -1765,20 +1774,45 @@ def api_create_project_service(project_id):
     required = ['service_code', 'service_name']
     if not all(body.get(k) for k in required):
         return jsonify({'error': 'Missing required fields'}), 400
-    
+
+    agreed_fee = body.get('agreed_fee')
+    unit_type = body.get('unit_type')
+    unit_rate = body.get('unit_rate')
+    unit_qty = body.get('unit_qty')
+    bill_rule = body.get('bill_rule')
+    if agreed_fee in (None, '') and not (unit_type and unit_rate not in (None, '') and unit_qty not in (None, '') and bill_rule):
+        return jsonify({'error': 'Billing model requires agreed_fee or unit_type/unit_rate/unit_qty/bill_rule'}), 400
+
+    start_date = body.get('start_date')
+    if not start_date:
+        project_start = get_project_start_date(project_id)
+        if isinstance(project_start, (datetime, date)):
+            start_date = project_start.strftime('%Y-%m-%d')
+        elif project_start:
+            start_date = project_start
+        else:
+            start_date = date.today().isoformat()
+
+    review_anchor_date = body.get('review_anchor_date') or start_date
+
     service_id = create_project_service(
         project_id,
         body['service_code'],
         body['service_name'],
         phase=body.get('phase'),
-        unit_type=body.get('unit_type'),
-        unit_qty=body.get('unit_qty'),
-        unit_rate=body.get('unit_rate'),
+        unit_type=unit_type,
+        unit_qty=unit_qty,
+        unit_rate=unit_rate,
         lump_sum_fee=body.get('lump_sum_fee'),
-        agreed_fee=body.get('agreed_fee'),
-        bill_rule=body.get('bill_rule'),
+        agreed_fee=agreed_fee,
+        bill_rule=bill_rule,
         notes=body.get('notes'),
-        assigned_user_id=body.get('assigned_user_id')
+        assigned_user_id=body.get('assigned_user_id'),
+        start_date=start_date,
+        end_date=body.get('end_date'),
+        review_anchor_date=review_anchor_date,
+        review_interval_days=body.get('review_interval_days'),
+        review_count_planned=body.get('review_count_planned'),
     )
     if service_id:
         return jsonify({'service_id': service_id}), 201
@@ -1799,11 +1833,16 @@ def api_update_project_service(project_id, service_id):
         'lumpSumFee': 'lump_sum_fee',
         'agreedFee': 'agreed_fee',
         'billRule': 'bill_rule',
-        'progressPct': 'progress_pct',
-        'claimedToDate': 'claimed_to_date',
+        'startDate': 'start_date',
+        'endDate': 'end_date',
+        'phase': 'phase',
+        'status': 'status',
+        'notes': 'notes',
     }
     mapped_body = {}
     for frontend_key, value in body.items():
+        if frontend_key not in field_map and frontend_key not in field_map.values():
+            continue
         db_key = field_map.get(frontend_key, frontend_key)
         mapped_body[db_key] = value
     
@@ -1870,6 +1909,15 @@ def api_get_project_reviews(project_id):
 
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews', methods=['GET'])
 def api_get_service_reviews(project_id, service_id):
+    try:
+        assert_service_in_project(project_id, service_id)
+    except ServiceScopeError:
+        logging.warning(
+            "service reviews scope reject project_id=%s service_id=%s",
+            project_id,
+            service_id,
+        )
+        return jsonify({'error': 'Service not found'}), 404
     reviews = get_service_reviews(service_id)
     return jsonify(reviews)
 
@@ -1895,6 +1943,19 @@ def api_create_service_review(project_id, service_id):
     required = ['cycle_no', 'planned_date']
     if not all(body.get(k) for k in required):
         return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        assert_service_in_project(project_id, service_id)
+    except ServiceScopeError:
+        logging.warning(
+            "service review create scope reject project_id=%s service_id=%s",
+            project_id,
+            service_id,
+        )
+        return jsonify({'error': 'Service not found'}), 404
+
+    if 'invoiceDate' in body and 'invoice_date' not in body:
+        body['invoice_date'] = body['invoiceDate']
     
     review_id = create_service_review(
         service_id,
@@ -1907,6 +1968,7 @@ def api_create_service_review(project_id, service_id):
         weight_factor=body.get('weight_factor', 1.0),
         evidence_links=body.get('evidence_links'),
         invoice_reference=body.get('invoice_reference'),
+        invoice_date=body.get('invoice_date'),
         source_phase=body.get('source_phase'),
         billing_phase=body.get('billing_phase'),
         billing_rate=body.get('billing_rate'),
@@ -1915,6 +1977,7 @@ def api_create_service_review(project_id, service_id):
         origin=body.get('origin'),
         is_template_managed=body.get('is_template_managed'),
         sort_order=body.get('sort_order'),
+        project_id=project_id,
     )
     if review_id:
         return jsonify({'review_id': review_id}), 201
@@ -2014,6 +2077,48 @@ def api_delete_service_review(project_id, service_id, review_id):
     if success:
         return jsonify({'success': True})
     return jsonify({'error': 'Failed to delete review'}), 500
+
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/resequence', methods=['POST'])
+def api_resequence_service_reviews(project_id, service_id):
+    body = request.get_json() or {}
+    if 'invoiceDate' in body and 'invoice_date' not in body:
+        body['invoice_date'] = body['invoiceDate']
+    mode = body.get('mode') or 'update_existing_planned'
+    if mode != 'update_existing_planned':
+        return jsonify({'error': 'Unsupported resequence mode'}), 400
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectServices.SERVICE_ID}
+                FROM {S.ProjectServices.TABLE}
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
+                  AND {S.ProjectServices.PROJECT_ID} = ?
+                """,
+                (service_id, project_id),
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'Service not found in this project'}), 404
+    except Exception as e:
+        logging.error(f"Error validating service scope for resequence: {e}")
+        return jsonify({'error': 'Validation error'}), 500
+
+    try:
+        result = resequence_service_reviews(
+            service_id=service_id,
+            anchor_date=body.get('anchor_date'),
+            interval_days=body.get('interval_days'),
+            count=body.get('count'),
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as e:
+        logging.exception("Failed to resequence service reviews")
+        return jsonify({'error': str(e)}), 500
 
 
 # --- Invoice Batches API ---
@@ -2199,6 +2304,64 @@ def api_projects_overview():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/projects/summary', methods=['GET'])
+def api_projects_summary():
+    """Return ProjectSummary rows for Projects V2 list/board."""
+    try:
+        view_id = request.args.get('viewId') or request.args.get('view_id')
+        search = request.args.get('searchTerm') or request.args.get('search')
+        current_user_id = request.args.get('current_user_id', type=int)
+        client_ids = _parse_id_list("client_ids")
+        type_ids = _parse_id_list("type_ids")
+        manager = request.args.get('manager')
+
+        projects = get_projects_summary(
+            view_id=view_id,
+            search=search,
+            current_user_id=current_user_id,
+            client_ids=client_ids or None,
+            type_ids=type_ids or None,
+            manager=manager,
+        )
+        return jsonify(projects)
+    except Exception as e:
+        logging.exception("Failed to get projects summary")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/aggregates', methods=['GET'])
+def api_projects_aggregates():
+    """Return aggregate totals for Projects V2 list view."""
+    try:
+        view_id = request.args.get('viewId') or request.args.get('view_id')
+        search = request.args.get('searchTerm') or request.args.get('search')
+        current_user_id = request.args.get('current_user_id', type=int)
+        client_ids = _parse_id_list("client_ids")
+        type_ids = _parse_id_list("type_ids")
+        manager = request.args.get('manager')
+
+        aggregates = get_projects_aggregates(
+            view_id=view_id,
+            search=search,
+            current_user_id=current_user_id,
+            client_ids=client_ids or None,
+            type_ids=type_ids or None,
+            manager=manager,
+        ) or {
+            "project_count": 0,
+            "sum_agreed_fee": 0.0,
+            "sum_billed_to_date": 0.0,
+            "sum_unbilled_amount": 0.0,
+            "sum_earned_value": 0.0,
+            "weighted_earned_value_pct": 0.0,
+        }
+
+        return jsonify(aggregates)
+    except Exception as e:
+        logging.exception("Failed to get projects aggregates")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/projects/finance_grid', methods=['GET'])
 def api_projects_finance_grid():
     project_id = request.args.get('project_id', type=int)
@@ -2259,6 +2422,14 @@ def api_projects_finance_grid():
         },
     }
     return jsonify(response)
+
+
+@app.route('/api/projects/<int:project_id>/finance-summary', methods=['GET'])
+def api_project_finance_summary(project_id):
+    summary = get_project_finance_summary(project_id)
+    if summary is None:
+        return jsonify({'error': 'Project finance summary not found'}), 404
+    return jsonify(summary)
 
 
 @app.route('/api/users', methods=['GET'])
@@ -3669,16 +3840,18 @@ def api_update_bep_status_endpoint():
 def api_update_project(project_id):
     """Update project details - enhanced for React frontend"""
     body = request.get_json() or {}
-    
-    # Update project details
-    success = update_project_details(
-        project_id,
-        body.get('start_date'),
-        body.get('end_date'),
-        body.get('status'),
-        body.get('priority'),
-    )
-    
+    success = True
+
+    update_details = any(key in body for key in ['start_date', 'end_date', 'status', 'priority'])
+    if update_details:
+        success = update_project_details(
+            project_id,
+            body.get('start_date'),
+            body.get('end_date'),
+            body.get('status'),
+            body.get('priority'),
+        )
+
     # Update folder paths if provided
     if any(key in body for key in ['folder_path', 'ifc_folder_path', 'data_export_path']):
         update_project_folders(
@@ -3687,6 +3860,21 @@ def api_update_project(project_id):
             body.get('data_export_path'),
             body.get('ifc_folder_path'),
         )
+        success = bool(success)
+
+    update_payload = {}
+    if 'internal_lead' in body:
+        update_payload[S.Projects.INTERNAL_LEAD] = body.get('internal_lead')
+    if 'project_manager' in body:
+        update_payload[S.Projects.PROJECT_MANAGER] = body.get('project_manager')
+    if 'project_name' in body:
+        update_payload[S.Projects.NAME] = body.get('project_name')
+    if 'project_number' in body or 'contract_number' in body:
+        update_payload[S.Projects.CONTRACT_NUMBER] = body.get('project_number') or body.get('contract_number')
+
+    if update_payload:
+        update_payload[S.Projects.UPDATED_AT] = datetime.utcnow()
+        success = update_project_record(project_id, update_payload) and success
     
     if success:
         invalidate_projects_cache()
@@ -6517,6 +6705,19 @@ def api_get_project_items(project_id):
 def api_get_service_items(project_id, service_id):
     """Get service items for a specific service."""
     try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectServices.SERVICE_ID}
+                FROM {S.ProjectServices.TABLE}
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
+                  AND {S.ProjectServices.PROJECT_ID} = ?
+                """,
+                (service_id, project_id),
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'Service not found in this project'}), 404
         from database import get_service_items
         item_type = request.args.get('type')
         items = get_service_items(service_id, item_type)
@@ -6532,19 +6733,46 @@ def api_create_service_item(project_id, service_id):
     try:
         from database import create_service_item
         data = request.get_json() or {}
+
+        if 'invoiceDate' in data and 'invoice_date' not in data:
+            data['invoice_date'] = data['invoiceDate']
         
         required = ['item_type', 'title']
         if not all(k in data for k in required):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        planned_date = data.get('planned_date') or date.today().isoformat()
+        planned_date = data.get('planned_date')
+        service_start_date = None
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectServices.PROJECT_ID}, {S.ProjectServices.START_DATE}
+                FROM {S.ProjectServices.TABLE}
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
+                """,
+                (service_id,),
+            )
+            row = cursor.fetchone()
+            if not row or row[0] != project_id:
+                return jsonify({'error': 'Service not found in this project'}), 404
+            service_start_date = row[1]
+
+        if not planned_date:
+            if service_start_date:
+                planned_date = service_start_date.strftime('%Y-%m-%d') if isinstance(service_start_date, (datetime, date)) else service_start_date
+            else:
+                return jsonify({'error': 'planned_date is required when service has no start_date'}), 400
+
+        if data.get('origin') != 'template_generated':
+            data.pop('template_node_key', None)
 
         item_id = create_service_item(
             service_id=service_id,
             item_type=data['item_type'],
             title=data['title'],
             planned_date=planned_date,
-            project_id=data.get('project_id'),
+            project_id=project_id,
             description=data.get('description'),
             due_date=data.get('due_date'),
             actual_date=data.get('actual_date'),
@@ -6552,12 +6780,14 @@ def api_create_service_item(project_id, service_id):
             priority=data.get('priority', 'medium'),
             assigned_to=data.get('assigned_to'),
             invoice_reference=data.get('invoice_reference'),
+            invoice_date=data.get('invoice_date'),
             evidence_links=data.get('evidence_links'),
             notes=data.get('notes'),
             is_billed=data.get('is_billed'),
             generated_from_template_id=data.get('generated_from_template_id'),
             generated_from_template_version=data.get('generated_from_template_version'),
             generated_key=data.get('generated_key'),
+            template_node_key=data.get('template_node_key'),
             origin=data.get('origin'),
             is_template_managed=data.get('is_template_managed'),
             sort_order=data.get('sort_order'),
@@ -6579,8 +6809,36 @@ def api_update_service_item(project_id, service_id, item_id):
     try:
         from database import update_service_item
         data = request.get_json() or {}
-        
-        success = update_service_item(item_id, **data)
+        if 'invoiceDate' in data and 'invoice_date' not in data:
+            data['invoice_date'] = data['invoiceDate']
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT si.{S.ServiceItems.ITEM_ID}
+                FROM {S.ServiceItems.TABLE} si
+                JOIN {S.ProjectServices.TABLE} ps
+                  ON si.{S.ServiceItems.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE si.{S.ServiceItems.ITEM_ID} = ?
+                  AND si.{S.ServiceItems.SERVICE_ID} = ?
+                  AND ps.{S.ProjectServices.PROJECT_ID} = ?
+                """,
+                (item_id, service_id, project_id),
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'Service item not found in this project'}), 404
+
+        allowed_fields = {
+            'item_type', 'title', 'description', 'planned_date', 'due_date',
+            'actual_date', 'status', 'priority', 'assigned_to', 'invoice_reference',
+            'invoice_date',
+            'evidence_links', 'notes', 'is_billed', 'sort_order',
+        }
+        filtered = {k: v for k, v in data.items() if k in allowed_fields}
+        if not filtered:
+            return jsonify({'error': 'No valid fields to update'}), 400
+
+        success = update_service_item(item_id, **filtered)
         
         if success:
             return jsonify({'message': 'Service item updated successfully'})
@@ -6597,7 +6855,23 @@ def api_delete_service_item(project_id, service_id, item_id):
     """Delete a service item."""
     try:
         from database import delete_service_item
-        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT si.{S.ServiceItems.ITEM_ID}
+                FROM {S.ServiceItems.TABLE} si
+                JOIN {S.ProjectServices.TABLE} ps
+                  ON si.{S.ServiceItems.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE si.{S.ServiceItems.ITEM_ID} = ?
+                  AND si.{S.ServiceItems.SERVICE_ID} = ?
+                  AND ps.{S.ProjectServices.PROJECT_ID} = ?
+                """,
+                (item_id, service_id, project_id),
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'Service item not found'}), 404
+
         success = delete_service_item(item_id)
         
         if success:

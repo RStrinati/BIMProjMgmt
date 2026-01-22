@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Project, ProjectFilters, DashboardTimelineResponse, ProjectFinanceGrid } from '@/types/api';
+import type { Project, ProjectFilters, DashboardTimelineResponse, ProjectFinanceGrid, ProjectFinanceSummary, ProjectSummary, ProjectAggregates } from '@/types/api';
 
 export const projectsApi = {
   // Get all projects
@@ -11,6 +11,38 @@ export const projectsApi = {
   // Get all projects with health metrics
   getAllWithHealth: async (): Promise<Project[]> => {
     const response = await apiClient.get<Project[]>('/projects/overview');
+    return response.data;
+  },
+
+  // Get projects summary for V2 list/board
+  getSummary: async (params?: {
+    viewId?: string;
+    searchTerm?: string;
+    currentUserId?: number | null;
+  }): Promise<ProjectSummary[]> => {
+    const response = await apiClient.get<ProjectSummary[]>('/projects/summary', {
+      params: {
+        viewId: params?.viewId,
+        searchTerm: params?.searchTerm,
+        current_user_id: params?.currentUserId ?? undefined,
+      },
+    });
+    return response.data;
+  },
+
+  // Get aggregates for V2 list footer
+  getAggregates: async (params?: {
+    viewId?: string;
+    searchTerm?: string;
+    currentUserId?: number | null;
+  }): Promise<ProjectAggregates> => {
+    const response = await apiClient.get<ProjectAggregates>('/projects/aggregates', {
+      params: {
+        viewId: params?.viewId,
+        searchTerm: params?.searchTerm,
+        current_user_id: params?.currentUserId ?? undefined,
+      },
+    });
     return response.data;
   },
 
@@ -29,6 +61,12 @@ export const projectsApi = {
   // Update project
   update: async (id: number, project: Partial<Project>): Promise<Project> => {
     const response = await apiClient.put<Project>(`/projects/${id}`, project);
+    return response.data;
+  },
+
+  // Patch project (partial update)
+  patch: async (id: number, patch: Partial<Project>): Promise<{ success: boolean }> => {
+    const response = await apiClient.patch<{ success: boolean }>(`/projects/${id}`, patch);
     return response.data;
   },
 
@@ -91,6 +129,11 @@ export const projectsApi = {
     const response = await apiClient.get<ProjectFinanceGrid>('/projects/finance_grid', {
       params: { project_id: projectId },
     });
+    return response.data;
+  },
+
+  getFinanceSummary: async (projectId: number): Promise<ProjectFinanceSummary> => {
+    const response = await apiClient.get<ProjectFinanceSummary>(`/projects/${projectId}/finance-summary`);
     return response.data;
   },
 };

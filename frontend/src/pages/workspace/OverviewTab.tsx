@@ -52,6 +52,7 @@ export default function OverviewTab() {
   const [taskDraft, setTaskDraft] = useState('');
   const [taskError, setTaskError] = useState<string | null>(null);
   const [updateDraft, setUpdateDraft] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const { data: recentTasksResult, isLoading: isRecentTasksLoading } = useQuery({
     queryKey: ['projectTasksPreview', projectId],
@@ -114,9 +115,13 @@ export default function OverviewTab() {
     mutationFn: (body: string) => updatesApi.createProjectUpdate(projectId, body),
     onSuccess: () => {
       setUpdateDraft('');
+      setUpdateError(null);
       if (Number.isFinite(projectId)) {
         queryClient.invalidateQueries({ queryKey: ['projectUpdatesLatest', projectId] });
       }
+    },
+    onError: (err: any) => {
+      setUpdateError(err?.response?.data?.error || 'Failed to post update.');
     },
   });
 
@@ -133,7 +138,7 @@ export default function OverviewTab() {
   };
 
   const handlePostUpdate = () => {
-    if (!updateDraft.trim()) return;
+    if (!updateDraft.trim() || createUpdate.isPending) return;
     createUpdate.mutate(updateDraft.trim());
   };
 
@@ -184,6 +189,7 @@ export default function OverviewTab() {
             Post an update
           </Typography>
           <Stack spacing={1}>
+            {updateError && <Alert severity="error">{updateError}</Alert>}
             <TextField
               multiline
               rows={3}
@@ -197,10 +203,10 @@ export default function OverviewTab() {
               <Button 
                 variant="contained" 
                 onClick={handlePostUpdate}
-                disabled={!updateDraft.trim()}
+                disabled={!updateDraft.trim() || createUpdate.isPending}
                 data-testid="workspace-post-update-button"
               >
-                Post update
+                {createUpdate.isPending ? 'Posting...' : 'Post update'}
               </Button>
               <Button 
                 variant="text" 

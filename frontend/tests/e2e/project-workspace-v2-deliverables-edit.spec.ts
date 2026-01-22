@@ -31,7 +31,7 @@ const projectReviewsPayload = {
 };
 
 const setupMocks = async (page: any) => {
-  await page.route('**/api/project/1', async (route) => {
+  await page.route('**/api/projects/1', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

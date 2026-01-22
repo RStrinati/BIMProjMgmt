@@ -1,0 +1,250 @@
+{
+  "Badge": {
+    "component_path": "frontend/src/components/ui/badge.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/dashboards/RealTimeMonitoringDashboard.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "BlockerBadge": {
+    "component_path": "frontend/src/components/ui/BlockerBadge.tsx",
+    "used_in": [
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "Button": {
+    "component_path": "frontend/src/components/ui/button.tsx",
+    "used_in": [
+      "frontend/src/components/ProjectFormDialog.tsx",
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/components/ProjectServicesTab_Linear.tsx",
+      "frontend/src/pages/BidDetailPage.tsx",
+      "frontend/src/pages/BidsListPage.tsx"
+    ],
+    "used_in_count": 50
+  },
+  "Card": {
+    "component_path": "frontend/src/components/ui/card.tsx",
+    "used_in": [
+      "frontend/src/components/DashboardTimelineChart.tsx",
+      "frontend/src/pages/AnalyticsPage.tsx",
+      "frontend/src/pages/DashboardPage.tsx",
+      "frontend/src/pages/ProjectDetailPage.tsx",
+      "frontend/src/pages/ProjectsHomePageV2.tsx"
+    ],
+    "used_in_count": 13
+  },
+  "DetailsPanel": {
+    "component_path": "frontend/src/components/ui/DetailsPanel.tsx",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "Dialog": {
+    "component_path": "frontend/src/components/ui/dialog.tsx",
+    "used_in": [
+      "frontend/src/components/ProjectFormDialog.tsx",
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/components/ProjectServicesTab_Linear.tsx",
+      "frontend/src/pages/BidDetailPage.tsx",
+      "frontend/src/pages/BidsListPage.tsx"
+    ],
+    "used_in_count": 25
+  },
+  "DropdownMenu": {
+    "component_path": "frontend/src/components/ui/dropdown-menu.tsx",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "EditableCell": {
+    "component_path": "frontend/src/components/projects/EditableCells.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "InlineField": {
+    "component_path": "frontend/src/components/ui/InlineField.tsx",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/projects/ProjectLeadInline.tsx",
+      "frontend/src/components/projects/ProjectStatusInline.tsx"
+    ],
+    "used_in_count": 13
+  },
+  "Input": {
+    "component_path": "frontend/src/components/ui/input.tsx",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "IssuesTabContent": {
+    "component_path": "frontend/src/components/ProjectManagement/IssuesTabContent.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/workspace/IssuesTab.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "LinearListCell": {
+    "component_path": "frontend/src/components/ui/LinearList/LinearListCell.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/ProjectManagement/ProjectQualityRegisterTab.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx",
+      "frontend/src/pages/workspace/ServicesTab.tsx",
+      "frontend/src/components/ui/LinearList/index.ts"
+    ],
+    "used_in_count": 5
+  },
+  "LinearListContainer": {
+    "component_path": "frontend/src/components/ui/LinearList/LinearListContainer.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/ProjectManagement/ProjectQualityRegisterTab.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx",
+      "frontend/src/pages/workspace/ServicesTab.tsx",
+      "frontend/src/components/ui/LinearList/index.ts"
+    ],
+    "used_in_count": 5
+  },
+  "LinearListHeaderRow": {
+    "component_path": "frontend/src/components/ui/LinearList/LinearListHeaderRow.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/ProjectManagement/ProjectQualityRegisterTab.tsx",
+      "frontend/src/components/ui/LinearList/LinearListContainer.tsx",
+      "frontend/src/components/ui/LinearList/LinearListRow.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx"
+    ],
+    "used_in_count": 7
+  },
+  "LinearListRow": {
+    "component_path": "frontend/src/components/ui/LinearList/LinearListRow.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/components/ProjectManagement/ProjectQualityRegisterTab.tsx",
+      "frontend/src/components/ui/LinearList/LinearListContainer.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx",
+      "frontend/src/pages/workspace/ServicesTab.tsx"
+    ],
+    "used_in_count": 6
+  },
+  "LinkedIssuesList": {
+    "component_path": "frontend/src/components/ui/LinkedIssuesList.tsx",
+    "used_in": [
+      "frontend/src/components/ProjectServicesTab.tsx",
+      "frontend/src/components/ProjectServicesTab_Linear.tsx",
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx"
+    ],
+    "used_in_count": 3
+  },
+  "ListView": {
+    "component_path": "frontend/src/components/ui/ListView.tsx",
+    "used_in": [
+      "frontend/src/pages/BidsPanelPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx",
+      "frontend/src/features/projects/services/ProjectServiceReviewsPanel.tsx",
+      "frontend/src/features/projects/services/ProjectServicesList.tsx"
+    ],
+    "used_in_count": 4
+  },
+  "ProjectFormDialog": {
+    "component_path": "frontend/src/components/ProjectFormDialog.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectsHomePageV2.tsx",
+      "frontend/src/pages/ProjectsPage.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "ProjectLeadInline": {
+    "component_path": "frontend/src/components/projects/ProjectLeadInline.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ProjectStatusInline": {
+    "component_path": "frontend/src/components/projects/ProjectStatusInline.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ReviewStatusInline": {
+    "component_path": "frontend/src/components/projects/ReviewStatusInline.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/features/projects/services/ProjectServiceReviewsPanel.tsx"
+    ],
+    "used_in_count": 2
+  },
+  "RightPanel": {
+    "component_path": "frontend/src/components/workspace/RightPanel.tsx",
+    "used_in": [
+      "frontend/src/pages/WorkspaceShell.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "ServiceDetailDrawer": {
+    "component_path": "frontend/src/components/ProjectServices/ServiceDetailDrawer.tsx",
+    "used_in": [
+      "frontend/src/components/ProjectServicesTab_Linear.tsx",
+      "frontend/src/components/ProjectServices/index.ts"
+    ],
+    "used_in_count": 2
+  },
+  "ServiceStatusInline": {
+    "component_path": "frontend/src/components/projects/ServiceStatusInline.tsx",
+    "used_in": [
+      "frontend/src/features/projects/services/ProjectServiceDetails.tsx"
+    ],
+    "used_in_count": 1
+  },
+  "Sheet": {
+    "component_path": "frontend/src/components/ui/sheet.tsx",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "Tabs": {
+    "component_path": "frontend/src/components/ui/tabs.tsx",
+    "used_in": [
+      "frontend/src/pages/BidDetailPage.tsx",
+      "frontend/src/pages/DashboardPage.tsx",
+      "frontend/src/pages/DataImportsPage.tsx",
+      "frontend/src/pages/ProjectDetailPage.tsx",
+      "frontend/src/pages/ProjectsPanelPage.tsx"
+    ],
+    "used_in_count": 14
+  },
+  "TasksNotesView": {
+    "component_path": "frontend/src/components/ProjectManagement/TasksNotesView.jsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/TasksNotesPage.tsx",
+      "frontend/src/pages/workspace/TasksTab.tsx",
+      "frontend/src/types/tasks-notes-view.d.ts"
+    ],
+    "used_in_count": 4
+  },
+  "Textarea": {
+    "component_path": "frontend/src/components/ui/textarea.tsx",
+    "used_in": [],
+    "used_in_count": 0
+  },
+  "ToggleCell": {
+    "component_path": "frontend/src/components/projects/EditableCells.tsx",
+    "used_in": [
+      "frontend/src/pages/ProjectWorkspacePageV2.tsx",
+      "frontend/src/pages/workspace/DeliverablesTab.tsx"
+    ],
+    "used_in_count": 2
+  }
+}

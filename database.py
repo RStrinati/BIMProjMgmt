@@ -83,6 +83,32 @@ def delete_service_template(template_id):
 
 # --- Project Services Functions ---
 
+class ServiceScopeError(ValueError):
+    """Raised when a service does not belong to the specified project."""
+
+
+def _service_in_project(cursor, project_id, service_id) -> bool:
+    cursor.execute(
+        f"""
+        SELECT 1
+        FROM {S.ProjectServices.TABLE}
+        WHERE {S.ProjectServices.SERVICE_ID} = ?
+          AND {S.ProjectServices.PROJECT_ID} = ?
+        """,
+        (service_id, project_id),
+    )
+    return cursor.fetchone() is not None
+
+
+def assert_service_in_project(project_id, service_id) -> None:
+    """Ensure a service belongs to a project or raise ServiceScopeError."""
+    if project_id is None or service_id is None:
+        raise ServiceScopeError("Project/service scope is required.")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if not _service_in_project(cursor, project_id, service_id):
+            raise ServiceScopeError("Service not found for project.")
+
 def get_project_services(project_id):
     """Get all services for a project with billing metrics and derived status."""
 
@@ -107,7 +133,14 @@ def get_project_services(project_id):
                        ps.{S.ProjectServices.CREATED_AT}, ps.{S.ProjectServices.UPDATED_AT}, 
                        ps.{S.ProjectServices.STATUS}, ps.{S.ProjectServices.PROGRESS_PCT}, 
                        ps.{S.ProjectServices.CLAIMED_TO_DATE}, ps.{S.ProjectServices.ASSIGNED_USER_ID},
-                       u.{S.Users.NAME} AS assigned_user_name
+                       u.{S.Users.NAME} AS assigned_user_name,
+                       ps.{S.ProjectServices.START_DATE}, ps.{S.ProjectServices.END_DATE},
+                       ps.{S.ProjectServices.REVIEW_ANCHOR_DATE}, ps.{S.ProjectServices.REVIEW_INTERVAL_DAYS},
+                       ps.{S.ProjectServices.REVIEW_COUNT_PLANNED},
+                       ps.{S.ProjectServices.SOURCE_TEMPLATE_ID},
+                       ps.{S.ProjectServices.SOURCE_TEMPLATE_VERSION},
+                       ps.{S.ProjectServices.SOURCE_TEMPLATE_HASH},
+                       ps.{S.ProjectServices.TEMPLATE_MODE}
                 FROM {S.ProjectServices.TABLE} ps
                 LEFT JOIN {S.Users.TABLE} u ON ps.{S.ProjectServices.ASSIGNED_USER_ID} = u.{S.Users.ID}
                 WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
@@ -137,6 +170,15 @@ def get_project_services(project_id):
                 claimed_to_date=row[16],
                 assigned_user_id=row[17],
                 assigned_user_name=row[18],
+                start_date=row[19],
+                end_date=row[20],
+                review_anchor_date=row[21],
+                review_interval_days=row[22],
+                review_count_planned=row[23],
+                source_template_id=row[24],
+                source_template_version=row[25],
+                source_template_hash=row[26],
+                template_mode=row[27],
             ) for row in rows]
 
             if not services:
@@ -332,9 +374,29 @@ def get_project_services(project_id):
         return []
 
 
-def create_project_service(project_id, service_code, service_name, phase=None, unit_type=None,
-                          unit_qty=None, unit_rate=None, lump_sum_fee=None, agreed_fee=None,
-                          bill_rule=None, notes=None, assigned_user_id=None):
+def create_project_service(
+    project_id,
+    service_code,
+    service_name,
+    phase=None,
+    unit_type=None,
+    unit_qty=None,
+    unit_rate=None,
+    lump_sum_fee=None,
+    agreed_fee=None,
+    bill_rule=None,
+    notes=None,
+    assigned_user_id=None,
+    start_date=None,
+    end_date=None,
+    review_anchor_date=None,
+    review_interval_days=None,
+    review_count_planned=None,
+    source_template_id=None,
+    source_template_version=None,
+    source_template_hash=None,
+    template_mode=None,
+):
     """Create a new service for a project."""
     try:
         with get_db_connection() as conn:
@@ -347,11 +409,18 @@ def create_project_service(project_id, service_code, service_name, phase=None, u
                     {S.ProjectServices.UNIT_TYPE}, {S.ProjectServices.UNIT_QTY}, 
                     {S.ProjectServices.UNIT_RATE}, {S.ProjectServices.LUMP_SUM_FEE}, 
                     {S.ProjectServices.AGREED_FEE}, {S.ProjectServices.BILL_RULE}, 
-                    {S.ProjectServices.NOTES}, {S.ProjectServices.ASSIGNED_USER_ID}
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    {S.ProjectServices.NOTES}, {S.ProjectServices.ASSIGNED_USER_ID},
+                    {S.ProjectServices.START_DATE}, {S.ProjectServices.END_DATE},
+                    {S.ProjectServices.REVIEW_ANCHOR_DATE}, {S.ProjectServices.REVIEW_INTERVAL_DAYS},
+                    {S.ProjectServices.REVIEW_COUNT_PLANNED},
+                    {S.ProjectServices.SOURCE_TEMPLATE_ID}, {S.ProjectServices.SOURCE_TEMPLATE_VERSION},
+                    {S.ProjectServices.SOURCE_TEMPLATE_HASH}, {S.ProjectServices.TEMPLATE_MODE}
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (project_id, service_code, service_name, phase, unit_type, unit_qty, 
-                 unit_rate, lump_sum_fee, agreed_fee, bill_rule, notes, assigned_user_id)
+                 unit_rate, lump_sum_fee, agreed_fee, bill_rule, notes, assigned_user_id,
+                 start_date, end_date, review_anchor_date, review_interval_days, review_count_planned,
+                 source_template_id, source_template_version, source_template_hash, template_mode)
             )
             cursor.execute("SELECT SCOPE_IDENTITY()")
             row = cursor.fetchone()
@@ -371,13 +440,15 @@ def update_project_service(service_id, **kwargs):
             cursor = conn.cursor()
             update_fields = {}
             allowed_fields = [
-                S.ProjectServices.PHASE, S.ProjectServices.SERVICE_CODE, 
-                S.ProjectServices.SERVICE_NAME, S.ProjectServices.UNIT_TYPE, 
-                S.ProjectServices.UNIT_QTY, S.ProjectServices.UNIT_RATE, 
-                S.ProjectServices.LUMP_SUM_FEE, S.ProjectServices.AGREED_FEE, 
-                S.ProjectServices.BILL_RULE, S.ProjectServices.NOTES, 
-                S.ProjectServices.STATUS, S.ProjectServices.PROGRESS_PCT, 
-                S.ProjectServices.CLAIMED_TO_DATE, S.ProjectServices.ASSIGNED_USER_ID
+                S.ProjectServices.PHASE, S.ProjectServices.SERVICE_CODE,
+                S.ProjectServices.SERVICE_NAME, S.ProjectServices.UNIT_TYPE,
+                S.ProjectServices.UNIT_QTY, S.ProjectServices.UNIT_RATE,
+                S.ProjectServices.LUMP_SUM_FEE, S.ProjectServices.AGREED_FEE,
+                S.ProjectServices.BILL_RULE, S.ProjectServices.NOTES,
+                S.ProjectServices.STATUS, S.ProjectServices.ASSIGNED_USER_ID,
+                S.ProjectServices.START_DATE, S.ProjectServices.END_DATE,
+                S.ProjectServices.REVIEW_ANCHOR_DATE, S.ProjectServices.REVIEW_INTERVAL_DAYS,
+                S.ProjectServices.REVIEW_COUNT_PLANNED,
             ]
             
             for key, value in kwargs.items():
@@ -416,6 +487,134 @@ def delete_project_service(service_id):
         return False
 
 
+def get_project_start_date(project_id):
+    """Fetch a project's start date (if available)."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.Projects.START_DATE}
+                FROM {S.Projects.TABLE}
+                WHERE {S.Projects.ID} = ?
+                """,
+                (project_id,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        logger.error(f"Error fetching project start date: {e}")
+        return None
+
+
+def get_service_schedule_defaults(service_id):
+    """Fetch schedule defaults for a service."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectServices.START_DATE},
+                       {S.ProjectServices.REVIEW_ANCHOR_DATE},
+                       {S.ProjectServices.REVIEW_INTERVAL_DAYS}
+                FROM {S.ProjectServices.TABLE}
+                WHERE {S.ProjectServices.SERVICE_ID} = ?
+                """,
+                (service_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "start_date": row[0],
+                "review_anchor_date": row[1],
+                "review_interval_days": row[2],
+            }
+    except Exception as e:
+        logger.error(f"Error fetching service schedule defaults: {e}")
+        return None
+
+
+def resequence_service_reviews(service_id, anchor_date=None, interval_days=None, count=None):
+    """Resequence planned reviews for a service without touching user-modified rows."""
+    schedule = get_service_schedule_defaults(service_id)
+    if schedule is None:
+        raise ValueError("Service not found")
+
+    base_date = _parse_iso_date(anchor_date) if anchor_date else schedule.get("review_anchor_date") or schedule.get("start_date")
+    if not base_date:
+        raise ValueError("Anchor date is required to resequence reviews")
+
+    try:
+        interval = int(interval_days) if interval_days is not None else int(schedule.get("review_interval_days") or 7)
+    except (TypeError, ValueError):
+        interval = 7
+
+    try:
+        count_value = int(count) if count is not None else None
+    except (TypeError, ValueError):
+        count_value = None
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT {S.ServiceReviews.REVIEW_ID}
+            FROM {S.ServiceReviews.TABLE}
+            WHERE {S.ServiceReviews.SERVICE_ID} = ?
+              AND LOWER(ISNULL({S.ServiceReviews.STATUS}, '')) = 'planned'
+              AND ISNULL({S.ServiceReviews.IS_USER_MODIFIED}, 0) = 0
+            ORDER BY ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}), {S.ServiceReviews.REVIEW_ID}
+            """,
+            (service_id,)
+        )
+        rows = cursor.fetchall()
+        review_ids = [row[0] for row in rows]
+        if count_value is not None:
+            review_ids = review_ids[:count_value]
+
+        if not review_ids:
+            return {
+                "updated": 0,
+                "anchor_date": base_date,
+                "interval_days": interval,
+                "count": count_value or 0,
+            }
+
+        updates = []
+        for index, review_id in enumerate(review_ids):
+            planned_date = base_date + timedelta(days=index * interval)
+            updates.append((planned_date, review_id))
+
+        cursor.executemany(
+            f"""
+            UPDATE {S.ServiceReviews.TABLE}
+            SET {S.ServiceReviews.PLANNED_DATE} = ?
+            WHERE {S.ServiceReviews.REVIEW_ID} = ?
+            """,
+            updates
+        )
+
+        cursor.execute(
+            f"""
+            UPDATE {S.ProjectServices.TABLE}
+            SET {S.ProjectServices.REVIEW_ANCHOR_DATE} = ?,
+                {S.ProjectServices.REVIEW_INTERVAL_DAYS} = ?,
+                {S.ProjectServices.REVIEW_COUNT_PLANNED} = ?
+            WHERE {S.ProjectServices.SERVICE_ID} = ?
+            """,
+            (base_date, interval, count_value or len(review_ids), service_id)
+        )
+
+        conn.commit()
+
+    return {
+        "updated": len(review_ids),
+        "anchor_date": base_date,
+        "interval_days": interval,
+        "count": count_value or len(review_ids),
+    }
+
 # --- Service Reviews Functions ---
 
 def get_service_reviews(service_id):
@@ -424,109 +623,143 @@ def get_service_reviews(service_id):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             supports_billing = _ensure_service_review_billing_columns(cursor)
-            if not supports_billing:
-                logger.warning("ServiceReviews billing metadata columns not found; returning empty billing summary.")
-                return {
-                    'reviews': [],
-                    'summary_by_phase': [],
-                    'monthly_totals': [],
-                    'total_amount': 0.0,
-                    'total_reviews': 0
-                }
-            supports_billing = _ensure_service_review_billing_columns(cursor)
+            supports_invoice_month = _ensure_service_review_invoice_columns(cursor)
+            supports_invoice_date = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.INVOICE_DATE)
 
-            if supports_billing:
-                cursor.execute(
-                    f"""
-                    SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
-                           {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
-                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.DISCIPLINES}, 
-                           {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
-                           {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
-                           {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
-                           {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
-                           {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT}, 
-                           {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
-                           {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
-                    FROM {S.ServiceReviews.TABLE} 
-                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
-                    ORDER BY ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}), {S.ServiceReviews.CYCLE_NO}
-                    """,
-                    (service_id,)
+            invoice_date_select = (
+                f"sr.{S.ServiceReviews.INVOICE_DATE}" if supports_invoice_date else "NULL AS invoice_date"
+            )
+            source_phase_select = (
+                f"sr.{S.ServiceReviews.SOURCE_PHASE}" if supports_billing else "NULL AS source_phase"
+            )
+            billing_phase_select = (
+                f"sr.{S.ServiceReviews.BILLING_PHASE}" if supports_billing else "NULL AS billing_phase"
+            )
+            billing_rate_select = (
+                f"sr.{S.ServiceReviews.BILLING_RATE}" if supports_billing else "NULL AS billing_rate"
+            )
+            billing_amount_select = (
+                f"sr.{S.ServiceReviews.BILLING_AMOUNT}" if supports_billing else "NULL AS billing_amount"
+            )
+            invoice_month_select = ""
+            if supports_invoice_month:
+                invoice_month_select = (
+                    f", sr.{S.ServiceReviews.INVOICE_MONTH_OVERRIDE}"
+                    f", sr.{S.ServiceReviews.INVOICE_MONTH_AUTO}"
+                    f", sr.{S.ServiceReviews.INVOICE_MONTH_FINAL}"
+                    f", sr.{S.ServiceReviews.INVOICE_BATCH_ID}"
                 )
-                rows = cursor.fetchall()
-                reviews = [dict(
-                    review_id=row[0],
-                    service_id=row[1],
-                    cycle_no=row[2],
-                    planned_date=row[3],
-                    due_date=row[4],
-                    disciplines=row[5],
-                    deliverables=row[6],
-                    status=row[7],
-                    weight_factor=float(row[8]) if row[8] is not None else None,
-                    evidence_links=row[9],
-                    invoice_reference=row[10],
-                    actual_issued_at=row[11],
-                    source_phase=row[12],
-                    billing_phase=row[13],
-                    billing_rate=float(row[14]) if row[14] is not None else None,
-                    billing_amount=float(row[15]) if row[15] is not None else None,
-                    is_billed=bool(row[16]) if row[16] is not None else False,
-                    origin=row[17],
-                    is_template_managed=bool(row[18]) if row[18] is not None else None,
-                    sort_order=row[19],
-                ) for row in rows]
-            else:
-                cursor.execute(
-                    f"""
-                    SELECT {S.ServiceReviews.REVIEW_ID}, {S.ServiceReviews.SERVICE_ID}, 
-                           {S.ServiceReviews.CYCLE_NO}, {S.ServiceReviews.PLANNED_DATE}, 
-                           {S.ServiceReviews.DUE_DATE}, {S.ServiceReviews.INVOICE_MONTH_OVERRIDE},
-                           {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL},
-                           {S.ServiceReviews.INVOICE_BATCH_ID}, {S.ServiceReviews.DISCIPLINES}, 
-                           {S.ServiceReviews.DELIVERABLES}, {S.ServiceReviews.STATUS}, 
-                           {S.ServiceReviews.WEIGHT_FACTOR}, {S.ServiceReviews.EVIDENCE_LINKS}, 
-                           {S.ServiceReviews.INVOICE_REFERENCE}, {S.ServiceReviews.ACTUAL_ISSUED_AT}, 
-                           {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
-                           {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}
-                    FROM {S.ServiceReviews.TABLE} 
-                    WHERE {S.ServiceReviews.SERVICE_ID} = ?
-                    ORDER BY ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}), {S.ServiceReviews.CYCLE_NO}
-                    """,
-                    (service_id,)
-                )
-                rows = cursor.fetchall()
-                reviews = [dict(
-                    review_id=row[0],
-                    service_id=row[1],
-                    cycle_no=row[2],
-                    planned_date=row[3],
-                    due_date=row[4],
-                    invoice_month_override=row[5],
-                    invoice_month_auto=row[6],
-                    invoice_month_final=row[7],
-                    invoice_batch_id=row[8],
-                    disciplines=row[9],
-                    deliverables=row[10],
-                    status=row[11],
-                    weight_factor=float(row[12]) if row[12] is not None else None,
-                    evidence_links=row[13],
-                    invoice_reference=row[14],
-                    actual_issued_at=row[15],
-                    source_phase=None,
-                    billing_phase=None,
-                    billing_rate=None,
-                    billing_amount=None,
-                    is_billed=bool(row[16]) if row[16] is not None else False,
-                    origin=row[17],
-                    is_template_managed=bool(row[18]) if row[18] is not None else None,
-                    sort_order=row[19],
-                ) for row in rows]
-            return reviews
+
+            cursor.execute(
+                f"""
+                SELECT sr.{S.ServiceReviews.REVIEW_ID}, sr.{S.ServiceReviews.SERVICE_ID},
+                       sr.{S.ServiceReviews.CYCLE_NO}, sr.{S.ServiceReviews.PLANNED_DATE},
+                       sr.{S.ServiceReviews.DUE_DATE}, sr.{S.ServiceReviews.DISCIPLINES},
+                       sr.{S.ServiceReviews.DELIVERABLES}, sr.{S.ServiceReviews.STATUS},
+                       sr.{S.ServiceReviews.WEIGHT_FACTOR}, sr.{S.ServiceReviews.EVIDENCE_LINKS},
+                       sr.{S.ServiceReviews.INVOICE_REFERENCE}, {invoice_date_select},
+                       {source_phase_select}, {billing_phase_select},
+                       {billing_rate_select}, {billing_amount_select},
+                       sr.{S.ServiceReviews.ACTUAL_ISSUED_AT}, sr.{S.ServiceReviews.IS_BILLED},
+                       sr.{S.ServiceReviews.ORIGIN}, sr.{S.ServiceReviews.IS_TEMPLATE_MANAGED},
+                       sr.{S.ServiceReviews.SORT_ORDER}, sr.{S.ServiceReviews.TEMPLATE_NODE_KEY},
+                       sr.{S.ServiceReviews.IS_USER_MODIFIED}, sr.{S.ServiceReviews.USER_MODIFIED_AT},
+                       ps.{S.ProjectServices.PHASE}, ps.{S.ProjectServices.SERVICE_NAME}
+                       {invoice_month_select}
+                FROM {S.ServiceReviews.TABLE} sr
+                JOIN {S.ProjectServices.TABLE} ps
+                  ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE sr.{S.ServiceReviews.SERVICE_ID} = ?
+                ORDER BY ISNULL(sr.{S.ServiceReviews.SORT_ORDER}, sr.{S.ServiceReviews.CYCLE_NO}),
+                         sr.{S.ServiceReviews.CYCLE_NO}
+                """,
+                (service_id,)
+            )
+            rows = cursor.fetchall()
+
+            reviews = []
+            for row in rows:
+                idx = 0
+                review_id = row[idx]; idx += 1
+                service_id_val = row[idx]; idx += 1
+                cycle_no = row[idx]; idx += 1
+                planned_date = row[idx]; idx += 1
+                due_date = row[idx]; idx += 1
+                disciplines = row[idx]; idx += 1
+                deliverables = row[idx]; idx += 1
+                status = row[idx]; idx += 1
+                weight_factor = row[idx]; idx += 1
+                evidence_links = row[idx]; idx += 1
+                invoice_reference = row[idx]; idx += 1
+                invoice_date = row[idx]; idx += 1
+                source_phase = row[idx]; idx += 1
+                billing_phase = row[idx]; idx += 1
+                billing_rate = row[idx]; idx += 1
+                billing_amount = row[idx]; idx += 1
+                actual_issued_at = row[idx]; idx += 1
+                is_billed_val = row[idx]; idx += 1
+                origin = row[idx]; idx += 1
+                is_template_managed = row[idx]; idx += 1
+                sort_order = row[idx]; idx += 1
+                template_node_key = row[idx]; idx += 1
+                is_user_modified = row[idx]; idx += 1
+                user_modified_at = row[idx]; idx += 1
+                phase = row[idx]; idx += 1
+                service_name = row[idx]; idx += 1
+
+                invoice_month_override = None
+                invoice_month_auto = None
+                invoice_month_final = None
+                invoice_batch_id = None
+                if supports_invoice_month and idx < len(row):
+                    invoice_month_override = row[idx]; idx += 1
+                    invoice_month_auto = row[idx]; idx += 1
+                    invoice_month_final = row[idx]; idx += 1
+                    invoice_batch_id = row[idx]; idx += 1
+
+                reviews.append(dict(
+                    review_id=review_id,
+                    service_id=service_id_val,
+                    cycle_no=cycle_no,
+                    planned_date=planned_date,
+                    due_date=due_date,
+                    disciplines=disciplines,
+                    deliverables=deliverables,
+                    status=status,
+                    weight_factor=float(weight_factor) if weight_factor is not None else None,
+                    evidence_links=evidence_links,
+                    invoice_reference=invoice_reference,
+                    invoice_date=invoice_date,
+                    actual_issued_at=actual_issued_at,
+                    source_phase=source_phase,
+                    billing_phase=billing_phase,
+                    billing_rate=float(billing_rate) if billing_rate is not None else None,
+                    billing_amount=float(billing_amount) if billing_amount is not None else None,
+                    is_billed=bool(is_billed_val) if is_billed_val is not None else False,
+                    origin=origin,
+                    is_template_managed=bool(is_template_managed) if is_template_managed is not None else None,
+                    sort_order=sort_order,
+                    template_node_key=template_node_key,
+                    is_user_modified=bool(is_user_modified) if is_user_modified is not None else False,
+                    user_modified_at=user_modified_at,
+                    phase=phase,
+                    service_name=service_name,
+                    invoice_month_override=invoice_month_override,
+                    invoice_month_auto=invoice_month_auto,
+                    invoice_month_final=invoice_month_final,
+                    invoice_batch_id=invoice_batch_id,
+                ))
+
+            return {
+                "reviews": reviews,
+                "summary": {},
+            }
     except Exception as e:
         logger.error(f"Error fetching service reviews: {e}")
-        return []
+        return {
+            "reviews": [],
+            "summary": {},
+        }
 
 
 def get_project_reviews(
@@ -855,6 +1088,79 @@ def get_project_finance_rollup(project_id):
         return None
 
 
+def get_project_finance_summary(project_id):
+    """Return project finance rollup derived from service reviews/items billing state."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT ps.{S.ProjectServices.SERVICE_ID},
+                       ps.{S.ProjectServices.SERVICE_NAME},
+                       ps.{S.ProjectServices.AGREED_FEE},
+                       COALESCE(rev.billable_units, 0) + COALESCE(itm.billable_units, 0) AS billable_units,
+                       COALESCE(rev.billed_units, 0) + COALESCE(itm.billed_units, 0) AS billed_units
+                FROM {S.ProjectServices.TABLE} ps
+                LEFT JOIN (
+                    SELECT {S.ServiceReviews.SERVICE_ID} AS service_id,
+                           SUM(CASE WHEN LOWER(ISNULL({S.ServiceReviews.STATUS}, '')) <> 'cancelled' THEN 1 ELSE 0 END) AS billable_units,
+                           SUM(CASE WHEN ISNULL({S.ServiceReviews.IS_BILLED}, 0) = 1 THEN 1 ELSE 0 END) AS billed_units
+                    FROM {S.ServiceReviews.TABLE}
+                    GROUP BY {S.ServiceReviews.SERVICE_ID}
+                ) rev ON rev.service_id = ps.{S.ProjectServices.SERVICE_ID}
+                LEFT JOIN (
+                    SELECT {S.ServiceItems.SERVICE_ID} AS service_id,
+                           SUM(CASE WHEN LOWER(ISNULL({S.ServiceItems.STATUS}, '')) <> 'cancelled' THEN 1 ELSE 0 END) AS billable_units,
+                           SUM(CASE WHEN ISNULL({S.ServiceItems.IS_BILLED}, 0) = 1 THEN 1 ELSE 0 END) AS billed_units
+                    FROM {S.ServiceItems.TABLE}
+                    GROUP BY {S.ServiceItems.SERVICE_ID}
+                ) itm ON itm.service_id = ps.{S.ProjectServices.SERVICE_ID}
+                WHERE ps.{S.ProjectServices.PROJECT_ID} = ?
+                """,
+                (project_id,)
+            )
+
+            by_service = []
+            total_agreed_fee = 0.0
+            total_claimed_or_billed = 0.0
+
+            for row in cursor.fetchall():
+                service_id = row[0]
+                service_name = row[1]
+                agreed_fee = float(row[2] or 0)
+                billable_units = int(row[3] or 0)
+                billed_units = int(row[4] or 0)
+                billed_units = min(billed_units, billable_units) if billable_units else billed_units
+
+                progress_pct = (billed_units / billable_units * 100.0) if billable_units > 0 else 0.0
+                progress_pct = max(min(progress_pct, 100.0), 0.0)
+                claimed = (agreed_fee * (progress_pct / 100.0)) if agreed_fee else 0.0
+
+                total_agreed_fee += agreed_fee
+                total_claimed_or_billed += claimed
+
+                by_service.append({
+                    "service_id": service_id,
+                    "service_name": service_name,
+                    "agreed_fee": round(agreed_fee, 2),
+                    "claimed": round(claimed, 2),
+                    "progress_pct": round(progress_pct, 2),
+                })
+
+            overall_pct = (total_claimed_or_billed / total_agreed_fee * 100.0) if total_agreed_fee else 0.0
+            overall_pct = max(min(overall_pct, 100.0), 0.0)
+
+            return {
+                "total_agreed_fee": round(total_agreed_fee, 2),
+                "total_claimed_or_billed": round(total_claimed_or_billed, 2),
+                "progress_pct": round(overall_pct, 2),
+                "by_service": by_service,
+            }
+    except Exception as e:
+        logger.error(f"Error fetching project finance summary: {e}")
+        return None
+
+
 def _to_decimal(value):
     """Safely convert a value to Decimal or return None."""
     if value is None or value == '':
@@ -901,6 +1207,23 @@ def _derive_default_review_rate(unit_type, unit_rate, unit_qty, lump_sum_fee, ag
         return None
 
     return None
+
+
+def _column_exists(cursor, table: str, column: str) -> bool:
+    try:
+        cursor.execute(
+            """
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = ?
+            """,
+            (table, column),
+        )
+        return cursor.fetchone() is not None
+    except Exception:
+        return False
 
 
 def _ensure_service_review_billing_columns(cursor) -> bool:
@@ -977,13 +1300,14 @@ def _ensure_service_review_invoice_columns(cursor) -> bool:
         return False
 
 
-def create_service_review(service_id, cycle_no, planned_date, due_date=None, 
-                         disciplines=None, deliverables=None, status='planned', 
+def create_service_review(service_id, cycle_no, planned_date, due_date=None,
+                         disciplines=None, deliverables=None, status='planned',
                          weight_factor=1.0, evidence_links=None, invoice_reference=None,
-                         source_phase=None, billing_phase=None, billing_rate=None,
-                         billing_amount=None, is_billed=None, origin=None,
+                         invoice_date=None, source_phase=None, billing_phase=None,
+                         billing_rate=None, billing_amount=None, is_billed=None, origin=None,
                          is_template_managed=None, sort_order=None,
-                         invoice_month_override=None, invoice_batch_id=None):
+                         invoice_month_override=None, invoice_batch_id=None,
+                         project_id=None):
     """Create a new review for a service."""
     try:
         with get_db_connection() as conn:
@@ -1004,9 +1328,14 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
             if effective_is_billed is None:
                 effective_is_billed = 1 if status.lower() == 'completed' else 0
 
+            # Enforce project scope when provided
+            if project_id is not None and not _service_in_project(cursor, project_id, service_id):
+                raise ServiceScopeError("Service not found for project.")
+
             # Derive default billing metadata from the service record
             supports_billing = _ensure_service_review_billing_columns(cursor)
             supports_invoice_month = _ensure_service_review_invoice_columns(cursor)
+            supports_invoice_date = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.INVOICE_DATE)
             cursor.execute(
                 f"""
                 SELECT {S.ProjectServices.PHASE}, {S.ProjectServices.UNIT_TYPE}, 
@@ -1052,9 +1381,12 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
             if supports_billing:
                 extra_columns = ""
                 extra_values = []
+                if supports_invoice_date:
+                    extra_columns += f", {S.ServiceReviews.INVOICE_DATE}"
+                    extra_values.append(invoice_date)
                 if supports_invoice_month:
-                    extra_columns = f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
-                    extra_values = [invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id]
+                    extra_columns += f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
+                    extra_values.extend([invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id])
                 cursor.execute(
                     f"""
                     INSERT INTO {S.ServiceReviews.TABLE} (
@@ -1067,7 +1399,7 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT},
                         {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
                         {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}{extra_columns}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?, ?, ?, ?' if supports_invoice_month else ''})
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?' if supports_invoice_date else ''}{', ?, ?, ?, ?' if supports_invoice_month else ''})
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
@@ -1081,9 +1413,12 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
             else:
                 extra_columns = ""
                 extra_values = []
+                if supports_invoice_date:
+                    extra_columns += f", {S.ServiceReviews.INVOICE_DATE}"
+                    extra_values.append(invoice_date)
                 if supports_invoice_month:
-                    extra_columns = f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
-                    extra_values = [invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id]
+                    extra_columns += f", {S.ServiceReviews.INVOICE_MONTH_OVERRIDE}, {S.ServiceReviews.INVOICE_MONTH_AUTO}, {S.ServiceReviews.INVOICE_MONTH_FINAL}, {S.ServiceReviews.INVOICE_BATCH_ID}"
+                    extra_values.extend([invoice_month_override, invoice_month_auto, invoice_month_final, invoice_batch_id])
                 cursor.execute(
                     f"""
                     INSERT INTO {S.ServiceReviews.TABLE} (
@@ -1094,7 +1429,7 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
                         {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
                         {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}{extra_columns}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?, ?, ?, ?' if supports_invoice_month else ''})
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?' if supports_invoice_date else ''}{', ?, ?, ?, ?' if supports_invoice_month else ''})
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
@@ -1164,6 +1499,10 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.ORIGIN,
                 S.ServiceReviews.IS_TEMPLATE_MANAGED,
                 S.ServiceReviews.SORT_ORDER,
+                S.ServiceReviews.TEMPLATE_NODE_KEY,
+                S.ServiceReviews.IS_USER_MODIFIED,
+                S.ServiceReviews.USER_MODIFIED_AT,
+                S.ServiceReviews.USER_MODIFIED_FIELDS,
             ]
             if supports_billing:
                 allowed_fields.extend([
@@ -1191,6 +1530,10 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
                 S.ServiceReviews.INVOICE_BATCH_ID,
                 S.ServiceReviews.SORT_ORDER,
+                S.ServiceReviews.STATUS,
+                S.ServiceReviews.WEIGHT_FACTOR,
+                S.ServiceReviews.BILLING_RATE,
+                S.ServiceReviews.BILLING_AMOUNT,
             }
             should_unmanage = any(key in manual_fields for key in kwargs)
 
@@ -1227,7 +1570,7 @@ def update_service_review(review_id, **kwargs):
                         # Trim to max 60 chars
                         trimmed = (value or '').strip()[:60]
                         update_fields[key] = trimmed
-                    elif key == S.ServiceReviews.IS_BILLED:
+                    elif key in (S.ServiceReviews.IS_BILLED, S.ServiceReviews.IS_USER_MODIFIED):
                         # Convert to boolean int (0 or 1)
                         update_fields[key] = 1 if value else 0
                     elif key == S.ServiceReviews.INVOICE_MONTH_OVERRIDE:
@@ -1306,6 +1649,10 @@ def update_service_review(review_id, **kwargs):
 
             if should_unmanage and S.ServiceReviews.IS_TEMPLATE_MANAGED not in update_fields:
                 update_fields[S.ServiceReviews.IS_TEMPLATE_MANAGED] = 0
+
+            if should_unmanage and S.ServiceReviews.IS_USER_MODIFIED not in update_fields:
+                update_fields[S.ServiceReviews.IS_USER_MODIFIED] = 1
+                update_fields[S.ServiceReviews.USER_MODIFIED_AT] = datetime.now()
 
             if supports_billing:
                 needs_recalc_amount = False
@@ -1539,7 +1886,10 @@ def get_service_items(service_id, item_type=None):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             invoice_supported = _ensure_service_item_invoice_column(cursor)
-            
+            invoice_date_supported = _ensure_service_item_invoice_date_column(cursor)
+            invoice_date_supported = _ensure_service_item_invoice_date_column(cursor)
+            invoice_date_supported = _ensure_service_item_invoice_date_column(cursor)
+
             columns = [
                 S.ServiceItems.ITEM_ID,
                 S.ServiceItems.SERVICE_ID,
@@ -1555,6 +1905,8 @@ def get_service_items(service_id, item_type=None):
             ]
             if invoice_supported:
                 columns.append(S.ServiceItems.INVOICE_REFERENCE)
+            if invoice_date_supported:
+                columns.append(S.ServiceItems.INVOICE_DATE)
             columns.extend([
                 S.ServiceItems.EVIDENCE_LINKS,
                 S.ServiceItems.NOTES,
@@ -1564,6 +1916,9 @@ def get_service_items(service_id, item_type=None):
                 S.ServiceItems.ORIGIN,
                 S.ServiceItems.IS_TEMPLATE_MANAGED,
                 S.ServiceItems.SORT_ORDER,
+                S.ServiceItems.TEMPLATE_NODE_KEY,
+                S.ServiceItems.IS_USER_MODIFIED,
+                S.ServiceItems.USER_MODIFIED_AT,
             ])
 
             query = f"""
@@ -1572,16 +1927,16 @@ def get_service_items(service_id, item_type=None):
                 WHERE {S.ServiceItems.SERVICE_ID} = ?
             """
             params = [service_id]
-            
+
             if item_type:
                 query += f" AND {S.ServiceItems.ITEM_TYPE} = ?"
                 params.append(item_type)
-            
+
             query += f" ORDER BY ISNULL({S.ServiceItems.SORT_ORDER}, 9999), {S.ServiceItems.PLANNED_DATE} ASC"
-            
+
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            
+
             items = []
             for row in rows:
                 idx = 0
@@ -1602,6 +1957,11 @@ def get_service_items(service_id, item_type=None):
                     invoice_reference = row[idx]
                     idx += 1
 
+                invoice_date = None
+                if invoice_date_supported:
+                    invoice_date = row[idx]
+                    idx += 1
+
                 evidence_links = row[idx]; idx += 1
                 notes = row[idx]; idx += 1
                 created_at = row[idx]; idx += 1
@@ -1609,7 +1969,10 @@ def get_service_items(service_id, item_type=None):
                 is_billed_val = row[idx]; idx += 1
                 origin = row[idx] if idx < len(row) else None; idx += 1
                 is_template_managed = row[idx] if idx < len(row) else None; idx += 1
-                sort_order = row[idx] if idx < len(row) else None
+                sort_order = row[idx] if idx < len(row) else None; idx += 1
+                template_node_key = row[idx] if idx < len(row) else None; idx += 1
+                is_user_modified = row[idx] if idx < len(row) else None; idx += 1
+                user_modified_at = row[idx] if idx < len(row) else None
 
                 items.append({
                     'item_id': item_id,
@@ -1624,6 +1987,7 @@ def get_service_items(service_id, item_type=None):
                     'priority': priority,
                     'assigned_to': assigned_to,
                     'invoice_reference': invoice_reference,
+                    'invoice_date': invoice_date.isoformat() if isinstance(invoice_date, (datetime, date)) else invoice_date,
                     'evidence_links': evidence_links,
                     'notes': notes,
                     'created_at': created_at.isoformat() if created_at else None,
@@ -1632,10 +1996,13 @@ def get_service_items(service_id, item_type=None):
                     'origin': origin,
                     'is_template_managed': bool(is_template_managed) if is_template_managed is not None else None,
                     'sort_order': sort_order,
+                    'template_node_key': template_node_key,
+                    'is_user_modified': bool(is_user_modified) if is_user_modified is not None else False,
+                    'user_modified_at': user_modified_at.isoformat() if isinstance(user_modified_at, (datetime, date)) else user_modified_at,
                 })
-            
+
             return items
-            
+
     except Exception as e:
         logger.error(f"Error fetching service items: {e}")
         return []
@@ -1647,6 +2014,7 @@ def get_project_items(project_id, item_type=None):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             invoice_supported = _ensure_service_item_invoice_column(cursor)
+            invoice_date_supported = _ensure_service_item_invoice_date_column(cursor)
 
             columns = [
                 f"si.{S.ServiceItems.ITEM_ID}",
@@ -1667,6 +2035,8 @@ def get_project_items(project_id, item_type=None):
             ]
             if invoice_supported:
                 columns.append(f"si.{S.ServiceItems.INVOICE_REFERENCE}")
+            if invoice_date_supported:
+                columns.append(f"si.{S.ServiceItems.INVOICE_DATE}")
             columns.extend([
                 f"si.{S.ServiceItems.EVIDENCE_LINKS}",
                 f"si.{S.ServiceItems.NOTES}",
@@ -1676,6 +2046,9 @@ def get_project_items(project_id, item_type=None):
                 f"si.{S.ServiceItems.ORIGIN}",
                 f"si.{S.ServiceItems.IS_TEMPLATE_MANAGED}",
                 f"si.{S.ServiceItems.SORT_ORDER}",
+                f"si.{S.ServiceItems.TEMPLATE_NODE_KEY}",
+                f"si.{S.ServiceItems.IS_USER_MODIFIED}",
+                f"si.{S.ServiceItems.USER_MODIFIED_AT}",
             ])
 
             query = f"""
@@ -1720,6 +2093,11 @@ def get_project_items(project_id, item_type=None):
                     invoice_reference = row[idx]
                     idx += 1
 
+                invoice_date = None
+                if invoice_date_supported:
+                    invoice_date = row[idx]
+                    idx += 1
+
                 evidence_links = row[idx]; idx += 1
                 notes = row[idx]; idx += 1
                 created_at = row[idx]; idx += 1
@@ -1727,7 +2105,10 @@ def get_project_items(project_id, item_type=None):
                 is_billed_val = row[idx]; idx += 1
                 origin = row[idx] if idx < len(row) else None; idx += 1
                 is_template_managed = row[idx] if idx < len(row) else None; idx += 1
-                sort_order = row[idx] if idx < len(row) else None
+                sort_order = row[idx] if idx < len(row) else None; idx += 1
+                template_node_key = row[idx] if idx < len(row) else None; idx += 1
+                is_user_modified = row[idx] if idx < len(row) else None; idx += 1
+                user_modified_at = row[idx] if idx < len(row) else None
 
                 items.append({
                     'item_id': item_id,
@@ -1746,6 +2127,7 @@ def get_project_items(project_id, item_type=None):
                     'priority': priority,
                     'assigned_to': assigned_to,
                     'invoice_reference': invoice_reference,
+                    'invoice_date': invoice_date.isoformat() if isinstance(invoice_date, (datetime, date)) else invoice_date,
                     'evidence_links': evidence_links,
                     'notes': notes,
                     'created_at': created_at.isoformat() if created_at else None,
@@ -1754,6 +2136,9 @@ def get_project_items(project_id, item_type=None):
                     'origin': origin,
                     'is_template_managed': bool(is_template_managed) if is_template_managed is not None else None,
                     'sort_order': sort_order,
+                    'template_node_key': template_node_key,
+                    'is_user_modified': bool(is_user_modified) if is_user_modified is not None else False,
+                    'user_modified_at': user_modified_at.isoformat() if isinstance(user_modified_at, (datetime, date)) else user_modified_at,
                 })
 
             return items
@@ -1774,6 +2159,12 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
             kwargs['origin'] = origin
             if 'is_template_managed' not in kwargs or kwargs.get('is_template_managed') is None:
                 kwargs['is_template_managed'] = 1 if origin == 'template_generated' else 0
+            if not kwargs.get('template_node_key'):
+                template_id = kwargs.get('generated_from_template_id')
+                template_version = kwargs.get('generated_from_template_version')
+                generated_key = kwargs.get('generated_key')
+                if template_id and template_version and generated_key:
+                    kwargs['template_node_key'] = f"{template_id}:{template_version}:{generated_key}"
 
             # Build dynamic insert query
             columns = [S.ServiceItems.SERVICE_ID, S.ServiceItems.ITEM_TYPE, S.ServiceItems.TITLE, 
@@ -1803,17 +2194,23 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
                 'generated_from_template_id': S.ServiceItems.GENERATED_FROM_TEMPLATE_ID,
                 'generated_from_template_version': S.ServiceItems.GENERATED_FROM_TEMPLATE_VERSION,
                 'generated_key': S.ServiceItems.GENERATED_KEY,
+                'template_node_key': S.ServiceItems.TEMPLATE_NODE_KEY,
                 'origin': S.ServiceItems.ORIGIN,
                 'is_template_managed': S.ServiceItems.IS_TEMPLATE_MANAGED,
                 'sort_order': S.ServiceItems.SORT_ORDER,
+                'is_user_modified': S.ServiceItems.IS_USER_MODIFIED,
+                'user_modified_at': S.ServiceItems.USER_MODIFIED_AT,
+                'user_modified_fields': S.ServiceItems.USER_MODIFIED_FIELDS,
             }
             if invoice_supported:
                 optional_fields['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
+            if invoice_date_supported:
+                optional_fields['invoice_date'] = S.ServiceItems.INVOICE_DATE
             
             for field, column in optional_fields.items():
                 if field in kwargs and kwargs[field] is not None:
                     columns.append(column)
-                    if field == 'is_billed':
+                    if field in {'is_billed', 'is_user_modified'}:
                         values.append(int(bool(kwargs[field])))
                     else:
                         values.append(kwargs[field])
@@ -1867,12 +2264,18 @@ def update_service_item(item_id, **kwargs):
                 'generated_from_template_id': S.ServiceItems.GENERATED_FROM_TEMPLATE_ID,
                 'generated_from_template_version': S.ServiceItems.GENERATED_FROM_TEMPLATE_VERSION,
                 'generated_key': S.ServiceItems.GENERATED_KEY,
+                'template_node_key': S.ServiceItems.TEMPLATE_NODE_KEY,
                 'origin': S.ServiceItems.ORIGIN,
                 'is_template_managed': S.ServiceItems.IS_TEMPLATE_MANAGED,
                 'sort_order': S.ServiceItems.SORT_ORDER,
+                'is_user_modified': S.ServiceItems.IS_USER_MODIFIED,
+                'user_modified_at': S.ServiceItems.USER_MODIFIED_AT,
+                'user_modified_fields': S.ServiceItems.USER_MODIFIED_FIELDS,
             }
             if invoice_supported:
                 field_mappings['invoice_reference'] = S.ServiceItems.INVOICE_REFERENCE
+            if invoice_date_supported:
+                field_mappings['invoice_date'] = S.ServiceItems.INVOICE_DATE
 
             manual_fields = {
                 'title',
@@ -1887,13 +2290,15 @@ def update_service_item(item_id, **kwargs):
                 'invoice_reference',
                 'item_type',
                 'sort_order',
+                'status',
+                'is_billed',
             }
             should_unmanage = any(field in kwargs for field in manual_fields)
             
             for field, column in field_mappings.items():
                 if field in kwargs:
                     updates.append(f"{column} = ?")
-                    if field == 'is_billed':
+                    if field in {'is_billed', 'is_user_modified'}:
                         values.append(int(bool(kwargs[field])))
                     else:
                         if field == 'status':
@@ -1907,6 +2312,12 @@ def update_service_item(item_id, **kwargs):
             if should_unmanage and 'is_template_managed' not in kwargs:
                 updates.append(f"{S.ServiceItems.IS_TEMPLATE_MANAGED} = ?")
                 values.append(0)
+
+            if should_unmanage and 'is_user_modified' not in kwargs:
+                updates.append(f"{S.ServiceItems.IS_USER_MODIFIED} = ?")
+                values.append(1)
+                updates.append(f"{S.ServiceItems.USER_MODIFIED_AT} = ?")
+                values.append(datetime.now())
             
             if not updates:
                 return False
@@ -2449,6 +2860,27 @@ def _ensure_service_item_invoice_column(cursor) -> bool:
             logger.warning("Invoice reference column unavailable on ServiceItems: %s", exc)
             _service_item_invoice_column_ready = False
             return False
+
+
+_service_item_invoice_date_column_ready = None
+
+
+def _ensure_service_item_invoice_date_column(cursor) -> bool:
+    """Check whether ServiceItems has the invoice_date column."""
+    global _service_item_invoice_date_column_ready
+    if _service_item_invoice_date_column_ready is not None:
+        return _service_item_invoice_date_column_ready
+
+    table = S.ServiceItems.TABLE
+    column = S.ServiceItems.INVOICE_DATE
+    try:
+        cursor.execute(f"SELECT {column} FROM {table} WHERE 1 = 0")
+        _service_item_invoice_date_column_ready = True
+        return True
+    except Exception as exc:
+        logger.warning("Invoice date column unavailable on ServiceItems: %s", exc)
+        _service_item_invoice_date_column_ready = False
+        return False
 
 def connect_to_db(db_name=None):
     """Connect to the specified SQL Server database using environment settings."""
@@ -4943,12 +5375,157 @@ def get_projects_full():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM vw_projects_full")
+            cursor.execute(f"SELECT * FROM {S.ProjectsFullView.TABLE}")
             columns = [c[0] for c in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
     except Exception as e:
         logger.error(f"❌ Error fetching full projects: {e}")
         return []
+
+
+def _build_projects_summary_filters(
+    view_id=None,
+    search=None,
+    current_user_id=None,
+    client_ids=None,
+    type_ids=None,
+    manager=None,
+):
+    where_clauses = []
+    params = []
+
+    if view_id in ("active", "on_hold", "completed"):
+        where_clauses.append(
+            "LOWER(REPLACE(ISNULL({status}, ''), ' ', '_')) = ?".format(
+                status=S.ProjectsSummaryView.STATUS,
+            )
+        )
+        params.append(view_id)
+    elif view_id == "my_work" and current_user_id:
+        where_clauses.append(f"{S.ProjectsSummaryView.INTERNAL_LEAD} = ?")
+        params.append(current_user_id)
+
+    if search:
+        search_value = f"%{str(search).strip().lower()}%"
+        where_clauses.append(
+            "("
+            f"LOWER(ISNULL({S.ProjectsSummaryView.PROJECT_NAME}, '')) LIKE ? OR "
+            f"LOWER(ISNULL({S.ProjectsSummaryView.PROJECT_NUMBER}, '')) LIKE ? OR "
+            f"LOWER(ISNULL({S.ProjectsSummaryView.CONTRACT_NUMBER}, '')) LIKE ? OR "
+            f"LOWER(ISNULL({S.ProjectsSummaryView.CLIENT_NAME}, '')) LIKE ?"
+            ")"
+        )
+        params.extend([search_value, search_value, search_value, search_value])
+
+    if client_ids:
+        placeholders = ", ".join("?" for _ in client_ids)
+        where_clauses.append(f"{S.ProjectsSummaryView.CLIENT_ID} IN ({placeholders})")
+        params.extend(client_ids)
+
+    if type_ids:
+        placeholders = ", ".join("?" for _ in type_ids)
+        where_clauses.append(f"{S.ProjectsSummaryView.TYPE_ID} IN ({placeholders})")
+        params.extend(type_ids)
+
+    if manager:
+        where_clauses.append(f"LOWER(ISNULL({S.ProjectsSummaryView.PROJECT_MANAGER}, '')) = LOWER(?)")
+        params.append(manager)
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    return where_sql, params
+
+
+def get_projects_summary(
+    view_id=None,
+    search=None,
+    current_user_id=None,
+    client_ids=None,
+    type_ids=None,
+    manager=None,
+):
+    """Return ProjectSummary rows from vw_projects_summary."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            where_sql, params = _build_projects_summary_filters(
+                view_id=view_id,
+                search=search,
+                current_user_id=current_user_id,
+                client_ids=client_ids,
+                type_ids=type_ids,
+                manager=manager,
+            )
+            cursor.execute(
+                f"""
+                SELECT *
+                FROM {S.ProjectsSummaryView.TABLE}
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            columns = [c[0] for c in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Error fetching projects summary: {e}")
+        return []
+
+
+def get_projects_aggregates(
+    view_id=None,
+    search=None,
+    current_user_id=None,
+    client_ids=None,
+    type_ids=None,
+    manager=None,
+):
+    """Return aggregate totals for ProjectSummary filters."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            where_sql, params = _build_projects_summary_filters(
+                view_id=view_id,
+                search=search,
+                current_user_id=current_user_id,
+                client_ids=client_ids,
+                type_ids=type_ids,
+                manager=manager,
+            )
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS project_count,
+                    SUM(CAST(ISNULL({S.ProjectsSummaryView.AGREED_FEE}, 0) AS DECIMAL(18,4))) AS sum_agreed_fee,
+                    SUM(CAST(ISNULL({S.ProjectsSummaryView.BILLED_TO_DATE}, 0) AS DECIMAL(18,4))) AS sum_billed_to_date,
+                    SUM(CAST(ISNULL({S.ProjectsSummaryView.UNBILLED_AMOUNT}, 0) AS DECIMAL(18,4))) AS sum_unbilled_amount,
+                    SUM(CAST(ISNULL({S.ProjectsSummaryView.EARNED_VALUE}, 0) AS DECIMAL(18,4))) AS sum_earned_value,
+                    CASE
+                        WHEN SUM(CAST(ISNULL({S.ProjectsSummaryView.AGREED_FEE}, 0) AS DECIMAL(18,4))) > 0
+                            THEN (
+                                SUM(CAST(ISNULL({S.ProjectsSummaryView.EARNED_VALUE}, 0) AS DECIMAL(18,4)))
+                                / NULLIF(SUM(CAST(ISNULL({S.ProjectsSummaryView.AGREED_FEE}, 0) AS DECIMAL(18,4))), 0)
+                            ) * 100.0
+                        ELSE 0
+                    END AS weighted_earned_value_pct
+                FROM {S.ProjectsSummaryView.TABLE}
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "project_count": int(row[0] or 0),
+                "sum_agreed_fee": float(row[1] or 0),
+                "sum_billed_to_date": float(row[2] or 0),
+                "sum_unbilled_amount": float(row[3] or 0),
+                "sum_earned_value": float(row[4] or 0),
+                "weighted_earned_value_pct": float(row[5] or 0),
+            }
+    except Exception as e:
+        logger.error(f"Error fetching projects aggregates: {e}")
+        return None
+
 
 
 def get_projects_with_health():

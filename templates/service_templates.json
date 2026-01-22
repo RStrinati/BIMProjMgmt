@@ -206,6 +206,40 @@
           "is_optional": true
         }
       ]
+    },
+    {
+      "name": "Service Test Template",
+      "sector": "Education",
+      "notes": "Updated template",
+      "items": [
+        {
+          "phase": "Phase 1 - Updated",
+          "service_code": "UPD001",
+          "service_name": "Updated Service",
+          "unit_type": "review",
+          "default_units": 10,
+          "unit_rate": 3000.0,
+          "bill_rule": "per_unit_complete",
+          "notes": "Updated service for testing"
+        }
+      ]
+    },
+    {
+      "name": "New Service Template",
+      "sector": "Commercial",
+      "notes": "Newly created template",
+      "items": [
+        {
+          "phase": "Phase 1 - New Service",
+          "service_code": "NEW001",
+          "service_name": "New Test Service",
+          "unit_type": "lump_sum",
+          "default_units": 1,
+          "lump_sum_fee": 12000.0,
+          "bill_rule": "on_completion",
+          "notes": "New service for testing"
+        }
+      ]
     }
   ]
 }

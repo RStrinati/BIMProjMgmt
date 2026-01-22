@@ -79,38 +79,55 @@ export function TimelineRow({
       }}
     >
       <Box sx={{ width: labelWidth, pr: 2, overflow: 'hidden' }} data-testid="timeline-row-label">
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-          <Typography variant="body2" noWrap fontWeight={600} sx={{ minWidth: 0, flex: 1 }}>
-            {row.label}
-          </Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
-            {row.priorityLabel || row.priorityValue != null ? (
-              <Box data-testid="timeline-row-priority" sx={{ display: 'flex', alignItems: 'center' }}>
-                <FlagRounded
-                  fontSize="small"
-                  sx={(theme) => ({
-                    color: resolvePriorityTone(row.priorityLabel ?? row.priorityValue)
-                      ? theme.palette[resolvePriorityTone(row.priorityLabel ?? row.priorityValue) as 'error' | 'warning' | 'info'].main
-                      : theme.palette.text.disabled,
-                  })}
-                />
-              </Box>
-            ) : null}
-            {row.leadLabel ? (
-              <Avatar
-                data-testid="timeline-row-lead"
-                sx={{
-                  width: 18,
-                  height: 18,
-                  fontSize: 10,
-                  bgcolor: 'grey.200',
-                  color: 'text.primary',
-                }}
-              >
-                {row.leadInitials}
-              </Avatar>
-            ) : null}
+        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography variant="body2" noWrap fontWeight={600} sx={{ minWidth: 0, flex: 1 }}>
+              {row.label}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+              {row.priorityLabel || row.priorityValue != null ? (
+                <Box data-testid="timeline-row-priority" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FlagRounded
+                    fontSize="small"
+                    sx={(theme) => ({
+                      color: resolvePriorityTone(row.priorityLabel ?? row.priorityValue)
+                        ? theme.palette[resolvePriorityTone(row.priorityLabel ?? row.priorityValue) as 'error' | 'warning' | 'info'].main
+                        : theme.palette.text.disabled,
+                    })}
+                  />
+                </Box>
+              ) : null}
+              {row.leadLabel ? (
+                <Avatar
+                  data-testid="timeline-row-lead"
+                  sx={{
+                    width: 18,
+                    height: 18,
+                    fontSize: 10,
+                    bgcolor: 'grey.200',
+                    color: 'text.primary',
+                  }}
+                >
+                  {row.leadInitials}
+                </Avatar>
+              ) : null}
+            </Stack>
           </Stack>
+          {row.metaLines?.length ? (
+            <Stack spacing={0} sx={{ minWidth: 0 }}>
+              {row.metaLines.map((line, index) => (
+                <Box key={index} sx={{ minWidth: 0 }}>
+                  {typeof line === 'string' ? (
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {line}
+                    </Typography>
+                  ) : (
+                    line
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          ) : null}
         </Stack>
       </Box>
       <Box sx={{ position: 'relative', flex: 1, height: rowHeight, minWidth: laneWidth }}>

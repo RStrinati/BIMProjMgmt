@@ -9,7 +9,7 @@ type TimelineGridProps = {
   height?: number;
 };
 
-const ROW_HEIGHT = 36;
+const ROW_HEIGHT = 52;
 const LABEL_WIDTH = 200;
 const OVERSCAN = 6;
 const HEADER_HEIGHT = 52;
