@@ -1,11 +1,19 @@
 const sql = require('mssql');
 
-// Database configuration - using named pipes
+// Validate required environment variables
+if (!process.env.DB_USER || !process.env.DB_PASSWORD) {
+    throw new Error(
+        'Missing required environment variables: DB_USER and/or DB_PASSWORD. ' +
+        'Please set these in your .env file or system environment.'
+    );
+}
+
+// Database configuration - using environment variables (no hardcoded credentials)
 const dbConfig = {
-    user: 'admin02',
-    password: '1234',
-    server: 'np:\\\\.\\pipe\\MSSQL$SQLEXPRESS\\sql\\query',
-    database: 'acc_data_schema',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER || 'localhost\\SQLEXPRESS',
+    database: process.env.ACC_DB || 'acc_data_schema',
     options: {
         encrypt: false,
         trustServerCertificate: true,

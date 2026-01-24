@@ -5,10 +5,19 @@ const execAsync = util.promisify(exec);
 // Database helper using sqlcmd since direct connection isn't working
 class DatabaseHelper {
     constructor() {
-        this.connectionString = 'P-NB-USER-028\\SQLEXPRESS';
-        this.username = 'admin02';
-        this.password = '1234';
-        this.database = 'acc_data_schema';
+        // Use environment variables for credentials (no hardcoded defaults)
+        this.connectionString = process.env.DB_SERVER || 'localhost\\SQLEXPRESS';
+        this.username = process.env.DB_USER;
+        this.password = process.env.DB_PASSWORD;
+        this.database = process.env.ACC_DB || 'acc_data_schema';
+        
+        // Validate required credentials
+        if (!this.username || !this.password) {
+            throw new Error(
+                'Missing required environment variables: DB_USER and/or DB_PASSWORD. ' +
+                'Please set these in your .env file or system environment.'
+            );
+        }
     }
 
     async executeQuery(query) {

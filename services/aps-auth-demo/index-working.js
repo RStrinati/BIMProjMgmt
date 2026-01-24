@@ -161,9 +161,9 @@ app.get('/test-database', async (req, res) => {
             success: true,
             message: '✅ Database connection successful (via sqlcmd)',
             serverInfo: {
-                server: 'P-NB-USER-028\\SQLEXPRESS',
-                database: 'acc_data_schema',
-                user: 'admin02',
+                server: process.env.DB_SERVER || 'localhost\\SQLEXPRESS',
+                database: process.env.ACC_DB || 'acc_data_schema',
+                user: process.env.DB_USER,
                 method: 'sqlcmd (bypassing Node.js connection issues)'
             },
             dataInfo: {

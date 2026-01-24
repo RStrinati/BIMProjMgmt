@@ -3,11 +3,19 @@ const axios = require('axios');
 const sql = require('mssql');
 const app = express();
 
-// Database configuration using your SQL Server credentials
+// Validate required environment variables
+if (!process.env.DB_USER || !process.env.DB_PASSWORD) {
+    throw new Error(
+        'Missing required environment variables: DB_USER and/or DB_PASSWORD. ' +
+        'Please set these in your .env file or system environment.'
+    );
+}
+
+// Database configuration using environment variables (no hardcoded credentials)
 const dbConfig = {
-    user: process.env.DB_USER || 'admin02',
-    password: process.env.DB_PASSWORD || '1234',
-    server: process.env.DB_SERVER || 'P-NB-USER-028\\SQLEXPRESS',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER || 'localhost\\SQLEXPRESS',
     database: process.env.ACC_DB || 'acc_data_schema',
     driver: process.env.DB_DRIVER || 'ODBC Driver 17 for SQL Server',
     options: {
