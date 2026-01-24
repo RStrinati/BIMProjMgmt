@@ -793,7 +793,7 @@ export default function ProjectsHomePageV2() {
                   key={project.project_id}
                   data-testid={`projects-home-list-row-${project.project_id}`}
                   hover
-                  onClick={() => navigate(`/projects/${project.project_id}`)}
+                  onClick={() => navigate(`/projects/${project.project_id}/workspace/overview`)}
                   sx={{ cursor: 'pointer' }}
                 >
                   {listFields.map((field) => (
@@ -875,7 +875,7 @@ export default function ProjectsHomePageV2() {
                         cursor: 'pointer',
                         '&:hover': { boxShadow: 1 },
                       }}
-                      onClick={() => navigate(`/projects/${project.project_id}`)}
+                      onClick={() => navigate(`/projects/${project.project_id}/workspace/overview`)}
                     >
                       <CardContent sx={{ p: 0 }}>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>

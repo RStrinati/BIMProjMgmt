@@ -146,7 +146,7 @@ test.describe('Workspace Updates Feature', () => {
       await expect(page.getByText('No updates yet')).toBeVisible();
 
       // Type and post update
-      const composer = page.getByTestId('workspace-update-composer').locator('textarea, input');
+      const composer = page.getByTestId('workspace-update-composer').getByRole('textbox');
       await composer.fill('First project update!');
 
       const postButton = page.getByTestId('workspace-post-update-button');
@@ -333,7 +333,8 @@ test.describe('Workspace Updates Feature', () => {
       await page.waitForTimeout(200);
 
       // Verify URL updated
-      await expect(page).toHaveURL(/.*\?sel=update%3A1/);
+      // Selection uses unencoded colon in URL (e.g., ?sel=update:1)
+      await expect(page).toHaveURL(/.*\?sel=update:1/);
 
       // Verify right panel shows update detail
       const updateDetailPanel = page.getByTestId('update-detail-panel');
@@ -484,7 +485,7 @@ test.describe('Workspace Updates Feature', () => {
       await expect(updateDetailPanel).toContainText('Comments (0)');
 
       // Add comment
-      const commentComposer = page.getByTestId('update-comment-composer').locator('textarea, input');
+      const commentComposer = page.getByTestId('update-comment-composer').getByRole('textbox');
       await commentComposer.fill('This is a test comment!');
 
       const addCommentButton = page.getByTestId('update-add-comment-button');

@@ -22,7 +22,7 @@ import {
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { invoiceBatchesApi, projectServicesApi, serviceItemsApi } from '@/api';
 import { projectReviewsApi } from '@/api/projectReviews';
-import type { InvoiceBatch, Project, ProjectReviewItem, ProjectReviewsResponse, ServiceItem } from '@/types/api';
+import type { InvoiceBatch, Project, ProjectReviewItem, ProjectReviewsResponse, ServiceItem, ServiceReview } from '@/types/api';
 import { useProjectReviews } from '@/hooks/useProjectReviews';
 import type { Selection } from '@/hooks/useWorkspaceSelection';
 import { EditableCell, ToggleCell } from '@/components/projects/EditableCells';
@@ -57,6 +57,14 @@ const formatInvoiceMonth = (value?: string | null) => {
 
 const ITEM_STATUS_OPTIONS = ['planned', 'in_progress', 'completed', 'overdue', 'cancelled'] as const;
 const ITEM_PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical'] as const;
+const INVOICE_STATUS_OPTIONS = ['unbilled', 'invoiced', 'paid'] as const;
+
+const PHASE_ORDER = ['Initiation', 'Design', 'Construction', 'As-Built'];
+const phaseIndex = (p?: string | null) => {
+  if (!p) return Number.POSITIVE_INFINITY;
+  const idx = PHASE_ORDER.findIndex((x) => x.toLowerCase() === p.toLowerCase());
+  return idx >= 0 ? idx : Number.POSITIVE_INFINITY;
+};
 
 export default function DeliverablesTab() {
   const navigate = useNavigate();
@@ -352,6 +360,78 @@ export default function DeliverablesTab() {
     setItemDrafts((prev) => [draft, ...prev]);
   };
 
+  type UnifiedDeliverable = {
+    kind: 'review' | 'item';
+    id: number;
+    service_id: number;
+    service_label: string;
+    phase?: string | null;
+    title: string;
+    planned_date?: string | null;
+    due_date?: string | null;
+    status?: string | null;
+    fee_amount?: number | null;
+    invoice_status?: string | null;
+    invoice_reference?: string | null;
+    raw: ProjectReviewItem | ServiceItem;
+  };
+
+  const serviceLabelById = useMemo(() => {
+    const map = new Map<number, string>();
+    services.forEach((s) => {
+      map.set(s.service_id, [s.service_code, s.service_name].filter(Boolean).join(' · '));
+    });
+    return map;
+  }, [services]);
+
+  const reviewsForSelectedService = useMemo(
+    () => filteredReviewItems.filter((r) => !selectedServiceId || r.service_id === selectedServiceId),
+    [filteredReviewItems, selectedServiceId],
+  );
+
+  const unifiedDeliverables = useMemo<UnifiedDeliverable[]>(() => {
+    const reviewRows: UnifiedDeliverable[] = reviewsForSelectedService.map((r) => ({
+      kind: 'review',
+      id: r.review_id,
+      service_id: r.service_id,
+      service_label: serviceLabelById.get(r.service_id) || [r.service_code, r.service_name].filter(Boolean).join(' · '),
+      phase: r.phase,
+      title: r.deliverables || (r.cycle_no ? `Review Cycle ${r.cycle_no}` : 'Review'),
+      planned_date: r.planned_date,
+      due_date: r.due_date,
+      status: r.status || null,
+      fee_amount: (r as any).fee_amount ?? null,
+      invoice_status: (r as any).invoice_status ?? null,
+      invoice_reference: r.invoice_reference || null,
+      raw: r,
+    }));
+    const itemRows: UnifiedDeliverable[] = [...itemDrafts, ...filteredServiceItems].map((i) => ({
+      kind: 'item',
+      id: i.item_id,
+      service_id: i.service_id,
+      service_label: serviceLabelById.get(i.service_id) || [i.service_code, i.service_name].filter(Boolean).join(' · '),
+      phase: i.phase,
+      title: i.title,
+      planned_date: i.planned_date || null,
+      due_date: i.due_date || null,
+      status: i.status,
+      fee_amount: i.fee_amount ?? null,
+      invoice_status: i.invoice_status ?? null,
+      invoice_reference: i.invoice_reference || null,
+      raw: i,
+    }));
+    const all = [...reviewRows, ...itemRows];
+    return all.sort((a, b) => {
+      const pa = phaseIndex(a.phase);
+      const pb = phaseIndex(b.phase);
+      if (pa !== pb) return pa - pb;
+      const da = (a.planned_date || a.due_date || '') as string;
+      const db = (b.planned_date || b.due_date || '') as string;
+      if (da && db) return da.localeCompare(db);
+      return (a.title || '').localeCompare(b.title || '');
+    });
+  }, [reviewsForSelectedService, itemDrafts, filteredServiceItems, serviceLabelById]);
+
   return (
     <Box data-testid="workspace-deliverables-tab">
       {reviewUpdateError && (
@@ -369,9 +449,9 @@ export default function DeliverablesTab() {
           Failed to load project reviews.
         </Alert>
       )}
-      {projectReviewsLoading ? (
+      {projectReviewsLoading && serviceItemsLoading ? (
         <Typography color="text.secondary">Loading deliverables...</Typography>
-      ) : (reviewItems.length || serviceItems.length) ? (
+      ) : unifiedDeliverables.length ? (
         <>
           <Stack direction="row" spacing={1} sx={{ mb: 2 }} data-testid="deliverables-filters">
             <Chip
@@ -397,185 +477,178 @@ export default function DeliverablesTab() {
             />
           </Stack>
           <LinearListContainer>
-            <LinearListHeaderRow columns={['Service', 'Planned', 'Due', 'Invoice Month', 'Batch', 'Invoice #', 'Billed']} />
-            {filteredReviewItems.map((review) => {
-              const serviceLabel = [review.service_code, review.service_name]
-                .filter(Boolean)
-                .join(' | ');
-              const metadataLabel = [review.phase, review.cycle_no ? `Cycle ${review.cycle_no}` : null]
-                .filter(Boolean)
-                .join(' | ');
-              const invoiceMonth = review.invoice_month_final
-                || review.invoice_month_override
-                || review.invoice_month_auto
-                || formatInvoiceMonth(review.due_date);
-              const plannedMonth = formatInvoiceMonth(review.planned_date);
-              const dueMonth = formatInvoiceMonth(review.due_date);
-              const isSlipped = plannedMonth && dueMonth && plannedMonth !== dueMonth;
-              const batchOptions = invoiceMonth
-                ? invoiceBatches.filter((batch) =>
-                    batch.invoice_month === invoiceMonth
-                    && (batch.service_id == null || batch.service_id === review.service_id),
-                  )
-                : [];
-              const isBatchSaving = updateDeliverableField.isPending
-                && updateDeliverableField.variables?.review.review_id === review.review_id
-                && updateDeliverableField.variables?.fieldName === 'invoice_batch_id';
-
+            <LinearListHeaderRow columns={[
+              'Phase','Type','Service','Title','Planned','Due','Status','Fee','Invoice Status','Invoice #'
+            ]} />
+            {unifiedDeliverables.map((d) => {
+              const isReview = d.kind === 'review';
+              const review = isReview ? (d.raw as ProjectReviewItem) : null;
+              const item = !isReview ? (d.raw as ServiceItem) : null;
+              const plannedLabel = formatDate(d.planned_date || null);
+              const dueLabel = formatDate(d.due_date || null);
               return (
-                <LinearListRow
-                  key={review.review_id}
-                  testId={`deliverable-row-${review.review_id}`}
-                  columns={7}
-                  hoverable
-                >
-                  {/* Service + metadata */}
-                  <Box>
-                    <Typography variant="body2" fontWeight={500}>
-                      {serviceLabel || 'Service'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {metadataLabel}
-                    </Typography>
-                  </Box>
-
-                  {/* Planned Date (read-only) */}
-                  <LinearListCell variant="secondary">
-                    {formatDate(review.planned_date)}
-                  </LinearListCell>
-
-                  {/* Due Date - Editable */}
-                  <Box>
-                    <EditableCell
-                      value={review.due_date}
-                      type="date"
-                      testId={`cell-due-${review.review_id}`}
-                      isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'due_date'}
-                      onSave={async (newValue) => {
-                        await updateDeliverableField.mutateAsync({
-                          review,
-                          fieldName: 'due_date',
-                          value: newValue,
-                        });
+                <LinearListRow key={`${d.kind}-${d.id}`} testId={`deliverable-row-${d.kind}-${d.id}`} columns={10} hoverable>
+                  {/* Phase */}
+                  <Box sx={{ minWidth: 140 }}>
+                    <TextField
+                      size="small"
+                      value={d.phase || ''}
+                      placeholder="Phase"
+                      onChange={async (event) => {
+                        const value = event.target.value || null;
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'phase', value });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'phase', value });
+                        }
                       }}
                     />
-                    {isSlipped && (
-                      <Typography variant="caption" color="warning.main" sx={{ ml: 1 }}>
-                        Slipped
-                      </Typography>
+                  </Box>
+                  {/* Type */}
+                  <LinearListCell>{isReview ? 'Review' : (item?.item_type || 'Item')}</LinearListCell>
+                  {/* Service */}
+                  <LinearListCell>{d.service_label || 'Service'}</LinearListCell>
+                  {/* Title */}
+                  <Box sx={{ minWidth: 220 }}>
+                    {item ? (
+                      <EditableCell
+                        value={d.title}
+                        type="text"
+                        testId={`cell-title-${d.kind}-${d.id}`}
+                        isSaving={updateServiceItemField.isPending && updateServiceItemField.variables?.item.item_id === d.id && updateServiceItemField.variables?.fieldName === 'title'}
+                        onSave={async (value) => {
+                          await updateServiceItemField.mutateAsync({ item: item!, fieldName: 'title', value });
+                        }}
+                      />
+                    ) : (
+                      <LinearListCell variant="secondary">{d.title}</LinearListCell>
                     )}
                   </Box>
-
-                  {/* Invoice Month - Editable override */}
-                  <EditableCell
-                    value={invoiceMonth}
-                    type="month"
-                    testId={`cell-invoice-month-${review.review_id}`}
-                    isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_month_override'}
-                    onSave={async (newValue) => {
-                      await updateDeliverableField.mutateAsync({
-                        review,
-                        fieldName: 'invoice_month_override',
-                        value: newValue,
-                      });
-                    }}
-                  />
-
-                  {/* Invoice Batch - Select */}
-                  <Box sx={{ minWidth: 160 }}>
+                  {/* Planned */}
+                  <Box>
+                    {item ? (
+                      <EditableCell
+                        value={item.planned_date}
+                        type="date"
+                        testId={`cell-planned-${d.kind}-${d.id}`}
+                        isSaving={updateServiceItemField.isPending && updateServiceItemField.variables?.item.item_id === d.id && updateServiceItemField.variables?.fieldName === 'planned_date'}
+                        onSave={async (value) => {
+                          await updateServiceItemField.mutateAsync({ item: item!, fieldName: 'planned_date', value });
+                        }}
+                      />
+                    ) : (
+                      <LinearListCell variant="secondary">{plannedLabel}</LinearListCell>
+                    )}
+                  </Box>
+                  {/* Due */}
+                  <Box>
+                    <EditableCell
+                      value={d.due_date || ''}
+                      type="date"
+                      testId={`cell-due-${d.kind}-${d.id}`}
+                      isSaving={
+                        isReview
+                          ? (updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === d.id && updateDeliverableField.variables?.fieldName === 'due_date')
+                          : (updateServiceItemField.isPending && updateServiceItemField.variables?.item.item_id === d.id && updateServiceItemField.variables?.fieldName === 'due_date')
+                      }
+                      onSave={async (value) => {
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'due_date', value });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'due_date', value });
+                        }
+                      }}
+                    />
+                  </Box>
+                  {/* Status */}
+                  <Box sx={{ minWidth: 140 }}>
                     <TextField
                       select
                       size="small"
-                      fullWidth
-                      value={review.invoice_batch_id ? String(review.invoice_batch_id) : ''}
-                      disabled={!invoiceMonth || isBatchSaving || createInvoiceBatch.isPending}
-                      SelectProps={{
-                        displayEmpty: true,
-                        renderValue: (selected) => {
-                          if (!invoiceMonth) {
-                            return 'Set invoice month';
-                          }
-                          if (!selected) {
-                            return 'Unbatched';
-                          }
-                          const match = batchOptions.find((batch) => String(batch.invoice_batch_id) === selected);
-                          return match?.title || `Batch #${selected}`;
-                        },
-                        inputProps: {
-                          'data-testid': `cell-invoice-batch-${review.review_id}`,
-                        },
-                      }}
+                      value={(d.status || 'planned')}
                       onChange={async (event) => {
                         const value = event.target.value;
-                        if (value === '__create__' && invoiceMonth) {
-                          const title = window.prompt('Batch title (optional)') || null;
-                          const result = await createInvoiceBatch.mutateAsync({
-                            project_id: projectId,
-                            service_id: review.service_id,
-                            invoice_month: invoiceMonth,
-                            title,
-                          });
-                          if (result?.invoice_batch_id) {
-                            await updateDeliverableField.mutateAsync({
-                              review,
-                              fieldName: 'invoice_batch_id',
-                              value: result.invoice_batch_id,
-                            });
-                          }
-                          return;
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'status', value });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'status', value });
                         }
-                        await updateDeliverableField.mutateAsync({
-                          review,
-                          fieldName: 'invoice_batch_id',
-                          value: value ? Number(value) : null,
-                        });
                       }}
                     >
-                      <MenuItem value="">Unbatched</MenuItem>
-                      {batchOptions.map((batch) => (
-                        <MenuItem key={batch.invoice_batch_id} value={String(batch.invoice_batch_id)}>
-                          {batch.title || `Batch #${batch.invoice_batch_id}`}
-                        </MenuItem>
+                      {ITEM_STATUS_OPTIONS.map((s) => (
+                        <MenuItem key={s} value={s}>{s}</MenuItem>
                       ))}
-                      <MenuItem value="__create__">Create new batch</MenuItem>
                     </TextField>
                   </Box>
-
-                  {/* Invoice Number - Editable */}
-                  <EditableCell
-                    value={review.invoice_reference}
-                    type="text"
-                    testId={`cell-invoice-number-${review.review_id}`}
-                    isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'invoice_reference'}
-                    onSave={async (newValue) => {
-                      await updateDeliverableField.mutateAsync({
-                        review,
-                        fieldName: 'invoice_reference',
-                        value: newValue,
-                      });
-                    }}
-                  />
-
-                  {/* Billing Status - Toggleable */}
-                  <ToggleCell
-                    value={review.is_billed}
-                    testId={`cell-billing-status-${review.review_id}`}
-                    isSaving={updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === review.review_id && updateDeliverableField.variables?.fieldName === 'is_billed'}
-                    onSave={async (newValue) => {
-                      await updateDeliverableField.mutateAsync({
-                        review,
-                        fieldName: 'is_billed',
-                        value: newValue,
-                      });
-                    }}
-                  />
+                  {/* Fee */}
+                  <Box sx={{ minWidth: 120 }}>
+                    <EditableCell
+                      value={d.fee_amount ?? null}
+                      type="number"
+                      testId={`cell-fee-${d.kind}-${d.id}`}
+                      isSaving={
+                        isReview
+                          ? (updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === d.id && updateDeliverableField.variables?.fieldName === 'fee_amount')
+                          : (updateServiceItemField.isPending && updateServiceItemField.variables?.item.item_id === d.id && updateServiceItemField.variables?.fieldName === 'fee_amount')
+                      }
+                      onSave={async (value) => {
+                        const parsed = value === '' ? null : Number(value);
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'fee_amount', value: parsed });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'fee_amount', value: parsed });
+                        }
+                      }}
+                    />
+                  </Box>
+                  {/* Invoice Status */}
+                  <Box sx={{ minWidth: 140 }}>
+                    <TextField
+                      select
+                      size="small"
+                      value={d.invoice_status || ''}
+                      onChange={async (event) => {
+                        const value = event.target.value || null;
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'invoice_status', value });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'invoice_status', value });
+                        }
+                      }}
+                    >
+                      <MenuItem value="">--</MenuItem>
+                      {INVOICE_STATUS_OPTIONS.map((s) => (
+                        <MenuItem key={s} value={s}>{s}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Box>
+                  {/* Invoice # */}
+                  <Box sx={{ minWidth: 160 }}>
+                    <EditableCell
+                      value={d.invoice_reference || ''}
+                      type="text"
+                      testId={`cell-invref-${d.kind}-${d.id}`}
+                      isSaving={
+                        isReview
+                          ? (updateDeliverableField.isPending && updateDeliverableField.variables?.review.review_id === d.id && updateDeliverableField.variables?.fieldName === 'invoice_reference')
+                          : (updateServiceItemField.isPending && updateServiceItemField.variables?.item.item_id === d.id && updateServiceItemField.variables?.fieldName === 'invoice_reference')
+                      }
+                      onSave={async (value) => {
+                        if (isReview && review) {
+                          await updateDeliverableField.mutateAsync({ review, fieldName: 'invoice_reference', value });
+                        } else if (item) {
+                          await updateServiceItemField.mutateAsync({ item, fieldName: 'invoice_reference', value });
+                        }
+                      }}
+                    />
+                  </Box>
                 </LinearListRow>
               );
             })}
           </LinearListContainer>
           <Box sx={{ mt: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>
-              Items
+              Add Deliverable (Item)
             </Typography>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
               <TextField

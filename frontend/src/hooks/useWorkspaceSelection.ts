@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export type SelectionType = 'service' | 'review' | 'item' | 'issue' | 'task' | 'update' | 'model' | 'service_template';
 
@@ -51,6 +51,7 @@ const serializeSelection = (selection: Selection | null): string | null => {
 
 export function useWorkspaceSelection() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [selection, setSelectionState] = useState<Selection | null>(() => {
     return parseSelection(searchParams.get('sel'));
   });
@@ -80,20 +81,12 @@ export function useWorkspaceSelection() {
 
   const setSelection = useCallback((newSelection: Selection | null) => {
     setSelectionState(newSelection);
-    
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      const serialized = serializeSelection(newSelection);
-      
-      if (serialized) {
-        next.set('sel', serialized);
-      } else {
-        next.delete('sel');
-      }
-      
-      return next;
-    });
-  }, [setSearchParams]);
+
+    // Update URL search explicitly to avoid encoding the colon in sel value
+    const serialized = serializeSelection(newSelection);
+    const search = serialized ? `?sel=${serialized}` : '';
+    navigate({ search }, { replace: true });
+  }, [navigate]);
 
   const clearSelection = useCallback(() => {
     setSelection(null);

@@ -75,20 +75,22 @@ test.describe('Workspace Services - Panel Integration', () => {
       await route.continue();
     });
 
-    // Mock service reviews API
+    // Mock service reviews API (return { reviews: [...] } to match client)
     await page.route(/.*\/api\/projects\/\d+\/services\/\d+\/reviews/, async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([
-            {
-              review_id: 1,
-              cycle_no: 1,
-              status: 'completed',
-              planned_date: '2024-01-15',
-            },
-          ]),
+          body: JSON.stringify({
+            reviews: [
+              {
+                review_id: 1,
+                cycle_no: 1,
+                status: 'completed',
+                planned_date: '2024-01-15',
+              },
+            ],
+          }),
         });
         return;
       }
@@ -116,14 +118,14 @@ test.describe('Workspace Services - Panel Integration', () => {
     const container = page.locator('[data-testid*="linear-list-container"]').first();
     await expect(container).toBeVisible();
 
-    // Verify header row with consistent columns
-    await expect(page.getByText('Service')).toBeVisible();
-    await expect(page.getByText('Phase')).toBeVisible();
-    await expect(page.getByText('Status')).toBeVisible();
-    await expect(page.getByText('Agreed')).toBeVisible();
-    await expect(page.getByText('Billed')).toBeVisible();
-    await expect(page.getByText('Remaining')).toBeVisible();
-    await expect(page.getByText('Progress')).toBeVisible();
+    // Verify header row with consistent columns (scope to LinearList container)
+    await expect(container.getByText('Service')).toBeVisible();
+    await expect(container.getByText('Phase')).toBeVisible();
+    await expect(container.getByText('Status')).toBeVisible();
+    await expect(container.getByText('Agreed')).toBeVisible();
+    await expect(container.getByText('Billed')).toBeVisible();
+    await expect(container.getByText('Remaining')).toBeVisible();
+    await expect(container.getByText('Progress')).toBeVisible();
   });
 
   test('service rows are clickable and update right panel', async ({ page }) => {

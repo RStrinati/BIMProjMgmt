@@ -229,8 +229,8 @@ test.describe('Workspace Issues - Panel Integration', () => {
     const legacyDrawer = page.getByTestId('issue-detail-drawer');
     await expect(legacyDrawer).not.toBeVisible();
 
-    // Verify no MUI drawer/modal overlay
-    const drawerBackdrop = page.locator('.MuiDrawer-root');
+    // Verify no MUI modal drawer overlay (exclude permanent nav drawer)
+    const drawerBackdrop = page.locator('.MuiDrawer-modal');
     await expect(drawerBackdrop).not.toBeVisible();
   });
 

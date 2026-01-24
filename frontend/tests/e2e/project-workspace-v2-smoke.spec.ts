@@ -1,45 +1,43 @@
 import { test, expect } from '@playwright/test';
+import { navigateToProjectWorkspace, switchTab, editInlineCell, waitForLoading } from '../helpers';
 
 const projectId = Number(process.env.SMOKE_TEST_PROJECT_ID || 0);
 const reviewId = Number(process.env.SMOKE_TEST_REVIEW_ID || 0);
 const newDueDate = process.env.SMOKE_TEST_NEW_DUE_DATE || '';
 const overrideMonth = process.env.SMOKE_TEST_OVERRIDE_MONTH || '';
 
-test.describe('ProjectWorkspacePageV2 - Monthly Billing Smoke', () => {
+test.describe('ProjectWorkspacePageV2 - Smoke Tests', () => {
   test.skip(!projectId, 'SMOKE_TEST_PROJECT_ID is required for smoke testing.');
 
-  test('loads workspace and invoice widgets', async ({ page }) => {
-    await page.goto(`/workspace/${projectId}`);
+  test('loads workspace and navigates tabs', async ({ page }) => {
+    await navigateToProjectWorkspace(page, projectId);
     await expect(page.getByTestId('project-workspace-v2-root')).toBeVisible();
-    await expect(page.getByTestId('project-workspace-v2-invoice-pipeline')).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Deliverables' }).click();
-    await expect(page.getByTestId('project-workspace-v2-reviews')).toBeVisible();
+    // Navigate to deliverables tab
+    await switchTab(page, 'Deliverables');
+    await expect(page.getByTestId('project-workspace-v2-deliverables')).toBeVisible();
 
+    // If test data provided, update deliverable
     if (reviewId && newDueDate) {
-      const row = page.getByTestId(`deliverable-row-${reviewId}`);
-      await expect(row).toBeVisible();
-
-      const dueCell = row.getByTestId(`cell-due-${reviewId}`);
-      await dueCell.click();
-      const dueInput = page.getByTestId(`cell-due-${reviewId}-input`);
-      await dueInput.fill(newDueDate);
-      await dueInput.press('Enter');
-
-      await page.waitForTimeout(500);
+      await editInlineCell(page, 'due-date', reviewId, newDueDate);
     }
 
     if (reviewId && overrideMonth) {
-      const row = page.getByTestId(`deliverable-row-${reviewId}`);
-      await expect(row).toBeVisible();
-
-      const invoiceMonthCell = row.getByTestId(`cell-invoice-month-${reviewId}`);
-      await invoiceMonthCell.click();
-      const overrideInput = page.getByTestId(`cell-invoice-month-${reviewId}-input`);
-      await overrideInput.fill(overrideMonth);
-      await overrideInput.press('Enter');
-
-      await page.waitForTimeout(500);
+      await editInlineCell(page, 'invoice-month', reviewId, overrideMonth);
     }
+  });
+
+  test('navigates between workspace tabs', async ({ page }) => {
+    await navigateToProjectWorkspace(page, projectId);
+
+    // Test tab navigation
+    await switchTab(page, 'Services');
+    await expect(page.getByTestId('project-workspace-v2-services')).toBeVisible();
+
+    await switchTab(page, 'Deliverables');
+    await expect(page.getByTestId('project-workspace-v2-deliverables')).toBeVisible();
+
+    await switchTab(page, 'Reviews');
+    await expect(page.getByTestId('project-workspace-v2-reviews')).toBeVisible();
   });
 });

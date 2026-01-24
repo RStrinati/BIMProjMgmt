@@ -139,6 +139,7 @@ from database import (  # noqa: E402
     update_service_review,
     update_service_template,
     resequence_service_reviews,
+    set_service_review_count,
     list_invoice_batches,
     create_invoice_batch,
     update_invoice_batch,
@@ -2023,8 +2024,8 @@ def api_update_service_review(project_id, service_id, review_id):
     
     # Validate and filter request body - only allow deliverables fields
     allowed_fields = {
-        'due_date', 'status', 'invoice_reference', 'invoice_date', 'is_billed',
-        'invoice_month_override', 'invoice_batch_id'
+        'phase', 'due_date', 'status', 'invoice_reference', 'invoice_date', 'is_billed',
+        'invoice_month_override', 'invoice_batch_id', 'fee_amount', 'billed_amount', 'invoice_status'
     }
     filtered_body = {k: v for k, v in body.items() if k in allowed_fields}
 
@@ -2039,6 +2040,7 @@ def api_update_service_review(project_id, service_id, review_id):
     
     # Map camelCase keys to snake_case for database
     field_mapping = {
+        'phase': S.ServiceReviews.PHASE,
         'due_date': S.ServiceReviews.DUE_DATE,
         'status': S.ServiceReviews.STATUS,
         'invoice_reference': S.ServiceReviews.INVOICE_REFERENCE,
@@ -2046,6 +2048,9 @@ def api_update_service_review(project_id, service_id, review_id):
         'is_billed': S.ServiceReviews.IS_BILLED,
         'invoice_month_override': S.ServiceReviews.INVOICE_MONTH_OVERRIDE,
         'invoice_batch_id': S.ServiceReviews.INVOICE_BATCH_ID,
+        'fee_amount': S.ServiceReviews.FEE_AMOUNT,
+        'billed_amount': S.ServiceReviews.BILLED_AMOUNT,
+        'invoice_status': S.ServiceReviews.INVOICE_STATUS,
     }
     
     db_body = {field_mapping[k]: v for k, v in filtered_body.items()}
@@ -2118,6 +2123,37 @@ def api_resequence_service_reviews(project_id, service_id):
         return jsonify({'error': str(exc)}), 400
     except Exception as e:
         logging.exception("Failed to resequence service reviews")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/count', methods=['POST'])
+def api_set_service_review_count(project_id, service_id):
+    """Adjust planned review count for a service: append or cancel planned rows.
+
+    Body: { desired_count: int, anchor_date?: 'YYYY-MM-DD', interval_days?: int }
+    Returns summary of changes.
+    """
+    body = request.get_json() or {}
+    desired = body.get('desired_count')
+    anchor_date = body.get('anchor_date')
+    interval_days = body.get('interval_days')
+
+    try:
+        assert_service_in_project(project_id, service_id)
+    except ServiceScopeError:
+        logging.warning(
+            "service review count scope reject project_id=%s service_id=%s",
+            project_id,
+            service_id,
+        )
+        return jsonify({'error': 'Service not found'}), 404
+
+    try:
+        result = set_service_review_count(service_id, desired_count=int(desired) if desired is not None else None, anchor_date=anchor_date, interval_days=interval_days)
+        return jsonify(result), 200
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as e:
+        logging.exception("Failed to set service review count")
         return jsonify({'error': str(e)}), 500
 
 
@@ -6831,7 +6867,7 @@ def api_update_service_item(project_id, service_id, item_id):
         allowed_fields = {
             'item_type', 'title', 'description', 'planned_date', 'due_date',
             'actual_date', 'status', 'priority', 'assigned_to', 'invoice_reference',
-            'invoice_date',
+            'invoice_date', 'phase', 'fee_amount', 'billed_amount', 'invoice_status',
             'evidence_links', 'notes', 'is_billed', 'sort_order',
         }
         filtered = {k: v for k, v in data.items() if k in allowed_fields}

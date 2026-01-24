@@ -972,6 +972,7 @@ export interface ProjectService {
 export interface ServiceReview {
   review_id: number;
   service_id: number;
+  phase?: string | null;
   cycle_no: number;
   planned_date: string;
   due_date?: string;
@@ -991,6 +992,9 @@ export interface ServiceReview {
   billing_phase?: string | null;
   billing_rate?: number | null;
   billing_amount?: number | null;
+  fee_amount?: number | null;
+  billed_amount?: number | null;
+  invoice_status?: 'unbilled' | 'invoiced' | 'paid' | string | null;
   service_name?: string;
   service_phase?: string;
   is_billed?: boolean;
@@ -1105,6 +1109,10 @@ export interface ServiceItem {
   priority: 'low' | 'medium' | 'high' | 'critical';
   assigned_to?: string;
   invoice_reference?: string;
+  invoice_date?: string | null;
+  fee_amount?: number | null;
+  billed_amount?: number | null;
+  invoice_status?: 'unbilled' | 'invoiced' | 'paid' | string | null;
   evidence_links?: string;
   notes?: string;
   created_at: string;

@@ -75,11 +75,12 @@ const formatNumericDisplay = (value: number | string | null | undefined): string
 };
 
 export function ProjectsPage() {
-  if (featureFlags.projectsHomeV2) {
-    return <ProjectsHomePageV2 />;
-  }
+  // Prefer panel UI when explicitly enabled
   if (featureFlags.projectsPanel) {
     return <ProjectsPanelPage />;
+  }
+  if (featureFlags.projectsHomeV2) {
+    return <ProjectsHomePageV2 />;
   }
 
   const navigate = useNavigate();
@@ -252,7 +253,7 @@ export function ProjectsPage() {
   };
 
   const handleViewProject = (projectId: number) => {
-    navigate(`/projects/${projectId}`);
+    navigate(`/projects/${projectId}/workspace/overview`);
   };
 
   const handleCloseDialog = () => {

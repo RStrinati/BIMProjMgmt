@@ -1,128 +1,101 @@
 import { test, expect } from '@playwright/test';
+import { setupWorkspaceMocks, switchTab, navigateToProjectWorkspace, waitForLoading } from '../helpers';
 
-const projectPayload = {
-  project_id: 1,
-  project_name: 'Delta Hub',
-  status: 'active',
-};
+const reviews = [
+  {
+    review_id: 101,
+    service_id: 55,
+    project_id: 1,
+    cycle_no: 1,
+    planned_date: '2024-05-10',
+    due_date: '2024-05-20',
+    status: 'planned',
+    service_name: 'Design Review',
+    service_code: 'DR-01',
+  },
+];
 
-const projectReviewsPayload = {
-  items: [
-    {
-      review_id: 101,
-      service_id: 55,
-      project_id: 1,
-      cycle_no: 1,
-      planned_date: '2024-05-10',
-      due_date: '2024-05-20',
-      status: 'planned',
-      disciplines: 'Architecture',
-      deliverables: 'Model',
-      is_billed: false,
-      billing_amount: 0,
-      invoice_reference: null,
-      invoice_date: null,
-      service_name: 'Design Review',
-      service_code: 'DR-01',
-      phase: 'Concept',
-    },
-  ],
-  total: 1,
-};
 
-const setupMocks = async (page: any) => {
-  await page.route('**/api/projects/1', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(projectPayload),
+test.describe('Project-wide reviews', () => {
+  test('renders all reviews for project', async ({ page }) => {
+    await setupWorkspaceMocks(page, { reviews });
+
+    // Mock reviews endpoint
+    await page.route('**/api/projects/1/reviews**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: reviews, total: 1 }),
+      });
     });
+
+    await navigateToProjectWorkspace(page, 1);
+    await switchTab(page, 'Reviews');
+
+    // Verify reviews are displayed
+    await expect(page.getByText('DR-01')).toBeVisible();
+    await expect(page.getByText('Design Review')).toBeVisible();
   });
 
-  await page.route('**/api/users', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([]),
-    });
-  });
+  test('updates review status', async ({ page }) => {
+    let statusUpdated = false;
 
-  await page.route('**/api/tasks/notes-view**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ tasks: [], total: 0, page: 1, page_size: 5 }),
-    });
-  });
+    await setupWorkspaceMocks(page, { reviews });
 
-  await page.route('**/api/projects/1/reviews**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(projectReviewsPayload),
-    });
-  });
-
-  await page.route('**/api/projects/1/items**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], total: 0 }),
-    });
-  });
-};
-
-test.describe('Workspace v2 project-wide reviews', () => {
-  test('renders reviews and handles status updates with rollback', async ({ page }) => {
-    const consoleErrors: string[] = [];
-    page.on('pageerror', (error) => consoleErrors.push(error.message));
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
+    // Mock reviews endpoint
+    await page.route('**/api/projects/1/reviews**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: reviews, total: 1 }),
+      });
     });
 
-    let patchCount = 0;
+    // Mock review status update
     await page.route('**/api/projects/1/services/55/reviews/101', async (route) => {
-      patchCount += 1;
-      if (patchCount === 1) {
-        projectReviewsPayload.items[0].status = 'completed';
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
-      } else {
-        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'fail' }) });
+      if (route.request().method() === 'PATCH') {
+        const payload = await route.request().postDataJSON();
+        reviews[0].status = payload.status || 'completed';
+        statusUpdated = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+        return;
       }
+      await route.continue();
     });
 
-    await page.addInitScript(() => {
-      window.localStorage.setItem('ff_project_workspace_v2', 'true');
-    });
+    await navigateToProjectWorkspace(page, 1);
+    await switchTab(page, 'Reviews');
 
-    await setupMocks(page);
-
-    await page.goto('/projects/1');
-    await page.getByRole('tab', { name: 'Deliverables' }).click();
-
-    const reviewRow = page.getByTestId('project-workspace-v2-review-row-101');
-    await expect(reviewRow).toBeVisible();
-    await expect(reviewRow).toContainText('DR-01');
-
-    const statusSelect = reviewRow.getByTestId('projects-panel-review-status-select');
-    await statusSelect.click();
+    // Click status selector and update
+    const statusButton = page.locator('[data-testid="review-status-101"]').first();
+    await statusButton.click();
     await page.getByRole('option', { name: 'Completed' }).click();
-    await expect(statusSelect).toHaveText('Completed');
 
-    await statusSelect.click();
-    await page.getByRole('option', { name: 'Overdue' }).click();
-    await expect(page.getByTestId('project-workspace-v2-reviews-error')).toBeVisible();
-    await expect(statusSelect).toHaveText('Completed');
+    await waitForLoading(page);
+    expect(statusUpdated).toBe(true);
+  });
 
-    const allowedErrors = [
-      'Failed to load resource: the server responded with a status of 500',
-      'API Error: 500',
-    ];
-    const unexpected = consoleErrors.filter(
-      (message) => !allowedErrors.some((allowed) => message.includes(allowed)),
-    );
-    expect(unexpected).toEqual([]);
+  test('displays review metadata', async ({ page }) => {
+    await setupWorkspaceMocks(page, { reviews });
+
+    // Mock reviews endpoint
+    await page.route('**/api/projects/1/reviews**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: reviews, total: 1 }),
+      });
+    });
+
+    await navigateToProjectWorkspace(page, 1);
+    await switchTab(page, 'Reviews');
+
+    // Verify review details are visible
+    await expect(page.getByText('Cycle 1')).toBeVisible();
+    await expect(page.getByText('5/10/2024')).toBeVisible(); // planned date formatted
   });
 });

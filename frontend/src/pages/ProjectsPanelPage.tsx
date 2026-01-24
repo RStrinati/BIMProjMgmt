@@ -350,7 +350,7 @@ export default function ProjectsPanelPage() {
           subtitle={selectedProject?.client_name || 'Unassigned client'}
           actions={
             selectedProject && (
-              <Button size="small" onClick={() => navigate(`/projects/${selectedProject.project_id}`)}>
+              <Button size="small" onClick={() => navigate(`/projects/${selectedProject.project_id}/workspace/overview`)}>
                 Open full project
               </Button>
             )

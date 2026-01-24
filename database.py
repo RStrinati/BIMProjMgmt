@@ -1,3 +1,5 @@
+from typing import Optional, Any, Dict, List, Tuple
+
 def create_service_template(template_name, description, service_type, parameters, created_by):
     """Insert a new service template."""
     try:
@@ -613,6 +615,124 @@ def resequence_service_reviews(service_id, anchor_date=None, interval_days=None,
         "anchor_date": base_date,
         "interval_days": interval,
         "count": count_value or len(review_ids),
+    }
+
+def set_service_review_count(service_id: int, desired_count: int, anchor_date: Optional[str] = None, interval_days: Optional[int] = None) -> dict:
+    """Adjust planned review count by appending new planned rows or cancelling extras.
+
+    - If desired_count > current planned count: append planned reviews after the last planned.
+    - If desired_count < current planned count: mark excess planned reviews as 'cancelled' (do not delete).
+    - Updates {S.ProjectServices.REVIEW_COUNT_PLANNED} to desired_count.
+    """
+    if desired_count is None or int(desired_count) < 0:
+        raise ValueError("desired_count must be a non-negative integer")
+
+    schedule = get_service_schedule_defaults(service_id)
+    if schedule is None:
+        raise ValueError("Service not found")
+
+    base_date = _parse_iso_date(anchor_date) if anchor_date else schedule.get("review_anchor_date") or schedule.get("start_date")
+    if not base_date:
+        raise ValueError("Anchor date is required to set review count")
+
+    try:
+        interval = int(interval_days) if interval_days is not None else int(schedule.get("review_interval_days") or 7)
+    except (TypeError, ValueError):
+        interval = 7
+
+    added = 0
+    cancelled = 0
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # Fetch planned reviews ordered by cycle_no/sort_order
+        cursor.execute(
+            f"""
+            SELECT {S.ServiceReviews.REVIEW_ID}, ISNULL({S.ServiceReviews.SORT_ORDER}, {S.ServiceReviews.CYCLE_NO}) AS ord,
+                   {S.ServiceReviews.PLANNED_DATE}
+            FROM {S.ServiceReviews.TABLE}
+            WHERE {S.ServiceReviews.SERVICE_ID} = ?
+              AND LOWER(ISNULL({S.ServiceReviews.STATUS}, '')) = 'planned'
+            ORDER BY ord ASC, {S.ServiceReviews.REVIEW_ID} ASC
+            """,
+            (service_id,)
+        )
+        planned_rows = cursor.fetchall()
+        current_planned = len(planned_rows)
+
+        # Determine max cycle_no to append new rows sequentially
+        cursor.execute(
+            f"""
+            SELECT MAX(ISNULL({S.ServiceReviews.CYCLE_NO}, 0))
+            FROM {S.ServiceReviews.TABLE}
+            WHERE {S.ServiceReviews.SERVICE_ID} = ?
+            """,
+            (service_id,)
+        )
+        row = cursor.fetchone()
+        start_cycle = int(row[0] or 0) + 1
+
+        last_planned_date = planned_rows[-1][2] if planned_rows else None
+        last_planned_date = _parse_iso_date(last_planned_date) if last_planned_date else None
+
+        if desired_count > current_planned:
+            to_add = desired_count - current_planned
+            # If we have an existing last planned date, start after it; otherwise use base_date
+            append_start = last_planned_date or base_date
+            for i in range(to_add):
+                planned_dt = append_start + timedelta(days=interval * (i + 1 if last_planned_date else i))
+                try:
+                    # Minimal planned review insert; phase defaults handled in create_service_review
+                    create_service_review(
+                        service_id=service_id,
+                        cycle_no=start_cycle + i,
+                        planned_date=planned_dt.strftime('%Y-%m-%d'),
+                        status='planned',
+                        weight_factor=1.0,
+                        origin='user_created',
+                        is_template_managed=0,
+                    )
+                    added += 1
+                except Exception:
+                    logger.exception("Failed to append planned review")
+                    continue
+
+        elif desired_count < current_planned:
+            to_cancel = current_planned - desired_count
+            # Cancel the last planned ones first
+            ids_desc = [r[0] for r in reversed(planned_rows)][:to_cancel]
+            for rid in ids_desc:
+                try:
+                    update_service_review(
+                        rid,
+                        **{
+                            S.ServiceReviews.STATUS: 'cancelled',
+                            S.ServiceReviews.IS_BILLED: 0,
+                            S.ServiceReviews.INVOICE_STATUS: 'cancelled',
+                        }
+                    )
+                    cancelled += 1
+                except Exception:
+                    logger.exception("Failed to cancel planned review")
+                    continue
+
+        # Update planned count on service
+        cursor.execute(
+            f"""
+            UPDATE {S.ProjectServices.TABLE}
+            SET {S.ProjectServices.REVIEW_COUNT_PLANNED} = ?
+            WHERE {S.ProjectServices.SERVICE_ID} = ?
+            """,
+            (desired_count, service_id)
+        )
+        conn.commit()
+
+    return {
+        "desired_count": int(desired_count),
+        "current_planned": current_planned,
+        "added": added,
+        "cancelled": cancelled,
     }
 
 # --- Service Reviews Functions ---
@@ -1378,6 +1498,27 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
             invoice_month_auto = _format_invoice_month(due_date)
             invoice_month_final = invoice_month_override or invoice_month_auto
 
+            # Prepare additional financial columns (fee_amount, billed_amount, invoice_status, phase)
+            fee_amount = billing_amount
+            billed_amount = None
+            invoice_status = None
+            try:
+                if fee_amount is None:
+                    fee_amount = float(Decimal(str(effective_rate or 0)) * Decimal(str(final_weight or 1)))
+            except Exception:
+                fee_amount = float(effective_rate or 0) * float(final_weight or 1)
+            if bool(effective_is_billed):
+                billed_amount = fee_amount
+                invoice_status = 'invoiced'
+            else:
+                billed_amount = 0.0
+                invoice_status = 'unbilled'
+
+            has_phase_col = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.PHASE)
+            has_fee_amount_col = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.FEE_AMOUNT)
+            has_billed_amount_col = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.BILLED_AMOUNT)
+            has_invoice_status_col = _column_exists(cursor, S.ServiceReviews.TABLE, S.ServiceReviews.INVOICE_STATUS)
+
             if supports_billing:
                 extra_columns = ""
                 extra_values = []
@@ -1397,14 +1538,18 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                         {S.ServiceReviews.EVIDENCE_LINKS}, {S.ServiceReviews.INVOICE_REFERENCE}, 
                         {S.ServiceReviews.SOURCE_PHASE}, {S.ServiceReviews.BILLING_PHASE}, 
                         {S.ServiceReviews.BILLING_RATE}, {S.ServiceReviews.BILLING_AMOUNT},
+                        {S.ServiceReviews.FEE_AMOUNT if has_fee_amount_col else S.ServiceReviews.BILLING_AMOUNT},
+                        {S.ServiceReviews.BILLED_AMOUNT if has_billed_amount_col else S.ServiceReviews.BILLING_AMOUNT},
+                        {S.ServiceReviews.INVOICE_STATUS if has_invoice_status_col else S.ServiceReviews.IS_BILLED},
                         {S.ServiceReviews.IS_BILLED}, {S.ServiceReviews.ORIGIN},
                         {S.ServiceReviews.IS_TEMPLATE_MANAGED}, {S.ServiceReviews.SORT_ORDER}{extra_columns}
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?' if supports_invoice_date else ''}{', ?, ?, ?, ?' if supports_invoice_month else ''})
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{', ?' if supports_invoice_date else ''}{', ?, ?, ?, ?' if supports_invoice_month else ''})
                     """,
                     (
                         service_id, cycle_no, planned_date, due_date, disciplines,
                         deliverables, status, final_weight, evidence_links, invoice_reference,
                         final_source_phase, final_billing_phase, effective_rate, effective_amount,
+                        fee_amount, billed_amount, invoice_status,
                         int(bool(effective_is_billed)), origin_value,
                         int(bool(is_template_managed)), sort_order,
                         *extra_values
@@ -1440,6 +1585,16 @@ def create_service_review(service_id, cycle_no, planned_date, due_date=None,
                     )
                 )
             conn.commit()
+            # Backfill phase if column exists
+            try:
+                if has_phase_col:
+                    cursor.execute(
+                        f"UPDATE {S.ServiceReviews.TABLE} SET {S.ServiceReviews.PHASE} = ? WHERE {S.ServiceReviews.REVIEW_ID} = @@IDENTITY",
+                        (final_source_phase,)
+                    )
+                    conn.commit()
+            except Exception:
+                pass
             return cursor.lastrowid
     except Exception as e:
         logger.error(f"Error creating service review: {e}")
@@ -1503,6 +1658,10 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.IS_USER_MODIFIED,
                 S.ServiceReviews.USER_MODIFIED_AT,
                 S.ServiceReviews.USER_MODIFIED_FIELDS,
+                S.ServiceReviews.PHASE,
+                S.ServiceReviews.FEE_AMOUNT,
+                S.ServiceReviews.BILLED_AMOUNT,
+                S.ServiceReviews.INVOICE_STATUS,
             ]
             if supports_billing:
                 allowed_fields.extend([
@@ -1534,6 +1693,9 @@ def update_service_review(review_id, **kwargs):
                 S.ServiceReviews.WEIGHT_FACTOR,
                 S.ServiceReviews.BILLING_RATE,
                 S.ServiceReviews.BILLING_AMOUNT,
+                S.ServiceReviews.FEE_AMOUNT,
+                S.ServiceReviews.BILLED_AMOUNT,
+                S.ServiceReviews.INVOICE_STATUS,
             }
             should_unmanage = any(key in manual_fields for key in kwargs)
 
@@ -1570,6 +1732,8 @@ def update_service_review(review_id, **kwargs):
                         # Trim to max 60 chars
                         trimmed = (value or '').strip()[:60]
                         update_fields[key] = trimmed
+                    elif key == S.ServiceReviews.INVOICE_STATUS:
+                        update_fields[key] = (value or None)
                     elif key in (S.ServiceReviews.IS_BILLED, S.ServiceReviews.IS_USER_MODIFIED):
                         # Convert to boolean int (0 or 1)
                         update_fields[key] = 1 if value else 0
@@ -1646,6 +1810,18 @@ def update_service_review(review_id, **kwargs):
             if status_update is not None and S.ServiceReviews.IS_BILLED not in update_fields:
                 # Auto-align billed flag with completed status if not explicitly provided.
                 update_fields[S.ServiceReviews.IS_BILLED] = 1 if status_update == 'completed' else 0
+
+            # Align invoice_status and billed_amount when billing flags change
+            if S.ServiceReviews.IS_BILLED in update_fields and S.ServiceReviews.INVOICE_STATUS not in update_fields:
+                update_fields[S.ServiceReviews.INVOICE_STATUS] = 'invoiced' if update_fields[S.ServiceReviews.IS_BILLED] else 'unbilled'
+
+            # If fee amount changes and billed amount not provided, adjust billed_amount based on invoice_status
+            if (S.ServiceReviews.FEE_AMOUNT in update_fields) and (S.ServiceReviews.BILLED_AMOUNT not in update_fields):
+                current_invoice_status = update_fields.get(S.ServiceReviews.INVOICE_STATUS)
+                if current_invoice_status in ('invoiced', 'paid'):
+                    update_fields[S.ServiceReviews.BILLED_AMOUNT] = update_fields[S.ServiceReviews.FEE_AMOUNT]
+                else:
+                    update_fields[S.ServiceReviews.BILLED_AMOUNT] = 0
 
             if should_unmanage and S.ServiceReviews.IS_TEMPLATE_MANAGED not in update_fields:
                 update_fields[S.ServiceReviews.IS_TEMPLATE_MANAGED] = 0
@@ -2154,6 +2330,7 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             invoice_supported = _ensure_service_item_invoice_column(cursor)
+            invoice_date_supported = _column_exists(cursor, S.ServiceItems.TABLE, S.ServiceItems.INVOICE_DATE)
 
             origin = kwargs.get('origin') or 'user_created'
             kwargs['origin'] = origin
@@ -2182,12 +2359,16 @@ def create_service_item(service_id, item_type, title, planned_date, **kwargs):
             # Add optional fields
             optional_fields = {
                 'project_id': S.ServiceItems.PROJECT_ID,
+                'phase': S.ServiceItems.PHASE,
                 'description': S.ServiceItems.DESCRIPTION,
                 'due_date': S.ServiceItems.DUE_DATE,
                 'actual_date': S.ServiceItems.ACTUAL_DATE,
                 'status': S.ServiceItems.STATUS,
                 'priority': S.ServiceItems.PRIORITY,
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
+                'fee_amount': S.ServiceItems.FEE_AMOUNT,
+                'billed_amount': S.ServiceItems.BILLED_AMOUNT,
+                'invoice_status': S.ServiceItems.INVOICE_STATUS,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
                 'notes': S.ServiceItems.NOTES,
                 'is_billed': S.ServiceItems.IS_BILLED,
@@ -2241,6 +2422,7 @@ def update_service_item(item_id, **kwargs):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             invoice_supported = _ensure_service_item_invoice_column(cursor)
+            invoice_date_supported = _column_exists(cursor, S.ServiceItems.TABLE, S.ServiceItems.INVOICE_DATE)
             
             # Build dynamic update query
             updates = []
@@ -2251,6 +2433,7 @@ def update_service_item(item_id, **kwargs):
                 'project_id': S.ServiceItems.PROJECT_ID,
                 'item_type': S.ServiceItems.ITEM_TYPE,
                 'title': S.ServiceItems.TITLE,
+                'phase': S.ServiceItems.PHASE,
                 'description': S.ServiceItems.DESCRIPTION,
                 'planned_date': S.ServiceItems.PLANNED_DATE,
                 'due_date': S.ServiceItems.DUE_DATE,
@@ -2258,6 +2441,9 @@ def update_service_item(item_id, **kwargs):
                 'status': S.ServiceItems.STATUS,
                 'priority': S.ServiceItems.PRIORITY,
                 'assigned_to': S.ServiceItems.ASSIGNED_TO,
+                'fee_amount': S.ServiceItems.FEE_AMOUNT,
+                'billed_amount': S.ServiceItems.BILLED_AMOUNT,
+                'invoice_status': S.ServiceItems.INVOICE_STATUS,
                 'evidence_links': S.ServiceItems.EVIDENCE_LINKS,
                 'notes': S.ServiceItems.NOTES,
                 'is_billed': S.ServiceItems.IS_BILLED,
