@@ -86,10 +86,14 @@ class TestConfigSecurity:
     
     def test_no_hardcoded_credentials_in_config(self):
         """Test that config.py doesn't contain hardcoded credentials."""
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            "config.py"
-        )
+        # Navigate up from tests/unit to project root
+        tests_dir = os.path.dirname(__file__)
+        if os.path.basename(tests_dir) == "unit":
+            project_root = os.path.dirname(os.path.dirname(tests_dir))
+        else:
+            project_root = os.path.dirname(tests_dir)
+        
+        config_path = os.path.join(project_root, "config.py")
         
         with open(config_path, "r") as f:
             config_content = f.read()
@@ -111,7 +115,12 @@ class TestConfigSecurity:
     
     def test_env_example_files_exist(self):
         """Test that .env.example template files exist."""
-        project_root = os.path.dirname(os.path.dirname(__file__))
+        # Navigate up from tests/unit to project root
+        tests_dir = os.path.dirname(__file__)
+        if os.path.basename(tests_dir) == "unit":
+            project_root = os.path.dirname(os.path.dirname(tests_dir))
+        else:
+            project_root = os.path.dirname(tests_dir)
         
         # Check root .env.example
         root_example = os.path.join(project_root, ".env.example")
@@ -132,7 +141,13 @@ class TestConfigSecurity:
     
     def test_sensitive_env_file_not_in_git(self):
         """Test that tools/.env has been removed from git."""
-        project_root = os.path.dirname(os.path.dirname(__file__))
+        # Navigate up from tests/unit to project root
+        tests_dir = os.path.dirname(__file__)
+        if os.path.basename(tests_dir) == "unit":
+            project_root = os.path.dirname(os.path.dirname(tests_dir))
+        else:
+            project_root = os.path.dirname(tests_dir)
+        
         tools_env = os.path.join(project_root, "tools", ".env")
         
         # Check if file is tracked by git
@@ -153,10 +168,14 @@ class TestConfigSecurity:
     
     def test_config_validation_function_exists(self):
         """Test that validation function exists and is called."""
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            "config.py"
-        )
+        # Navigate up from tests/unit to project root
+        tests_dir = os.path.dirname(__file__)
+        if os.path.basename(tests_dir) == "unit":
+            project_root = os.path.dirname(os.path.dirname(tests_dir))
+        else:
+            project_root = os.path.dirname(tests_dir)
+        
+        config_path = os.path.join(project_root, "config.py")
         
         with open(config_path, "r") as f:
             config_content = f.read()
