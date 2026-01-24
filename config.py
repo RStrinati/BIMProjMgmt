@@ -9,13 +9,36 @@ except ModuleNotFoundError:
     # import error.
     pass
 
+def _validate_required_config():
+    """Validate that all required environment variables are set.
+    
+    Raises:
+        ValueError: If any required environment variables are missing.
+    """
+    missing = []
+    
+    # Check for sensitive credentials (no defaults allowed)
+    if not os.getenv("DB_USER"):
+        missing.append("DB_USER")
+    if not os.getenv("DB_PASSWORD"):
+        missing.append("DB_PASSWORD")
+    
+    if missing:
+        raise ValueError(
+            f"Missing required environment variables: {', '.join(missing)}. "
+            f"Please set these in your .env file or system environment. "
+            f"See .env.example for required configuration."
+        )
+
 class Config:
     # SQL Server DB config
     DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
     # Default to local SQLEXPRESS via shared memory; override with DB_SERVER as needed.
     DB_SERVER = os.getenv("DB_SERVER", r".\SQLEXPRESS")
-    DB_USER = os.getenv("DB_USER", "admin02")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
+    
+    # Require sensitive environment variables (no defaults)
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
 
     PROJECT_MGMT_DB = os.getenv("PROJECT_MGMT_DB", "ProjectManagement")
     WAREHOUSE_DB = os.getenv("WAREHOUSE_DB", "ProjectManagement")
@@ -36,6 +59,9 @@ class Config:
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_JSON = os.getenv("LOG_JSON", "true").lower() == "true"
+
+# Run validation on module import
+_validate_required_config()
 
 # Provide module-level aliases for backwards compatibility with code that
 # imports configuration values directly from this module.

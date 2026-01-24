@@ -159,6 +159,47 @@ External Data Sources:                         Database Operations & Queries
 
 ---
 
+## 🔒 Security Setup
+
+### First-Time Setup
+
+1. **Copy environment template:**
+   ```bash
+   cp .env.example .env
+   cp tools/.env.example tools/.env
+   ```
+
+2. **Edit .env files with your actual credentials:**
+   - Never commit these files to Git
+   - Use strong, unique passwords
+   - Keep credentials secure
+
+3. **Verify .gitignore is working:**
+   ```bash
+   git check-ignore .env tools/.env
+   ```
+   Both should return the filename (meaning they're ignored)
+
+### Required Environment Variables
+
+The following environment variables **MUST** be set:
+- `DB_USER` - Database username
+- `DB_PASSWORD` - Database password
+- `DB_SERVER` - Database server address
+
+See `.env.example` for all available configuration options.
+
+### Security Best Practices
+
+- ✅ Never commit credentials to Git
+- ✅ Use strong passwords (min 16 characters, mixed case, numbers, symbols)
+- ✅ Rotate credentials regularly
+- ✅ Use Azure Key Vault or similar in production
+- ❌ Never use default/example passwords
+- ❌ Never share .env files via email/chat
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -168,22 +209,28 @@ External Data Sources:                         Database Operations & Queries
 - ODBC Driver 18 for SQL Server
 - Access to project databases
 
-### Environment Variables
+### Environment Setup
 
-Set the following environment variables (or create a `.env` file):
+⚠️ **IMPORTANT:** Before proceeding, complete the [Security Setup](#-security-setup) section above to configure your credentials.
+
+Required environment variables are now loaded from `.env` files:
 
 ```bash
-# Database Connection
-DB_SERVER=your-server-name
+# Database Connection (REQUIRED - no defaults)
 DB_USER=your-username
 DB_PASSWORD=your-password
-DB_DRIVER={ODBC Driver 18 for SQL Server}
 
-# Database Names
+# Database Server (defaults to local SQLEXPRESS)
+DB_SERVER=your-server-name
+DB_DRIVER=ODBC Driver 17 for SQL Server
+
+# Database Names (have defaults)
 PROJECT_MGMT_DB=ProjectManagement
 ACC_DB=acc_data_schema
 REVIT_HEALTH_DB=RevitHealthCheckDB
 ```
+
+See `.env.example` for the complete configuration template.
 
 ### Installation
 

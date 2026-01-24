@@ -75,7 +75,33 @@ Project
 
 ## 🚀 Getting Started
 
-### 1. Set Up Environment
+### Step 1: Security Setup (REQUIRED)
+
+⚠️ **CRITICAL:** This must be done FIRST before any development work.
+
+1. **Copy environment templates:**
+   ```bash
+   cp .env.example .env
+   cp tools/.env.example tools/.env
+   ```
+
+2. **Edit `.env` and `tools/.env` with your actual database credentials**
+   - Use a text editor to open both files
+   - Replace `your_username_here` with your actual database username
+   - Replace `your_secure_password_here` with your actual password
+   - Update `your_server_here` with your database server address
+
+3. **Verify files are ignored by Git:**
+   ```bash
+   git check-ignore .env tools/.env
+   ```
+   Both should be returned by the command (meaning they're properly ignored)
+
+⚠️ **IMPORTANT:** Never commit `.env` files! They contain sensitive credentials.
+
+See the [Security Setup section in README.md](./README.md#-security-setup) for more details.
+
+### Step 2: Set Up Environment
 ```bash
 # Create virtual environment (Python 3.12+)
 python -m venv venv
@@ -83,18 +109,16 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Set up database credentials in config.py
 ```
 
-### 2. Start Backend (Flask API)
+### Step 3: Start Backend (Flask API)
 ```bash
 cd backend
 python app.py
 # Runs on http://localhost:5000
 ```
 
-### 3. Start Frontend (React)
+### Step 4: Start Frontend (React)
 ```bash
 cd frontend
 npm install
@@ -102,7 +126,7 @@ npm run dev
 # Runs on http://localhost:5173
 ```
 
-### 4. Read the Core Docs
+### Step 5: Read the Core Docs
 - [README.md](./README.md) — Full project documentation
 - [AGENTS.md](./AGENTS.md) — Development guidelines
 - [docs/core/DEVELOPER_ONBOARDING.md](./docs/core/DEVELOPER_ONBOARDING.md) — Setup guide
