@@ -10,10 +10,19 @@ This test ensures that:
 import os
 import sys
 import pytest
-import importlib
 
-# Add parent directory to path
+# Note: sys.path modification is needed because tests are in subdirectory
+# and config.py is at project root. This is handled via project structure.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def get_project_root():
+    """Helper function to get project root from test file location."""
+    tests_dir = os.path.dirname(__file__)
+    if os.path.basename(tests_dir) == "unit":
+        return os.path.dirname(os.path.dirname(tests_dir))
+    else:
+        return os.path.dirname(tests_dir)
 
 
 class TestConfigSecurity:
@@ -86,13 +95,7 @@ class TestConfigSecurity:
     
     def test_no_hardcoded_credentials_in_config(self):
         """Test that config.py doesn't contain hardcoded credentials."""
-        # Navigate up from tests/unit to project root
-        tests_dir = os.path.dirname(__file__)
-        if os.path.basename(tests_dir) == "unit":
-            project_root = os.path.dirname(os.path.dirname(tests_dir))
-        else:
-            project_root = os.path.dirname(tests_dir)
-        
+        project_root = get_project_root()
         config_path = os.path.join(project_root, "config.py")
         
         with open(config_path, "r") as f:
@@ -115,12 +118,7 @@ class TestConfigSecurity:
     
     def test_env_example_files_exist(self):
         """Test that .env.example template files exist."""
-        # Navigate up from tests/unit to project root
-        tests_dir = os.path.dirname(__file__)
-        if os.path.basename(tests_dir) == "unit":
-            project_root = os.path.dirname(os.path.dirname(tests_dir))
-        else:
-            project_root = os.path.dirname(tests_dir)
+        project_root = get_project_root()
         
         # Check root .env.example
         root_example = os.path.join(project_root, ".env.example")
@@ -133,21 +131,24 @@ class TestConfigSecurity:
         # Verify they contain placeholder values, not real credentials
         with open(root_example, "r") as f:
             content = f.read()
-            assert "your_username_here" in content or "your_server_here" in content
-            assert "your_secure_password_here" in content or "your_password_here" in content
+            assert "your_username_here" in content or "your_server_here" in content, (
+                "Root .env.example should contain placeholder values"
+            )
+            assert "your_secure_password_here" in content or "your_password_here" in content, (
+                "Root .env.example should contain password placeholder"
+            )
             # Should NOT contain actual credentials
-            assert "admin02" not in content
-            assert content.count("1234") == 0 or "your_secure_password_here" in content  # 1234 might be in a port
+            assert "admin02" not in content, (
+                "Root .env.example should not contain actual username 'admin02'"
+            )
+            # Note: We check for the exact password pattern to avoid false positives with port numbers
+            assert 'DB_PASSWORD=1234' not in content and 'DB_PASSWORD="1234"' not in content, (
+                "Root .env.example should not contain actual password '1234'"
+            )
     
     def test_sensitive_env_file_not_in_git(self):
         """Test that tools/.env has been removed from git."""
-        # Navigate up from tests/unit to project root
-        tests_dir = os.path.dirname(__file__)
-        if os.path.basename(tests_dir) == "unit":
-            project_root = os.path.dirname(os.path.dirname(tests_dir))
-        else:
-            project_root = os.path.dirname(tests_dir)
-        
+        project_root = get_project_root()
         tools_env = os.path.join(project_root, "tools", ".env")
         
         # Check if file is tracked by git
@@ -168,13 +169,7 @@ class TestConfigSecurity:
     
     def test_config_validation_function_exists(self):
         """Test that validation function exists and is called."""
-        # Navigate up from tests/unit to project root
-        tests_dir = os.path.dirname(__file__)
-        if os.path.basename(tests_dir) == "unit":
-            project_root = os.path.dirname(os.path.dirname(tests_dir))
-        else:
-            project_root = os.path.dirname(tests_dir)
-        
+        project_root = get_project_root()
         config_path = os.path.join(project_root, "config.py")
         
         with open(config_path, "r") as f:
