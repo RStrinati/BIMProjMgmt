@@ -14,8 +14,15 @@ class Config:
     DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
     # Default to local SQLEXPRESS via shared memory; override with DB_SERVER as needed.
     DB_SERVER = os.getenv("DB_SERVER", r".\SQLEXPRESS")
-    DB_USER = os.getenv("DB_USER", "admin02")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
+    DB_USER = os.getenv("DB_USER")  # SECURITY: No default - must be explicitly set
+    DB_PASSWORD = os.getenv("DB_PASSWORD")  # SECURITY: No default - must be explicitly set
+    
+    # Validate critical credentials are set
+    if not DB_USER or not DB_PASSWORD:
+        raise ValueError(
+            "CRITICAL: Database credentials not configured. "
+            "Set DB_USER and DB_PASSWORD environment variables before running."
+        )
 
     PROJECT_MGMT_DB = os.getenv("PROJECT_MGMT_DB", "ProjectManagement")
     WAREHOUSE_DB = os.getenv("WAREHOUSE_DB", "ProjectManagement")

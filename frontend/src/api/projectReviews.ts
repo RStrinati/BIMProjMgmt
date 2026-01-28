@@ -22,6 +22,19 @@ export type PatchProjectReviewPayload = {
   invoice_batch_id?: number | null;
 };
 
+export type MoveServiceReviewPayload = {
+  to_service_id: number;
+  reason?: string;
+};
+
+export type MoveServiceReviewResponse = {
+  review_id: number;
+  from_service_id: number;
+  to_service_id: number;
+  is_billed: boolean;
+  template_sync_locked: boolean;
+};
+
 export const projectReviewsApi = {
   getProjectReviews: async (
     projectId: number,
@@ -49,6 +62,26 @@ export const projectReviewsApi = {
   ): Promise<ProjectReviewItem> => {
     const response = await apiClient.patch<ProjectReviewItem>(
       `/projects/${projectId}/services/${serviceId}/reviews/${reviewId}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Move a service review to a different service in the same project.
+   * Sets is_user_modified=1 and template_sync_locked=1 to protect from template overwrites.
+   * @param projectId - Project ID
+   * @param reviewId - Review ID to move
+   * @param payload - { to_service_id, reason }
+   * @returns Move result with template_sync_locked status
+   */
+  moveServiceReview: async (
+    projectId: number,
+    reviewId: number,
+    payload: MoveServiceReviewPayload,
+  ): Promise<MoveServiceReviewResponse> => {
+    const response = await apiClient.patch<MoveServiceReviewResponse>(
+      `/projects/${projectId}/reviews/${reviewId}/move`,
       payload,
     );
     return response.data;

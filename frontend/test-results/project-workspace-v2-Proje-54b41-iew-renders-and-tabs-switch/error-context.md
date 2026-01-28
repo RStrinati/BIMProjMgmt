@@ -1,0 +1,180 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 7
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: overview
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "MEL064" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Priority: Medium"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [selected] [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - heading "Summary" [level=6] [ref=e125]
+              - paragraph [ref=e126]: Add a description to summarize scope and outcomes.
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - heading "Invoice pipeline" [level=6] [ref=e129]
+                - button "Including items" [ref=e130] [cursor=pointer]:
+                  - generic [ref=e131]: Including items
+              - paragraph [ref=e132]: No line items yet.
+            - generic [ref=e133]:
+              - heading "Service fee reconciliation" [level=6] [ref=e134]
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - generic [ref=e137]: Service
+                  - generic [ref=e138]: Agreed
+                  - generic [ref=e139]: Line items
+                  - generic [ref=e140]: Billed
+                  - generic [ref=e141]: Outstanding
+                  - generic [ref=e142]: Variance
+                - generic [ref=e143]:
+                  - paragraph [ref=e144]: PROJECT TOTAL
+                  - paragraph [ref=e145]: $0.00
+                  - paragraph [ref=e146]: $0.00
+                  - paragraph [ref=e147]: $0.00
+                  - paragraph [ref=e148]: $0.00
+                  - paragraph [ref=e149]: $0.00
+            - generic [ref=e150]:
+              - heading "Post an update" [level=6] [ref=e151]
+              - generic [ref=e152]:
+                - generic [ref=e154]:
+                  - textbox "What's the latest progress on this project?" [ref=e155]
+                  - group
+                - generic [ref=e156]:
+                  - button "Post update" [disabled]
+                  - button "View all updates →" [ref=e157] [cursor=pointer]: View all updates →
+            - generic [ref=e158]:
+              - heading "Latest update" [level=6] [ref=e159]
+              - paragraph [ref=e160]: No updates yet. Post the first one above!
+            - generic [ref=e161]:
+              - heading "Add task" [level=6] [ref=e162]
+              - generic [ref=e163]:
+                - generic [ref=e165]:
+                  - textbox "New task" [ref=e166]
+                  - group
+                - button "Add task" [ref=e167] [cursor=pointer]: Add task
+            - generic [ref=e168]:
+              - heading "Recent tasks" [level=6] [ref=e169]
+              - paragraph [ref=e170]: No tasks yet.
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - heading "Properties" [level=6] [ref=e175]
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - paragraph [ref=e178]: "Project #"
+                - paragraph [ref=e179]: D3_252348
+              - generic [ref=e180]:
+                - paragraph [ref=e181]: Client
+                - paragraph [ref=e182]: Lendlease
+              - generic [ref=e183]:
+                - paragraph [ref=e184]: Type
+                - paragraph [ref=e185]: Datacentre
+              - generic [ref=e186]:
+                - paragraph [ref=e187]: Manager
+                - paragraph [ref=e188]: "--"
+              - generic [ref=e189]:
+                - paragraph [ref=e190]: Start
+                - paragraph [ref=e191]: 7/8/2025
+              - generic [ref=e192]:
+                - paragraph [ref=e193]: End
+                - paragraph [ref=e194]: 11/25/2025
+          - generic [ref=e195]:
+            - heading "Progress" [level=6] [ref=e196]
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - paragraph [ref=e199]: Agreed fee
+                - paragraph [ref=e200]: $0.00
+              - generic [ref=e201]:
+                - paragraph [ref=e202]: Line items
+                - paragraph [ref=e203]: $0.00
+              - generic [ref=e204]:
+                - paragraph [ref=e205]: Billed
+                - paragraph [ref=e206]: $0.00 (0%)
+              - generic [ref=e207]:
+                - paragraph [ref=e208]: Outstanding
+                - paragraph [ref=e209]: $0.00
+          - generic [ref=e210]:
+            - heading "Activity" [level=6] [ref=e211]
+            - paragraph [ref=e212]: Recent activity will appear here.
+          - separator [ref=e213]
+          - generic [ref=e214]:
+            - heading "Overview Summary" [level=6] [ref=e215]
+            - paragraph [ref=e216]: Select an item to view details, or browse the overview tab content.
+```

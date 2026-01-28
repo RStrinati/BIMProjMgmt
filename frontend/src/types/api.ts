@@ -967,6 +967,10 @@ export interface ProjectService {
   source_template_version?: string | null;
   source_template_hash?: string | null;
   template_mode?: string | null;
+  // Execution planning fields
+  execution_intent?: 'planned' | 'optional' | 'not_proceeding';
+  decision_reason?: string | null;
+  decision_at?: string | null;
 }
 
 export interface ServiceReview {
@@ -1027,6 +1031,10 @@ export interface ProjectReviewItem {
   service_name?: string | null;
   service_code?: string | null;
   phase?: string | null;
+  fee?: number | null;
+  fee_source?: string | null;
+  is_user_modified?: boolean | null;
+  user_modified_at?: string | null;
 }
 
 export interface ProjectReviewsResponse {
@@ -1063,6 +1071,73 @@ export interface ProjectFinanceGrid {
   earned_value_pct: number;
   invoice_pipeline: InvoicePipelineItem[];
   ready_this_month: InvoicePipelineItem;
+}
+
+export interface FinanceLineItem {
+  type: 'review' | 'item';
+  id: number | string;
+  service_id: number;
+  service_code?: string | null;
+  service_name?: string | null;
+  phase?: string | null;
+  title: string;
+  planned_date?: string | null;
+  due_date?: string | null;
+  status?: string | null;
+  fee: number;
+  fee_source?: 'override' | 'calculated_equal_split' | 'calculated_weighted' | 'explicit' | string | null;
+  invoice_status?: string | null;
+  invoice_reference?: string | null;
+  invoice_date?: string | null;
+  invoice_month: string;
+  is_billed?: number | null;
+}
+
+export interface FinanceLineItemsResponse {
+  project_id: number;
+  line_items: FinanceLineItem[];
+  totals: {
+    total_fee: number;
+    billed_fee: number;
+    outstanding_fee: number;
+  };
+}
+
+export interface FinanceReconciliationProject {
+  project_id: number;
+  agreed_fee: number;
+  line_items_total_fee: number;
+  billed_total_fee: number;
+  outstanding_total_fee: number;
+  variance: number;
+  review_count: number;
+  item_count: number;
+}
+
+export interface FinanceReconciliationService extends FinanceReconciliationProject {
+  service_id: number;
+  service_code?: string | null;
+  service_name?: string | null;
+}
+
+export interface FinanceReconciliationResponse {
+  project: FinanceReconciliationProject;
+  by_service: FinanceReconciliationService[];
+}
+
+export interface ProjectFinanceSummaryItem {
+  project_id: number;
+  agreed_fee_total: number;
+  line_items_total: number;
+  billed_total: number;
+  unbilled_total: number;
+  earned_value: number;
+  pipeline_this_month: number;
+}
+
+export interface ProjectsFinanceSummaryResponse {
+  projects: ProjectFinanceSummaryItem[];
+}
 }
 
 export interface ReviewBillingRecord extends ServiceReview {

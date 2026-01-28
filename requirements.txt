@@ -1,13 +1,18 @@
-pandas
-pyodbc
-dash
-plotly
-python-dateutil
+pandas>=2.0.0
+pyodbc>=5.0.0
+dash>=2.14.0
+plotly>=5.17.0
+python-dateutil>=2.8.2
 ifcopenshell
-sqlparse
-Flask
-Flask-Cors
-pytest
+sqlparse>=0.4.4
+Flask>=3.0.0
+Flask-Cors>=4.0.0
+pytest>=7.4.0
+Werkzeug>=3.0.0
+
+# SECURITY: Security-focused dependencies
+cryptography>=41.0.0
+Jinja2>=3.1.2
 
 # Issue Analytics dependencies
 nltk>=3.8

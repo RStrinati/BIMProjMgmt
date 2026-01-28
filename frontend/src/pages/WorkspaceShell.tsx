@@ -190,14 +190,14 @@ export default function WorkspaceShell() {
       {/* 3-column layout */}
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '1fr 400px' },
+          display: 'flex',
           flex: 1,
           overflow: 'hidden',
+          minWidth: 0,
         }}
       >
         {/* Center: Tabs + Content */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Box sx={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Tabs */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
             <Tabs 
@@ -217,7 +217,7 @@ export default function WorkspaceShell() {
           </Box>
 
           {/* Tab Content */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 0, overflow: 'auto', p: 2 }}>
             <Outlet context={{ projectId, project, selection }} />
           </Box>
         </Box>
@@ -228,6 +228,8 @@ export default function WorkspaceShell() {
             borderLeft: { xs: 0, lg: 1 },
             borderColor: 'divider',
             display: { xs: 'none', lg: 'block' },
+            width: 360,
+            flexShrink: 0,
           }}
         >
           <RightPanel project={project || null} currentTab={currentTab} selection={selection}>

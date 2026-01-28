@@ -1055,6 +1055,11 @@ class ProjectServices:
     REVIEW_ANCHOR_DATE = "review_anchor_date"
     REVIEW_INTERVAL_DAYS = "review_interval_days"
     REVIEW_COUNT_PLANNED = "review_count_planned"
+    # Execution planning fields
+    EXECUTION_INTENT = "execution_intent"  # 'planned', 'optional', 'not_proceeding'
+    DECISION_REASON = "decision_reason"  # Optional reason for decision
+    DECISION_AT = "decision_at"  # When the decision was made
+    IS_PLANNED_FOR_EXECUTION = "is_planned_for_execution"  # Computed column
 
 class ProjectServiceTemplateBindings:
     TABLE = "ProjectServiceTemplateBindings"
@@ -1188,6 +1193,8 @@ class ServiceReviews:
     BILLING_RATE = "billing_rate"
     BILLING_AMOUNT = "billing_amount"
     FEE_AMOUNT = "fee_amount"
+    FEE = "fee"
+    FEE_SOURCE = "fee_source"
     BILLED_AMOUNT = "billed_amount"
     INVOICE_STATUS = "invoice_status"
     ASSIGNED_USER_ID = "assigned_user_id"
@@ -1201,6 +1208,7 @@ class ServiceReviews:
     IS_USER_MODIFIED = "is_user_modified"
     USER_MODIFIED_AT = "user_modified_at"
     USER_MODIFIED_FIELDS = "user_modified_fields"
+    TEMPLATE_SYNC_LOCKED = "template_sync_locked"
 
 class InvoiceBatches:
     TABLE = "InvoiceBatches"
@@ -1263,6 +1271,7 @@ class ServiceItems:
     INVOICE_REFERENCE = "invoice_reference"
     INVOICE_DATE = "invoice_date"
     FEE_AMOUNT = "fee_amount"
+    FEE_SOURCE = "fee_source"
     BILLED_AMOUNT = "billed_amount"
     INVOICE_STATUS = "invoice_status"
     EVIDENCE_LINKS = "evidence_links"

@@ -5,8 +5,22 @@
 [![TypeScript 5.2+](https://img.shields.io/badge/typescript-5.2+-3178C6.svg)](https://www.typescriptlang.org/)
 [![SQL Server](https://img.shields.io/badge/database-SQL%20Server-red.svg)](https://www.microsoft.com/en-us/sql-server)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Security](https://img.shields.io/badge/security-audit%20pass-green.svg)](#-security)
 
 A comprehensive **BIM (Building Information Modeling) project management system** with integrated review management, scheduling, billing workflows, real-time analytics, and multi-platform data integration capabilities.
+
+## 🔒 Security
+
+**IMPORTANT**: This application handles sensitive construction project data. A comprehensive security audit was performed on January 24, 2026, and all critical vulnerabilities have been remediated.
+
+- ✅ Database credentials no longer hardcoded
+- ✅ CORS restricted to authorized origins only
+- ✅ Security headers enforced on all responses
+- ✅ Error messages sanitized for production
+- ✅ Input validation on all query parameters
+- ✅ Dependencies updated to secure versions
+
+**Before deployment**: See [Environment Configuration Guide](docs/security/ENVIRONMENT_SETUP.md) and [Security Audit Report](docs/security/SECURITY_AUDIT.md)
 
 ## 🎯 Overview
 

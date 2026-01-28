@@ -94,6 +94,7 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [deletingRowId, setDeletingRowId] = useState<number | null>(null);
   const firstCellRef = useRef<HTMLInputElement>(null);
+  const noWrapCell = { whiteSpace: 'nowrap' } as const;
   useEffect(() => {
     // Auto-focus first editable cell when entering edit mode
     if (editingRowId && firstCellRef.current) {
@@ -219,8 +220,18 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
   };
 
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 250px)' }}>
-      <Table stickyHeader size="small">
+    <TableContainer
+      component={Paper}
+      sx={{
+        maxHeight: 'calc(100vh - 250px)',
+        width: '100%',
+        overflowX: 'auto',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+      }}
+    >
+      <Table stickyHeader size="small" sx={{ minWidth: 1400, tableLayout: 'auto' }}>
         <TableHead>
           <TableRow>
             <TableCell><strong>ABV</strong></TableCell>
@@ -230,12 +241,12 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
             <TableCell><strong>Description</strong></TableCell>
             <TableCell><strong>BIM Contact</strong></TableCell>
             <TableCell><strong>Folder Path</strong></TableCell>
-            <TableCell align="center"><strong>ACC</strong></TableCell>
-            <TableCell><strong>ACC Date</strong></TableCell>
-            <TableCell align="center"><strong>Revizto</strong></TableCell>
-            <TableCell><strong>Revizto Date</strong></TableCell>
+            <TableCell align="center" sx={noWrapCell}><strong>ACC</strong></TableCell>
+            <TableCell sx={noWrapCell}><strong>ACC Date</strong></TableCell>
+            <TableCell align="center" sx={noWrapCell}><strong>Revizto</strong></TableCell>
+            <TableCell sx={noWrapCell}><strong>Revizto Date</strong></TableCell>
             <TableCell><strong>Notes</strong></TableCell>
-            <TableCell align="right"><strong>Actions</strong></TableCell>
+            <TableCell align="right" sx={noWrapCell}><strong>Actions</strong></TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -313,22 +324,22 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
                   <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.85rem' }}>
                     {row.folderPath || '—'}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={noWrapCell}>
                     {row.accPresent ? (
                       <CheckCircleIcon color="success" fontSize="small" />
                     ) : (
                       <CancelIcon color="disabled" fontSize="small" />
                     )}
                   </TableCell>
-                  <TableCell>{formatDate(row.accDate)}</TableCell>
-                  <TableCell align="center">
+                  <TableCell sx={noWrapCell}>{formatDate(row.accDate)}</TableCell>
+                  <TableCell align="center" sx={noWrapCell}>
                     {row.reviztoPresent ? (
                       <CheckCircleIcon color="success" fontSize="small" />
                     ) : (
                       <CancelIcon color="disabled" fontSize="small" />
                     )}
                   </TableCell>
-                  <TableCell>{formatDate(row.reviztoDate)}</TableCell>
+                  <TableCell sx={noWrapCell}>{formatDate(row.reviztoDate)}</TableCell>
                   <TableCell 
                     onClick={() => !isEditing && onEditRow(row.expected_model_id)}
                     sx={{ maxWidth: isEditing ? 'none' : 200, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.85rem' }}
@@ -347,7 +358,7 @@ export const QualityRegisterTable: React.FC<QualityRegisterTableProps> = ({
                     )}
                   </TableCell>
                   {/* Actions column */}
-                  <TableCell align="right" sx={{ width: 120 }}>
+                  <TableCell align="right" sx={{ width: 120, ...noWrapCell }}>
                     {isEditing ? (
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                         <IconButton

@@ -22,7 +22,15 @@ import {
   Chip,
 } from '@mui/material';
 import { projectsApi, tasksApi, updatesApi } from '@/api';
-import type { Project, ProjectFinanceGrid, TaskPayload } from '@/types/api';
+import type {
+  Project,
+  FinanceLineItemsResponse,
+  FinanceReconciliationResponse,
+  FinanceLineItem,
+  TaskPayload,
+} from '@/types/api';
+
+const READY_STATUSES = new Set(['ready', 'draft', 'unbilled']);
 
 type OutletContext = {
   projectId: number;
@@ -53,6 +61,7 @@ export default function OverviewTab() {
   const [taskError, setTaskError] = useState<string | null>(null);
   const [updateDraft, setUpdateDraft] = useState('');
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [includeItems, setIncludeItems] = useState(true);
 
   const { data: recentTasksResult, isLoading: isRecentTasksLoading } = useQuery({
     queryKey: ['projectTasksPreview', projectId],
@@ -72,9 +81,15 @@ export default function OverviewTab() {
     enabled: Number.isFinite(projectId),
   });
 
-  const { data: financeGrid } = useQuery<ProjectFinanceGrid>({
-    queryKey: ['projectFinanceGrid', projectId],
-    queryFn: () => projectsApi.getFinanceGrid(projectId),
+  const { data: lineItemsResult, isLoading: isLineItemsLoading, error: lineItemsError } = useQuery<FinanceLineItemsResponse>({
+    queryKey: ['projectFinanceLineItems', projectId],
+    queryFn: () => projectsApi.getFinanceLineItems(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
+  const { data: reconciliation, isLoading: isReconciliationLoading, error: reconciliationError } = useQuery<FinanceReconciliationResponse>({
+    queryKey: ['projectFinanceReconciliation', projectId],
+    queryFn: () => projectsApi.getFinanceReconciliation(projectId),
     enabled: Number.isFinite(projectId),
   });
 
@@ -83,6 +98,91 @@ export default function OverviewTab() {
       return '--';
     }
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
+  };
+
+  const formatMonthLabel = (value: string) => {
+    if (!value) return 'Unscheduled';
+    const parsed = new Date(`${value}-01`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  };
+
+  const filteredLineItems = useMemo<FinanceLineItem[]>(() => {
+    const items = lineItemsResult?.line_items ?? [];
+    if (includeItems) return items;
+    return items.filter((item) => item.type === 'review');
+  }, [lineItemsResult, includeItems]);
+
+  const pipelineBuckets = useMemo(() => {
+    const buckets = new Map<string, {
+      month: string;
+      deliverables_count: number;
+      total_amount: number;
+      ready_count: number;
+      ready_amount: number;
+    }>();
+
+    filteredLineItems.forEach((item) => {
+      const month = item.invoice_month || 'Unscheduled';
+      const existing = buckets.get(month) || {
+        month,
+        deliverables_count: 0,
+        total_amount: 0,
+        ready_count: 0,
+        ready_amount: 0,
+      };
+
+      const fee = Number(item.fee ?? 0);
+      existing.deliverables_count += 1;
+      existing.total_amount += fee;
+
+      const normalizedStatus = (item.invoice_status || '').toLowerCase();
+      if (READY_STATUSES.has(normalizedStatus)) {
+        existing.ready_count += 1;
+        existing.ready_amount += fee;
+      }
+
+      buckets.set(month, existing);
+    });
+
+    return Array.from(buckets.values()).sort((a, b) => a.month.localeCompare(b.month));
+  }, [filteredLineItems]);
+
+  const currentMonthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const readyThisMonth = useMemo(() => {
+    return (
+      pipelineBuckets.find((bucket) => bucket.month === currentMonthKey) || {
+        month: currentMonthKey,
+        deliverables_count: 0,
+        total_amount: 0,
+        ready_count: 0,
+        ready_amount: 0,
+      }
+    );
+  }, [pipelineBuckets, currentMonthKey]);
+
+  const reconciliationRows = useMemo(() => {
+    if (!reconciliation) return [];
+    const { by_service, project: projectTotals } = reconciliation;
+    return [
+      ...by_service,
+      {
+        ...projectTotals,
+        service_id: -1,
+        service_code: '',
+        service_name: 'PROJECT TOTAL',
+      },
+    ];
+  }, [reconciliation]);
+
+  const varianceColor = (variance: number) => {
+    if (variance > 1000 || variance < -1000) return 'error.main';
+    if (variance > 100 || variance < -100) return 'warning.main';
+    return 'success.main';
   };
 
   const latestUpdate = useMemo(
@@ -157,29 +257,117 @@ export default function OverviewTab() {
 
         {/* Invoice Pipeline */}
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-            Invoice pipeline
-          </Typography>
-          {financeGrid ? (
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Invoice pipeline
+            </Typography>
+            <Chip
+              label={includeItems ? 'Including items' : 'Reviews only'}
+              color={includeItems ? 'primary' : 'default'}
+              variant={includeItems ? 'filled' : 'outlined'}
+              size="small"
+              onClick={() => setIncludeItems((prev) => !prev)}
+            />
+          </Stack>
+          {lineItemsError ? (
+            <Alert severity="error">Failed to load invoice pipeline.</Alert>
+          ) : isLineItemsLoading ? (
+            <Typography color="text.secondary">Loading invoice pipeline...</Typography>
+          ) : pipelineBuckets.length ? (
             <Stack spacing={1} data-testid="workspace-invoice-pipeline">
               <Typography variant="body2">
-                Ready this month: {financeGrid.ready_this_month.ready_count} · {formatCurrency(financeGrid.ready_this_month.ready_amount)}
+                Ready this month: {readyThisMonth.ready_count} · {formatCurrency(readyThisMonth.ready_amount)}
               </Typography>
               <Stack spacing={0.5}>
-                {financeGrid.invoice_pipeline.map((item) => (
-                  <Box key={item.month} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                {pipelineBuckets.map((item) => (
+                  <Box key={item.month} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                     <Typography variant="caption" color="text.secondary">
-                      {item.month}
+                      {formatMonthLabel(item.month)}
                     </Typography>
-                    <Typography variant="caption">
-                      {item.deliverables_count} · {formatCurrency(item.total_amount)}
-                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="caption">
+                        {item.deliverables_count} · {formatCurrency(item.total_amount)}
+                      </Typography>
+                      {item.ready_count > 0 && (
+                        <Chip
+                          label={`Ready ${item.ready_count} · ${formatCurrency(item.ready_amount)}`}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                          sx={{ height: 22, fontSize: '0.7rem' }}
+                        />
+                      )}
+                    </Stack>
                   </Box>
                 ))}
               </Stack>
             </Stack>
           ) : (
-            <Typography color="text.secondary">Loading invoice pipeline...</Typography>
+            <Typography color="text.secondary">No line items yet.</Typography>
+          )}
+        </Paper>
+
+        {/* Reconciliation */}
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+            Service fee reconciliation
+          </Typography>
+          {reconciliationError ? (
+            <Alert severity="error">Failed to load reconciliation.</Alert>
+          ) : isReconciliationLoading ? (
+            <Typography color="text.secondary">Loading reconciliation...</Typography>
+          ) : reconciliationRows.length ? (
+            <Stack spacing={0.5} data-testid="workspace-reconciliation">
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '2fr repeat(5, 1fr)',
+                  typography: 'caption',
+                  fontWeight: 600,
+                  color: 'text.secondary',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                <Box>Service</Box>
+                <Box>Agreed</Box>
+                <Box>Line items</Box>
+                <Box>Billed</Box>
+                <Box>Outstanding</Box>
+                <Box>Variance</Box>
+              </Box>
+              {reconciliationRows.map((row) => {
+                const isTotal = row.service_id === -1;
+                return (
+                  <Box
+                    key={`${row.service_id}-${row.service_name}`}
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr repeat(5, 1fr)',
+                      gap: 1,
+                      alignItems: 'center',
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      backgroundColor: isTotal ? 'action.hover' : 'transparent',
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={isTotal ? 700 : 600} noWrap>
+                      {row.service_name || row.service_code || 'Service'}
+                    </Typography>
+                    <Typography variant="body2">{formatCurrency(row.agreed_fee)}</Typography>
+                    <Typography variant="body2">{formatCurrency(row.line_items_total_fee)}</Typography>
+                    <Typography variant="body2">{formatCurrency(row.billed_total_fee)}</Typography>
+                    <Typography variant="body2">{formatCurrency(row.outstanding_total_fee)}</Typography>
+                    <Typography variant="body2" sx={{ color: varianceColor(row.variance) }}>
+                      {formatCurrency(row.variance)}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          ) : (
+            <Typography color="text.secondary">No reconciliation data yet.</Typography>
           )}
         </Paper>
 

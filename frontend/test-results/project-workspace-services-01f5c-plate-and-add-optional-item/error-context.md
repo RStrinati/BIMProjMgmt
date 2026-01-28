@@ -103,88 +103,94 @@
                 - generic [ref=e142]: Service
                 - generic [ref=e143]: Phase
                 - generic [ref=e144]: Status
-                - generic [ref=e145]: Agreed
-                - generic [ref=e146]: Billed
-                - generic [ref=e147]: Remaining
-                - generic [ref=e148]: Progress
-              - generic [ref=e149] [cursor=pointer]:
-                - generic [ref=e150]:
-                  - paragraph [ref=e151]: BIM_COORD
+                - generic [ref=e145]: Deliverables
+                - generic [ref=e146]: Agreed
+                - generic [ref=e147]: Billed
+                - generic [ref=e148]: Remaining
+                - generic [ref=e149]: Progress
+              - generic [ref=e150] [cursor=pointer]:
+                - generic [ref=e151]:
+                  - paragraph [ref=e152]: BIM_COORD
                   - text: BIM Coordination Review
-                - paragraph [ref=e153]: Construction
-                - generic [ref=e154]: planned
-                - paragraph [ref=e156]: $22,000.00
-                - paragraph [ref=e158]: $0.00
+                - paragraph [ref=e154]: Construction
+                - generic [ref=e155]: planned
+                - paragraph [ref=e157]:
+                  - paragraph [ref=e158]: "Reviews: 0 / Items: 0"
                 - paragraph [ref=e160]: $22,000.00
-                - paragraph [ref=e162]: 0%
-        - generic [ref=e165]:
-          - generic [ref=e166]:
-            - heading "Properties" [level=6] [ref=e167]
-            - generic [ref=e168]:
-              - generic [ref=e169]:
-                - paragraph [ref=e170]: "Project #"
-                - paragraph [ref=e171]: P-007
-              - generic [ref=e172]:
-                - paragraph [ref=e173]: Client
-                - paragraph [ref=e174]: Test Client
-              - generic [ref=e175]:
-                - paragraph [ref=e176]: Type
-                - paragraph [ref=e177]: "--"
-              - generic [ref=e178]:
-                - paragraph [ref=e179]: Manager
-                - paragraph [ref=e180]: "--"
-              - generic [ref=e181]:
-                - paragraph [ref=e182]: Start
-                - paragraph [ref=e183]: "--"
-              - generic [ref=e184]:
-                - paragraph [ref=e185]: End
-                - paragraph [ref=e186]: "--"
-          - generic [ref=e187]:
-            - heading "Progress" [level=6] [ref=e188]
-            - generic [ref=e189]:
-              - generic [ref=e190]:
-                - paragraph [ref=e191]: Agreed fee
-                - paragraph [ref=e192]: $0.00
-              - generic [ref=e193]:
-                - paragraph [ref=e194]: Billed
-                - paragraph [ref=e195]: $0.00
-              - generic [ref=e196]:
-                - paragraph [ref=e197]: Billed %
-                - paragraph [ref=e198]: 0%
-          - generic [ref=e199]:
-            - heading "Activity" [level=6] [ref=e200]
-            - paragraph [ref=e201]: Recent activity will appear here.
-          - separator [ref=e202]
-          - generic [ref=e203]:
-            - generic [ref=e204]:
-              - generic [ref=e205]:
-                - generic [ref=e206]: BIM_COORD
-                - generic [ref=e208]: planned
-              - heading "BIM Coordination Review" [level=6] [ref=e209]
-              - generic [ref=e210]: "Phase: Construction"
+                - paragraph [ref=e162]: $0.00
+                - paragraph [ref=e164]: $22,000.00
+                - paragraph [ref=e166]: 0%
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - heading "Properties" [level=6] [ref=e171]
+            - generic [ref=e172]:
+              - generic [ref=e173]:
+                - paragraph [ref=e174]: "Project #"
+                - paragraph [ref=e175]: P-007
+              - generic [ref=e176]:
+                - paragraph [ref=e177]: Client
+                - paragraph [ref=e178]: Test Client
+              - generic [ref=e179]:
+                - paragraph [ref=e180]: Type
+                - paragraph [ref=e181]: "--"
+              - generic [ref=e182]:
+                - paragraph [ref=e183]: Manager
+                - paragraph [ref=e184]: "--"
+              - generic [ref=e185]:
+                - paragraph [ref=e186]: Start
+                - paragraph [ref=e187]: "--"
+              - generic [ref=e188]:
+                - paragraph [ref=e189]: End
+                - paragraph [ref=e190]: "--"
+          - generic [ref=e191]:
+            - heading "Progress" [level=6] [ref=e192]
+            - generic [ref=e193]:
+              - generic [ref=e194]:
+                - paragraph [ref=e195]: Agreed fee
+                - paragraph [ref=e196]: $0.00
+              - generic [ref=e197]:
+                - paragraph [ref=e198]: Line items
+                - paragraph [ref=e199]: $0.00
+              - generic [ref=e200]:
+                - paragraph [ref=e201]: Billed
+                - paragraph [ref=e202]: $0.00 (0%)
+              - generic [ref=e203]:
+                - paragraph [ref=e204]: Outstanding
+                - paragraph [ref=e205]: $0.00
+          - generic [ref=e206]:
+            - heading "Activity" [level=6] [ref=e207]
+            - paragraph [ref=e208]: Recent activity will appear here.
+          - separator [ref=e209]
+          - generic [ref=e210]:
             - generic [ref=e211]:
-              - heading "Finance" [level=6] [ref=e212]
-              - generic [ref=e213]:
-                - generic [ref=e214]:
-                  - paragraph [ref=e215]: Agreed Fee
-                  - paragraph [ref=e216]: $22,000.00
-                - generic [ref=e217]:
-                  - paragraph [ref=e218]: Billed
-                  - paragraph [ref=e219]: $0.00
-                - generic [ref=e220]:
-                  - paragraph [ref=e221]: Remaining
-                  - paragraph [ref=e222]: $22,000.00
-                - generic [ref=e223]:
-                  - generic [ref=e224]:
-                    - generic [ref=e225]: Billing Progress
-                    - generic [ref=e226]: 0%
-                  - progressbar [ref=e227]
-            - generic [ref=e229]:
-              - tablist [ref=e232]:
-                - tab "Reviews (0)" [selected] [ref=e233] [cursor=pointer]: Reviews (0)
-                - tab "Items (0)" [ref=e234] [cursor=pointer]: Items (0)
-              - generic [ref=e236]:
-                - button "Add Review" [ref=e238] [cursor=pointer]: Add Review
-                - progressbar [ref=e240]:
-                  - img [ref=e241]
+              - generic [ref=e212]:
+                - generic [ref=e213]: BIM_COORD
+                - generic [ref=e215]: planned
+              - heading "BIM Coordination Review" [level=6] [ref=e216]
+              - generic [ref=e217]: "Phase: Construction"
+            - generic [ref=e218]:
+              - heading "Finance" [level=6] [ref=e219]
+              - generic [ref=e220]:
+                - generic [ref=e221]:
+                  - paragraph [ref=e222]: Agreed Fee
+                  - paragraph [ref=e223]: $22,000.00
+                - generic [ref=e224]:
+                  - paragraph [ref=e225]: Billed
+                  - paragraph [ref=e226]: $0.00
+                - generic [ref=e227]:
+                  - paragraph [ref=e228]: Remaining
+                  - paragraph [ref=e229]: $22,000.00
+                - generic [ref=e230]:
+                  - generic [ref=e231]:
+                    - generic [ref=e232]: Billing Progress
+                    - generic [ref=e233]: 0%
+                  - progressbar [ref=e234]
+            - generic [ref=e236]:
+              - tablist [ref=e239]:
+                - tab "Reviews (0)" [selected] [ref=e240] [cursor=pointer]: Reviews (0)
+                - tab "Items (0)" [ref=e241] [cursor=pointer]: Items (0)
+              - generic [ref=e243]:
+                - button "Add Review" [ref=e245] [cursor=pointer]: Add Review
+                - progressbar [ref=e247]:
+                  - img [ref=e248]
 ```

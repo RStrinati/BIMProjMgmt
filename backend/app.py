@@ -24,6 +24,7 @@ from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 
 from config import (
+    Config,
     ACC_SERVICE_TOKEN,
     ACC_SERVICE_URL,
     APS_AUTH_LOGIN_PATH,
@@ -31,6 +32,9 @@ from config import (
     REVIZTO_SERVICE_TOKEN,
     REVIZTO_SERVICE_URL,
 )
+
+from services.fee_resolver_service import FeeResolverService
+from services.financial_data_service import FinancialDataService
 
 from database import (  # noqa: E402
     add_bookmark,
@@ -56,6 +60,7 @@ from database import (  # noqa: E402
     delete_project_service,
     delete_review_cycle,
     delete_service_review,
+    move_service_review,
     delete_service_template,
     get_acc_folder_path,
     get_acc_import_logs,
@@ -140,6 +145,7 @@ from database import (  # noqa: E402
     update_service_template,
     resequence_service_reviews,
     set_service_review_count,
+    reset_service_reviews,
     list_invoice_batches,
     create_invoice_batch,
     update_invoice_batch,
@@ -196,6 +202,20 @@ from backend.anchor_links import (  # noqa: E402
     get_issue_linked_anchors,
 )
 from services.template_loader import LEGACY_TEMPLATE_PATH  # noqa: E402
+
+
+# --- Input Validation Utilities ---
+
+def _validate_sort_direction(sort_dir: str) -> str:
+    """Validate sort direction to prevent SQL injection."""
+    sort_dir = (sort_dir or "asc").lower().strip()
+    return "asc" if sort_dir in ("asc", "ascending") else "desc"
+
+
+def _validate_sort_column(sort_by: str, allowed_columns: list[str]) -> str:
+    """Validate sort column is in whitelist to prevent SQL injection."""
+    sort_by = (sort_by or "").lower().strip()
+    return sort_by if sort_by in allowed_columns else allowed_columns[0]
 
 
 # --- Revizto utility helpers ---
@@ -336,6 +356,13 @@ def _find_revizto_exporter():
 def _run_revizto_cli(exe_path, cli_args, timeout=900):
     """Run the Revizto exporter in CLI mode and capture parsed JSON plus raw output."""
     try:
+        # SECURITY: Validate cli_args to prevent injection
+        if not isinstance(cli_args, list):
+            raise ValueError("cli_args must be a list")
+        
+        # Ensure all args are strings to prevent injection
+        cli_args = [str(arg) for arg in cli_args]
+        
         command = [exe_path] + cli_args
         completed = subprocess.run(
             command,
@@ -417,6 +444,23 @@ _FRONTEND_LOG_FILE = LOG_DIR / "frontend.log"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.json = CustomJSONProvider(app)
 
+# SECURITY: Add security headers to all responses
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to mitigate common web vulnerabilities."""
+    # Prevent clickjacking attacks
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Enable XSS protection in older browsers
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Control referrer policy to reduce information leakage
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Disable unnecessary plugins
+    response.headers['Permissions-Policy'] = 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+    return response
+
+
 _formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
 _root_logger = logging.getLogger()
 _root_logger.setLevel(logging.INFO)
@@ -475,10 +519,12 @@ if not getattr(_frontend_logger, "_frontend_handler_added", False):
         backupCount=3,
         encoding="utf-8",
     )
-    _frontend_handler.setLevel(logging.DEBUG)
+    # SECURITY: Set log level from environment, default to INFO (not DEBUG) in production
+    log_level = getattr(logging, Config.LOG_LEVEL.upper(), logging.INFO)
+    _frontend_handler.setLevel(log_level)
     _frontend_handler.setFormatter(_formatter)
     _frontend_logger.addHandler(_frontend_handler)
-    _frontend_logger.setLevel(logging.DEBUG)
+    _frontend_logger.setLevel(log_level)
     _frontend_logger.propagate = False
     _frontend_logger._frontend_handler_added = True
 
@@ -544,7 +590,9 @@ def api_schema_health_check():
         return jsonify(report), status
     except Exception as e:
         logging.exception("Error running schema health check")
-        return jsonify({"error": str(e)}), 500
+        # SECURITY: Don't expose exception details in production
+        error_msg = "Schema health check failed" if Config.LOG_LEVEL == "INFO" else str(e)
+        return jsonify({"error": error_msg}), 500
 
 
 def _serialize_datetime(value):
@@ -958,7 +1006,53 @@ def _build_control_model_configuration(project_id: int) -> dict:
         'mode': mode,
         'validation_targets': list(CONTROL_MODEL_TARGETS),
     }
-CORS(app)
+
+# SECURITY: Configure CORS with restricted origins instead of allowing all
+# In development, allow localhost; in production, only allow specific domains
+ALLOWED_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:3000"
+).split(",")
+
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ALLOWED_ORIGINS,
+        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "max_age": 3600,
+        "supports_credentials": True
+    }
+})
+
+
+# SECURITY: Global error handlers to prevent information disclosure
+@app.errorhandler(400)
+def bad_request(e):
+    """Handle 400 Bad Request without exposing details."""
+    logging.warning("Bad request: %s", str(e))
+    return jsonify({"error": "Invalid request"}), 400
+
+
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 Not Found."""
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    """Handle 405 Method Not Allowed."""
+    return jsonify({"error": "Method not allowed"}), 405
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    """Handle 500 Internal Server Error without exposing details."""
+    logging.exception("Internal server error")
+    # SECURITY: Only expose details in debug mode
+    if Config.LOG_LEVEL == "DEBUG":
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Internal server error"}), 500
 
 
 def _extract_project_payload(body):
@@ -1839,6 +1933,9 @@ def api_update_project_service(project_id, service_id):
         'phase': 'phase',
         'status': 'status',
         'notes': 'notes',
+        # Execution planning fields
+        'executionIntent': 'execution_intent',
+        'decisionReason': 'decision_reason',
     }
     mapped_body = {}
     for frontend_key, value in body.items():
@@ -1846,6 +1943,10 @@ def api_update_project_service(project_id, service_id):
             continue
         db_key = field_map.get(frontend_key, frontend_key)
         mapped_body[db_key] = value
+    
+    # If execution_intent is being updated, set decision_at to current timestamp
+    if 'execution_intent' in mapped_body:
+        mapped_body['decision_at'] = datetime.now()
     
     success = update_project_service(service_id, **mapped_body)
     if success:
@@ -1865,8 +1966,12 @@ def api_delete_project_service(project_id, service_id):
 def api_get_project_reviews(project_id):
     start_time = perf_counter()
     status = request.args.get('status')
-    sort_by = request.args.get('sort_by', 'planned_date')
-    sort_dir = request.args.get('sort_dir', 'asc')
+    # SECURITY: Validate sort parameters to prevent SQL injection
+    sort_by = _validate_sort_column(
+        request.args.get('sort_by', 'planned_date'),
+        ['planned_date', 'actual_issued_at', 'created_at', 'status']
+    )
+    sort_dir = _validate_sort_direction(request.args.get('sort_dir', 'asc'))
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
 
@@ -2084,6 +2189,64 @@ def api_delete_service_review(project_id, service_id, review_id):
     return jsonify({'error': 'Failed to delete review'}), 500
 
 
+@app.route('/api/projects/<int:project_id>/reviews/<int:review_id>/move', methods=['PATCH'])
+def api_move_service_review(project_id, review_id):
+    """Move a review from one service to another within the same project.
+    
+    Request body:
+    {
+        "to_service_id": 456,
+        "reason": "Optional description of move reason"
+    }
+    
+    Returns:
+    {
+        "review_id": 123,
+        "from_service_id": 111,
+        "to_service_id": 456,
+        "is_billed": false,
+        "template_sync_locked": true
+    }
+    """
+    body = request.get_json() or {}
+    to_service_id = body.get('to_service_id')
+    reason = body.get('reason')
+    
+    if not to_service_id:
+        return jsonify({'error': 'to_service_id is required'}), 400
+    
+    try:
+        to_service_id = int(to_service_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'to_service_id must be an integer'}), 400
+    
+    try:
+        # Verify review exists in this project
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT sr.{S.ServiceReviews.REVIEW_ID}, sr.{S.ServiceReviews.PROJECT_ID}
+                FROM {S.ServiceReviews.TABLE} sr
+                WHERE sr.{S.ServiceReviews.REVIEW_ID} = ?
+                  AND sr.{S.ServiceReviews.PROJECT_ID} = ?
+                """,
+                (review_id, project_id)
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'Review not found in this project'}), 404
+        
+        # Move the review
+        result = move_service_review(review_id, to_service_id, reason)
+        return jsonify(result), 200
+    
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    except Exception as e:
+        logging.exception(f"Failed to move review {review_id}")
+        return jsonify({'error': f'Failed to move review: {str(e)}'}), 500
+
+
 @app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/resequence', methods=['POST'])
 def api_resequence_service_reviews(project_id, service_id):
     body = request.get_json() or {}
@@ -2117,6 +2280,7 @@ def api_resequence_service_reviews(project_id, service_id):
             anchor_date=body.get('anchor_date'),
             interval_days=body.get('interval_days'),
             count=body.get('count'),
+            apply_to=body.get('apply_to', 'non_modified_only'),
         )
         return jsonify(result), 200
     except ValueError as exc:
@@ -2154,6 +2318,39 @@ def api_set_service_review_count(project_id, service_id):
         return jsonify({'error': str(exc)}), 400
     except Exception as e:
         logging.exception("Failed to set service review count")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/services/<int:service_id>/reviews/reset', methods=['POST'])
+def api_reset_service_reviews(project_id, service_id):
+    """Cancel all planned reviews and recreate a clean schedule."""
+    body = request.get_json() or {}
+    desired = body.get('desired_count')
+    anchor_date = body.get('anchor_date')
+    interval_days = body.get('interval_days')
+
+    try:
+        assert_service_in_project(project_id, service_id)
+    except ServiceScopeError:
+        logging.warning(
+            "service review reset scope reject project_id=%s service_id=%s",
+            project_id,
+            service_id,
+        )
+        return jsonify({'error': 'Service not found'}), 404
+
+    try:
+        result = reset_service_reviews(
+            service_id,
+            desired_count=int(desired) if desired is not None else None,
+            anchor_date=anchor_date,
+            interval_days=interval_days,
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as e:
+        logging.exception("Failed to reset service reviews")
         return jsonify({'error': str(e)}), 500
 
 
@@ -7511,6 +7708,161 @@ def api_get_issue_linked_anchors(issue_key_hash: str):
     
     except Exception as e:
         logging.exception(f"Error fetching issue linked anchors: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ===================== Finance Endpoints (Task 2) =====================
+
+@app.route('/api/projects/<int:project_id>/finance/line-items', methods=['GET'])
+def api_get_line_items(project_id: int):
+    """
+    Get unified line items (reviews + items) for a project.
+    
+    Query Parameters:
+        - service_id (optional): Filter by service
+        - invoice_status (optional): Filter by invoice status (draft, ready, issued, paid)
+    
+    Returns:
+        {
+          'project_id': int,
+          'line_items': [
+            {
+              'type': 'review' | 'item',
+              'id': str,
+              'service_id': int,
+              'service_code': str,
+              'service_name': str,
+              'phase': str,
+              'title': str,
+              'planned_date': ISO date string,
+              'due_date': ISO date string,
+              'status': str,
+              'fee': float (resolved using fee_resolver),
+              'fee_source': str (override|calculated_equal_split|calculated_weighted),
+              'invoice_status': str,
+              'invoice_reference': str | null,
+              'invoice_date': ISO date | null,
+              'invoice_month': YYYY-MM,
+              'is_billed': int
+            },
+            ...
+          ],
+          'totals': {
+            'total_fee': float,
+            'billed_fee': float,
+            'outstanding_fee': float
+          }
+        }
+    """
+    try:
+        service_id = request.args.get('service_id', type=int)
+        invoice_status = request.args.get('invoice_status', type=str)
+        
+        result = FinancialDataService.get_line_items(
+            project_id=project_id,
+            service_id=service_id,
+            invoice_status=invoice_status
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error fetching line items: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/finance/reconciliation', methods=['GET'])
+def api_get_reconciliation(project_id: int):
+    """
+    Get financial reconciliation summary by service and project.
+    
+    Returns:
+        {
+          'project': {
+            'project_id': int,
+            'agreed_fee': float,
+            'line_items_total_fee': float,
+            'billed_total_fee': float,
+            'outstanding_total_fee': float,
+            'variance': float (agreed - line_items_total),
+            'review_count': int,
+            'item_count': int
+          },
+          'by_service': [
+            {
+              'service_id': int,
+              'service_code': str,
+              'service_name': str,
+              'agreed_fee': float,
+              'line_items_total_fee': float,
+              'billed_total_fee': float,
+              'outstanding_total_fee': float,
+              'variance': float,
+              'review_count': int,
+              'item_count': int
+            },
+            ...
+          ]
+        }
+    """
+    try:
+        result = FinancialDataService.get_reconciliation(project_id=project_id)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error computing reconciliation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/finance/summary', methods=['GET'])
+def api_get_projects_finance_summary():
+    """
+    Get batch finance summary for all projects using deterministic fee model.
+    
+    Query Parameters:
+        - status (optional): Filter by project status (e.g., 'active'). If omitted, returns all.
+    
+    Returns:
+        {
+          'projects': [
+            {
+              'project_id': int,
+              'agreed_fee_total': float,
+              'line_items_total': float,
+              'billed_total': float,
+              'unbilled_total': float,
+              'earned_value': float,
+              'pipeline_this_month': float
+            },
+            ...
+          ]
+        }
+    
+    Fee resolution logic (deterministic model):
+    - Reviews: fee_amount if set, else service.agreed_fee / actual_review_count
+    - Items: fee_amount if set, else 0
+    
+    Performance: Single batch query with CTEs, no per-project N+1 calls.
+    """
+    try:
+        status = request.args.get('status', type=str)
+        
+        result = FinancialDataService.get_projects_finance_summary(status=status)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logging.exception(f"Error computing projects finance summary: {e}")
         return jsonify({'error': str(e)}), 500
 
 

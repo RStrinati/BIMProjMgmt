@@ -1,5 +1,16 @@
 import apiClient from './client';
-import type { Project, ProjectFilters, DashboardTimelineResponse, ProjectFinanceGrid, ProjectFinanceSummary, ProjectSummary, ProjectAggregates } from '@/types/api';
+import type {
+  Project,
+  ProjectFilters,
+  DashboardTimelineResponse,
+  ProjectFinanceGrid,
+  ProjectFinanceSummary,
+  ProjectSummary,
+  ProjectAggregates,
+  FinanceLineItemsResponse,
+  FinanceReconciliationResponse,
+  ProjectsFinanceSummaryResponse,
+} from '@/types/api';
 
 export const projectsApi = {
   // Get all projects
@@ -134,6 +145,32 @@ export const projectsApi = {
 
   getFinanceSummary: async (projectId: number): Promise<ProjectFinanceSummary> => {
     const response = await apiClient.get<ProjectFinanceSummary>(`/projects/${projectId}/finance-summary`);
+    return response.data;
+  },
+
+  getFinanceLineItems: async (
+    projectId: number,
+    options?: { serviceId?: number; invoiceStatus?: string }
+  ): Promise<FinanceLineItemsResponse> => {
+    const response = await apiClient.get<FinanceLineItemsResponse>(`/projects/${projectId}/finance/line-items`, {
+      params: {
+        service_id: options?.serviceId,
+        invoice_status: options?.invoiceStatus,
+      },
+    });
+    return response.data;
+  },
+
+  getFinanceReconciliation: async (projectId: number): Promise<FinanceReconciliationResponse> => {
+    const response = await apiClient.get<FinanceReconciliationResponse>(`/projects/${projectId}/finance/reconciliation`);
+    return response.data;
+  },
+
+  // Get batch finance summary for all projects (deterministic fee model)
+  getProjectsFinanceSummary: async (options?: { status?: string }): Promise<ProjectsFinanceSummaryResponse> => {
+    const response = await apiClient.get<ProjectsFinanceSummaryResponse>('/projects/finance/summary', {
+      params: options?.status ? { status: options.status } : undefined,
+    });
     return response.data;
   },
 };

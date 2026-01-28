@@ -1,0 +1,175 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 7
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: services
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Test Project" [level=5] [ref=e98]
+          - generic [ref=e100]: Active
+          - generic [ref=e102]: "Lead: Test User"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic:
+              - img
+            - tablist [ref=e109]:
+              - tab "Overview" [ref=e110] [cursor=pointer]: Overview
+              - tab "Services" [selected] [ref=e111] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e112] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e113] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e114] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e115] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e116] [cursor=pointer]: Quality
+            - img [ref=e119] [cursor=pointer]
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - heading "Services" [level=6] [ref=e124]
+              - group "add-service-options" [ref=e126]:
+                - button "Add Service" [ref=e127] [cursor=pointer]:
+                  - img [ref=e129]
+                  - text: Add Service
+                - button [ref=e131] [cursor=pointer]:
+                  - img [ref=e132]
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e136]: Service
+                - generic [ref=e137]: Phase
+                - generic [ref=e138]: Status
+                - generic [ref=e139]: Deliverables
+                - generic [ref=e140]: Agreed
+                - generic [ref=e141]: Billed
+                - generic [ref=e142]: Remaining
+                - generic [ref=e143]: Progress
+              - generic [ref=e144] [cursor=pointer]:
+                - generic [ref=e145]:
+                  - paragraph [ref=e146]: S001
+                  - text: Architectural Design
+                - paragraph [ref=e148]: Design
+                - generic [ref=e149]: active
+                - paragraph [ref=e151]:
+                  - paragraph [ref=e152]: "Reviews: 0 / Items: 0"
+                - paragraph [ref=e154]: $50,000.00
+                - paragraph [ref=e156]: $15,000.00
+                - paragraph [ref=e158]: $35,000.00
+                - paragraph [ref=e160]: 30%
+              - generic [ref=e161] [cursor=pointer]:
+                - generic [ref=e162]:
+                  - paragraph [ref=e163]: S002
+                  - text: Structural Engineering
+                - paragraph [ref=e165]: Design
+                - generic [ref=e166]: in_progress
+                - paragraph [ref=e168]:
+                  - paragraph [ref=e169]: "Reviews: 0 / Items: 0"
+                - paragraph [ref=e171]: $40,000.00
+                - paragraph [ref=e173]: $20,000.00
+                - paragraph [ref=e175]: $20,000.00
+                - paragraph [ref=e177]: 50%
+        - generic [ref=e180]:
+          - generic [ref=e181]:
+            - heading "Properties" [level=6] [ref=e182]
+            - generic [ref=e183]:
+              - generic [ref=e184]:
+                - paragraph [ref=e185]: "Project #"
+                - paragraph [ref=e186]: P-007
+              - generic [ref=e187]:
+                - paragraph [ref=e188]: Client
+                - paragraph [ref=e189]: Test Client
+              - generic [ref=e190]:
+                - paragraph [ref=e191]: Type
+                - paragraph [ref=e192]: "--"
+              - generic [ref=e193]:
+                - paragraph [ref=e194]: Manager
+                - paragraph [ref=e195]: "--"
+              - generic [ref=e196]:
+                - paragraph [ref=e197]: Start
+                - paragraph [ref=e198]: "--"
+              - generic [ref=e199]:
+                - paragraph [ref=e200]: End
+                - paragraph [ref=e201]: "--"
+          - generic [ref=e202]:
+            - heading "Progress" [level=6] [ref=e203]
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - paragraph [ref=e206]: Agreed fee
+                - paragraph [ref=e207]: $150,000.00
+              - generic [ref=e208]:
+                - paragraph [ref=e209]: Line items
+                - paragraph [ref=e210]: $150,000.00
+              - generic [ref=e211]:
+                - paragraph [ref=e212]: Billed
+                - paragraph [ref=e213]: $50,000.00 (33%)
+              - generic [ref=e214]:
+                - paragraph [ref=e215]: Outstanding
+                - paragraph [ref=e216]: $0.00
+          - generic [ref=e217]:
+            - heading "Activity" [level=6] [ref=e218]
+            - paragraph [ref=e219]: Recent activity will appear here.
+          - separator [ref=e220]
+          - generic [ref=e221]:
+            - heading "Services Summary" [level=6] [ref=e222]
+            - paragraph [ref=e223]: "Total services: 2"
+            - paragraph [ref=e224]: Select a service to view details.
+```

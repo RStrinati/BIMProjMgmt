@@ -215,7 +215,7 @@ export const PROJECT_FIELD_REGISTRY: ProjectFieldDefinition[] = [
   },
   {
     id: 'health_pct',
-    label: 'Health %',
+    label: 'Service completion %',
     format: 'percent',
     aggregatable: 'none',
     editable: false,
@@ -226,7 +226,7 @@ export const PROJECT_FIELD_REGISTRY: ProjectFieldDefinition[] = [
         size="small"
         color="primary"
         variant="outlined"
-        label={`Health: ${formatValue('percent', project.health_pct)}`}
+        label={`Service completion: ${formatValue('percent', project.health_pct)}`}
       />
     ),
   },

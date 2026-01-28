@@ -210,6 +210,30 @@ export const projectServicesApi = {
     `/projects/${projectId}/services/${serviceId}/reviews/resequence`,
     data,
   ),
+  setReviewCount: (
+    projectId: number,
+    serviceId: number,
+    data: {
+      desired_count: number;
+      anchor_date?: string;
+      interval_days?: number;
+    },
+  ) => apiClient.post(
+    `/projects/${projectId}/services/${serviceId}/reviews/count`,
+    data,
+  ),
+  resetReviews: (
+    projectId: number,
+    serviceId: number,
+    data: {
+      desired_count: number;
+      anchor_date?: string;
+      interval_days?: number;
+    },
+  ) => apiClient.post(
+    `/projects/${projectId}/services/${serviceId}/reviews/reset`,
+    data,
+  ),
 
   getGeneratedStructure: (projectId: number, serviceId: number) =>
     apiClient

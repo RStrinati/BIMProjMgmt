@@ -70,9 +70,19 @@ export function ServicesListRow({
         </Typography>
       </TableCell>
 
-      {/* Status (color-coded chip) */}
+      {/* Status (color-coded chip) + execution intent badge */}
       <TableCell sx={{ py: 1.5 }}>
-        <Chip label={service.status} color={getStatusColor(service.status)} size="small" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Chip label={service.status} color={getStatusColor(service.status)} size="small" />
+          {service.execution_intent && service.execution_intent !== 'planned' ? (
+            <Chip
+              label={service.execution_intent === 'optional' ? 'Optional' : 'Not proceeding'}
+              variant="outlined"
+              size="small"
+              color="default"
+            />
+          ) : null}
+        </Box>
       </TableCell>
 
       {/* Agreed Fee (muted) */}

@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api/projects';
 import { ReactNode } from 'react';
 import type { Selection } from '@/hooks/useWorkspaceSelection';
-import type { Project } from '@/types/api';
+import type { FinanceReconciliationResponse, Project } from '@/types/api';
 import { InlineField } from '@/components/ui/InlineField';
 
 type RightPanelProps = {
@@ -63,18 +63,22 @@ function ProgressBlock({ project }: { project: Project | null }) {
   if (!project) return null;
 
   const projectId = project.project_id;
-  const { data: financeSummary } = useQuery({
-    queryKey: ['projectFinanceSummary', projectId],
-    queryFn: () => projectsApi.getFinanceSummary(projectId),
+  const { data: reconciliation } = useQuery<FinanceReconciliationResponse>({
+    queryKey: ['projectFinanceReconciliation', projectId],
+    queryFn: () => projectsApi.getFinanceReconciliation(projectId),
     enabled: Number.isFinite(projectId),
   });
 
-  const totalAgreed = Number(financeSummary?.total_agreed_fee ?? project.total_service_agreed_fee ?? project.agreed_fee ?? 0) || 0;
-  const totalBilled = Number(financeSummary?.total_claimed_or_billed ?? project.total_service_billed_amount ?? 0) || 0;
-  const billedPctRaw = financeSummary?.progress_pct ?? project.service_billed_pct ?? 0;
-  const billedPct = Number.isFinite(Number(billedPctRaw))
-    ? Number(billedPctRaw)
-    : totalAgreed > 0 ? (totalBilled / totalAgreed) * 100 : 0;
+  const projectTotals = reconciliation?.project;
+  const totalAgreed = Number(projectTotals?.agreed_fee ?? project.total_service_agreed_fee ?? project.agreed_fee ?? 0) || 0;
+  const lineItemsTotal = Number(projectTotals?.line_items_total_fee ?? 0) || 0;
+  const totalBilled = Number(projectTotals?.billed_total_fee ?? project.total_service_billed_amount ?? 0) || 0;
+  const outstanding = Number(projectTotals?.outstanding_total_fee ?? Math.max(lineItemsTotal - totalBilled, 0)) || 0;
+  const billedPct = lineItemsTotal > 0
+    ? (totalBilled / lineItemsTotal) * 100
+    : totalAgreed > 0
+      ? (totalBilled / totalAgreed) * 100
+      : 0;
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -83,8 +87,12 @@ function ProgressBlock({ project }: { project: Project | null }) {
       </Typography>
       <Stack spacing={1}>
         <InlineField label="Agreed fee" value={formatCurrency(totalAgreed)} />
-        <InlineField label="Billed" value={formatCurrency(totalBilled)} />
-        <InlineField label="Billed %" value={`${Math.round(Math.min(Math.max(billedPct, 0), 100))}%`} />
+        <InlineField label="Line items" value={formatCurrency(lineItemsTotal || totalAgreed)} />
+        <InlineField
+          label="Billed"
+          value={`${formatCurrency(totalBilled)} (${Math.round(Math.min(Math.max(billedPct, 0), 100))}%)`}
+        />
+        <InlineField label="Outstanding" value={formatCurrency(outstanding)} />
       </Stack>
     </Paper>
   );

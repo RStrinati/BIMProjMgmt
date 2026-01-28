@@ -1,0 +1,744 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]:
+              - paragraph [ref=e14]: Projects
+      - generic [ref=e17]:
+        - img [ref=e19]
+        - textbox "Global search (projects, services)" [ref=e21]
+        - group
+  - navigation [ref=e22]:
+    - generic [ref=e24]:
+      - generic [ref=e26]: BIM Manager
+      - separator [ref=e27]
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - button "Dashboard" [ref=e30] [cursor=pointer]:
+            - img [ref=e32]
+            - generic [ref=e35]: Dashboard
+        - listitem [ref=e36]:
+          - button "Projects & Services" [ref=e37] [cursor=pointer]:
+            - img [ref=e39]
+            - generic [ref=e42]: Projects & Services
+        - listitem [ref=e43]:
+          - button "Bids" [ref=e44] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: Bids
+        - listitem [ref=e50]:
+          - button "Data Imports" [ref=e51] [cursor=pointer]:
+            - img [ref=e53]
+            - generic [ref=e56]: Data Imports
+        - listitem [ref=e57]:
+          - button "Reviews (redirect)" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+            - generic [ref=e63]: Reviews (redirect)
+        - listitem [ref=e64]:
+          - button "Tasks" [ref=e65] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Tasks
+      - separator [ref=e71]
+      - list [ref=e72]:
+        - listitem [ref=e73]:
+          - button "Settings" [ref=e74] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: Settings
+  - main [ref=e80]:
+    - generic [ref=e82]:
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - heading "Projects" [level=4] [ref=e85]
+          - paragraph [ref=e86]: Track project status across list, board, and timeline.
+        - generic [ref=e87]:
+          - button "Create Project" [ref=e88] [cursor=pointer]:
+            - img [ref=e90]
+            - text: Create Project
+          - generic [ref=e92]:
+            - generic [ref=e93]: View
+            - generic [ref=e94]:
+              - combobox "View All projects" [ref=e95] [cursor=pointer]: All projects
+              - textbox: all
+              - img
+              - group:
+                - generic: View
+          - generic [ref=e97]:
+            - textbox "Search projects" [ref=e98]
+            - group
+          - button "Columns" [ref=e99] [cursor=pointer]:
+            - img [ref=e101]
+            - text: Columns
+          - group [ref=e103]:
+            - button "List" [pressed] [ref=e104] [cursor=pointer]: List
+            - button "Board" [ref=e105] [cursor=pointer]: Board
+            - button "Timeline" [ref=e106] [cursor=pointer]: Timeline
+      - table [ref=e108]:
+        - rowgroup [ref=e109]:
+          - 'row "Project Project # Status Priority Lead Target Health %" [ref=e110]':
+            - columnheader "Project" [ref=e111]:
+              - button "Project" [ref=e112] [cursor=pointer]:
+                - text: Project
+                - img [ref=e113]
+            - 'columnheader "Project #" [ref=e115]':
+              - 'button "Project #" [ref=e116] [cursor=pointer]':
+                - text: "Project #"
+                - img [ref=e117]
+            - columnheader "Status" [ref=e119]:
+              - button "Status" [ref=e120] [cursor=pointer]:
+                - text: Status
+                - img [ref=e121]
+            - columnheader "Priority" [ref=e123]:
+              - button "Priority" [ref=e124] [cursor=pointer]:
+                - text: Priority
+                - img [ref=e125]
+            - columnheader "Lead" [ref=e127]:
+              - button "Lead" [ref=e128] [cursor=pointer]:
+                - text: Lead
+                - img [ref=e129]
+            - columnheader "Target" [ref=e131]:
+              - button "Target" [ref=e132] [cursor=pointer]:
+                - text: Target
+                - img [ref=e133]
+            - columnheader "Health %" [ref=e135]:
+              - button "Health %" [ref=e136] [cursor=pointer]:
+                - text: Health %
+                - img [ref=e137]
+        - rowgroup [ref=e139]:
+          - row "55 Pitt Street Completed --" [ref=e140] [cursor=pointer]:
+            - cell "55 Pitt Street" [ref=e141]:
+              - textbox [ref=e144]: 55 Pitt Street
+            - cell [ref=e145]:
+              - textbox [ref=e148]
+            - cell "Completed" [ref=e149]:
+              - generic [ref=e151]:
+                - combobox "Completed" [ref=e152]
+                - textbox: Completed
+                - img
+            - cell [ref=e153]:
+              - generic [ref=e155]:
+                - combobox [ref=e156]
+                - textbox
+                - img
+            - cell [ref=e157]:
+              - generic [ref=e159]:
+                - combobox [ref=e160]
+                - textbox
+                - img
+            - cell [ref=e161]:
+              - textbox [ref=e164]
+            - cell "--" [ref=e165]
+          - row "CWPS D2_252358 Completed Low Rico Strinati 2025-08-01 --" [ref=e166] [cursor=pointer]:
+            - cell "CWPS" [ref=e167]:
+              - textbox [ref=e170]: CWPS
+            - cell "D2_252358" [ref=e171]:
+              - textbox [ref=e174]: D2_252358
+            - cell "Completed" [ref=e175]:
+              - generic [ref=e177]:
+                - combobox "Completed" [ref=e178]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e179]:
+              - generic [ref=e181]:
+                - combobox "Low" [ref=e182]
+                - textbox: "1"
+                - img
+            - cell "Rico Strinati" [ref=e183]:
+              - generic [ref=e185]:
+                - combobox "Rico Strinati" [ref=e186]
+                - textbox: "1"
+                - img
+            - cell "2025-08-01" [ref=e187]:
+              - textbox [ref=e190]: 2025-08-01
+            - cell "--" [ref=e191]
+          - row "EVHS Phase 3 D2_252355 Completed Low Rico Strinati 2025-09-30 100%" [ref=e192] [cursor=pointer]:
+            - cell "EVHS Phase 3" [ref=e193]:
+              - textbox [ref=e196]: EVHS Phase 3
+            - cell "D2_252355" [ref=e197]:
+              - textbox [ref=e200]: D2_252355
+            - cell "Completed" [ref=e201]:
+              - generic [ref=e203]:
+                - combobox "Completed" [ref=e204]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e205]:
+              - generic [ref=e207]:
+                - combobox "Low" [ref=e208]
+                - textbox: "1"
+                - img
+            - cell "Rico Strinati" [ref=e209]:
+              - generic [ref=e211]:
+                - combobox "Rico Strinati" [ref=e212]
+                - textbox: "1"
+                - img
+            - cell "2025-09-30" [ref=e213]:
+              - textbox [ref=e216]: 2025-09-30
+            - cell "100%" [ref=e217]
+          - row "EVHS Phase 5-8 D2_OPP_250877 Active High Rico Strinati 2027-05-31 13%" [ref=e218] [cursor=pointer]:
+            - cell "EVHS Phase 5-8" [ref=e219]:
+              - textbox [ref=e222]: EVHS Phase 5-8
+            - cell "D2_OPP_250877" [ref=e223]:
+              - textbox [ref=e226]: D2_OPP_250877
+            - cell "Active" [ref=e227]:
+              - generic [ref=e229]:
+                - combobox "Active" [ref=e230]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e231]:
+              - generic [ref=e233]:
+                - combobox "High" [ref=e234]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e235]:
+              - generic [ref=e237]:
+                - combobox "Rico Strinati" [ref=e238]
+                - textbox: "1"
+                - img
+            - cell "2027-05-31" [ref=e239]:
+              - textbox [ref=e242]: 2027-05-31
+            - cell "13%" [ref=e243]
+          - row "GPS D2_252298 Completed Low 2025-12-12 --" [ref=e244] [cursor=pointer]:
+            - cell "GPS" [ref=e245]:
+              - textbox [ref=e248]: GPS
+            - cell "D2_252298" [ref=e249]:
+              - textbox [ref=e252]: D2_252298
+            - cell "Completed" [ref=e253]:
+              - generic [ref=e255]:
+                - combobox "Completed" [ref=e256]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e257]:
+              - generic [ref=e259]:
+                - combobox "Low" [ref=e260]
+                - textbox: "1"
+                - img
+            - cell [ref=e261]:
+              - generic [ref=e263]:
+                - combobox [ref=e264]
+                - textbox
+                - img
+            - cell "2025-12-12" [ref=e265]:
+              - textbox [ref=e268]: 2025-12-12
+            - cell "--" [ref=e269]
+          - row "HammondCare Greenwich --" [ref=e270] [cursor=pointer]:
+            - cell "HammondCare Greenwich" [ref=e271]:
+              - textbox [ref=e274]: HammondCare Greenwich
+            - cell [ref=e275]:
+              - textbox [ref=e278]
+            - cell [ref=e279]:
+              - generic [ref=e281]:
+                - combobox [ref=e282]
+                - textbox: unmanaged
+                - img
+            - cell [ref=e283]:
+              - generic [ref=e285]:
+                - combobox [ref=e286]
+                - textbox
+                - img
+            - cell [ref=e287]:
+              - generic [ref=e289]:
+                - combobox [ref=e290]
+                - textbox
+                - img
+            - cell [ref=e291]:
+              - textbox [ref=e294]
+            - cell "--" [ref=e295]
+          - row "Iglu UNSW D2_262399 Active Low --" [ref=e296] [cursor=pointer]:
+            - cell "Iglu UNSW" [ref=e297]:
+              - textbox [ref=e300]: Iglu UNSW
+            - cell "D2_262399" [ref=e301]:
+              - textbox [ref=e304]: D2_262399
+            - cell "Active" [ref=e305]:
+              - generic [ref=e307]:
+                - combobox "Active" [ref=e308]
+                - textbox: Active
+                - img
+            - cell "Low" [ref=e309]:
+              - generic [ref=e311]:
+                - combobox "Low" [ref=e312]
+                - textbox: "1"
+                - img
+            - cell [ref=e313]:
+              - generic [ref=e315]:
+                - combobox [ref=e316]
+                - textbox
+                - img
+            - cell [ref=e317]:
+              - textbox [ref=e320]
+            - cell "--" [ref=e321]
+          - row "MEL01A D2_252304 Completed Low 2025-03-31 --" [ref=e322] [cursor=pointer]:
+            - cell "MEL01A" [ref=e323]:
+              - textbox [ref=e326]: MEL01A
+            - cell "D2_252304" [ref=e327]:
+              - textbox [ref=e330]: D2_252304
+            - cell "Completed" [ref=e331]:
+              - generic [ref=e333]:
+                - combobox "Completed" [ref=e334]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e335]:
+              - generic [ref=e337]:
+                - combobox "Low" [ref=e338]
+                - textbox: "1"
+                - img
+            - cell [ref=e339]:
+              - generic [ref=e341]:
+                - combobox [ref=e342]
+                - textbox
+                - img
+            - cell "2025-03-31" [ref=e343]:
+              - textbox [ref=e346]: 2025-03-31
+            - cell "--" [ref=e347]
+          - row "MEL01CD 111 Active Low 2025-10-31 --" [ref=e348] [cursor=pointer]:
+            - cell "MEL01CD" [ref=e349]:
+              - textbox [ref=e352]: MEL01CD
+            - cell "111" [ref=e353]:
+              - textbox [ref=e356]: "111"
+            - cell "Active" [ref=e357]:
+              - generic [ref=e359]:
+                - combobox "Active" [ref=e360]
+                - textbox: Active
+                - img
+            - cell "Low" [ref=e361]:
+              - generic [ref=e363]:
+                - combobox "Low" [ref=e364]
+                - textbox: "1"
+                - img
+            - cell [ref=e365]:
+              - generic [ref=e367]:
+                - combobox [ref=e368]
+                - textbox
+                - img
+            - cell "2025-10-31" [ref=e369]:
+              - textbox [ref=e372]: 2025-10-31
+            - cell "--" [ref=e373]
+          - row "MEL063 D2_262409 Active Low --" [ref=e374] [cursor=pointer]:
+            - cell "MEL063" [ref=e375]:
+              - textbox [ref=e378]: MEL063
+            - cell "D2_262409" [ref=e379]:
+              - textbox [ref=e382]: D2_262409
+            - cell "Active" [ref=e383]:
+              - generic [ref=e385]:
+                - combobox "Active" [ref=e386]
+                - textbox: Active
+                - img
+            - cell "Low" [ref=e387]:
+              - generic [ref=e389]:
+                - combobox "Low" [ref=e390]
+                - textbox: "1"
+                - img
+            - cell [ref=e391]:
+              - generic [ref=e393]:
+                - combobox [ref=e394]
+                - textbox
+                - img
+            - cell [ref=e395]:
+              - textbox [ref=e398]
+            - cell "--" [ref=e399]
+          - row "MEL064 D3_252348 Active Medium 2025-11-25 --" [ref=e400] [cursor=pointer]:
+            - cell "MEL064" [ref=e401]:
+              - textbox [ref=e404]: MEL064
+            - cell "D3_252348" [ref=e405]:
+              - textbox [ref=e408]: D3_252348
+            - cell "Active" [ref=e409]:
+              - generic [ref=e411]:
+                - combobox "Active" [ref=e412]
+                - textbox: Active
+                - img
+            - cell "Medium" [ref=e413]:
+              - generic [ref=e415]:
+                - combobox "Medium" [ref=e416]
+                - textbox: "2"
+                - img
+            - cell [ref=e417]:
+              - generic [ref=e419]:
+                - combobox [ref=e420]
+                - textbox
+                - img
+            - cell "2025-11-25" [ref=e421]:
+              - textbox [ref=e424]: 2025-11-25
+            - cell "--" [ref=e425]
+          - row "MEL070 D2_262410 Active High Rico Strinati 2028-10-31 33%" [ref=e426] [cursor=pointer]:
+            - cell "MEL070" [ref=e427]:
+              - textbox [ref=e430]: MEL070
+            - cell "D2_262410" [ref=e431]:
+              - textbox [ref=e434]: D2_262410
+            - cell "Active" [ref=e435]:
+              - generic [ref=e437]:
+                - combobox "Active" [ref=e438]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e439]:
+              - generic [ref=e441]:
+                - combobox "High" [ref=e442]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e443]:
+              - generic [ref=e445]:
+                - combobox "Rico Strinati" [ref=e446]
+                - textbox: "1"
+                - img
+            - cell "2028-10-31" [ref=e447]:
+              - textbox [ref=e450]: 2028-10-31
+            - cell "33%" [ref=e451]
+          - row "MEL071 D3_252349 Active High Rico Strinati 2025-11-25 67%" [ref=e452] [cursor=pointer]:
+            - cell "MEL071" [ref=e453]:
+              - textbox [ref=e456]: MEL071
+            - cell "D3_252349" [ref=e457]:
+              - textbox [ref=e460]: D3_252349
+            - cell "Active" [ref=e461]:
+              - generic [ref=e463]:
+                - combobox "Active" [ref=e464]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e465]:
+              - generic [ref=e467]:
+                - combobox "High" [ref=e468]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e469]:
+              - generic [ref=e471]:
+                - combobox "Rico Strinati" [ref=e472]
+                - textbox: "1"
+                - img
+            - cell "2025-11-25" [ref=e473]:
+              - textbox [ref=e476]: 2025-11-25
+            - cell "67%" [ref=e477]
+          - row "MEL080 D2_262411 Active Low --" [ref=e478] [cursor=pointer]:
+            - cell "MEL080" [ref=e479]:
+              - textbox [ref=e482]: MEL080
+            - cell "D2_262411" [ref=e483]:
+              - textbox [ref=e486]: D2_262411
+            - cell "Active" [ref=e487]:
+              - generic [ref=e489]:
+                - combobox "Active" [ref=e490]
+                - textbox: Active
+                - img
+            - cell "Low" [ref=e491]:
+              - generic [ref=e493]:
+                - combobox "Low" [ref=e494]
+                - textbox: "1"
+                - img
+            - cell [ref=e495]:
+              - generic [ref=e497]:
+                - combobox [ref=e498]
+                - textbox
+                - img
+            - cell [ref=e499]:
+              - textbox [ref=e502]
+            - cell "--" [ref=e503]
+          - row "MEL081 D3_252347 Active Medium 2025-11-25 0%" [ref=e504] [cursor=pointer]:
+            - cell "MEL081" [ref=e505]:
+              - textbox [ref=e508]: MEL081
+            - cell "D3_252347" [ref=e509]:
+              - textbox [ref=e512]: D3_252347
+            - cell "Active" [ref=e513]:
+              - generic [ref=e515]:
+                - combobox "Active" [ref=e516]
+                - textbox: Active
+                - img
+            - cell "Medium" [ref=e517]:
+              - generic [ref=e519]:
+                - combobox "Medium" [ref=e520]
+                - textbox: "2"
+                - img
+            - cell [ref=e521]:
+              - generic [ref=e523]:
+                - combobox [ref=e524]
+                - textbox
+                - img
+            - cell "2025-11-25" [ref=e525]:
+              - textbox [ref=e528]: 2025-11-25
+            - cell "0%" [ref=e529]
+          - row "MEL081- Site A --" [ref=e530] [cursor=pointer]:
+            - cell "MEL081- Site A" [ref=e531]:
+              - textbox [ref=e534]: MEL081- Site A
+            - cell [ref=e535]:
+              - textbox [ref=e538]
+            - cell [ref=e539]:
+              - generic [ref=e541]:
+                - combobox [ref=e542]
+                - textbox: unmanaged
+                - img
+            - cell [ref=e543]:
+              - generic [ref=e545]:
+                - combobox [ref=e546]
+                - textbox
+                - img
+            - cell [ref=e547]:
+              - generic [ref=e549]:
+                - combobox [ref=e550]
+                - textbox
+                - img
+            - cell [ref=e551]:
+              - textbox [ref=e554]
+            - cell "--" [ref=e555]
+          - row "MPHS D2_252380 Active High Rico Strinati 2026-02-06 43%" [ref=e556] [cursor=pointer]:
+            - cell "MPHS" [ref=e557]:
+              - textbox [ref=e560]: MPHS
+            - cell "D2_252380" [ref=e561]:
+              - textbox [ref=e564]: D2_252380
+            - cell "Active" [ref=e565]:
+              - generic [ref=e567]:
+                - combobox "Active" [ref=e568]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e569]:
+              - generic [ref=e571]:
+                - combobox "High" [ref=e572]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e573]:
+              - generic [ref=e575]:
+                - combobox "Rico Strinati" [ref=e576]
+                - textbox: "1"
+                - img
+            - cell "2026-02-06" [ref=e577]:
+              - textbox [ref=e580]: 2026-02-06
+            - cell "43%" [ref=e581]
+          - row "NDC S4 D2_222173 Active Medium --" [ref=e582] [cursor=pointer]:
+            - cell "NDC S4" [ref=e583]:
+              - textbox [ref=e586]: NDC S4
+            - cell "D2_222173" [ref=e587]:
+              - textbox [ref=e590]: D2_222173
+            - cell "Active" [ref=e591]:
+              - generic [ref=e593]:
+                - combobox "Active" [ref=e594]
+                - textbox: Active
+                - img
+            - cell "Medium" [ref=e595]:
+              - generic [ref=e597]:
+                - combobox "Medium" [ref=e598]
+                - textbox: "2"
+                - img
+            - cell [ref=e599]:
+              - generic [ref=e601]:
+                - combobox [ref=e602]
+                - textbox
+                - img
+            - cell [ref=e603]:
+              - textbox [ref=e606]
+            - cell "--" [ref=e607]
+          - row "NEPS D2_252357 Completed Low Rico Strinati 2025-09-30 100%" [ref=e608] [cursor=pointer]:
+            - cell "NEPS" [ref=e609]:
+              - textbox [ref=e612]: NEPS
+            - cell "D2_252357" [ref=e613]:
+              - textbox [ref=e616]: D2_252357
+            - cell "Completed" [ref=e617]:
+              - generic [ref=e619]:
+                - combobox "Completed" [ref=e620]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e621]:
+              - generic [ref=e623]:
+                - combobox "Low" [ref=e624]
+                - textbox: "1"
+                - img
+            - cell "Rico Strinati" [ref=e625]:
+              - generic [ref=e627]:
+                - combobox "Rico Strinati" [ref=e628]
+                - textbox: "1"
+                - img
+            - cell "2025-09-30" [ref=e629]:
+              - textbox [ref=e632]: 2025-09-30
+            - cell "100%" [ref=e633]
+          - row "NEXTDC | S3 | SP14 / SP17 / SP18 Completed --" [ref=e634] [cursor=pointer]:
+            - cell "NEXTDC | S3 | SP14 / SP17 / SP18" [ref=e635]:
+              - textbox [ref=e638]: NEXTDC | S3 | SP14 / SP17 / SP18
+            - cell [ref=e639]:
+              - textbox [ref=e642]
+            - cell "Completed" [ref=e643]:
+              - generic [ref=e645]:
+                - combobox "Completed" [ref=e646]
+                - textbox: Completed
+                - img
+            - cell [ref=e647]:
+              - generic [ref=e649]:
+                - combobox [ref=e650]
+                - textbox
+                - img
+            - cell [ref=e651]:
+              - generic [ref=e653]:
+                - combobox [ref=e654]
+                - textbox
+                - img
+            - cell [ref=e655]:
+              - textbox [ref=e658]
+            - cell "--" [ref=e659]
+          - row "NFPS D2_252323 Active High Rico Strinati 2025-10-25 71%" [ref=e660] [cursor=pointer]:
+            - cell "NFPS" [ref=e661]:
+              - textbox [ref=e664]: NFPS
+            - cell "D2_252323" [ref=e665]:
+              - textbox [ref=e668]: D2_252323
+            - cell "Active" [ref=e669]:
+              - generic [ref=e671]:
+                - combobox "Active" [ref=e672]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e673]:
+              - generic [ref=e675]:
+                - combobox "High" [ref=e676]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e677]:
+              - generic [ref=e679]:
+                - combobox "Rico Strinati" [ref=e680]
+                - textbox: "1"
+                - img
+            - cell "2025-10-25" [ref=e681]:
+              - textbox [ref=e684]: 2025-10-25
+            - cell "71%" [ref=e685]
+          - row "PDP Foods Fitout D2_262406 On Hold Low Rico Strinati 2026-03-31 20%" [ref=e686] [cursor=pointer]:
+            - cell "PDP Foods Fitout" [ref=e687]:
+              - textbox [ref=e690]: PDP Foods Fitout
+            - cell "D2_262406" [ref=e691]:
+              - textbox [ref=e694]: D2_262406
+            - cell "On Hold" [ref=e695]:
+              - generic [ref=e697]:
+                - combobox "On Hold" [ref=e698]
+                - textbox: On Hold
+                - img
+            - cell "Low" [ref=e699]:
+              - generic [ref=e701]:
+                - combobox "Low" [ref=e702]
+                - textbox: "1"
+                - img
+            - cell "Rico Strinati" [ref=e703]:
+              - generic [ref=e705]:
+                - combobox "Rico Strinati" [ref=e706]
+                - textbox: "1"
+                - img
+            - cell "2026-03-31" [ref=e707]:
+              - textbox [ref=e710]: 2026-03-31
+            - cell "20%" [ref=e711]
+          - row "Project G D8_OPP_250772 Active Medium Rico Strinati 2026-11-30 0%" [ref=e712] [cursor=pointer]:
+            - cell "Project G" [ref=e713]:
+              - textbox [ref=e716]: Project G
+            - cell "D8_OPP_250772" [ref=e717]:
+              - textbox [ref=e720]: D8_OPP_250772
+            - cell "Active" [ref=e721]:
+              - generic [ref=e723]:
+                - combobox "Active" [ref=e724]
+                - textbox: Active
+                - img
+            - cell "Medium" [ref=e725]:
+              - generic [ref=e727]:
+                - combobox "Medium" [ref=e728]
+                - textbox: "2"
+                - img
+            - cell "Rico Strinati" [ref=e729]:
+              - generic [ref=e731]:
+                - combobox "Rico Strinati" [ref=e732]
+                - textbox: "1"
+                - img
+            - cell "2026-11-30" [ref=e733]:
+              - textbox [ref=e736]: 2026-11-30
+            - cell "0%" [ref=e737]
+          - row "RHS D2_252356 Completed Low Rico Strinati 2025-09-30 100%" [ref=e738] [cursor=pointer]:
+            - cell "RHS" [ref=e739]:
+              - textbox [ref=e742]: RHS
+            - cell "D2_252356" [ref=e743]:
+              - textbox [ref=e746]: D2_252356
+            - cell "Completed" [ref=e747]:
+              - generic [ref=e749]:
+                - combobox "Completed" [ref=e750]
+                - textbox: Completed
+                - img
+            - cell "Low" [ref=e751]:
+              - generic [ref=e753]:
+                - combobox "Low" [ref=e754]
+                - textbox: "1"
+                - img
+            - cell "Rico Strinati" [ref=e755]:
+              - generic [ref=e757]:
+                - combobox "Rico Strinati" [ref=e758]
+                - textbox: "1"
+                - img
+            - cell "2025-09-30" [ref=e759]:
+              - textbox [ref=e762]: 2025-09-30
+            - cell "100%" [ref=e763]
+          - row "SPS D2_252323 Active High Rico Strinati 2025-09-03 63%" [ref=e764] [cursor=pointer]:
+            - cell "SPS" [ref=e765]:
+              - textbox [ref=e768]: SPS
+            - cell "D2_252323" [ref=e769]:
+              - textbox [ref=e772]: D2_252323
+            - cell "Active" [ref=e773]:
+              - generic [ref=e775]:
+                - combobox "Active" [ref=e776]
+                - textbox: Active
+                - img
+            - cell "High" [ref=e777]:
+              - generic [ref=e779]:
+                - combobox "High" [ref=e780]
+                - textbox: "3"
+                - img
+            - cell "Rico Strinati" [ref=e781]:
+              - generic [ref=e783]:
+                - combobox "Rico Strinati" [ref=e784]
+                - textbox: "1"
+                - img
+            - cell "2025-09-03" [ref=e785]:
+              - textbox [ref=e788]: 2025-09-03
+            - cell "63%" [ref=e789]
+          - row "SYD01 - Goodman --" [ref=e790] [cursor=pointer]:
+            - cell "SYD01 - Goodman" [ref=e791]:
+              - textbox [ref=e794]: SYD01 - Goodman
+            - cell [ref=e795]:
+              - textbox [ref=e798]
+            - cell [ref=e799]:
+              - generic [ref=e801]:
+                - combobox [ref=e802]
+                - textbox: unmanaged
+                - img
+            - cell [ref=e803]:
+              - generic [ref=e805]:
+                - combobox [ref=e806]
+                - textbox
+                - img
+            - cell [ref=e807]:
+              - generic [ref=e809]:
+                - combobox [ref=e810]
+                - textbox
+                - img
+            - cell [ref=e811]:
+              - textbox [ref=e814]
+            - cell "--" [ref=e815]
+          - row "Test Project from Script Completed 2024-12-31 --" [ref=e816] [cursor=pointer]:
+            - cell "Test Project from Script" [ref=e817]:
+              - textbox [ref=e820]: Test Project from Script
+            - cell [ref=e821]:
+              - textbox [ref=e824]
+            - cell "Completed" [ref=e825]:
+              - generic [ref=e827]:
+                - combobox "Completed" [ref=e828]
+                - textbox: Completed
+                - img
+            - cell [ref=e829]:
+              - generic [ref=e831]:
+                - combobox [ref=e832]
+                - textbox
+                - img
+            - cell [ref=e833]:
+              - generic [ref=e835]:
+                - combobox [ref=e836]
+                - textbox
+                - img
+            - cell "2024-12-31" [ref=e837]:
+              - textbox [ref=e840]: 2024-12-31
+            - cell "--" [ref=e841]
+        - rowgroup [ref=e842]:
+          - row "27 projects" [ref=e843]:
+            - cell "27 projects" [ref=e844]
+            - cell [ref=e845]
+            - cell [ref=e846]
+            - cell [ref=e847]
+            - cell [ref=e848]
+            - cell [ref=e849]
+            - cell [ref=e850]
+```

@@ -340,13 +340,48 @@ export default function ProjectsHomePageV2() {
     staleTime: 30_000,
   });
 
+  // Fetch batch finance summary using deterministic fee model
+  const { data: financeSummary } = useQuery({
+    queryKey: ['projects-finance-summary'],
+    queryFn: () => projectsApi.getProjectsFinanceSummary(),
+    staleTime: 60_000, // Cache for 1 minute
+  });
+
+  // Merge finance data with projects
+  const projectsWithFinance = useMemo(() => {
+    if (!financeSummary?.projects) {
+      return projects;
+    }
+    const financeMap = new Map(
+      financeSummary.projects.map((f) => [f.project_id, f])
+    );
+    return projects.map((project) => {
+      const finance = financeMap.get(project.project_id);
+      if (!finance) {
+        return project;
+      }
+      const agreedTotal = Number(finance.agreed_fee_total ?? 0) || 0;
+      const earnedValue = Number(finance.earned_value ?? 0) || 0;
+      const earnedValuePct = agreedTotal > 0 ? (earnedValue / agreedTotal) * 100 : 0;
+      return {
+        ...project,
+        agreed_fee: finance.agreed_fee_total,
+        billed_to_date: finance.billed_total,
+        unbilled_amount: finance.unbilled_total,
+        earned_value: finance.earned_value,
+        earned_value_pct: earnedValuePct,
+        invoice_pipeline_this_month: finance.pipeline_this_month,
+      };
+    });
+  }, [projects, financeSummary]);
+
   const summaryById = useMemo(
     () =>
-      projects.reduce<Record<number, ProjectSummary>>((acc, project) => {
+      projectsWithFinance.reduce<Record<number, ProjectSummary>>((acc, project) => {
         acc[project.project_id] = project;
         return acc;
       }, {}),
-    [projects],
+    [projectsWithFinance],
   );
 
   const applyProjectPatch = useCallback(
@@ -360,7 +395,7 @@ export default function ProjectsHomePageV2() {
   );
 
   const filteredProjects = useMemo(() => {
-    const sorted = activeView.sort ? [...projects].sort(activeView.sort) : [...projects];
+    const sorted = activeView.sort ? [...projectsWithFinance].sort(activeView.sort) : [...projectsWithFinance];
     const viewFiltered =
       viewId === 'my_work' && currentUserId != null
         ? sorted.filter((project) => {
@@ -381,7 +416,96 @@ export default function ProjectsHomePageV2() {
       }
       return sortOrder === 'asc' ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
-  }, [projects, activeView, resolveSortValue, sortField, sortOrder, viewId, currentUserId]);
+  }, [projectsWithFinance, activeView, resolveSortValue, sortField, sortOrder, viewId, currentUserId]);
+
+  const derivedAggregates = useMemo(() => {
+    if (!filteredProjects.length) {
+      return null;
+    }
+    const totals = filteredProjects.reduce(
+      (acc, project) => {
+        const agreed = Number(project.agreed_fee ?? 0) || 0;
+        const billed = Number(project.billed_to_date ?? 0) || 0;
+        const unbilled = Number(project.unbilled_amount ?? 0) || 0;
+        const earned = Number(project.earned_value ?? 0) || 0;
+        const pipeline = Number(project.invoice_pipeline_this_month ?? 0) || 0;
+        acc.sum_agreed_fee += agreed;
+        acc.sum_billed_to_date += billed;
+        acc.sum_unbilled_amount += unbilled;
+        acc.sum_earned_value += earned;
+        acc.sum_invoice_pipeline_this_month += pipeline;
+        return acc;
+      },
+      {
+        sum_agreed_fee: 0,
+        sum_billed_to_date: 0,
+        sum_unbilled_amount: 0,
+        sum_earned_value: 0,
+        sum_invoice_pipeline_this_month: 0,
+      },
+    );
+    const weightedPct =
+      totals.sum_agreed_fee > 0
+        ? (totals.sum_earned_value / totals.sum_agreed_fee) * 100
+        : 0;
+    return {
+      project_count: filteredProjects.length,
+      weighted_earned_value_pct: weightedPct,
+      ...totals,
+    };
+  }, [filteredProjects]);
+
+  const aggregateCurrencyFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
+    [],
+  );
+  const aggregateNumberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
+
+  const formatAggregateValue = useCallback(
+    (fieldId: string, value?: number | null) => {
+      const field = PROJECT_FIELD_MAP.get(fieldId);
+      if (!field || value == null || Number.isNaN(Number(value))) {
+        return '--';
+      }
+      if (field.format === 'currency') {
+        return aggregateCurrencyFormatter.format(Number(value));
+      }
+      if (field.format === 'percent') {
+        return `${Math.round(Number(value))}%`;
+      }
+      if (field.format === 'number') {
+        return aggregateNumberFormatter.format(Number(value));
+      }
+      return String(value);
+    },
+    [aggregateCurrencyFormatter, aggregateNumberFormatter],
+  );
+
+  const resolveAggregateValue = useCallback(
+    (fieldId: string) => {
+      const source = derivedAggregates ?? aggregates;
+      if (!source) {
+        return '--';
+      }
+      switch (fieldId) {
+        case 'agreed_fee':
+          return formatAggregateValue(fieldId, source.sum_agreed_fee);
+        case 'billed_to_date':
+          return formatAggregateValue(fieldId, source.sum_billed_to_date);
+        case 'unbilled_amount':
+          return formatAggregateValue(fieldId, source.sum_unbilled_amount);
+        case 'earned_value':
+          return formatAggregateValue(fieldId, source.sum_earned_value);
+        case 'earned_value_pct':
+          return formatAggregateValue(fieldId, source.weighted_earned_value_pct);
+        case 'invoice_pipeline_this_month':
+          return formatAggregateValue(fieldId, source.sum_invoice_pipeline_this_month);
+        default:
+          return '--';
+      }
+    },
+    [aggregates, derivedAggregates, formatAggregateValue],
+  );
 
   const timelineProjectIds = useMemo(
     () => filteredProjects.map((project) => project.project_id),
@@ -614,55 +738,6 @@ export default function ProjectsHomePageV2() {
     [applyProjectPatch, buildDetailsPatch, users],
   );
 
-  const aggregateCurrencyFormatter = useMemo(
-    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
-    [],
-  );
-  const aggregateNumberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
-
-  const formatAggregateValue = useCallback(
-    (fieldId: string, value?: number | null) => {
-      const field = PROJECT_FIELD_MAP.get(fieldId);
-      if (!field || value == null || Number.isNaN(Number(value))) {
-        return '--';
-      }
-      if (field.format === 'currency') {
-        return aggregateCurrencyFormatter.format(Number(value));
-      }
-      if (field.format === 'percent') {
-        return `${Math.round(Number(value))}%`;
-      }
-      if (field.format === 'number') {
-        return aggregateNumberFormatter.format(Number(value));
-      }
-      return String(value);
-    },
-    [aggregateCurrencyFormatter, aggregateNumberFormatter],
-  );
-
-  const resolveAggregateValue = useCallback(
-    (fieldId: string) => {
-      if (!aggregates) {
-        return '--';
-      }
-      switch (fieldId) {
-        case 'agreed_fee':
-          return formatAggregateValue(fieldId, aggregates.sum_agreed_fee);
-        case 'billed_to_date':
-          return formatAggregateValue(fieldId, aggregates.sum_billed_to_date);
-        case 'unbilled_amount':
-          return formatAggregateValue(fieldId, aggregates.sum_unbilled_amount);
-        case 'earned_value':
-          return formatAggregateValue(fieldId, aggregates.sum_earned_value);
-        case 'earned_value_pct':
-          return formatAggregateValue(fieldId, aggregates.weighted_earned_value_pct);
-        default:
-          return '--';
-      }
-    },
-    [aggregates, formatAggregateValue],
-  );
-
   return (
     <Box data-testid="projects-home-v2-root" sx={{ display: 'grid', gap: 2 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
@@ -836,7 +911,7 @@ export default function ProjectsHomePageV2() {
                     }}
                   >
                     {index === 0
-                      ? `${aggregates?.project_count ?? 0} projects`
+                      ? `${(derivedAggregates ?? aggregates)?.project_count ?? 0} projects`
                       : field.aggregatable === 'none'
                         ? ''
                         : resolveAggregateValue(field.id)}

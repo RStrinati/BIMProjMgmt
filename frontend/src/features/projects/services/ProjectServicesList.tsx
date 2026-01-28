@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Stack, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectServicesApi, type ProjectService, type ProjectServicesListResponse } from '@/api/services';
 import { useUpdateServiceStatus } from '@/hooks/useUpdateServiceStatus';
 import { ListView } from '@/components/ui/ListView';
 import { formatServiceStatusLabel } from '@/utils/serviceStatus';
 import { ProjectServiceDetails } from './ProjectServiceDetails';
+import { ServicePlanningPanel } from './ServicePlanningPanel';
 
 type ProjectServicesListProps = {
   projectId: number;
@@ -34,9 +35,48 @@ export function ProjectServicesList({
   testIdPrefix = 'projects-panel',
   renderExtraDetails,
 }: ProjectServicesListProps) {
+  const queryClient = useQueryClient();
   const updateServiceStatus = useUpdateServiceStatus();
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(initialSelectedServiceId);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [planningError, setPlanningError] = useState<string | null>(null);
+
+  // Mutation for updating execution intent
+  const updateExecutionIntent = useMutation({
+    mutationFn: async ({
+      serviceId,
+      intent,
+      reason,
+    }: {
+      serviceId: number;
+      intent: 'planned' | 'optional' | 'not_proceeding';
+      reason?: string | null;
+    }) => {
+      const response = await fetch(
+        `/api/projects/${projectId}/services/${serviceId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            executionIntent: intent,
+            decisionReason: reason || null,
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error('Failed to update service plan');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate services query to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['projectServices', projectId] });
+      setPlanningError(null);
+    },
+    onError: (error: Error) => {
+      setPlanningError(error.message || 'Failed to update plan');
+    },
+  });
 
   useEffect(() => {
     if (initialSelectedServiceId != null) {
@@ -119,6 +159,20 @@ export function ProjectServicesList({
     );
   };
 
+  const handleExecutionIntentChange = async (
+    intent: 'planned' | 'optional' | 'not_proceeding',
+    reason?: string | null
+  ) => {
+    if (!selectedService) {
+      return;
+    }
+    await updateExecutionIntent.mutateAsync({
+      serviceId: selectedService.service_id,
+      intent,
+      reason: reason || null,
+    });
+  };
+
   const isSaving =
     updateServiceStatus.isPending &&
     updateServiceStatus.variables?.serviceId === selectedService?.service_id;
@@ -160,7 +214,18 @@ export function ProjectServicesList({
         disabled={updateServiceStatus.isPending}
         saveError={saveError}
         testIdPrefix={testIdPrefix}
-        extraDetails={renderExtraDetails ? renderExtraDetails(selectedService) : null}
+        extraDetails={
+          renderExtraDetails ? (
+            renderExtraDetails(selectedService)
+          ) : (
+            <ServicePlanningPanel
+              service={selectedService}
+              onExecutionIntentChange={handleExecutionIntentChange}
+              isSaving={updateExecutionIntent.isPending}
+              saveError={planningError}
+            />
+          )
+        }
       />
     </Stack>
   );

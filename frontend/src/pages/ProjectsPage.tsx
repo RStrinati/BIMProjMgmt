@@ -75,12 +75,13 @@ const formatNumericDisplay = (value: number | string | null | undefined): string
 };
 
 export function ProjectsPage() {
-  // Prefer panel UI when explicitly enabled
-  if (featureFlags.projectsPanel) {
-    return <ProjectsPanelPage />;
-  }
+  // Prefer the V2 projects home (list/board/timeline) as the default experience
+  // Even if the legacy panel flag is on, V2 should take precedence when enabled.
   if (featureFlags.projectsHomeV2) {
     return <ProjectsHomePageV2 />;
+  }
+  if (featureFlags.projectsPanel) {
+    return <ProjectsPanelPage />;
   }
 
   const navigate = useNavigate();

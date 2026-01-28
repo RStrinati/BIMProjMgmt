@@ -144,6 +144,11 @@ export default function ServiceEditView() {
     enabled: Number.isFinite(projectId) && Number.isFinite(serviceId),
   });
 
+  const activeServiceReviews = useMemo(
+    () => serviceReviews.filter((review) => (review.status || '').toLowerCase() !== 'cancelled'),
+    [serviceReviews],
+  );
+
   const { data: serviceItems = [] } = useQuery<ServiceItem[]>({
     queryKey: ['serviceItems', projectId, serviceId],
     queryFn: async () => {
@@ -337,10 +342,18 @@ export default function ServiceEditView() {
 
   const resequenceMutation = useMutation({
     mutationFn: async () => {
+      const desiredCount = resequenceForm.count ? Number(resequenceForm.count) : null;
+      if (desiredCount !== null) {
+        await projectServicesApi.setReviewCount(projectId, serviceId, {
+          desired_count: desiredCount,
+          anchor_date: resequenceForm.anchor_date || undefined,
+          interval_days: resequenceForm.interval_days ? Number(resequenceForm.interval_days) : undefined,
+        });
+      }
       return projectServicesApi.resequenceReviews(projectId, serviceId, {
         anchor_date: resequenceForm.anchor_date || undefined,
         interval_days: resequenceForm.interval_days ? Number(resequenceForm.interval_days) : undefined,
-        count: resequenceForm.count ? Number(resequenceForm.count) : undefined,
+        count: desiredCount ?? undefined,
         mode: 'update_existing_planned',
       });
     },
@@ -350,6 +363,27 @@ export default function ServiceEditView() {
     },
     onError: (err: any) => {
       setSaveError(err?.response?.data?.error || 'Failed to resequence reviews');
+    },
+  });
+
+  const resetReviewsMutation = useMutation({
+    mutationFn: async () => {
+      const desiredCount = resequenceForm.count ? Number(resequenceForm.count) : null;
+      if (desiredCount === null) {
+        throw new Error('Enter a planned review count to reset.');
+      }
+      return projectServicesApi.resetReviews(projectId, serviceId, {
+        desired_count: desiredCount,
+        anchor_date: resequenceForm.anchor_date || undefined,
+        interval_days: resequenceForm.interval_days ? Number(resequenceForm.interval_days) : undefined,
+      });
+    },
+    onSuccess: () => {
+      setResequenceDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, serviceId] });
+    },
+    onError: (err: any) => {
+      setSaveError(err?.response?.data?.error || err?.message || 'Failed to reset reviews');
     },
   });
 
@@ -547,66 +581,6 @@ export default function ServiceEditView() {
               </AccordionDetails>
             </Accordion>
 
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Pricing
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={2}>
-                  <TextField
-                    label="Unit Type"
-                    value={formData.unit_type || ''}
-                    onChange={(e) => handleChange('unit_type', e.target.value)}
-                    fullWidth
-                  />
-                  <TextField
-                    label="Unit Quantity"
-                    type="number"
-                    value={formData.unit_qty ?? ''}
-                    onChange={(e) => handleChange('unit_qty', Number(e.target.value) || 0)}
-                    fullWidth
-                  />
-                  <TextField
-                    label="Unit Rate"
-                    type="number"
-                    value={formData.unit_rate ?? ''}
-                    onChange={(e) => handleChange('unit_rate', Number(e.target.value) || 0)}
-                    fullWidth
-                  />
-                  <TextField
-                    label="Lump Sum Fee"
-                    type="number"
-                    value={formData.lump_sum_fee ?? ''}
-                    onChange={(e) => handleChange('lump_sum_fee', Number(e.target.value) || 0)}
-                    fullWidth
-                  />
-                  <TextField
-                    select
-                    label="Bill Rule"
-                    value={formData.bill_rule || ''}
-                    onChange={(e) => handleChange('bill_rule', e.target.value)}
-                    fullWidth
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {billRules.map((rule: string) => (
-                      <MenuItem key={rule} value={rule}>
-                        {formatBillRuleLabel(rule)}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    label="Agreed Fee"
-                    type="number"
-                    value={formData.agreed_fee ?? ''}
-                    onChange={(e) => handleChange('agreed_fee', Number(e.target.value) || 0)}
-                    fullWidth
-                  />
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -636,25 +610,178 @@ export default function ServiceEditView() {
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Review Plan (Pricing + Cadence)
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    Define pricing and review schedule as one coherent plan. Changes are calculated in real-time.
+                  </Typography>
+
+                  {/* Pricing Inputs */}
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                      Service Pricing
+                    </Typography>
+                    <Stack spacing={1.5} sx={{ ml: 1 }}>
+                      <TextField
+                        label="Agreed Fee (Total)"
+                        type="number"
+                        value={formData.agreed_fee ?? ''}
+                        onChange={(e) => handleChange('agreed_fee', Number(e.target.value) || 0)}
+                        fullWidth
+                        size="small"
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        Total agreed fee for this service across all reviews
+                      </Typography>
+                    </Stack>
+                  </Box>
+
+                  {/* Cadence Inputs */}
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                      Review Schedule
+                    </Typography>
+                    <Stack spacing={1.5} sx={{ ml: 1 }}>
+                      <TextField
+                        label="Anchor Date (Start)"
+                        type="date"
+                        value={resequenceForm.anchor_date || ''}
+                        onChange={(e) => setResequenceForm({ ...resequenceForm, anchor_date: e.target.value })}
+                        fullWidth
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                      <TextField
+                        label="Interval (days)"
+                        type="number"
+                        value={resequenceForm.interval_days}
+                        onChange={(e) => setResequenceForm({ ...resequenceForm, interval_days: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                      <TextField
+                        label="Planned Review Count"
+                        type="number"
+                        value={resequenceForm.count}
+                        onChange={(e) => setResequenceForm({ ...resequenceForm, count: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        Number of planned review cycles for this service
+                      </Typography>
+                    </Stack>
+                  </Box>
+
+                  {/* Preview & Calculated Metrics */}
+                  <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                      Calculated Metrics
+                    </Typography>
+                    <Stack spacing={1} sx={{ ml: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2">Fee per review:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {(() => {
+                            const total = Number(formData.agreed_fee) || 0;
+                            const count = Number(resequenceForm.count) || 1;
+                            const perReview = total / (count > 0 ? count : 1);
+                            return formatCurrency(perReview);
+                          })()}
+                        </Typography>
+                      </Box>
+                      {resequenceForm.count && Number(resequenceForm.count) > 0 && (
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                            Calculated Review Dates:
+                          </Typography>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 0.5 }}>
+                            {Array.from({ length: Number(resequenceForm.count) || 0 }).map((_, i) => {
+                              if (!resequenceForm.anchor_date || !resequenceForm.interval_days) return null;
+                              const baseDate = new Date(resequenceForm.anchor_date);
+                              const reviewDate = new Date(baseDate);
+                              reviewDate.setDate(reviewDate.getDate() + i * Number(resequenceForm.interval_days));
+                              return (
+                                <Box
+                                  key={i}
+                                  sx={{
+                                    p: 0.75,
+                                    bgcolor: 'background.paper',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: 0.5,
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                    Review {i + 1}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    {reviewDate.toLocaleDateString()}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+
+                  {/* Action Button */}
+                  <Button
+                    variant="contained"
+                    onClick={() => setResequenceDialogOpen(true)}
+                    disabled={resequenceMutation.isPending}
+                  >
+                    {resequenceMutation.isPending ? 'Applying...' : 'Apply Review Schedule'}
+                  </Button>
+
+                  {/* Review List */}
+                  {activeServiceReviews.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        Existing Reviews ({activeServiceReviews.length})
+                      </Typography>
+                      <Stack spacing={0.5} sx={{ ml: 1, maxHeight: 200, overflow: 'auto' }}>
+                        {activeServiceReviews.map((review) => (
+                          <Box key={review.review_id} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ minWidth: 80 }}>
+                              Cycle #{review.cycle_no}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDate(review.planned_date)}
+                            </Typography>
+                            {review.is_user_modified && (
+                              <Chip size="small" label="Modified" color="warning" variant="outlined" />
+                            )}
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   Deliverables (Reviews)
                 </Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={2}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setResequenceDialogOpen(true)}
-                    data-testid="service-resequence-reviews-button"
-                  >
-                    Re-sequence planned reviews
-                  </Button>
-                  {serviceReviews.length === 0 ? (
+                  {activeServiceReviews.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
-                      No reviews yet.
+                      No reviews yet. Use the Review Plan section above to set up your review schedule.
                     </Typography>
                   ) : (
                     <Stack spacing={1}>
-                      {serviceReviews.map((review) => (
+                      {activeServiceReviews.map((review) => (
                         <Box
                           key={review.review_id}
                           sx={{ border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}
@@ -680,7 +807,7 @@ export default function ServiceEditView() {
               </AccordionDetails>
             </Accordion>
 
-            <Accordion defaultExpanded>
+            <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   Items
@@ -965,11 +1092,29 @@ export default function ServiceEditView() {
             onChange={(event) =>
               setResequenceForm((prev) => ({ ...prev, count: event.target.value }))
             }
-            helperText="Leave blank to resequence existing planned reviews."
+            helperText="Leave blank to resequence existing planned reviews. If set, extra planned reviews will be cancelled and missing ones added."
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setResequenceDialogOpen(false)}>Cancel</Button>
+          <Button
+            color="warning"
+            variant="outlined"
+            onClick={() => {
+              setSaveError(null);
+              if (!resequenceForm.count) {
+                setSaveError('Enter a planned review count before resetting.');
+                return;
+              }
+              if (!window.confirm('Reset planned reviews? This will cancel all planned reviews and recreate a clean schedule.')) {
+                return;
+              }
+              resetReviewsMutation.mutate();
+            }}
+            disabled={resetReviewsMutation.isPending}
+          >
+            {resetReviewsMutation.isPending ? 'Resetting...' : 'Reset Planned Reviews'}
+          </Button>
           <Button
             variant="contained"
             onClick={() => resequenceMutation.mutate()}

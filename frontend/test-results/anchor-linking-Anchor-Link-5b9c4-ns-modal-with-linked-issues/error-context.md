@@ -1,0 +1,179 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: BIM Project Management System
+        - navigation "breadcrumb" [ref=e9]:
+          - list [ref=e10]:
+            - listitem [ref=e11]: Dashboard
+            - listitem [ref=e12]: /
+            - listitem [ref=e13]: Projects
+            - listitem [ref=e14]: /
+            - listitem [ref=e15]: Project 1
+            - listitem [ref=e16]: /
+            - listitem [ref=e17]: workspace
+            - listitem [ref=e18]: /
+            - listitem [ref=e19]:
+              - paragraph [ref=e20]: overview
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - textbox "Global search (projects, services)" [ref=e27]
+        - group
+  - navigation [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e32]: BIM Manager
+      - separator [ref=e33]
+      - list [ref=e34]:
+        - listitem [ref=e35]:
+          - button "Dashboard" [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Dashboard
+        - listitem [ref=e42]:
+          - button "Projects & Services" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Projects & Services
+        - listitem [ref=e49]:
+          - button "Bids" [ref=e50] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Bids
+        - listitem [ref=e56]:
+          - button "Data Imports" [ref=e57] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Data Imports
+        - listitem [ref=e63]:
+          - button "Reviews (redirect)" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Reviews (redirect)
+        - listitem [ref=e70]:
+          - button "Tasks" [ref=e71] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e76]: Tasks
+      - separator [ref=e77]
+      - list [ref=e78]:
+        - listitem [ref=e79]:
+          - button "Settings" [ref=e80] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Settings
+  - main [ref=e86]:
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - navigation "breadcrumb" [ref=e91]:
+          - list [ref=e92]:
+            - listitem [ref=e93]: Projects
+            - listitem [ref=e94]: /
+            - listitem [ref=e95]:
+              - paragraph [ref=e96]: Workspace
+        - generic [ref=e97]:
+          - heading "Delta Hub" [level=5] [ref=e98]
+          - generic [ref=e100]: active
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - generic [ref=e104]:
+            - generic:
+              - img
+            - tablist [ref=e107]:
+              - tab "Overview" [selected] [ref=e108] [cursor=pointer]: Overview
+              - tab "Services" [ref=e109] [cursor=pointer]: Services
+              - tab "Deliverables" [ref=e110] [cursor=pointer]: Deliverables
+              - tab "Updates" [ref=e111] [cursor=pointer]: Updates
+              - tab "Issues" [ref=e112] [cursor=pointer]: Issues
+              - tab "Tasks" [ref=e113] [cursor=pointer]: Tasks
+              - tab "Quality" [ref=e114] [cursor=pointer]: Quality
+            - img [ref=e117] [cursor=pointer]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - heading "Summary" [level=6] [ref=e123]
+              - paragraph [ref=e124]: Test project description
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - heading "Invoice pipeline" [level=6] [ref=e127]
+                - button "Including items" [ref=e128] [cursor=pointer]:
+                  - generic [ref=e129]: Including items
+              - paragraph [ref=e130]: No line items yet.
+            - generic [ref=e131]:
+              - heading "Service fee reconciliation" [level=6] [ref=e132]
+              - generic [ref=e133]:
+                - generic [ref=e134]:
+                  - generic [ref=e135]: Service
+                  - generic [ref=e136]: Agreed
+                  - generic [ref=e137]: Line items
+                  - generic [ref=e138]: Billed
+                  - generic [ref=e139]: Outstanding
+                  - generic [ref=e140]: Variance
+                - generic [ref=e141]:
+                  - paragraph [ref=e142]: PROJECT TOTAL
+                  - paragraph [ref=e143]: $0.00
+                  - paragraph [ref=e144]: $0.00
+                  - paragraph [ref=e145]: $0.00
+                  - paragraph [ref=e146]: $0.00
+                  - paragraph [ref=e147]: $0.00
+            - generic [ref=e148]:
+              - heading "Post an update" [level=6] [ref=e149]
+              - generic [ref=e150]:
+                - generic [ref=e152]:
+                  - textbox "What's the latest progress on this project?" [ref=e153]
+                  - group
+                - generic [ref=e154]:
+                  - button "Post update" [disabled]
+                  - button "View all updates →" [ref=e155] [cursor=pointer]: View all updates →
+            - generic [ref=e156]:
+              - heading "Latest update" [level=6] [ref=e157]
+              - paragraph [ref=e158]: No updates yet. Post the first one above!
+            - generic [ref=e159]:
+              - heading "Add task" [level=6] [ref=e160]
+              - generic [ref=e161]:
+                - generic [ref=e163]:
+                  - textbox "New task" [ref=e164]
+                  - group
+                - button "Add task" [ref=e165] [cursor=pointer]: Add task
+            - generic [ref=e166]:
+              - heading "Recent tasks" [level=6] [ref=e167]
+              - paragraph [ref=e168]: No tasks yet.
+        - generic [ref=e171]:
+          - generic [ref=e172]:
+            - heading "Properties" [level=6] [ref=e173]
+            - generic [ref=e174]:
+              - generic [ref=e175]:
+                - paragraph [ref=e176]: "Project #"
+                - paragraph [ref=e177]: PROJ-001
+              - generic [ref=e178]:
+                - paragraph [ref=e179]: Client
+                - paragraph [ref=e180]: "--"
+              - generic [ref=e181]:
+                - paragraph [ref=e182]: Type
+                - paragraph [ref=e183]: Commercial
+              - generic [ref=e184]:
+                - paragraph [ref=e185]: Manager
+                - paragraph [ref=e186]: "--"
+              - generic [ref=e187]:
+                - paragraph [ref=e188]: Start
+                - paragraph [ref=e189]: 1/1/2024
+              - generic [ref=e190]:
+                - paragraph [ref=e191]: End
+                - paragraph [ref=e192]: "--"
+          - generic [ref=e193]:
+            - heading "Progress" [level=6] [ref=e194]
+            - generic [ref=e195]:
+              - generic [ref=e196]:
+                - paragraph [ref=e197]: Agreed fee
+                - paragraph [ref=e198]: $0.00
+              - generic [ref=e199]:
+                - paragraph [ref=e200]: Line items
+                - paragraph [ref=e201]: $0.00
+              - generic [ref=e202]:
+                - paragraph [ref=e203]: Billed
+                - paragraph [ref=e204]: $0.00 (0%)
+              - generic [ref=e205]:
+                - paragraph [ref=e206]: Outstanding
+                - paragraph [ref=e207]: $0.00
+          - generic [ref=e208]:
+            - heading "Activity" [level=6] [ref=e209]
+            - paragraph [ref=e210]: Recent activity will appear here.
+          - separator [ref=e211]
+          - generic [ref=e212]:
+            - heading "Overview Summary" [level=6] [ref=e213]
+            - paragraph [ref=e214]: Select an item to view details, or browse the overview tab content.
+```

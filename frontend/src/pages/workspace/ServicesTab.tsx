@@ -150,6 +150,33 @@ export default function ServicesTab() {
     return found;
   }, [services, selection]);
 
+  const noWrap = { whiteSpace: 'nowrap' } as const;
+  const columnWidths = {
+    service: 260,
+    phase: 120,
+    status: 140,
+    deliverables: 220,
+    agreed: 120,
+    billed: 120,
+    remaining: 120,
+    progress: 100,
+  } as const;
+  const serviceColumns = [
+    { id: 'service', label: 'Service', minWidth: columnWidths.service, flex: true },
+    { id: 'phase', label: 'Phase', minWidth: columnWidths.phase },
+    { id: 'status', label: 'Status', minWidth: columnWidths.status },
+    { id: 'deliverables', label: 'Deliverables', minWidth: columnWidths.deliverables },
+    { id: 'agreed', label: 'Agreed', minWidth: columnWidths.agreed },
+    { id: 'billed', label: 'Billed', minWidth: columnWidths.billed },
+    { id: 'remaining', label: 'Remaining', minWidth: columnWidths.remaining },
+    { id: 'progress', label: 'Progress', minWidth: columnWidths.progress },
+  ];
+  const servicesGridTemplate = serviceColumns
+    .map((column) => (column.flex ? `minmax(${column.minWidth}px, 1fr)` : `${column.minWidth}px`))
+    .join(' ');
+  const servicesMinWidth = serviceColumns.reduce((sum, column) => sum + column.minWidth, 0);
+
+
   const handleDeleteClick = () => {
     if (selectedService) {
       setServiceToDelete(selectedService);
@@ -266,92 +293,106 @@ export default function ServicesTab() {
       {isLoading ? (
         <Typography color="text.secondary">Loading services...</Typography>
       ) : services.length ? (
-        <LinearListContainer>
-          <LinearListHeaderRow 
-            columns={['Service', 'Phase', 'Status', 'Agreed', 'Billed', 'Remaining', 'Progress']} 
-          />
-          {services.map((service) => {
-            const billedAmount = service.billed_amount ?? service.claimed_to_date ?? 0;
-            const progressValue = service.billing_progress_pct ?? service.progress_pct ?? 0;
-            const isSelected = selection?.type === 'service' && selection?.id === service.service_id;
+        <Box sx={{ width: '100%', overflowX: 'auto' }}>
+          <LinearListContainer sx={{ minWidth: servicesMinWidth }}>
+            <LinearListHeaderRow
+              columns={serviceColumns.map((column) => column.label)}
+              sx={{ gridTemplateColumns: servicesGridTemplate }}
+            />
+            {services.map((service) => {
+              const billedAmount = service.billed_amount ?? service.claimed_to_date ?? 0;
+              const progressValue = service.billing_progress_pct ?? service.progress_pct ?? 0;
+              const isSelected = selection?.type === 'service' && selection?.id === service.service_id;
+              const reviewCount = service.review_count_total ?? 0;
+              const itemCount = service.item_count_total ?? 0;
+              const deliverableLabel = `Reviews: ${reviewCount} / Items: ${itemCount}`;
 
-            return (
-              <LinearListRow
-                key={service.service_id}
-                testId={`workspace-service-row-${service.service_id}`}
-                columns={7}
-                hoverable
-                onClick={() => {
-                  console.log('[ServicesTab] Row clicked:', {
-                    serviceId: service.service_id,
-                    serviceCode: service.service_code,
-                    currentSelection: selection
-                  });
-                  // Use React Router navigate to update URL with selection
-                  navigate(`/projects/${projectId}/workspace/services?sel=service:${service.service_id}`, {
-                    replace: true
-                  });
-                  console.log('[ServicesTab] Navigated with selection');
-                }}
-                sx={{
-                  backgroundColor: isSelected ? 'action.selected' : 'transparent',
-                }}
-              >
-                {/* Service code + name */}
-                <Box>
-                  <Typography variant="body2" fontWeight={500}>
-                    {service.service_code}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {service.service_name}
-                  </Typography>
-                </Box>
+              return (
+                <LinearListRow
+                  key={service.service_id}
+                  testId={`workspace-service-row-${service.service_id}`}
+                  columns={serviceColumns.length}
+                  hoverable
+                  onClick={() => {
+                    console.log('[ServicesTab] Row clicked:', {
+                      serviceId: service.service_id,
+                      serviceCode: service.service_code,
+                      currentSelection: selection
+                    });
+                    // Use React Router navigate to update URL with selection
+                    navigate(`/projects/${projectId}/workspace/services?sel=service:${service.service_id}`, {
+                      replace: true
+                    });
+                    console.log('[ServicesTab] Navigated with selection');
+                  }}
+                  sx={{
+                    gridTemplateColumns: servicesGridTemplate,
+                    backgroundColor: isSelected ? 'action.selected' : 'transparent',
+                  }}
+                >
+                  {/* Service code + name */}
+                  <Box sx={{ minWidth: columnWidths.service }}>
+                    <Typography variant="body2" fontWeight={500} sx={noWrap}>
+                      {service.service_code}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={noWrap}>
+                      {service.service_name}
+                    </Typography>
+                  </Box>
 
-                {/* Phase */}
-                <LinearListCell variant="secondary">
-                  {service.phase || '—'}
-                </LinearListCell>
+                  {/* Phase */}
+                  <LinearListCell variant="secondary" sx={noWrap}>
+                    {service.phase || '???'}
+                  </LinearListCell>
 
-                {/* Status */}
-                <Box>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      px: 1, 
-                      py: 0.5, 
-                      borderRadius: 1, 
-                      bgcolor: `${getStatusColor(service.status)}.light`,
-                      color: `${getStatusColor(service.status)}.dark`,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {service.status}
-                  </Typography>
-                </Box>
+                  {/* Status */}
+                  <Box sx={noWrap}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        bgcolor: `${getStatusColor(service.status)}.light`,
+                        color: `${getStatusColor(service.status)}.dark`,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {service.status}
+                    </Typography>
+                  </Box>
 
-                {/* Agreed Fee */}
-                <LinearListCell variant="number">
-                  {formatCurrency(service.agreed_fee)}
-                </LinearListCell>
+                  {/* Deliverables (Reviews + Items) */}
+                  <LinearListCell variant="secondary" sx={noWrap}>
+                    <Typography variant="body2" title={`Reviews: ${reviewCount}, Items: ${itemCount}`} sx={noWrap}>
+                      {deliverableLabel}
+                    </Typography>
+                  </LinearListCell>
 
-                {/* Billed */}
-                <LinearListCell variant="number">
-                  {formatCurrency(billedAmount)}
-                </LinearListCell>
+                  {/* Agreed Fee */}
+                  <LinearListCell variant="number" sx={noWrap}>
+                    {formatCurrency(service.agreed_fee)}
+                  </LinearListCell>
 
-                {/* Remaining */}
-                <LinearListCell variant="number">
-                  {formatCurrency(service.agreed_fee_remaining)}
-                </LinearListCell>
+                  {/* Billed */}
+                  <LinearListCell variant="number" sx={noWrap}>
+                    {formatCurrency(billedAmount)}
+                  </LinearListCell>
 
-                {/* Progress */}
-                <LinearListCell variant="number">
-                  {formatPercent(progressValue)}
-                </LinearListCell>
-              </LinearListRow>
-            );
-          })}
-        </LinearListContainer>
+                  {/* Remaining */}
+                  <LinearListCell variant="number" sx={noWrap}>
+                    {formatCurrency(service.agreed_fee_remaining)}
+                  </LinearListCell>
+
+                  {/* Progress */}
+                  <LinearListCell variant="number" sx={noWrap}>
+                    {formatPercent(progressValue)}
+                  </LinearListCell>
+                </LinearListRow>
+              );
+            })}
+          </LinearListContainer>
+        </Box>
       ) : (
         <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
           <Typography color="text.secondary">
