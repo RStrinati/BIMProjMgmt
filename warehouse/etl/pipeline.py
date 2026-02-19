@@ -13,7 +13,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -213,7 +213,7 @@ class WarehousePipeline:
                     pm.status,
                     pm.status_normalized,
                     pm.priority,
-                    pm.source_updated_at,
+                    COALESCE(pm.source_updated_at, pm.created_at) AS source_updated_at,
                     pm.phase,
                     pm.building_level,
                     pm.clash_level,
@@ -232,13 +232,21 @@ class WarehousePipeline:
                     loc_map.location_root AS mapped_location_root,
                     loc_map.location_building AS mapped_location_building,
                     loc_map.location_level AS mapped_location_level,
+                    disc_map.normalized_discipline AS mapped_discipline,
                     pm.title,
                     pm.assignee,
                     pm.author,
                     pm.created_at,
                     pm.closed_at,
+                    pm.created_by,
+                    pm.updated_by,
+                    pm.closed_by,
+                    pm.linked_document_urn,
+                    pm.snapshot_urn,
+                    pm.web_link,
+                    pm.preview_middle_url,
                     ROW_NUMBER() OVER (
-                        PARTITION BY pm.source, pm.issue_id
+                        PARTITION BY pm.source, pm.issue_id, COALESCE(CAST(pm.project_id AS NVARCHAR(255)), CAST(pm.source_project_id AS NVARCHAR(255)))
                         ORDER BY
                             CASE WHEN pm.created_at IS NOT NULL THEN pm.created_at ELSE '1900-01-01' END DESC,
                             CASE WHEN pm.closed_at IS NOT NULL THEN pm.closed_at ELSE '1900-01-01' END DESC
@@ -260,8 +268,8 @@ class WarehousePipeline:
                     ORDER BY CASE WHEN m.project_id = CAST(pm.project_id AS NVARCHAR(100)) THEN 0 ELSE 1 END,
                              CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
                 ) prio_map
-                OUTER APPLY (
-                    SELECT TOP (1) m.location_root, m.location_building, m.location_level
+                    OUTER APPLY (
+                        SELECT TOP (1) m.location_root, m.location_building, m.location_level
                     FROM dbo.issue_location_map m
                     WHERE m.source_system = pm.source
                       AND m.raw_location = COALESCE(
@@ -271,12 +279,22 @@ class WarehousePipeline:
                           JSON_VALUE(rv.tags_json, '$[0]')
                       )
                       AND (m.project_id = CAST(pm.project_id AS NVARCHAR(100)) OR m.project_id IS NULL)
+                      AND m.is_active = 1
                     ORDER BY CASE WHEN m.project_id = CAST(pm.project_id AS NVARCHAR(100)) THEN 0 ELSE 1 END,
                              CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
                 ) loc_map
+                OUTER APPLY (
+                    SELECT TOP (1) m.normalized_discipline
+                    FROM dbo.issue_discipline_map m
+                    WHERE m.source_system = pm.source
+                      AND m.raw_discipline = COALESCE(ve.Discipline, pm.assignee)
+                      AND (m.project_id = CAST(pm.project_id AS NVARCHAR(100)) OR m.project_id IS NULL)
+                      AND m.is_active = 1
+                    ORDER BY CASE WHEN m.project_id = CAST(pm.project_id AS NVARCHAR(100)) THEN 0 ELSE 1 END,
+                             CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
+                ) disc_map
                 WHERE
-                    pm.source_updated_at IS NOT NULL
-                    AND pm.source_updated_at > ?
+                    COALESCE(pm.source_updated_at, pm.created_at) > ?
             )
             SELECT
                 source,
@@ -307,11 +325,19 @@ class WarehousePipeline:
                 mapped_location_root,
                 mapped_location_building,
                 mapped_location_level,
+                mapped_discipline,
                 title,
                 assignee,
                 author,
                 created_at,
-                closed_at
+                closed_at,
+                created_by,
+                updated_by,
+                closed_by,
+                linked_document_urn,
+                snapshot_urn,
+                web_link,
+                preview_middle_url
             FROM source_issues
             WHERE rn = 1
         """
@@ -329,6 +355,7 @@ class WarehousePipeline:
                 last_activity_date, due_date, discipline, category_primary,
                 category_secondary, location_raw, location_root, location_building, location_level,
                 phase, building_level, clash_level, custom_attributes_json,
+                created_by, updated_by, closed_by, linked_document_urn, snapshot_urn, web_link, preview_middle_url,
                 is_deleted, project_mapped,
                 record_source, source_load_ts
             )
@@ -339,11 +366,13 @@ class WarehousePipeline:
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
                 ?, ?,
-                ?, SYSUTCDATETIME()
+                ?, ?
             )
         """
         record_source = "ProjectManagement"
+        base_ts = datetime.utcnow()
         insert_rows = [
             (
                 row.source,
@@ -364,7 +393,8 @@ class WarehousePipeline:
                 row.closed_at,
                 None,
                 getattr(row, "due_date", None),
-                getattr(row, "acc_discipline", None)
+                getattr(row, "mapped_discipline", None)
+                or getattr(row, "acc_discipline", None)
                 or (row.assignee if row.source == "Revizto" else None),
                 getattr(row, "primary_category", None),
                 getattr(row, "secondary_category", None),
@@ -383,11 +413,19 @@ class WarehousePipeline:
                 getattr(row, "building_level", None),
                 getattr(row, "clash_level", None),
                 getattr(row, "custom_attributes_json", None),
+                getattr(row, "created_by", None),
+                getattr(row, "updated_by", None),
+                getattr(row, "closed_by", None),
+                getattr(row, "linked_document_urn", None),
+                getattr(row, "snapshot_urn", None),
+                getattr(row, "web_link", None),
+                getattr(row, "preview_middle_url", None),
                 getattr(row, "is_deleted", None),
                 getattr(row, "project_mapped", None),
                 record_source,
+                base_ts + timedelta(microseconds=idx),
             )
-            for row in rows
+            for idx, row in enumerate(rows)
         ]
 
         self._bulk_insert(insert_sql, insert_rows)
@@ -951,6 +989,12 @@ class WarehousePipeline:
     def _execute_warehouse_tasks(self, statements: Iterable[str], label: str) -> None:
         with get_db_connection(self.warehouse_db) as conn:
             cursor = conn.cursor()
+            cursor.execute("SET ANSI_NULLS ON")
+            cursor.execute("SET QUOTED_IDENTIFIER ON")
+            cursor.execute("SET ANSI_PADDING ON")
+            cursor.execute("SET ANSI_WARNINGS ON")
+            cursor.execute("SET ARITHABORT ON")
+            cursor.execute("SET CONCAT_NULL_YIELDS_NULL ON")
             for statement in statements:
                 logger.info("Executing %s task: %s", label, statement)
                 cursor.execute(statement)
@@ -1108,7 +1152,16 @@ class WarehousePipeline:
                     {S.IssuesSnapshots.RESOLUTION_DAYS},
                     {S.IssuesSnapshots.CREATED_AT},
                     {S.IssuesSnapshots.UPDATED_AT},
-                    {S.IssuesSnapshots.CLOSED_AT}
+                    {S.IssuesSnapshots.CLOSED_AT},
+                    {S.IssuesSnapshots.CREATED_BY},
+                    {S.IssuesSnapshots.UPDATED_BY},
+                    {S.IssuesSnapshots.CLOSED_BY},
+                    {S.IssuesSnapshots.LINKED_DOCUMENT_URN},
+                    {S.IssuesSnapshots.SNAPSHOT_URN},
+                    {S.IssuesSnapshots.WEB_LINK},
+                    {S.IssuesSnapshots.PREVIEW_MIDDLE_URL},
+                    {S.IssuesSnapshots.ISSUE_LINK},
+                    {S.IssuesSnapshots.SNAPSHOT_PREVIEW_URL}
                 )
                 SELECT
                     d.[date] AS snapshot_date,
@@ -1145,7 +1198,16 @@ class WarehousePipeline:
                     s.resolution_days,
                     d_created.[date] AS created_at,
                     NULL AS updated_at,
-                    d_closed.[date] AS closed_at
+                    d_closed.[date] AS closed_at,
+                    i.created_by,
+                    i.updated_by,
+                    i.closed_by,
+                    i.linked_document_urn,
+                    i.snapshot_urn,
+                    i.web_link,
+                    i.preview_middle_url,
+                    i.issue_link,
+                    i.snapshot_preview_url
                 FROM fact.issue_snapshot s
                 JOIN dim.issue i ON s.issue_sk = i.issue_sk
                 LEFT JOIN dim.project p ON s.project_sk = p.project_sk
@@ -1208,6 +1270,7 @@ class WarehousePipeline:
                          FROM dbo.{S.IssuesSnapshots.TABLE} s
                          LEFT JOIN dim.project p
                              ON TRY_CAST(s.{S.IssuesSnapshots.PROJECT_ID} AS INT) = p.project_bk
+                            AND p.current_flag = 1
                          WHERE s.{S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS joined_count
                 """,
                 params=(self._issue_import_run_id, self._issue_import_run_id),
@@ -1222,6 +1285,7 @@ class WarehousePipeline:
                     FROM dbo.{S.IssuesSnapshots.TABLE} s
                     LEFT JOIN dim.project p
                         ON TRY_CAST(s.{S.IssuesSnapshots.PROJECT_ID} AS INT) = p.project_bk
+                       AND p.current_flag = 1
                     WHERE s.{S.IssuesSnapshots.IMPORT_RUN_ID} = ?
                       AND s.{S.IssuesSnapshots.PROJECT_ID} IS NOT NULL
                       AND p.project_sk IS NULL
@@ -1258,22 +1322,6 @@ class WarehousePipeline:
                 params=(self._issue_import_run_id,),
                 expected_result=lambda rows: rows[0][0] == 0,
                 failure_message=lambda rows: f"{rows[0][0]} issues closed before created",
-            ),
-            DataQualityCheck(
-                name="issue_current_vs_snapshot_count",
-                severity="medium",
-                query=f"""
-                    SELECT
-                        (SELECT COUNT(*)
-                         FROM dbo.{S.IssuesCurrent.TABLE}) AS current_count,
-                        (SELECT COUNT(*)
-                         FROM dbo.{S.IssuesSnapshots.TABLE}
-                         WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS snapshot_count
-                """,
-                params=(self._issue_import_run_id,),
-                expected_result=lambda rows: rows[0][0] == rows[0][1],
-                failure_message=lambda rows: f"current={rows[0][0]} snapshot={rows[0][1]}",
-                details_on_pass=True,
             ),
             DataQualityCheck(
                 name="issue_status_changes",
@@ -1411,6 +1459,37 @@ class WarehousePipeline:
             conn.commit()
         return all_passed
 
+    def _check_issue_current_vs_snapshot_count(self) -> None:
+        """Log mismatch between Issues_Current and latest snapshot counts after refresh."""
+        if self._issue_import_run_id is None:
+            return
+        query = f"""
+            SELECT
+                (SELECT COUNT(*)
+                 FROM dbo.{S.IssuesCurrent.TABLE}) AS current_count,
+                (SELECT COUNT(*)
+                 FROM dbo.{S.IssuesSnapshots.TABLE}
+                 WHERE {S.IssuesSnapshots.IMPORT_RUN_ID} = ?) AS snapshot_count
+        """
+        with get_db_connection(self.warehouse_db) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (self._issue_import_run_id,))
+            row = cursor.fetchone()
+        if not row:
+            return
+        current_count, snapshot_count = row[0], row[1]
+        if current_count != snapshot_count:
+            logger.warning(
+                "Issues_Current count mismatch after refresh (current=%s snapshot=%s)",
+                current_count,
+                snapshot_count,
+            )
+        else:
+            logger.info(
+                "Issues_Current count matches snapshot (count=%s)",
+                current_count,
+            )
+
     def _refresh_issues_current(self) -> int:
         """Replace Issues_Current using the latest snapshot for the current run."""
         if self._issue_import_run_id is None:
@@ -1466,6 +1545,15 @@ class WarehousePipeline:
                         s.{S.IssuesSnapshots.CREATED_AT} AS created_at,
                         s.{S.IssuesSnapshots.UPDATED_AT} AS updated_at,
                         s.{S.IssuesSnapshots.CLOSED_AT} AS closed_at,
+                        s.{S.IssuesSnapshots.CREATED_BY} AS created_by,
+                        s.{S.IssuesSnapshots.UPDATED_BY} AS updated_by,
+                        s.{S.IssuesSnapshots.CLOSED_BY} AS closed_by,
+                        s.{S.IssuesSnapshots.LINKED_DOCUMENT_URN} AS linked_document_urn,
+                        s.{S.IssuesSnapshots.SNAPSHOT_URN} AS snapshot_urn,
+                        s.{S.IssuesSnapshots.WEB_LINK} AS web_link,
+                        s.{S.IssuesSnapshots.PREVIEW_MIDDLE_URL} AS preview_middle_url,
+                        s.{S.IssuesSnapshots.ISSUE_LINK} AS issue_link,
+                        s.{S.IssuesSnapshots.SNAPSHOT_PREVIEW_URL} AS snapshot_preview_url,
                         i.location_root,
                         i.location_building,
                         i.location_level,
@@ -1517,6 +1605,15 @@ class WarehousePipeline:
                     {S.IssuesCurrent.CREATED_AT},
                     {S.IssuesCurrent.UPDATED_AT},
                     {S.IssuesCurrent.CLOSED_AT},
+                    {S.IssuesCurrent.CREATED_BY},
+                    {S.IssuesCurrent.UPDATED_BY},
+                    {S.IssuesCurrent.CLOSED_BY},
+                    {S.IssuesCurrent.LINKED_DOCUMENT_URN},
+                    {S.IssuesCurrent.SNAPSHOT_URN},
+                    {S.IssuesCurrent.WEB_LINK},
+                    {S.IssuesCurrent.PREVIEW_MIDDLE_URL},
+                    {S.IssuesCurrent.ISSUE_LINK},
+                    {S.IssuesCurrent.SNAPSHOT_PREVIEW_URL},
                     {S.IssuesCurrent.LOCATION_ROOT},
                     {S.IssuesCurrent.LOCATION_BUILDING},
                     {S.IssuesCurrent.LOCATION_LEVEL},
@@ -1542,6 +1639,15 @@ class WarehousePipeline:
                     created_at,
                     updated_at,
                     closed_at,
+                    created_by,
+                    updated_by,
+                    closed_by,
+                    linked_document_urn,
+                    snapshot_urn,
+                    web_link,
+                    preview_middle_url,
+                    issue_link,
+                    snapshot_preview_url,
                     location_root,
                     location_building,
                     location_level,
@@ -1717,6 +1823,7 @@ class WarehousePipeline:
             issue_checks_passed = self._run_issue_quality_checks()
             if issue_checks_passed:
                 self._refresh_issues_current()
+                self._check_issue_current_vs_snapshot_count()
                 self._complete_issue_import_run(
                     status="success",
                     row_count=issue_snapshot_count,

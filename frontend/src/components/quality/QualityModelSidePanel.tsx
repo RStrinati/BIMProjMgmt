@@ -123,20 +123,21 @@ export const QualityModelSidePanel: React.FC<QualityModelSidePanelProps> = ({
             {/* Read-only register info summary */}
             <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Register Information</Typography>
-              <Typography variant="body2"><strong>ABV:</strong> {modelDetail?.abv || '—'}</Typography>
-              <Typography variant="body2"><strong>Model Name:</strong> {modelDetail?.registeredModelName || '—'}</Typography>
-              <Typography variant="body2"><strong>Company:</strong> {modelDetail?.company || '—'}</Typography>
-              <Typography variant="body2"><strong>Discipline:</strong> {modelDetail?.discipline || '—'}</Typography>
+              <Typography variant="body2"><strong>ABV:</strong> {modelDetail?.abv || '--'}</Typography>
+              <Typography variant="body2"><strong>Model Name:</strong> {modelDetail?.registeredModelName || '--'}</Typography>
+              <Typography variant="body2"><strong>Company:</strong> {modelDetail?.company || '--'}</Typography>
+              <Typography variant="body2"><strong>Discipline:</strong> {modelDetail?.discipline || '--'}</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
                 Edit these fields inline in the table
               </Typography>
             </Box>
 
-            <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb: 2 }}>
-              <Tab label="Mapping" />
-              <Tab label="Health" />
-              <Tab label="Activity" />
-            </Tabs>
+            {!modelDetail?.observedMatch && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This model is currently unmatched (no observed file).
+              </Alert>
+            )}
+
             <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb: 2 }}>
               <Tab label="Mapping" />
               <Tab label="Health" />
@@ -147,7 +148,7 @@ export const QualityModelSidePanel: React.FC<QualityModelSidePanelProps> = ({
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="subtitle2">Registered Model Name</Typography>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  {modelDetail?.registeredModelName || '—'}
+                  {modelDetail?.registeredModelName || '--'}
                 </Typography>
 
                 <Divider />
@@ -161,7 +162,7 @@ export const QualityModelSidePanel: React.FC<QualityModelSidePanelProps> = ({
                       <strong>Last Modified:</strong>{' '}
                       {modelDetail.observedMatch.lastModified
                         ? new Date(modelDetail.observedMatch.lastModified).toLocaleString()
-                        : '—'}
+                        : '--'}
                     </Typography>
                   </Box>
                 ) : (

@@ -263,13 +263,41 @@ def _iter_template_items(template: Dict[str, Any], options_enabled: List[str]) -
     return items
 
 
-def _derive_template_review_cadence(template: Dict[str, Any], options_enabled: List[str]) -> Tuple[Optional[int], Optional[int]]:
+def _normalize_exclusions(values: Optional[List[Any]]) -> List[str]:
+    return [str(value).strip() for value in (values or []) if str(value).strip()]
+
+
+def _review_exclusion_key(option_id: str, review_entry: Dict[str, Any]) -> Optional[str]:
+    review_template_id = review_entry.get("review_template_id") or review_entry.get("template_id")
+    if not review_template_id:
+        return None
+    option_key = option_id or "base"
+    return f"{option_key}:{review_template_id}"
+
+
+def _item_exclusion_key(option_id: str, item_entry: Dict[str, Any]) -> Optional[str]:
+    item_template_id = item_entry.get("item_template_id") or item_entry.get("template_id") or item_entry.get("title")
+    if not item_template_id:
+        return None
+    option_key = option_id or "base"
+    return f"{option_key}:{item_template_id}"
+
+
+def _derive_template_review_cadence(
+    template: Dict[str, Any],
+    options_enabled: List[str],
+    excluded_review_keys: Optional[set] = None,
+) -> Tuple[Optional[int], Optional[int]]:
     review_entries = _iter_template_reviews(template, options_enabled)
+    excluded_review_keys = excluded_review_keys or set()
     if not review_entries:
         return None, None
     interval_candidates = []
     total_count = 0
-    for _option_id, review in review_entries:
+    for option_id, review in review_entries:
+        exclusion_key = _review_exclusion_key(option_id, review)
+        if exclusion_key and exclusion_key in excluded_review_keys:
+            continue
         count = int(review.get("count") or 1)
         total_count += count
         interval = review.get("interval_days")
@@ -830,6 +858,8 @@ def _sync_reviews_and_items(
     mode: str,
     dry_run: bool,
     base_date: date,
+    excluded_review_keys: Optional[set] = None,
+    excluded_item_keys: Optional[set] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     existing_reviews = _fetch_existing_reviews(cursor, service_id)
     existing_items = _fetch_existing_items(cursor, service_id)
@@ -841,10 +871,16 @@ def _sync_reviews_and_items(
     updated_items: List[Dict[str, Any]] = []
     skipped_items: List[Dict[str, Any]] = []
 
+    excluded_review_keys = excluded_review_keys or set()
+    excluded_item_keys = excluded_item_keys or set()
+
     review_entries = _iter_template_reviews(template, options_enabled)
     for review_index, (option_id, review) in enumerate(review_entries, start=1):
         review_template_id = review.get("review_template_id")
         if not review_template_id:
+            continue
+        exclusion_key = _review_exclusion_key(option_id, review)
+        if exclusion_key and exclusion_key in excluded_review_keys:
             continue
         count = int(review.get("count") or 1)
         interval_days = int(review.get("interval_days") or 7)
@@ -933,6 +969,9 @@ def _sync_reviews_and_items(
         item_template_id = item.get("item_template_id") or item.get("template_id")
         if not item_template_id:
             continue
+        exclusion_key = _item_exclusion_key(option_id, item)
+        if exclusion_key and exclusion_key in excluded_item_keys:
+            continue
         generated_key = _item_generated_key(option_id, item)
         template_node_key = _item_template_node_key(
             template["template_id"],
@@ -1015,6 +1054,8 @@ def _generate_reviews_and_items(
     mode: str,
     dry_run: bool,
     base_date: date,
+    excluded_review_keys: Optional[set] = None,
+    excluded_item_keys: Optional[set] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     return _sync_reviews_and_items(
         cursor=cursor,
@@ -1025,6 +1066,8 @@ def _generate_reviews_and_items(
         mode=mode,
         dry_run=dry_run,
         base_date=base_date,
+        excluded_review_keys=excluded_review_keys,
+        excluded_item_keys=excluded_item_keys,
     )
 
 
@@ -1033,11 +1076,15 @@ def create_service_from_template(
     template_id: str,
     options_enabled: List[str],
     overrides: Dict[str, Any],
+    exclude_reviews: Optional[List[Any]] = None,
+    exclude_items: Optional[List[Any]] = None,
     applied_by_user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     template = _get_template_by_id(template_id)
     payload = _resolve_service_payload(template, overrides or {})
     options_enabled = [str(option) for option in options_enabled or []]
+    excluded_review_keys = set(_normalize_exclusions(exclude_reviews))
+    excluded_item_keys = set(_normalize_exclusions(exclude_items))
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -1045,7 +1092,11 @@ def create_service_from_template(
         if not start_date:
             start_date = _fetch_project_start_date(cursor, project_id) or date.today()
         review_anchor_date = _coerce_date(overrides.get("review_anchor_date")) or start_date
-        review_interval_days, review_count_planned = _derive_template_review_cadence(template, options_enabled)
+        review_interval_days, review_count_planned = _derive_template_review_cadence(
+            template,
+            options_enabled,
+            excluded_review_keys=excluded_review_keys,
+        )
         if overrides.get("review_interval_days") is not None:
             try:
                 review_interval_days = int(overrides.get("review_interval_days"))
@@ -1088,6 +1139,8 @@ def create_service_from_template(
             mode="sync_missing_only",
             dry_run=False,
             base_date=review_anchor_date,
+            excluded_review_keys=excluded_review_keys,
+            excluded_item_keys=excluded_item_keys,
         )
         conn.commit()
 
@@ -1116,6 +1169,8 @@ def apply_template_to_service(
     template_id: str,
     options_enabled: List[str],
     overrides: Dict[str, Any],
+    exclude_reviews: Optional[List[Any]] = None,
+    exclude_items: Optional[List[Any]] = None,
     applied_by_user_id: Optional[int] = None,
     mode: str = "sync_and_update_managed",
     dry_run: bool = False,
@@ -1124,6 +1179,9 @@ def apply_template_to_service(
     payload = _resolve_service_payload(template, overrides or {})
     if mode not in {"sync_missing_only", "sync_and_update_managed"}:
         mode = "sync_and_update_managed"
+
+    excluded_review_keys = set(_normalize_exclusions(exclude_reviews))
+    excluded_item_keys = set(_normalize_exclusions(exclude_items))
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -1187,6 +1245,8 @@ def apply_template_to_service(
             mode=mode,
             dry_run=dry_run,
             base_date=base_date,
+            excluded_review_keys=excluded_review_keys,
+            excluded_item_keys=excluded_item_keys,
         )
         if not dry_run:
             conn.commit()

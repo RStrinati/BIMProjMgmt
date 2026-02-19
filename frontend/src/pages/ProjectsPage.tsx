@@ -34,6 +34,7 @@ import { profilerLog } from '@/utils/perfLogger';
 import { featureFlags } from '@/config/featureFlags';
 import ProjectsPanelPage from '@/pages/ProjectsPanelPage';
 import ProjectsHomePageV2 from '@/pages/ProjectsHomePageV2';
+import FilterChipsPanel from '@/components/filters/FilterChipsPanel';
 
 const ProjectFormDialog = lazy(() => import('@/components/ProjectFormDialog'));
 
@@ -316,66 +317,38 @@ export function ProjectsPage() {
 
       {/* Filter chips and bulk actions */}
       <Stack spacing={2} sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="subtitle2" color="text.secondary">
-            Status
-          </Typography>
-          {filterOptions.statuses.map((status) => (
-            <Chip
-              key={status}
-              label={status}
-              size="small"
-              color={statusFilters.includes(status) ? 'primary' : 'default'}
-              onClick={() => toggleFilter(status, statusFilters, setStatusFilters)}
-            />
-          ))}
-          {!filterOptions.statuses.length && <Chip label="No statuses yet" size="small" variant="outlined" />}
-        </Stack>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="subtitle2" color="text.secondary">
-            Type
-          </Typography>
-          {filterOptions.types.map((type) => (
-            <Chip
-              key={type}
-              label={type}
-              size="small"
-              color={typeFilters.includes(type) ? 'primary' : 'default'}
-              onClick={() => toggleFilter(type, typeFilters, setTypeFilters)}
-            />
-          ))}
-          {!filterOptions.types.length && <Chip label="No project types yet" size="small" variant="outlined" />}
-        </Stack>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="subtitle2" color="text.secondary">
-            Manager
-          </Typography>
-          {filterOptions.managers.map((manager) => (
-            <Chip
-              key={manager}
-              label={manager}
-              size="small"
-              color={managerFilters.includes(manager) ? 'primary' : 'default'}
-              onClick={() => toggleFilter(manager, managerFilters, setManagerFilters)}
-            />
-          ))}
-          {!filterOptions.managers.length && <Chip label="No managers yet" size="small" variant="outlined" />}
-        </Stack>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="subtitle2" color="text.secondary">
-            Client
-          </Typography>
-          {filterOptions.clients.map((client) => (
-            <Chip
-              key={client}
-              label={client}
-              size="small"
-              color={clientFilters.includes(client) ? 'primary' : 'default'}
-              onClick={() => toggleFilter(client, clientFilters, setClientFilters)}
-            />
-          ))}
-          {!filterOptions.clients.length && <Chip label="No clients yet" size="small" variant="outlined" />}
-        </Stack>
+        <FilterChipsPanel
+          groups={[
+            {
+              label: 'Status',
+              options: filterOptions.statuses,
+              selected: statusFilters,
+              onToggle: (value) => toggleFilter(value, statusFilters, setStatusFilters),
+              emptyLabel: 'No statuses yet',
+            },
+            {
+              label: 'Type',
+              options: filterOptions.types,
+              selected: typeFilters,
+              onToggle: (value) => toggleFilter(value, typeFilters, setTypeFilters),
+              emptyLabel: 'No project types yet',
+            },
+            {
+              label: 'Manager',
+              options: filterOptions.managers,
+              selected: managerFilters,
+              onToggle: (value) => toggleFilter(value, managerFilters, setManagerFilters),
+              emptyLabel: 'No managers yet',
+            },
+            {
+              label: 'Client',
+              options: filterOptions.clients,
+              selected: clientFilters,
+              onToggle: (value) => toggleFilter(value, clientFilters, setClientFilters),
+              emptyLabel: 'No clients yet',
+            },
+          ]}
+        />
 
         {selectedProjectIds.length > 0 && (
           <Alert

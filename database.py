@@ -3676,6 +3676,7 @@ def get_project_details(project_id):
                 f"""
                 SELECT p.{S.Projects.NAME}, p.{S.Projects.START_DATE}, p.{S.Projects.END_DATE}, 
                        p.{S.Projects.STATUS}, p.{S.Projects.PRIORITY}, p.{S.Projects.CONTRACT_NUMBER},
+                       p.{S.Projects.SUMMARY}, p.{S.Projects.DESCRIPTION}, p.{S.Projects.EMOJI}, p.{S.Projects.ICON_KEY},
                        p.{S.Projects.AREA_HECTARES}, p.{S.Projects.MW_CAPACITY},
                        p.{S.Projects.ADDRESS}, p.{S.Projects.CITY}, p.{S.Projects.STATE}, p.{S.Projects.POSTCODE},
                        c.{S.Clients.CLIENT_NAME}, c.{S.Clients.CONTACT_NAME}, c.{S.Clients.CONTACT_EMAIL},
@@ -3701,16 +3702,20 @@ def get_project_details(project_id):
                     "status": row[3],
                     "priority": priority_name,
                     "contract_number": row[5],
-                    "area": row[6],
-                    "mw_capacity": row[7],
-                    "address": row[8],
-                    "city": row[9],
-                    "state": row[10],
-                    "postcode": row[11],
-                    "client_name": row[12],
-                    "client_contact": row[13],
-                    "contact_email": row[14],
-                    "project_type": row[15]
+                    "summary": row[6],
+                    "description": row[7],
+                    "emoji": row[8],
+                    "icon_key": row[9],
+                    "area": row[10],
+                    "mw_capacity": row[11],
+                    "address": row[12],
+                    "city": row[13],
+                    "state": row[14],
+                    "postcode": row[15],
+                    "client_name": row[16],
+                    "client_contact": row[17],
+                    "contact_email": row[18],
+                    "project_type": row[19]
                 }
                 return result
             else:
@@ -4347,7 +4352,6 @@ def _get_quality_register_phase1d(project_id: int) -> Dict[str, Any]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
             # Get expected models with observed enrichment
             query = """
             SELECT 
@@ -4360,24 +4364,7 @@ def _get_quality_register_phase1d(project_id: int) -> Dict[str, Any]:
                 em.bim_contact,
                 em.notes,
                 em.notes_updated_at,
-                
-                -- ACC enrichment (placeholder for now)
-                NULL as folder_path,
-                CAST(0 as BIT) as acc_present,
-                NULL as acc_date,
-                
-                -- Revizto enrichment (placeholder)
-                CAST(0 as BIT) as revizto_present,
-                NULL as revizto_date,
-                
-                -- Mapping status
-                'UNMAPPED' as mapping_status,
-                NULL as matched_observed_file,
-                
-                -- Health enrichment (placeholder)
-                'UNKNOWN' as validation_overall,
-                'UNKNOWN' as freshness_status
-                
+                em.acc_required_override
             FROM ExpectedModels em
             WHERE em.project_id = ?
             ORDER BY em.abv, em.registered_model_name
@@ -4385,42 +4372,249 @@ def _get_quality_register_phase1d(project_id: int) -> Dict[str, Any]:
             
             cursor.execute(query, (project_id,))
             rows = cursor.fetchall()
-            
+
+            aliases = get_expected_model_aliases(project_id)
+
+            def normalize_filename(filename: Optional[str]) -> Optional[str]:
+                if not filename:
+                    return None
+                value = filename.upper()
+                value = value.replace('.IFC.RVT', '.RVT')
+                value = value.replace('-DETACHED.RVT', '.RVT')
+                value = value.replace('.NWD', '')
+                value = value.replace('.RVT', '')
+                value = value.strip()
+                return value
+
+            expected_name_map: Dict[str, List[int]] = {}
+            for row in rows:
+                normalized = normalize_filename(row[2]) if row[2] else None
+                if not normalized:
+                    continue
+                expected_name_map.setdefault(normalized, []).append(row[0])
+
+            def match_expected_id(file_name: Optional[str]) -> Optional[int]:
+                normalized = normalize_filename(file_name)
+                if normalized and normalized in expected_name_map:
+                    ids = expected_name_map[normalized]
+                    if len(ids) == 1:
+                        return ids[0]
+                return match_observed_to_expected(normalized or file_name or '', None, aliases)
+
+            live_query = """
+                WITH SplitPaths AS (
+                    SELECT 
+                        d.id,
+                        d.project_id,
+                        d.file_name,
+                        d.date_modified,
+                        d.created_at,
+                        value AS folder,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY d.id 
+                            ORDER BY CHARINDEX(value, d.file_path)
+                        ) AS folder_level
+                    FROM ProjectManagement.dbo.tblACCDocs d
+                    CROSS APPLY STRING_SPLIT(REPLACE(d.file_path, '/', '\\'), '\\')
+                    WHERE d.project_id = ?
+                ),
+                LiveNormalized AS (
+                    SELECT
+                        d.id,
+                        d.project_id,
+                        UPPER(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(d.file_name, '.IFC.RVT', '.RVT'),
+                                    '-DETACHED.RVT', '.RVT'
+                                ),
+                                '.NWD', ''
+                            )
+                        ) AS NormalizedFileName,
+                        d.file_name,
+                        d.date_modified,
+                        d.created_at
+                    FROM ProjectManagement.dbo.tblACCDocs d
+                    WHERE d.project_id = ?
+                ),
+                Deduped AS (
+                    SELECT 
+                        sp9.id, 
+                        d.project_id, 
+                        d.file_name, 
+                        d.date_modified, 
+                        sp9.folder AS level_9_folder, 
+                        sp10.folder AS level_10_folder,
+                        CONCAT(
+                            sp9.folder, 
+                            CASE WHEN sp10.folder IS NOT NULL THEN ' \\ ' + sp10.folder ELSE '' END
+                        ) AS file_location,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY d.project_id, sp9.folder, sp10.folder, d.file_name
+                            ORDER BY d.date_modified DESC
+                        ) AS rn
+                    FROM SplitPaths sp9
+                    LEFT JOIN SplitPaths sp10 
+                        ON sp9.id = sp10.id AND sp10.folder_level = 10
+                    JOIN LiveNormalized d 
+                        ON sp9.id = d.id
+                    WHERE sp9.folder_level = 9 
+                      AND (sp9.folder LIKE '%WIP%' OR sp9.folder LIKE '%WORK IN PROGRESS%' OR sp9.folder LIKE '%Coordination%')
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM SplitPaths sp_filter
+                          WHERE sp_filter.id = sp9.id
+                            AND LOWER(sp_filter.folder) LIKE '%consumed%'
+                      )
+                )
+                SELECT file_name, date_modified, file_location
+                FROM Deduped
+                WHERE rn = 1;
+            """
+
+            shared_query = """
+                WITH SplitPaths AS (
+                    SELECT 
+                        d.id,
+                        d.project_id,
+                        d.file_name,
+                        d.date_modified,
+                        d.created_at,
+                        value AS folder,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY d.id 
+                            ORDER BY CHARINDEX(value, d.file_path)
+                        ) AS folder_level
+                    FROM ProjectManagement.dbo.tblACCDocs d
+                    CROSS APPLY STRING_SPLIT(REPLACE(d.file_path, '/', '\\'), '\\')
+                    WHERE d.project_id = ?
+                ),
+                Deduped AS (
+                    SELECT 
+                        sp9.id, 
+                        d.project_id, 
+                        d.file_name, 
+                        d.date_modified, 
+                        sp9.folder AS level_9_folder, 
+                        sp10.folder AS level_10_folder,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY d.project_id, sp9.folder, sp10.folder, d.file_name
+                            ORDER BY d.date_modified DESC
+                        ) AS rn
+                    FROM SplitPaths sp9
+                    LEFT JOIN SplitPaths sp10 
+                        ON sp9.id = sp10.id AND sp10.folder_level = 10
+                    JOIN ProjectManagement.dbo.tblACCDocs d 
+                        ON sp9.id = d.id
+                    WHERE sp9.folder_level = 9 
+                      AND sp9.folder LIKE '%Shared%'
+                )
+                SELECT file_name, date_modified, level_9_folder, level_10_folder
+                FROM Deduped
+                WHERE rn = 1;
+            """
+
+            cursor.execute(live_query, (project_id, project_id))
+            live_rows = cursor.fetchall()
+
+            cursor.execute(shared_query, (project_id,))
+            shared_rows = cursor.fetchall()
+
+            live_by_model: Dict[int, Dict[str, Any]] = {}
+            for file_name, date_modified, file_location in live_rows:
+                matched_id = match_expected_id(file_name)
+                if not matched_id:
+                    continue
+                existing = live_by_model.get(matched_id)
+                if not existing or (date_modified and existing['date_modified'] and date_modified > existing['date_modified']):
+                    live_by_model[matched_id] = {
+                        'file_name': file_name,
+                        'date_modified': date_modified,
+                        'file_location': file_location,
+                    }
+
+            shared_by_model: Dict[int, Dict[str, Any]] = {}
+            for file_name, date_modified, level_9_folder, level_10_folder in shared_rows:
+                if level_9_folder and level_10_folder:
+                    file_location = f"{level_9_folder} \\ {level_10_folder}"
+                else:
+                    file_location = level_9_folder or level_10_folder
+                matched_id = match_expected_id(file_name)
+                if not matched_id:
+                    continue
+                existing = shared_by_model.get(matched_id)
+                if not existing or (date_modified and existing['date_modified'] and date_modified > existing['date_modified']):
+                    shared_by_model[matched_id] = {
+                        'file_name': file_name,
+                        'date_modified': date_modified,
+                        'file_location': file_location,
+                    }
+
+            from datetime import datetime, timedelta
+            window_start = datetime.now().date() - timedelta(days=7)
+
+            def compute_status(date_value, required_flag: bool) -> str:
+                if not required_flag:
+                    return 'NOT_REQUIRED'
+                if not date_value:
+                    return 'MISSING'
+                date_only = date_value.date() if hasattr(date_value, 'date') else date_value
+                return 'CURRENT' if date_only >= window_start else 'OUT_OF_DATE'
+
             # Column mapping (0-indexed):
             # 0=expected_model_id, 1=abv, 2=registered_model_name, 3=company, 4=discipline,
-            # 5=description, 6=bim_contact, 7=notes, 8=notes_updated_at, 9=folder_path,
-            # 10=acc_present, 11=acc_date, 12=revizto_present, 13=revizto_date,
-            # 14=mapping_status, 15=matched_observed_file, 16=validation_overall, 17=freshness_status
+            # 5=description, 6=bim_contact, 7=notes, 8=notes_updated_at, 9=acc_required_override
             
             result = {
                 "rows": [
                     {
                         "expected_model_id": row[0],
                         "abv": row[1],
-                        "modelName": row[2],  # Display field for UI
-                        "registeredModelName": row[2],  # Canonical field for edits
+                        "modelName": row[2],
+                        "registeredModelName": row[2],
                         "company": row[3],
                         "discipline": row[4],
                         "description": row[5],
                         "bimContact": row[6],
                         "notes": row[7],
                         "notesUpdatedAt": row[8] if isinstance(row[8], str) else (row[8].isoformat() if row[8] else None),
-                        "folderPath": row[9],
-                        "accPresent": bool(row[10]),
-                        "accDate": row[11] if isinstance(row[11], str) else (row[11].isoformat() if row[11] else None),
-                        "reviztoPresent": bool(row[12]),
-                        "reviztoDate": row[13] if isinstance(row[13], str) else (row[13].isoformat() if row[13] else None),
-                        "mappingStatus": row[14],
-                        "matchedObservedFile": row[15],
-                        "validationOverall": row[16],
-                        "freshnessStatus": row[17]
+                        "accRequiredOverride": row[9],
+                        "accFolderPath": (
+                            live_by_model.get(row[0], {}).get('file_location')
+                            or shared_by_model.get(row[0], {}).get('file_location')
+                        ),
+                        "accLiveDate": (
+                            live_by_model.get(row[0], {}).get('date_modified').isoformat()
+                            if live_by_model.get(row[0], {}).get('date_modified') else None
+                        ),
+                        "accLiveStatus": compute_status(
+                            live_by_model.get(row[0], {}).get('date_modified'),
+                            False if row[9] is False else True
+                        ),
+                        "accSharedDate": (
+                            shared_by_model.get(row[0], {}).get('date_modified').isoformat()
+                            if shared_by_model.get(row[0], {}).get('date_modified') else None
+                        ),
+                        "accSharedStatus": compute_status(
+                            shared_by_model.get(row[0], {}).get('date_modified'),
+                            False if row[9] is False else True
+                        ),
+                        "mappingStatus": (
+                            'MAPPED' if (row[0] in live_by_model or row[0] in shared_by_model) else 'UNMAPPED'
+                        ),
+                        "matchedObservedFile": (
+                            live_by_model.get(row[0], {}).get('file_name')
+                            or shared_by_model.get(row[0], {}).get('file_name')
+                        ),
+                        "validationOverall": "UNKNOWN",
+                        "freshnessStatus": "UNKNOWN"
                     }
                     for row in rows
                 ]
             }
             
             return result
-            
+                
     except Exception as e:
         logger.error(f"Error fetching Phase 1D quality register for project {project_id}: {e}", exc_info=True)
         return {"rows": []}
@@ -5296,6 +5490,228 @@ def deactivate_issue_attribute_mapping(map_id: int) -> bool:
         return False
 
 
+def get_issue_location_mappings(active_only: bool = True) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filter_sql = "WHERE m.is_active = 1" if active_only else ""
+            cursor.execute(
+                f"""
+                SELECT m.location_map_id, m.project_id, m.source_system, m.raw_location,
+                       m.location_root, m.location_building, m.location_level,
+                       m.is_default, m.is_active, m.updated_at
+                FROM ProjectManagement.dbo.issue_location_map m
+                {filter_sql}
+                ORDER BY m.source_system, m.project_id, m.raw_location
+                """
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "map_id": row[0],
+                    "project_id": row[1],
+                    "source_system": row[2],
+                    "raw_location": row[3],
+                    "location_root": row[4],
+                    "location_building": row[5],
+                    "location_level": row[6],
+                    "is_default": bool(row[7]) if row[7] is not None else False,
+                    "is_active": bool(row[8]) if row[8] is not None else False,
+                    "updated_at": row[9],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error fetching issue location mappings: %s", exc)
+        return []
+
+
+def create_issue_location_mapping(payload: Dict[str, Any]) -> Optional[int]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ProjectManagement.dbo.issue_location_map
+                    (project_id, source_system, raw_location, location_root, location_building,
+                     location_level, is_default, is_active)
+                OUTPUT INSERTED.location_map_id
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_location"),
+                    payload.get("location_root"),
+                    payload.get("location_building"),
+                    payload.get("location_level"),
+                    1 if payload.get("is_default") else 0,
+                ),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row[0] if row else None
+    except Exception as exc:
+        logger.error("Error creating issue location mapping: %s", exc)
+        return None
+
+
+def update_issue_location_mapping(map_id: int, payload: Dict[str, Any]) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_location_map
+                SET project_id = ?, source_system = ?, raw_location = ?,
+                    location_root = ?, location_building = ?, location_level = ?,
+                    is_default = ?, updated_at = SYSUTCDATETIME()
+                WHERE location_map_id = ?
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_location"),
+                    payload.get("location_root"),
+                    payload.get("location_building"),
+                    payload.get("location_level"),
+                    1 if payload.get("is_default") else 0,
+                    map_id,
+                ),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error updating issue location mapping: %s", exc)
+        return False
+
+
+def deactivate_issue_location_mapping(map_id: int) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_location_map
+                SET is_active = 0, updated_at = SYSUTCDATETIME()
+                WHERE location_map_id = ?
+                """,
+                (map_id,),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error deactivating issue location mapping: %s", exc)
+        return False
+
+
+def get_issue_discipline_mappings(active_only: bool = True) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            filter_sql = "WHERE m.is_active = 1" if active_only else ""
+            cursor.execute(
+                f"""
+                SELECT m.discipline_map_id, m.project_id, m.source_system, m.raw_discipline,
+                       m.normalized_discipline, m.is_default, m.is_active, m.updated_at
+                FROM ProjectManagement.dbo.issue_discipline_map m
+                {filter_sql}
+                ORDER BY m.source_system, m.project_id, m.raw_discipline
+                """
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "map_id": row[0],
+                    "project_id": row[1],
+                    "source_system": row[2],
+                    "raw_discipline": row[3],
+                    "normalized_discipline": row[4],
+                    "is_default": bool(row[5]) if row[5] is not None else False,
+                    "is_active": bool(row[6]) if row[6] is not None else False,
+                    "updated_at": row[7],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error fetching issue discipline mappings: %s", exc)
+        return []
+
+
+def create_issue_discipline_mapping(payload: Dict[str, Any]) -> Optional[int]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ProjectManagement.dbo.issue_discipline_map
+                    (project_id, source_system, raw_discipline, normalized_discipline,
+                     is_default, is_active)
+                OUTPUT INSERTED.discipline_map_id
+                VALUES (?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_discipline"),
+                    payload.get("normalized_discipline"),
+                    1 if payload.get("is_default") else 0,
+                ),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return row[0] if row else None
+    except Exception as exc:
+        logger.error("Error creating issue discipline mapping: %s", exc)
+        return None
+
+
+def update_issue_discipline_mapping(map_id: int, payload: Dict[str, Any]) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_discipline_map
+                SET project_id = ?, source_system = ?, raw_discipline = ?,
+                    normalized_discipline = ?, is_default = ?, updated_at = SYSUTCDATETIME()
+                WHERE discipline_map_id = ?
+                """,
+                (
+                    payload.get("project_id"),
+                    payload.get("source_system"),
+                    payload.get("raw_discipline"),
+                    payload.get("normalized_discipline"),
+                    1 if payload.get("is_default") else 0,
+                    map_id,
+                ),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error updating issue discipline mapping: %s", exc)
+        return False
+
+
+def deactivate_issue_discipline_mapping(map_id: int) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ProjectManagement.dbo.issue_discipline_map
+                SET is_active = 0, updated_at = SYSUTCDATETIME()
+                WHERE discipline_map_id = ?
+                """,
+                (map_id,),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error deactivating issue discipline mapping: %s", exc)
+        return False
+
+
 def set_control_models(project_id: int, models: List[Dict[str, Any]]) -> bool:
     """Persist the control models (and metadata) assigned to a project."""
     normalized: List[Dict[str, Any]] = []
@@ -6104,6 +6520,33 @@ def get_projects_summary(
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            service_items_assigned_user_exists = _column_exists(
+                cursor,
+                S.ServiceItems.TABLE,
+                S.ServiceItems.ASSIGNED_USER_ID,
+            )
+            service_items_assigned_to_exists = _column_exists(
+                cursor,
+                S.ServiceItems.TABLE,
+                S.ServiceItems.ASSIGNED_TO,
+            )
+            service_reviews_assigned_user_exists = _column_exists(
+                cursor,
+                S.ServiceReviews.TABLE,
+                S.ServiceReviews.ASSIGNED_USER_ID,
+            )
+            service_reviews_assigned_expr = (
+                f"sr.{S.ServiceReviews.ASSIGNED_USER_ID}"
+                if service_reviews_assigned_user_exists
+                else "NULL"
+            )
+            if service_items_assigned_user_exists:
+                service_items_assigned_expr = f"si.{S.ServiceItems.ASSIGNED_USER_ID}"
+            elif service_items_assigned_to_exists:
+                service_items_assigned_expr = f"TRY_CONVERT(INT, si.{S.ServiceItems.ASSIGNED_TO})"
+            else:
+                service_items_assigned_expr = "NULL"
+
             where_sql, params = _build_projects_summary_filters(
                 view_id=view_id,
                 search=search,
@@ -6112,13 +6555,84 @@ def get_projects_summary(
                 type_ids=type_ids,
                 manager=manager,
             )
+            assigned_user_id = current_user_id
+            has_assigned_filter = 1 if current_user_id is not None else 0
             cursor.execute(
                 f"""
-                SELECT *
-                FROM {S.ProjectsSummaryView.TABLE}
+                SELECT
+                    summary.*,
+                    ISNULL(due_counts.deliverables_due_total, 0) AS deliverables_due_total,
+                    ISNULL(due_counts.deliverables_due_next_week, 0) AS deliverables_due_next_week,
+                    ISNULL(due_counts.deliverables_due_next_fortnight, 0) AS deliverables_due_next_fortnight,
+                    ISNULL(due_counts.deliverables_due_next_month, 0) AS deliverables_due_next_month,
+                    ISNULL(due_counts.deliverables_due_next_quarter, 0) AS deliverables_due_next_quarter
+                FROM {S.ProjectsSummaryView.TABLE} summary
+                LEFT JOIN (
+                    SELECT
+                        filtered.project_id,
+                        COUNT(*) AS deliverables_due_total,
+                        SUM(CASE WHEN filtered.due_date >= bounds.next_week_start AND filtered.due_date < bounds.next_week_end THEN 1 ELSE 0 END) AS deliverables_due_next_week,
+                        SUM(CASE WHEN filtered.due_date >= bounds.next_week_start AND filtered.due_date < bounds.next_fortnight_end THEN 1 ELSE 0 END) AS deliverables_due_next_fortnight,
+                        SUM(CASE WHEN filtered.due_date >= bounds.next_month_start AND filtered.due_date < bounds.next_month_end THEN 1 ELSE 0 END) AS deliverables_due_next_month,
+                        SUM(CASE WHEN filtered.due_date >= bounds.next_quarter_start AND filtered.due_date < bounds.next_quarter_end THEN 1 ELSE 0 END) AS deliverables_due_next_quarter
+                    FROM (
+                        SELECT deliverables.project_id, deliverables.due_date, deliverables.status, deliverables.assigned_user_id
+                        FROM (
+                            SELECT
+                                COALESCE(sr.{S.ServiceReviews.PROJECT_ID}, ps.{S.ProjectServices.PROJECT_ID}) AS project_id,
+                                COALESCE(sr.{S.ServiceReviews.DUE_DATE}, sr.{S.ServiceReviews.PLANNED_DATE}) AS due_date,
+                                sr.{S.ServiceReviews.STATUS} AS status,
+                                {service_reviews_assigned_expr} AS assigned_user_id
+                            FROM {S.ServiceReviews.TABLE} sr
+                            INNER JOIN {S.ProjectServices.TABLE} ps
+                                ON sr.{S.ServiceReviews.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                            UNION ALL
+                            SELECT
+                                COALESCE(si.{S.ServiceItems.PROJECT_ID}, ps.{S.ProjectServices.PROJECT_ID}) AS project_id,
+                                COALESCE(si.{S.ServiceItems.DUE_DATE}, si.{S.ServiceItems.PLANNED_DATE}) AS due_date,
+                                si.{S.ServiceItems.STATUS} AS status,
+                                {service_items_assigned_expr} AS assigned_user_id
+                            FROM {S.ServiceItems.TABLE} si
+                            INNER JOIN {S.ProjectServices.TABLE} ps
+                                ON si.{S.ServiceItems.SERVICE_ID} = ps.{S.ProjectServices.SERVICE_ID}
+                        ) deliverables
+                        INNER JOIN {S.Projects.TABLE} p
+                            ON deliverables.project_id = p.{S.Projects.ID}
+                        WHERE (
+                            ? = 0
+                            OR COALESCE(deliverables.assigned_user_id, p.{S.Projects.INTERNAL_LEAD}) = ?
+                        )
+                          AND due_date IS NOT NULL
+                          AND LOWER(ISNULL(deliverables.status, '')) NOT IN ('completed', 'cancelled')
+                    ) filtered
+                    CROSS JOIN (
+                        SELECT
+                            DATEADD(WEEK, DATEDIFF(WEEK, 0, GETDATE()) + 1, 0) AS next_week_start,
+                            DATEADD(WEEK, DATEDIFF(WEEK, 0, GETDATE()) + 2, 0) AS next_week_end,
+                            DATEADD(DAY, 14, DATEADD(WEEK, DATEDIFF(WEEK, 0, GETDATE()) + 1, 0)) AS next_fortnight_end,
+                            DATEFROMPARTS(
+                                YEAR(DATEADD(MONTH, 1, GETDATE())),
+                                MONTH(DATEADD(MONTH, 1, GETDATE())),
+                                1
+                            ) AS next_month_start,
+                            DATEADD(
+                                MONTH,
+                                1,
+                                DATEFROMPARTS(
+                                    YEAR(DATEADD(MONTH, 1, GETDATE())),
+                                    MONTH(DATEADD(MONTH, 1, GETDATE())),
+                                    1
+                                )
+                            ) AS next_month_end,
+                            DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()) + 1, 0) AS next_quarter_start,
+                            DATEADD(QUARTER, 1, DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()) + 1, 0)) AS next_quarter_end
+                    ) bounds
+                    GROUP BY filtered.project_id
+                ) due_counts
+                    ON summary.{S.ProjectsSummaryView.PROJECT_ID} = due_counts.project_id
                 {where_sql}
                 """,
-                tuple(params),
+                tuple([has_assigned_filter, assigned_user_id, *params]),
             )
             columns = [c[0] for c in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -6965,6 +7479,116 @@ def delete_bookmark(bookmark_id):
             return True
     except Exception as e:
         logger.error(f"❌ Error deleting bookmark: {e}")
+        return False
+
+# ===================== Project Resources Functions =====================
+
+def get_project_resources(project_id):
+    """Get all resources for a specific project."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT {S.ProjectResources.RESOURCE_ID},
+                       {S.ProjectResources.PROJECT_ID},
+                       {S.ProjectResources.TITLE},
+                       {S.ProjectResources.URL},
+                       {S.ProjectResources.CREATED_AT},
+                       {S.ProjectResources.UPDATED_AT}
+                FROM {S.ProjectResources.TABLE}
+                WHERE {S.ProjectResources.PROJECT_ID} = ?
+                  AND {S.ProjectResources.IS_DELETED} = 0
+                ORDER BY {S.ProjectResources.CREATED_AT} DESC
+                """,
+                (project_id,)
+            )
+            rows = cursor.fetchall()
+            resources = []
+            for row in rows:
+                resources.append({
+                    'resource_id': row[0],
+                    'project_id': row[1],
+                    'title': row[2],
+                    'url': row[3],
+                    'created_at': row[4],
+                    'updated_at': row[5],
+                })
+            return resources
+    except Exception as e:
+        logger.error(f"Error fetching project resources: {e}")
+        return []
+
+
+def add_project_resource(project_id, title, url):
+    """Add a new resource for a project."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.ProjectResources.TABLE} (
+                    {S.ProjectResources.PROJECT_ID},
+                    {S.ProjectResources.TITLE},
+                    {S.ProjectResources.URL}
+                ) VALUES (?, ?, ?)
+                """,
+                (project_id, title, url)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error adding project resource: {e}")
+        return False
+
+
+def update_project_resource(resource_id, title=None, url=None):
+    """Update an existing project resource."""
+    try:
+        update_fields = {}
+        if title is not None:
+            update_fields[S.ProjectResources.TITLE] = title
+        if url is not None:
+            update_fields[S.ProjectResources.URL] = url
+
+        if not update_fields:
+            return False
+
+        update_fields[S.ProjectResources.UPDATED_AT] = datetime.utcnow()
+        set_clause = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+        values = list(update_fields.values()) + [resource_id]
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE {S.ProjectResources.TABLE} SET {set_clause} WHERE {S.ProjectResources.RESOURCE_ID} = ?",
+                values
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating project resource: {e}")
+        return False
+
+
+def delete_project_resource(resource_id):
+    """Soft-delete a project resource by ID."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.ProjectResources.TABLE}
+                SET {S.ProjectResources.IS_DELETED} = 1,
+                    {S.ProjectResources.UPDATED_AT} = GETUTCDATE()
+                WHERE {S.ProjectResources.RESOURCE_ID} = ?
+                """,
+                (resource_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting project resource: {e}")
         return False
 
 def get_bookmark_categories(project_id):
@@ -9751,13 +10375,14 @@ def insert_task_notes_record(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
     else:
         task_items_value = str(task_items_value)
 
-    task_date_value = _coerce_date_input(payload.get(S.Tasks.TASK_DATE))
+    raw_task_date = _coerce_date_input(payload.get(S.Tasks.TASK_DATE))
     start_date_value = (
         _coerce_date_input(payload.get(S.Tasks.START_DATE))
-        or task_date_value
+        or raw_task_date
         or datetime.utcnow().date()
     )
-    end_date_value = _coerce_date_input(payload.get(S.Tasks.END_DATE)) or task_date_value
+    task_date_value = raw_task_date or start_date_value
+    end_date_value = _coerce_date_input(payload.get(S.Tasks.END_DATE)) or task_date_value or start_date_value
 
     columns = [
         S.Tasks.TASK_NAME,
@@ -10151,6 +10776,724 @@ def get_all_users():
     except Exception as e:
         logger.error(f"Error fetching all users: {e}")
         return []
+
+
+def get_master_users():
+    """Fetch unified ACC/Revizto users for the master users list."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            flags_map = {}
+            try:
+                cursor.execute(
+                    """
+                    SELECT user_key, invited_to_bim_meetings, is_watcher, is_assignee
+                    FROM ProjectManagement.dbo.master_user_flags
+                    """
+                )
+                flags_map = {
+                    row[0]: {
+                        "invited_to_bim_meetings": bool(row[1]) if row[1] is not None else None,
+                        "is_watcher": bool(row[2]) if row[2] is not None else None,
+                        "is_assignee": bool(row[3]) if row[3] is not None else None,
+                    }
+                    for row in cursor.fetchall()
+                }
+            except Exception as exc:
+                logger.warning("master_user_flags unavailable: %s", exc)
+                flags_map = {}
+
+            try:
+                cursor.execute(
+                    """
+                    SELECT
+                        au.id,
+                        au.name,
+                        au.email,
+                        au.job_title,
+                        au.phone,
+                        au.status,
+                        au.last_sign_in,
+                        au.default_company_id
+                    FROM acc_data_schema.dbo.admin_users au
+                    """
+                )
+                acc_rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("ACC admin_users unavailable: %s", exc)
+                acc_rows = []
+
+            company_map = {}
+            if acc_rows:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT id, name
+                        FROM acc_data_schema.dbo.admin_companies
+                        """
+                    )
+                    company_map = {row[0]: row[1] for row in cursor.fetchall()}
+                except Exception as exc:
+                    logger.warning("ACC admin_companies unavailable: %s", exc)
+                    company_map = {}
+
+            project_stats = {}
+            if acc_rows:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT
+                            user_id,
+                            COUNT(DISTINCT bim360_project_id) AS project_count,
+                            MAX(access_level) AS access_level
+                        FROM acc_data_schema.dbo.admin_project_users
+                        GROUP BY user_id
+                        """
+                    )
+                    project_stats = {
+                        row[0]: {"project_count": row[1], "access_level": row[2]}
+                        for row in cursor.fetchall()
+                    }
+                except Exception as exc:
+                    logger.warning("ACC admin_project_users unavailable: %s", exc)
+                    project_stats = {}
+
+            product_map = {}
+            if acc_rows:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT user_id, product_key
+                        FROM acc_data_schema.dbo.admin_project_user_products
+                        WHERE user_id IS NOT NULL AND product_key IS NOT NULL
+                        """
+                    )
+                    for user_id, product_key in cursor.fetchall():
+                        product_map.setdefault(user_id, set()).add(product_key)
+                except Exception as exc:
+                    logger.warning("ACC admin_project_user_products unavailable: %s", exc)
+                    product_map = {}
+
+            users = []
+            for row in acc_rows:
+                user_id = row[0]
+                stats = project_stats.get(user_id, {})
+                products = sorted(product_map.get(user_id, []))
+                user_key = f"ACC:{user_id}"
+                flags = flags_map.get(user_key, {})
+                users.append(
+                    dict(
+                        user_key=user_key,
+                        source_system="ACC",
+                        source_user_id=str(user_id),
+                        name=row[1],
+                        email=row[2],
+                        role=row[3],
+                        phone=row[4],
+                        status=row[5],
+                        last_active=row[6].isoformat() if row[6] else None,
+                        last_active_source="ACC" if row[6] else None,
+                        company=company_map.get(row[7]),
+                        license_type=", ".join(products) if products else None,
+                        project_count=stats.get("project_count"),
+                        access_level=stats.get("access_level"),
+                        acc_project_count=stats.get("project_count"),
+                        revizto_project_count=None,
+                        invited_to_bim_meetings=flags.get("invited_to_bim_meetings"),
+                        is_watcher=flags.get("is_watcher"),
+                        is_assignee=flags.get("is_assignee"),
+                    )
+                )
+
+            # --- Revizto users from ReviztoData.dbo.tblLicenseMembers ---
+            try:
+                cursor.execute(
+                    """
+                    SELECT
+                        lm.member_uuid,
+                        lm.email,
+                        lm.member_json,
+                        lm.last_active,
+                        lm.invited_at,
+                        lm.activated,
+                        lm.deactivated,
+                        lm.license_uuid,
+                        lic.name AS license_name,
+                        lic.region AS license_region,
+                        lm.full_name,
+                        lm.role_name,
+                        lm.company_name,
+                        lm.last_active_source,
+                        lm.revizto_project_count
+                    FROM ProjectManagement.dbo.revizto_license_members lm
+                    LEFT JOIN ProjectManagement.dbo.revizto_licenses lic
+                        ON lic.license_uuid = lm.license_uuid
+                    """
+                )
+                revizto_rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("PM revizto_license_members unavailable: %s", exc)
+                revizto_rows = []
+
+            for row in revizto_rows:
+                    member_uuid = row[0]
+                    email = row[1]
+                    member_json = row[2]
+                    last_active = row[3]
+                    invited_at = row[4]
+                    activated = row[5]
+                    deactivated = row[6]
+                    license_uuid = row[7]
+                    license_name_value = row[8]
+                    license_region_value = row[9]
+                    stored_full_name = row[10]
+                    stored_role = row[11]
+                    stored_company = row[12]
+                    stored_last_active_source = row[13]
+                    stored_revizto_project_count = row[14]
+
+                    full_name = stored_full_name
+                    role = stored_role
+                    company = stored_company
+                    member_last_active = None
+                    if member_json:
+                        try:
+                            payload = json.loads(member_json)
+                            if isinstance(payload, dict):
+                                full_name = full_name or payload.get("fullName") or payload.get("fullname")
+                                role = role or payload.get("role")
+                                company = company or payload.get("company")
+                                member_last_active = (
+                                    payload.get("lastActive")
+                                    or (payload.get("user") or {}).get("lastActive")
+                                )
+                        except Exception:
+                            full_name = None
+
+                    if member_uuid:
+                        user_key = f"REV:{member_uuid}"
+                        source_user_id = str(member_uuid)
+                    elif email:
+                        user_key = f"REV:{email}"
+                        source_user_id = None
+                    else:
+                        continue
+
+                    status = None
+                    if deactivated is True:
+                        status = "Deactivated"
+                    elif activated is True:
+                        status = "Active"
+
+                    license_label = None
+                    if license_name_value:
+                        license_label = str(license_name_value)
+                        if license_region_value:
+                            license_label = f"{license_label} ({license_region_value})"
+                    elif license_uuid:
+                        license_label = str(license_uuid)
+
+                    flags = flags_map.get(user_key, {})
+
+                    resolved_last_active = last_active
+                    if resolved_last_active is None and member_last_active:
+                        resolved_last_active = member_last_active
+                    last_active_source = stored_last_active_source or ("Revizto" if resolved_last_active else None)
+
+                    users.append(
+                        dict(
+                            user_key=user_key,
+                            source_system="Revizto",
+                            source_user_id=source_user_id,
+                            name=full_name or email,
+                            email=email,
+                            role=role,
+                            phone=None,
+                            status=status,
+                            last_active=resolved_last_active.isoformat() if isinstance(resolved_last_active, (datetime, date)) else resolved_last_active,
+                            last_active_source=last_active_source,
+                            company=company,
+                            license_type=license_label,
+                            project_count=None,
+                            access_level=None,
+                            acc_project_count=None,
+                            revizto_project_count=stored_revizto_project_count,
+                            invited_to_bim_meetings=flags.get("invited_to_bim_meetings"),
+                            is_watcher=flags.get("is_watcher"),
+                            is_assignee=flags.get("is_assignee"),
+                        )
+                    )
+
+            return users
+    except Exception as e:
+        logger.error(f"Error fetching master users: {e}")
+        return []
+
+
+def upsert_master_user_flags(
+    user_key: str,
+    invited_to_bim_meetings: Optional[bool] = None,
+    is_watcher: Optional[bool] = None,
+    is_assignee: Optional[bool] = None,
+) -> bool:
+    """Upsert user-specified flags for the master users list."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                MERGE ProjectManagement.dbo.master_user_flags AS target
+                USING (SELECT ? AS user_key) AS source
+                ON target.user_key = source.user_key
+                WHEN MATCHED THEN
+                    UPDATE SET
+                        invited_to_bim_meetings = COALESCE(?, target.invited_to_bim_meetings),
+                        is_watcher = COALESCE(?, target.is_watcher),
+                        is_assignee = COALESCE(?, target.is_assignee),
+                        updated_at = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN
+                    INSERT (user_key, invited_to_bim_meetings, is_watcher, is_assignee, updated_at)
+                    VALUES (?, ?, ?, ?, SYSUTCDATETIME());
+                """,
+                (
+                    user_key,
+                    invited_to_bim_meetings,
+                    is_watcher,
+                    is_assignee,
+                    user_key,
+                    invited_to_bim_meetings,
+                    is_watcher,
+                    is_assignee,
+                ),
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error upserting master user flags: {e}")
+        return False
+
+
+def sync_revizto_users_to_pm() -> dict:
+    """Sync Revizto license members and licenses from ReviztoData into ProjectManagement."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                MERGE ProjectManagement.dbo.revizto_licenses AS target
+                USING (
+                    SELECT
+                        CAST(uuid AS NVARCHAR(100)) AS license_uuid,
+                        name,
+                        region,
+                        expires,
+                        created,
+                        ownerId,
+                        ownerUuid,
+                        ownerEmail,
+                        planUsers,
+                        planProjects,
+                        slotsProjects,
+                        slotsUsers,
+                        clashAutomation,
+                        allowBeExternalGuest,
+                        allowGuestsHere,
+                        allowBCFExport,
+                        allowApiAccess
+                    FROM ReviztoData.dbo.tblUserLicenses
+                ) AS source
+                ON target.license_uuid = source.license_uuid
+                WHEN MATCHED THEN
+                    UPDATE SET
+                        name = source.name,
+                        region = source.region,
+                        expires = source.expires,
+                        created = source.created,
+                        owner_id = source.ownerId,
+                        owner_uuid = source.ownerUuid,
+                        owner_email = source.ownerEmail,
+                        plan_users = source.planUsers,
+                        plan_projects = source.planProjects,
+                        slots_projects = source.slotsProjects,
+                        slots_users = source.slotsUsers,
+                        clash_automation = source.clashAutomation,
+                        allow_be_external_guest = source.allowBeExternalGuest,
+                        allow_guests_here = source.allowGuestsHere,
+                        allow_bcf_export = source.allowBCFExport,
+                        allow_api_access = source.allowApiAccess,
+                        synced_at = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN
+                    INSERT (
+                        license_uuid, name, region, expires, created,
+                        owner_id, owner_uuid, owner_email,
+                        plan_users, plan_projects, slots_projects, slots_users,
+                        clash_automation, allow_be_external_guest, allow_guests_here,
+                        allow_bcf_export, allow_api_access, synced_at
+                    )
+                    VALUES (
+                        source.license_uuid, source.name, source.region, source.expires, source.created,
+                        source.ownerId, source.ownerUuid, source.ownerEmail,
+                        source.planUsers, source.planProjects, source.slotsProjects, source.slotsUsers,
+                        source.clashAutomation, source.allowBeExternalGuest, source.allowGuestsHere,
+                        source.allowBCFExport, source.allowApiAccess, SYSUTCDATETIME()
+                    );
+                """
+            )
+
+            cursor.execute(
+                """
+                MERGE ProjectManagement.dbo.revizto_license_members AS target
+                USING (
+                    SELECT
+                        CAST(licenseUuid AS NVARCHAR(100)) AS license_uuid,
+                        CAST(memberUuid AS NVARCHAR(100)) AS member_uuid,
+                        email,
+                        invitedAt,
+                        activated,
+                        deactivated,
+                        lastActive,
+                        memberJson,
+                        JSON_VALUE(memberJson, '$.fullName') AS full_name,
+                        JSON_VALUE(memberJson, '$.fullname') AS full_name_fallback,
+                        JSON_VALUE(memberJson, '$.role') AS role_name,
+                        JSON_VALUE(memberJson, '$.company') AS company_name,
+                        JSON_VALUE(memberJson, '$.lastActive') AS last_active_json,
+                        JSON_VALUE(memberJson, '$.user.lastActive') AS last_active_user_json,
+                        JSON_QUERY(memberJson, '$.projects') AS projects_json
+                    FROM ReviztoData.dbo.tblLicenseMembers
+                ) AS source
+                ON target.license_uuid = source.license_uuid AND target.member_uuid = source.member_uuid
+                WHEN MATCHED THEN
+                    UPDATE SET
+                        email = source.email,
+                        invited_at = source.invitedAt,
+                        activated = source.activated,
+                        deactivated = source.deactivated,
+                        last_active = COALESCE(
+                            source.lastActive,
+                            TRY_CONVERT(datetime2, source.last_active_json),
+                            TRY_CONVERT(datetime2, source.last_active_user_json)
+                        ),
+                        last_active_source = CASE
+                            WHEN source.lastActive IS NOT NULL THEN 'Revizto'
+                            WHEN source.last_active_json IS NOT NULL THEN 'Revizto'
+                            WHEN source.last_active_user_json IS NOT NULL THEN 'Revizto'
+                            ELSE NULL
+                        END,
+                        full_name = COALESCE(source.full_name, source.full_name_fallback),
+                        role_name = source.role_name,
+                        company_name = source.company_name,
+                        revizto_project_count = CASE
+                            WHEN source.projects_json IS NULL THEN NULL
+                            ELSE (
+                                SELECT COUNT(*) 
+                                FROM OPENJSON(source.projects_json)
+                            )
+                        END,
+                        member_json = source.memberJson,
+                        synced_at = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN
+                    INSERT (
+                        license_uuid, member_uuid, email, invited_at,
+                        activated, deactivated, last_active, last_active_source,
+                        full_name, role_name, company_name, revizto_project_count,
+                        member_json, synced_at
+                    )
+                    VALUES (
+                        source.license_uuid, source.member_uuid, source.email, source.invitedAt,
+                        source.activated,
+                        source.deactivated,
+                        COALESCE(
+                            source.lastActive,
+                            TRY_CONVERT(datetime2, source.last_active_json),
+                            TRY_CONVERT(datetime2, source.last_active_user_json)
+                        ),
+                        CASE
+                            WHEN source.lastActive IS NOT NULL THEN 'Revizto'
+                            WHEN source.last_active_json IS NOT NULL THEN 'Revizto'
+                            WHEN source.last_active_user_json IS NOT NULL THEN 'Revizto'
+                            ELSE NULL
+                        END,
+                        COALESCE(source.full_name, source.full_name_fallback),
+                        source.role_name,
+                        source.company_name,
+                        CASE
+                            WHEN source.projects_json IS NULL THEN NULL
+                            ELSE (
+                                SELECT COUNT(*)
+                                FROM OPENJSON(source.projects_json)
+                            )
+                        END,
+                        source.memberJson,
+                        SYSUTCDATETIME()
+                    );
+                """
+            )
+            conn.commit()
+
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error syncing Revizto users to PM: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def sync_master_users_from_sources() -> dict:
+    """Normalize master users by email across ACC + Revizto sources."""
+    try:
+        identities: list[dict] = []
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # ACC users (acc_data_schema)
+            try:
+                cursor.execute(
+                    """
+                    SELECT
+                        au.id,
+                        au.email,
+                        au.name,
+                        au.job_title,
+                        au.status,
+                        au.last_sign_in,
+                        au.default_company_id,
+                        ac.name AS company_name
+                    FROM acc_data_schema.dbo.admin_users au
+                    LEFT JOIN acc_data_schema.dbo.admin_companies ac
+                        ON ac.id = au.default_company_id
+                    WHERE au.email IS NOT NULL
+                    """
+                )
+                for row in cursor.fetchall():
+                    user_id = row[0]
+                    email = row[1]
+                    name = row[2]
+                    role = row[3]
+                    status = row[4]
+                    last_active = row[5]
+                    company = row[7]
+                    identities.append(
+                        {
+                            "source_system": "ACC",
+                            "source_user_id": str(user_id),
+                            "email": email,
+                            "name": name,
+                            "company": company,
+                            "role": role,
+                            "status": status,
+                            "last_active_at": last_active,
+                            "user_key": f"ACC:{user_id}",
+                        }
+                    )
+            except Exception as exc:
+                logger.warning("ACC admin_users unavailable for master sync: %s", exc)
+
+            # Revizto users (ProjectManagement copy)
+            try:
+                cursor.execute(
+                    """
+                    SELECT
+                        lm.member_uuid,
+                        lm.email,
+                        lm.member_json,
+                        lm.activated,
+                        lm.deactivated,
+                        lm.last_active
+                    FROM ProjectManagement.dbo.revizto_license_members lm
+                    WHERE lm.email IS NOT NULL
+                    """
+                )
+                for row in cursor.fetchall():
+                    member_uuid = row[0]
+                    email = row[1]
+                    member_json = row[2]
+                    activated = row[3]
+                    deactivated = row[4]
+                    last_active = row[5]
+
+                    name = None
+                    role = None
+                    company = None
+                    if member_json:
+                        try:
+                            payload = json.loads(member_json)
+                            if isinstance(payload, dict):
+                                name = payload.get("fullName") or payload.get("fullname")
+                                role = payload.get("role")
+                                company = payload.get("company")
+                        except Exception:
+                            name = None
+
+                    status = None
+                    if deactivated is True:
+                        status = "Deactivated"
+                    elif activated is True:
+                        status = "Active"
+
+                    identities.append(
+                        {
+                            "source_system": "Revizto",
+                            "source_user_id": str(member_uuid),
+                            "email": email,
+                            "name": name,
+                            "company": company,
+                            "role": role,
+                            "status": status,
+                            "last_active_at": last_active,
+                            "user_key": f"REV:{member_uuid}",
+                        }
+                    )
+            except Exception as exc:
+                logger.warning("PM revizto_license_members unavailable for master sync: %s", exc)
+
+            if not identities:
+                return {"success": True, "message": "No identities found"}
+
+            def _normalize_email(value: Optional[str]) -> Optional[str]:
+                if not value:
+                    return None
+                return value.strip().lower()
+
+            # Aggregate by normalized email
+            aggregates: dict[str, dict] = {}
+            for identity in identities:
+                email_norm = _normalize_email(identity.get("email"))
+                if not email_norm:
+                    continue
+                identity["email_normalized"] = email_norm
+                agg = aggregates.get(email_norm)
+                if not agg:
+                    aggregates[email_norm] = {
+                        "email_normalized": email_norm,
+                        "display_name": identity.get("name"),
+                        "company": identity.get("company"),
+                        "status": identity.get("status"),
+                        "last_active_at": identity.get("last_active_at"),
+                    }
+                    continue
+                if not agg.get("display_name") and identity.get("name"):
+                    agg["display_name"] = identity.get("name")
+                if not agg.get("company") and identity.get("company"):
+                    agg["company"] = identity.get("company")
+                if identity.get("status") == "Active":
+                    agg["status"] = "Active"
+                if agg.get("last_active_at") is None:
+                    agg["last_active_at"] = identity.get("last_active_at")
+                elif identity.get("last_active_at") is not None:
+                    try:
+                        if identity["last_active_at"] > agg["last_active_at"]:
+                            agg["last_active_at"] = identity["last_active_at"]
+                    except Exception:
+                        pass
+
+            # Upsert master_users
+            for agg in aggregates.values():
+                cursor.execute(
+                    """
+                    MERGE ProjectManagement.dbo.master_users AS target
+                    USING (SELECT ? AS email_normalized) AS source
+                    ON target.email_normalized = source.email_normalized
+                    WHEN MATCHED THEN
+                        UPDATE SET
+                            display_name = COALESCE(target.display_name, ?),
+                            company = COALESCE(target.company, ?),
+                            status = COALESCE(?, target.status),
+                            last_active_at = CASE
+                                WHEN ? IS NULL THEN target.last_active_at
+                                WHEN target.last_active_at IS NULL THEN ?
+                                WHEN ? > target.last_active_at THEN ?
+                                ELSE target.last_active_at
+                            END,
+                            updated_at = SYSUTCDATETIME()
+                    WHEN NOT MATCHED THEN
+                        INSERT (email_normalized, display_name, company, status, last_active_at)
+                        VALUES (?, ?, ?, ?, ?);
+                    """,
+                    (
+                        agg["email_normalized"],
+                        agg.get("display_name"),
+                        agg.get("company"),
+                        agg.get("status"),
+                        agg.get("last_active_at"),
+                        agg.get("last_active_at"),
+                        agg.get("last_active_at"),
+                        agg.get("last_active_at"),
+                        agg["email_normalized"],
+                        agg.get("display_name"),
+                        agg.get("company"),
+                        agg.get("status"),
+                        agg.get("last_active_at"),
+                    ),
+                )
+
+            # Upsert identities with master_user_id lookup
+            for identity in identities:
+                email_norm = _normalize_email(identity.get("email"))
+                if not email_norm:
+                    continue
+                cursor.execute(
+                    "SELECT master_user_id FROM ProjectManagement.dbo.master_users WHERE email_normalized = ?",
+                    (email_norm,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    continue
+                master_user_id = row[0]
+                cursor.execute(
+                    """
+                    MERGE ProjectManagement.dbo.master_user_identities AS target
+                    USING (SELECT ? AS source_system, ? AS source_user_id) AS source
+                    ON target.source_system = source.source_system AND target.source_user_id = source.source_user_id
+                    WHEN MATCHED THEN
+                        UPDATE SET
+                            master_user_id = ?,
+                            email_normalized = ?,
+                            name = ?,
+                            company = ?,
+                            role = ?,
+                            status = ?,
+                            last_active_at = ?,
+                            user_key = ?,
+                            synced_at = SYSUTCDATETIME()
+                    WHEN NOT MATCHED THEN
+                        INSERT (
+                            master_user_id, source_system, source_user_id, email_normalized,
+                            name, company, role, status, last_active_at, user_key
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        identity["source_system"],
+                        identity["source_user_id"],
+                        master_user_id,
+                        email_norm,
+                        identity.get("name"),
+                        identity.get("company"),
+                        identity.get("role"),
+                        identity.get("status"),
+                        identity.get("last_active_at"),
+                        identity.get("user_key"),
+                        master_user_id,
+                        identity["source_system"],
+                        identity["source_user_id"],
+                        email_norm,
+                        identity.get("name"),
+                        identity.get("company"),
+                        identity.get("role"),
+                        identity.get("status"),
+                        identity.get("last_active_at"),
+                        identity.get("user_key"),
+                    ),
+                )
+
+            conn.commit()
+
+        return {"success": True, "identities": len(identities), "masters": len(aggregates)}
+    except Exception as e:
+        logger.error(f"Error syncing master users: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def create_user(name, role, email):
@@ -11531,6 +12874,11 @@ def award_bid(
 
 
 def get_reconciled_issues_table(
+    project_ids: Optional[list[str]] = None,
+    source_systems: Optional[list[str]] = None,
+    status_normalized_values: Optional[list[str]] = None,
+    priority_normalized_values: Optional[list[str]] = None,
+    discipline_normalized_values: Optional[list[str]] = None,
     project_id: Optional[str] = None,
     source_system: Optional[str] = None,
     status_normalized: Optional[str] = None,
@@ -11577,47 +12925,64 @@ def get_reconciled_issues_table(
     try:
         with get_db_connection(Config.PROJECT_MGMT_DB) as conn:  # ProjectManagement DB (not warehouse)
             cursor = conn.cursor()
-            
+
             # Build WHERE clause dynamically
             params = []
             where_clauses = []
-            
-            if project_id:
-                where_clauses.append("project_id = ?")
-                params.append(project_id)
-            
-            if source_system:
-                where_clauses.append("source_system = ?")
-                params.append(source_system)
-            
-            if status_normalized:
-                where_clauses.append("LOWER(status_normalized) = LOWER(?)")
-                params.append(status_normalized)
-            
-            if priority_normalized:
-                where_clauses.append("LOWER(priority_normalized) = LOWER(?)")
-                params.append(priority_normalized)
-            
-            if discipline_normalized:
-                where_clauses.append("LOWER(discipline_normalized) = LOWER(?)")
-                params.append(discipline_normalized)
-            
+
+            if not project_ids and project_id:
+                project_ids = [project_id]
+            if not source_systems and source_system:
+                source_systems = [source_system]
+            if not status_normalized_values and status_normalized:
+                status_normalized_values = [status_normalized]
+            if not priority_normalized_values and priority_normalized:
+                priority_normalized_values = [priority_normalized]
+            if not discipline_normalized_values and discipline_normalized:
+                discipline_normalized_values = [discipline_normalized]
+
+            if project_ids:
+                placeholders = ", ".join(["?"] * len(project_ids))
+                where_clauses.append(f"project_id IN ({placeholders})")
+                params.extend(project_ids)
+
+            if source_systems:
+                placeholders = ", ".join(["?"] * len(source_systems))
+                where_clauses.append(f"source_system IN ({placeholders})")
+                params.extend(source_systems)
+
+            if status_normalized_values:
+                placeholders = ", ".join(["?"] * len(status_normalized_values))
+                where_clauses.append(f"status_normalized IN ({placeholders})")
+                params.extend(status_normalized_values)
+
+            if priority_normalized_values:
+                placeholders = ", ".join(["?"] * len(priority_normalized_values))
+                where_clauses.append(f"priority_normalized IN ({placeholders})")
+                params.extend(priority_normalized_values)
+
+            if discipline_normalized_values:
+                placeholders = ", ".join(["?"] * len(discipline_normalized_values))
+                where_clauses.append(f"discipline_normalized IN ({placeholders})")
+                params.extend(discipline_normalized_values)
+
             if assignee_user_key:
                 where_clauses.append("assignee_user_key = ?")
                 params.append(assignee_user_key)
-            
+
             if search:
                 search_pattern = f"%{search}%"
                 where_clauses.append("(title LIKE ? OR issue_key LIKE ? OR display_id LIKE ?)")
                 params.extend([search_pattern, search_pattern, search_pattern])
-            
+
             where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-            
-            # Get total count
-            count_query = f"SELECT COUNT(*) FROM dbo.vw_Issues_Reconciled {where_sql}"
+
+            # Get total count (avoid view joins when no search term)
+            count_source = "dbo.vw_Issues_Reconciled" if search else "dbo.Issues_Current"
+            count_query = f"SELECT COUNT(*) FROM {count_source} {where_sql}"
             cursor.execute(count_query, params)
             total_count = cursor.fetchone()[0]
-            
+
             # Get paginated rows with all columns
             data_query = f"""
             SELECT
@@ -11641,6 +13006,15 @@ def get_reconciled_issues_table(
                 created_at,
                 updated_at,
                 closed_at,
+                created_by,
+                updated_by,
+                closed_by,
+                linked_document_urn,
+                snapshot_urn,
+                web_link,
+                preview_middle_url,
+                issue_link,
+                snapshot_preview_url,
                 location_root,
                 location_building,
                 location_level,
@@ -11654,20 +13028,23 @@ def get_reconciled_issues_table(
             ORDER BY {sort_col} {sort_direction}
             OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY
             """
-            
+
             cursor.execute(data_query, params)
             rows = cursor.fetchall()
-            
+
             # Format rows as dicts
             columns = [
                 'issue_key', 'source_system', 'source_issue_id', 'source_project_id',
                 'project_id', 'display_id', 'acc_issue_number', 'acc_issue_uuid', 'acc_id_type',
                 'title', 'status_raw', 'status_normalized', 'priority_raw', 'priority_normalized',
                 'discipline_raw', 'discipline_normalized', 'assignee_user_key', 'created_at',
-                'updated_at', 'closed_at', 'location_root', 'location_building', 'location_level',
-                'acc_status', 'acc_created_at', 'acc_updated_at', 'is_deleted', 'import_run_id'
+                'updated_at', 'closed_at', 'created_by', 'updated_by', 'closed_by',
+                'linked_document_urn', 'snapshot_urn', 'web_link', 'preview_middle_url',
+                'issue_link', 'snapshot_preview_url',
+                'location_root', 'location_building', 'location_level', 'acc_status',
+                'acc_created_at', 'acc_updated_at', 'is_deleted', 'import_run_id'
             ]
-            
+
             formatted_rows = []
             for row in rows:
                 row_dict = dict(zip(columns, row))
@@ -11676,7 +13053,7 @@ def get_reconciled_issues_table(
                     if row_dict[dt_field]:
                         row_dict[dt_field] = row_dict[dt_field].isoformat()
                 formatted_rows.append(row_dict)
-            
+
             return {
                 "page": page,
                 "page_size": page_size,
@@ -11773,7 +13150,9 @@ def create_expected_model(
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"""
+            cursor.execute("CREATE TABLE #InsertedIds (id INT);")
+            cursor.execute(
+                f"""
                 INSERT INTO ProjectManagement.dbo.{S.ExpectedModels.TABLE}
                 (
                     {S.ExpectedModels.PROJECT_ID},
@@ -11783,14 +13162,15 @@ def create_expected_model(
                     {S.ExpectedModels.COMPANY_ID},
                     {S.ExpectedModels.IS_REQUIRED}
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (project_id, expected_model_key, display_name, discipline, company_id, 1 if is_required else 0))
-            
-            conn.commit()
-            
-            # Get the ID of the inserted row
-            cursor.execute(f"SELECT @@IDENTITY")
+                OUTPUT INSERTED.{S.ExpectedModels.EXPECTED_MODEL_ID} INTO #InsertedIds
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (project_id, expected_model_key, display_name, discipline, company_id, 1 if is_required else 0),
+            )
+            cursor.execute("SELECT TOP 1 id FROM #InsertedIds;")
             new_id = cursor.fetchone()[0]
+            cursor.execute("DROP TABLE #InsertedIds;")
+            conn.commit()
             
             logger.info(f"Created expected model {new_id}: {expected_model_key} for project {project_id}")
             return int(new_id)
@@ -12111,19 +13491,20 @@ def create_project_update(project_id, body, created_by=None):
                     {S.ProjectUpdates.PROJECT_ID},
                     {S.ProjectUpdates.BODY},
                     {S.ProjectUpdates.CREATED_BY}
-                ) VALUES (?, ?, ?)
+                )
+                OUTPUT INSERTED.{S.ProjectUpdates.UPDATE_ID}
+                VALUES (?, ?, ?)
             """, (project_id, body, created_by))
-            
-            cursor.execute("SELECT SCOPE_IDENTITY() as update_id")
+
             result = cursor.fetchone()
-            
+
             if result and result[0] is not None:
                 update_id = int(result[0])
                 conn.commit()
                 return update_id
-            else:
-                logger.error(f"Failed to get update_id after insert, result: {result}")
-                return None
+
+            logger.error(f"Failed to get update_id after insert, result: {result}")
+            return None
     except Exception as e:
         logger.error(f"Error creating project update: {e}")
         return None

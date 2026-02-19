@@ -26,6 +26,7 @@ import ServiceCreateView from './pages/workspace/ServiceCreateView';
 import { IssuesPage } from './pages/IssuesPage';
 import { featureFlags } from './config/featureFlags';
 import UiPlaygroundPage from './pages/UiPlaygroundPage';
+import MasterUsersPage from './pages/MasterUsersPage';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -79,6 +80,7 @@ function App() {
               <Route path="/bids" element={<BidsListPage />} />
               <Route path="/bids/:id" element={<BidDetailPage />} />
               {featureFlags.issuesHub && <Route path="/issues" element={<IssuesPage />} />}
+              <Route path="/users" element={<MasterUsersPage />} />
               <Route path="/reviews" element={<Navigate to="/projects" replace />} />
               <Route path="/tasks" element={<TasksNotesPage />} />
               <Route path="/settings" element={<SettingsPage />} />

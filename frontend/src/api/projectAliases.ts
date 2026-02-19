@@ -20,18 +20,22 @@ export const projectAliasesApi = {
   },
 
   getAll: async (): Promise<ProjectAlias[]> => {
-    const response = await apiClient.get<ProjectAlias[]>('/project_aliases');
+    const response = await apiClient.get<ProjectAlias[]>('/project_aliases?include_stats=false');
     return response.data;
   },
 
-  create: async (payload: { alias_name: string; project_id: number }): Promise<ProjectAlias> => {
+  create: async (payload: {
+    alias_name: string;
+    project_id: number;
+    acc_project_id?: string | null;
+  }): Promise<ProjectAlias> => {
     const response = await apiClient.post<ProjectAlias>('/project_aliases', payload);
     return response.data;
   },
 
   update: async (
     aliasName: string,
-    payload: { alias_name?: string; project_id?: number },
+    payload: { alias_name?: string; project_id?: number; acc_project_id?: string | null },
   ): Promise<ProjectAlias> => {
     const response = await apiClient.patch<ProjectAlias>(
       `/project_aliases/${encodeAlias(aliasName)}`,
@@ -50,7 +54,9 @@ export const projectAliasesApi = {
   },
 
   getUnmapped: async (): Promise<UnmappedProjectAlias[]> => {
-    const response = await apiClient.get<UnmappedProjectAlias[]>('/project_aliases/unmapped');
+    const response = await apiClient.get<UnmappedProjectAlias[]>(
+      '/project_aliases/unmapped?include_stats=false&limit=200',
+    );
     return response.data;
   },
 

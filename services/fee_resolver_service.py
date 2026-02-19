@@ -190,7 +190,8 @@ class FeeResolverService:
     def calculate_invoice_month_final(
         override: Optional[str],
         auto_derived: Optional[str],
-        due_date: Optional[str] = None
+        due_date: Optional[str] = None,
+        planned_date: Optional[str] = None,
     ) -> str:
         """
         Determine the final invoice month using the three-tier fallback logic.
@@ -199,11 +200,12 @@ class FeeResolverService:
             override: invoice_month_override from database (YYYY-MM or None)
             auto_derived: invoice_month_auto from database (YYYY-MM or None)
             due_date: ISO date string (YYYY-MM-DD), used if auto_derived is None
+            planned_date: ISO date string (YYYY-MM-DD), used if due_date is None
         
         Returns:
             str: YYYY-MM format invoice month, or 'TBD' if cannot determine
         
-        Tier 1: override > Tier 2: auto_derived > Tier 3: due_date month > TBD
+        Tier 1: override > Tier 2: auto_derived > Tier 3: due_date month > Tier 4: planned_date month > TBD
         """
         if override:
             return override.strip()
@@ -211,10 +213,12 @@ class FeeResolverService:
         if auto_derived:
             return auto_derived.strip()
         
-        if due_date:
+        for date_value in (due_date, planned_date):
+            if not date_value:
+                continue
             # Extract YYYY-MM from ISO date
             try:
-                date_str = str(due_date).strip()
+                date_str = str(date_value).strip()
                 # Validate it looks like YYYY-MM-DD format (at least 7 chars and has hyphens)
                 if len(date_str) >= 7 and date_str[4] == '-' and date_str[7] == '-':
                     return date_str[:7]  # "2026-02-15" -> "2026-02"

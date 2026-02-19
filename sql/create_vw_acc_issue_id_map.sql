@@ -21,6 +21,7 @@ SELECT DISTINCT
     ic.source_system,
     ic.source_issue_id,
     ic.source_project_id,
+    ic.acc_project_id,
     CAST(acc.issue_id AS NVARCHAR(MAX)) as acc_issue_uuid,
     acc.display_id as acc_issue_number,
     CAST(acc.bim360_project_id AS NVARCHAR(100)) as acc_project_uuid,
@@ -45,6 +46,7 @@ SELECT DISTINCT
     ic.source_system,
     ic.source_issue_id,
     ic.source_project_id,
+    ic.acc_project_id,
     CAST(acc.issue_id AS NVARCHAR(MAX)) as acc_issue_uuid,
     acc.display_id as acc_issue_number,
     CAST(acc.bim360_project_id AS NVARCHAR(100)) as acc_project_uuid,
@@ -56,7 +58,7 @@ SELECT DISTINCT
 FROM dbo.Issues_Current ic
 INNER JOIN acc_data_schema.dbo.issues_issues acc
     ON TRY_CAST(ic.source_issue_id AS INT) = acc.display_id
-    AND ic.source_project_id = CAST(acc.bim360_project_id AS NVARCHAR(100))
+    AND ic.acc_project_id = acc.bim360_project_id
 WHERE ic.source_system = 'ACC'
     AND ic.source_issue_id NOT LIKE '%-%';
 

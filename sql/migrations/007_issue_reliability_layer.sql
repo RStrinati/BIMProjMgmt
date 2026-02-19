@@ -43,6 +43,7 @@ BEGIN
         source_issue_id NVARCHAR(255) NOT NULL,
         source_project_id NVARCHAR(255) NOT NULL,
         project_id NVARCHAR(100) NULL,
+        acc_project_id UNIQUEIDENTIFIER NULL,
         status_raw NVARCHAR(100) NULL,
         status_normalized NVARCHAR(50) NULL,
         priority_raw NVARCHAR(100) NULL,

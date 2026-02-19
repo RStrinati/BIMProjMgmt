@@ -329,12 +329,23 @@ class TestCalculateInvoiceMonthFinal:
         )
         assert result == '2026-01'
 
+    def test_planned_date_fallback_when_no_due_date(self):
+        """planned_date used when override, auto_derived, and due_date are None"""
+        result = FeeResolverService.calculate_invoice_month_final(
+            override=None,
+            auto_derived=None,
+            due_date=None,
+            planned_date='2026-02-20'
+        )
+        assert result == '2026-02'
+
     def test_tbd_when_all_none(self):
         """Returns 'TBD' when all sources are None"""
         result = FeeResolverService.calculate_invoice_month_final(
             override=None,
             auto_derived=None,
-            due_date=None
+            due_date=None,
+            planned_date=None
         )
         assert result == 'TBD'
 

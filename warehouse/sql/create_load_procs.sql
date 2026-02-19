@@ -12,6 +12,11 @@ BEGIN
 END
 GO
 
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
 /************************************************************
     DATE DIMENSION
 ************************************************************/
@@ -474,9 +479,9 @@ BEGIN
     ;WITH latest AS (
         SELECT
             i.source_system,
-            i.issue_id,
+            COALESCE(NULLIF(i.source_issue_id, ''), i.issue_id) AS issue_id,
             ROW_NUMBER() OVER (
-                PARTITION BY i.source_system, i.issue_id
+                PARTITION BY i.source_system, COALESCE(NULLIF(i.source_issue_id, ''), i.issue_id)
                 ORDER BY i.source_load_ts DESC
             ) AS rn,
             i.project_name,
@@ -500,6 +505,15 @@ BEGIN
             i.building_level,
             i.clash_level,
             i.custom_attributes_json,
+            i.created_by,
+            i.updated_by,
+            i.closed_by,
+            i.linked_document_urn,
+            i.snapshot_urn,
+            i.web_link,
+            i.preview_middle_url,
+            COALESCE(NULLIF(i.linked_document_urn, ''), NULLIF(i.web_link, '')) AS issue_link,
+            COALESCE(NULLIF(i.preview_middle_url, ''), NULLIF(i.snapshot_urn, '')) AS snapshot_preview_url,
             i.is_deleted,
             i.project_mapped,
             COALESCE(p_id.project_sk, palias.project_sk, p_name.project_sk) AS project_sk,
@@ -530,6 +544,15 @@ BEGIN
                     ISNULL(i.building_level, ''),
                     ISNULL(i.clash_level, ''),
                     ISNULL(i.custom_attributes_json, ''),
+                    ISNULL(i.created_by, ''),
+                    ISNULL(i.updated_by, ''),
+                    ISNULL(i.closed_by, ''),
+                    ISNULL(i.linked_document_urn, ''),
+                    ISNULL(i.snapshot_urn, ''),
+                    ISNULL(i.web_link, ''),
+                    ISNULL(i.preview_middle_url, ''),
+                    ISNULL(COALESCE(NULLIF(i.linked_document_urn, ''), NULLIF(i.web_link, '')), ''),
+                    ISNULL(COALESCE(NULLIF(i.preview_middle_url, ''), NULLIF(i.snapshot_urn, '')), ''),
                     ISNULL(CONVERT(NVARCHAR(5), i.is_deleted), ''),
                     ISNULL(CONVERT(NVARCHAR(5), i.project_mapped), '')
                 )
@@ -549,7 +572,7 @@ BEGIN
             FROM dbo.issue_discipline_map m
             WHERE m.source_system = i.source_system
               AND m.raw_discipline = i.discipline
-              AND m.active_flag = 1
+              AND m.is_active = 1
               AND (m.project_id = i.project_id_raw OR m.project_id IS NULL)
             ORDER BY CASE WHEN m.project_id = i.project_id_raw THEN 0 ELSE 1 END,
                      CASE WHEN m.is_default = 1 THEN 0 ELSE 1 END
@@ -577,6 +600,8 @@ BEGIN
         discipline_category_sk, primary_category_sk, secondary_category_sk,
         location_raw, location_root, location_building, location_level,
         phase, building_level, clash_level, custom_attributes_json,
+        created_by, updated_by, closed_by, linked_document_urn, snapshot_urn, web_link, preview_middle_url,
+        issue_link, snapshot_preview_url,
         source_issue_id, source_project_id, status_normalized,
         is_deleted, project_mapped,
         current_flag, effective_start, effective_end, record_hash, record_source
@@ -604,6 +629,15 @@ BEGIN
         src.building_level,
         src.clash_level,
         src.custom_attributes_json,
+        src.created_by,
+        src.updated_by,
+        src.closed_by,
+        src.linked_document_urn,
+        src.snapshot_urn,
+        src.web_link,
+        src.preview_middle_url,
+        src.issue_link,
+        src.snapshot_preview_url,
         src.source_issue_id,
         src.source_project_id,
         src.status_normalized,
@@ -627,7 +661,8 @@ BEGIN
            ON author.user_bk = src.author
           AND author.source_system = src.source_system
           AND author.current_flag = 1
-    WHERE tgt.issue_sk IS NULL OR tgt.record_hash <> src.row_hash;
+    WHERE (tgt.issue_sk IS NULL OR tgt.record_hash <> src.row_hash)
+      AND ISNULL(src.project_mapped, 0) = 1;
     DROP TABLE IF EXISTS #dedup;
 END
 GO

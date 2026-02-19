@@ -56,7 +56,11 @@ class OptimizedProjectAliasManager(ProjectAliasManager):
         
         try:
             cursor = conn.cursor()
-            
+
+            # Get main project names once
+            cursor.execute(f"SELECT {S.Projects.NAME} FROM {S.Projects.TABLE}")
+            main_project_names = [row[0] for row in cursor.fetchall()]
+
             # Single query to get unmapped projects with stats
             cursor.execute("""
                 WITH AllMappedNames AS (
@@ -85,10 +89,6 @@ class OptimizedProjectAliasManager(ProjectAliasManager):
                 ORDER BY COUNT(*) DESC
             """)
             
-            # Get main project names once
-            cursor.execute(f"SELECT {S.Projects.NAME} FROM {S.Projects.TABLE}")
-            main_project_names = [row[0] for row in cursor.fetchall()]
-            
             unmapped = []
             for row in cursor.fetchall():
                 unmapped.append({
@@ -106,6 +106,38 @@ class OptimizedProjectAliasManager(ProjectAliasManager):
         
         except Exception as e:
             print(f"❌ Error discovering unmapped projects (optimized): {e}")
+            return []
+
+    def discover_unmapped_names(self, limit: int = 200):
+        """Lightweight unmapped discovery without issue stats."""
+        conn = self._get_connection()
+        if not conn:
+            return []
+
+        try:
+            safe_limit = max(1, min(int(limit), 1000))
+        except Exception:
+            safe_limit = 200
+
+        try:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                WITH AllMappedNames AS (
+                    SELECT alias_name as name FROM project_aliases
+                    UNION
+                    SELECT project_name as name FROM projects
+                )
+                SELECT DISTINCT TOP {safe_limit} vi.project_name
+                FROM vw_ProjectManagement_AllIssues vi
+                WHERE vi.project_name IS NOT NULL
+                    AND vi.project_name NOT IN (SELECT name FROM AllMappedNames)
+                ORDER BY vi.project_name
+            """)
+
+            return [{'project_name': row[0]} for row in cursor.fetchall()]
+
+        except Exception as e:
+            print(f"❌ Error discovering unmapped project names: {e}")
             return []
 
 

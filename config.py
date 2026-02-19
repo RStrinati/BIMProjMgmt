@@ -1,13 +1,33 @@
 import os
+from pathlib import Path
+
+def _load_env_from_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if not key:
+            continue
+        if key not in os.environ or os.environ.get(key, "") == "":
+            os.environ[key] = val
 try:
     from dotenv import load_dotenv
-    load_dotenv()  # Load variables from .env file if python-dotenv is available
+    # Load repo-root .env regardless of current working directory
+    repo_root_env = Path(__file__).resolve().parent / ".env"
+    # Use override=True so values in .env take precedence over empty shell vars.
+    load_dotenv(dotenv_path=repo_root_env, override=True)
 except ModuleNotFoundError:
     # The optional dependency python-dotenv is not installed in some
     # environments (e.g. during CI tests). Falling back to environment
     # variables only keeps the configuration flexible without raising an
     # import error.
-    pass
+    repo_root_env = Path(__file__).resolve().parent / ".env"
+    _load_env_from_file(repo_root_env)
 
 class Config:
     # SQL Server DB config

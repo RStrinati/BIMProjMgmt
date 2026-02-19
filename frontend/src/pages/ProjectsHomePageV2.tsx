@@ -7,6 +7,7 @@ import {
   Button,
   CircularProgress,
   MenuItem,
+  Popover,
   Paper,
   Stack,
   TextField,
@@ -23,8 +24,23 @@ import {
   TableSortLabel,
   Card,
   CardContent,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Checkbox,
+  Divider,
 } from '@mui/material';
-import { Add as AddIcon, ViewColumn } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  ViewColumn,
+  FilterAlt,
+  ChevronRight,
+  PersonOutline,
+  FlagOutlined,
+  BusinessOutlined,
+  DonutSmall,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { projectsApi, usersApi } from '@/api';
 import type { ProjectSummary, ProjectAggregates, User } from '@/types/api';
@@ -53,8 +69,13 @@ type ViewState = {
 type SortField = string;
 type SortOrder = 'asc' | 'desc';
 
+type FilterCategory = 'lead' | 'status' | 'client' | 'priority';
+
+type FilterSelections = Record<FilterCategory, string[]>;
+
 const VIEW_STORAGE_KEY = 'projects_panel_view_state';
 const DISPLAY_STORAGE_KEY = 'projects_home_display_mode';
+const FILTER_STORAGE_KEY = 'projects_home_filter_selections';
 
 const VIEW_IDS: ViewId[] = ['all', 'active', 'on_hold', 'completed', 'my_work', 'recently_updated'];
 
@@ -85,6 +106,27 @@ const safeParseStoredViewState = () => {
     };
   } catch {
     return DEFAULT_VIEW_STATE;
+  }
+};
+
+const safeParseStoredFilters = (): FilterSelections => {
+  if (typeof window === 'undefined') {
+    return { lead: [], status: [], client: [], priority: [] };
+  }
+  const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+  if (!raw) {
+    return { lead: [], status: [], client: [], priority: [] };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<FilterSelections> | null;
+    return {
+      lead: Array.isArray(parsed?.lead) ? parsed!.lead : [],
+      status: Array.isArray(parsed?.status) ? parsed!.status : [],
+      client: Array.isArray(parsed?.client) ? parsed!.client : [],
+      priority: Array.isArray(parsed?.priority) ? parsed!.priority : [],
+    };
+  } catch {
+    return { lead: [], status: [], client: [], priority: [] };
   }
 };
 
@@ -248,6 +290,10 @@ export default function ProjectsHomePageV2() {
   const [sortField, setSortField] = useState<SortField>('project_name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [columnsAnchorEl, setColumnsAnchorEl] = useState<HTMLElement | null>(null);
+  const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLElement | null>(null);
+  const [activeFilterCategory, setActiveFilterCategory] = useState<FilterCategory>('lead');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterSelections, setFilterSelections] = useState<FilterSelections>(safeParseStoredFilters);
 
   const currentUserId = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -405,7 +451,48 @@ export default function ProjectsHomePageV2() {
             return Number(project.internal_lead) === currentUserId;
           })
         : sorted;
-    return [...viewFiltered].sort((a, b) => {
+
+    const hasLeadFilters = filterSelections.lead.length > 0;
+    const hasStatusFilters = filterSelections.status.length > 0;
+    const hasClientFilters = filterSelections.client.length > 0;
+    const hasPriorityFilters = filterSelections.priority.length > 0;
+
+    const filtered = viewFiltered.filter((project) => {
+      if (hasLeadFilters) {
+        const leadKey =
+          project.internal_lead == null ? 'unassigned' : `id:${project.internal_lead}`;
+        if (!filterSelections.lead.includes(leadKey)) {
+          return false;
+        }
+      }
+      if (hasStatusFilters) {
+        const statusKey = project.status ? normalizeStatusValue(project.status) : 'unassigned';
+        if (!filterSelections.status.includes(statusKey)) {
+          return false;
+        }
+      }
+      if (hasClientFilters) {
+        const clientKey =
+          project.client_id != null
+            ? `id:${project.client_id}`
+            : project.client_name
+              ? `name:${project.client_name}`
+              : 'unassigned';
+        if (!filterSelections.client.includes(clientKey)) {
+          return false;
+        }
+      }
+      if (hasPriorityFilters) {
+        const priorityValue = resolvePriorityValue(project.priority);
+        const priorityKey = priorityValue === '' ? 'unassigned' : String(priorityValue);
+        if (!filterSelections.priority.includes(priorityKey)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
       const aVal = resolveSortValue(a, sortField);
       const bVal = resolveSortValue(b, sortField);
 
@@ -416,7 +503,16 @@ export default function ProjectsHomePageV2() {
       }
       return sortOrder === 'asc' ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
-  }, [projectsWithFinance, activeView, resolveSortValue, sortField, sortOrder, viewId, currentUserId]);
+  }, [
+    projectsWithFinance,
+    activeView,
+    resolveSortValue,
+    sortField,
+    sortOrder,
+    viewId,
+    currentUserId,
+    filterSelections,
+  ]);
 
   const derivedAggregates = useMemo(() => {
     if (!filteredProjects.length) {
@@ -429,11 +525,21 @@ export default function ProjectsHomePageV2() {
         const unbilled = Number(project.unbilled_amount ?? 0) || 0;
         const earned = Number(project.earned_value ?? 0) || 0;
         const pipeline = Number(project.invoice_pipeline_this_month ?? 0) || 0;
+        const deliverablesTotal = Number(project.deliverables_due_total ?? 0) || 0;
+        const deliverablesNextWeek = Number(project.deliverables_due_next_week ?? 0) || 0;
+        const deliverablesNextFortnight = Number(project.deliverables_due_next_fortnight ?? 0) || 0;
+        const deliverablesNextMonth = Number(project.deliverables_due_next_month ?? 0) || 0;
+        const deliverablesNextQuarter = Number(project.deliverables_due_next_quarter ?? 0) || 0;
         acc.sum_agreed_fee += agreed;
         acc.sum_billed_to_date += billed;
         acc.sum_unbilled_amount += unbilled;
         acc.sum_earned_value += earned;
         acc.sum_invoice_pipeline_this_month += pipeline;
+        acc.sum_deliverables_due_total += deliverablesTotal;
+        acc.sum_deliverables_due_next_week += deliverablesNextWeek;
+        acc.sum_deliverables_due_next_fortnight += deliverablesNextFortnight;
+        acc.sum_deliverables_due_next_month += deliverablesNextMonth;
+        acc.sum_deliverables_due_next_quarter += deliverablesNextQuarter;
         return acc;
       },
       {
@@ -442,6 +548,11 @@ export default function ProjectsHomePageV2() {
         sum_unbilled_amount: 0,
         sum_earned_value: 0,
         sum_invoice_pipeline_this_month: 0,
+        sum_deliverables_due_total: 0,
+        sum_deliverables_due_next_week: 0,
+        sum_deliverables_due_next_fortnight: 0,
+        sum_deliverables_due_next_month: 0,
+        sum_deliverables_due_next_quarter: 0,
       },
     );
     const weightedPct =
@@ -500,6 +611,16 @@ export default function ProjectsHomePageV2() {
           return formatAggregateValue(fieldId, source.weighted_earned_value_pct);
         case 'invoice_pipeline_this_month':
           return formatAggregateValue(fieldId, source.sum_invoice_pipeline_this_month);
+        case 'deliverables_due_total':
+          return formatAggregateValue(fieldId, source.sum_deliverables_due_total);
+        case 'deliverables_due_next_week':
+          return formatAggregateValue(fieldId, source.sum_deliverables_due_next_week);
+        case 'deliverables_due_next_fortnight':
+          return formatAggregateValue(fieldId, source.sum_deliverables_due_next_fortnight);
+        case 'deliverables_due_next_month':
+          return formatAggregateValue(fieldId, source.sum_deliverables_due_next_month);
+        case 'deliverables_due_next_quarter':
+          return formatAggregateValue(fieldId, source.sum_deliverables_due_next_quarter);
         default:
           return '--';
       }
@@ -529,6 +650,13 @@ export default function ProjectsHomePageV2() {
     window.localStorage.setItem(DISPLAY_STORAGE_KEY, displayMode);
   }, [displayMode]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filterSelections));
+  }, [filterSelections]);
+
   const showMyWorkHint = activeView.id === 'my_work' && currentUserId == null;
 
   const activeLayout = displayMode === 'list' ? listLayout : displayMode === 'board' ? boardLayout : timelineLayout;
@@ -539,6 +667,40 @@ export default function ProjectsHomePageV2() {
 
   const handleColumnsClose = () => {
     setColumnsAnchorEl(null);
+  };
+
+  const handleFiltersOpen = (event: MouseEvent<HTMLElement>) => {
+    setFilterAnchorEl(event.currentTarget);
+  };
+
+  const handleFiltersClose = () => {
+    setFilterAnchorEl(null);
+    setFilterSearch('');
+  };
+
+  const toggleFilterValue = (category: FilterCategory, value: string) => {
+    setFilterSelections((prev) => {
+      const next = new Set(prev[category]);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return { ...prev, [category]: Array.from(next) };
+    });
+  };
+
+  const clearFilterCategory = (category: FilterCategory) => {
+    setFilterSelections((prev) => ({ ...prev, [category]: [] }));
+  };
+
+  const clearAllFilters = () => {
+    setFilterSelections({
+      lead: [],
+      status: [],
+      client: [],
+      priority: [],
+    });
   };
 
   const handleSortClick = (field: SortField) => {
@@ -738,6 +900,107 @@ export default function ProjectsHomePageV2() {
     [applyProjectPatch, buildDetailsPatch, users],
   );
 
+  const leadOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    users.forEach((user) => {
+      const label = user.name || user.full_name || user.username || `User ${user.user_id}`;
+      options.set(`id:${user.user_id}`, label);
+    });
+    projectsWithFinance.forEach((project) => {
+      if (project.internal_lead == null) {
+        return;
+      }
+      const key = `id:${project.internal_lead}`;
+      if (!options.has(key)) {
+        options.set(key, project.internal_lead_name || `User ${project.internal_lead}`);
+      }
+    });
+    const entries = Array.from(options.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+    const hasUnassigned = projectsWithFinance.some((project) => project.internal_lead == null);
+    const mapped = entries.map(([value, label]) => ({ value, label }));
+    return hasUnassigned ? [{ value: 'unassigned', label: 'Unassigned' }, ...mapped] : mapped;
+  }, [projectsWithFinance, users]);
+
+  const statusOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    STATUS_OPTIONS.forEach((option) => options.set(option.value, option.label));
+    projectsWithFinance.forEach((project) => {
+      const normalized = normalizeStatusValue(project.status ?? '');
+      if (normalized) {
+        options.set(normalized, normalized);
+      }
+    });
+    const entries = Array.from(options.entries()).map(([value, label]) => ({ value, label }));
+    entries.sort((a, b) => a.label.localeCompare(b.label));
+    const hasUnassigned = projectsWithFinance.some((project) => !project.status);
+    return hasUnassigned ? [{ value: 'unassigned', label: 'Unassigned' }, ...entries] : entries;
+  }, [projectsWithFinance]);
+
+  const clientOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    projectsWithFinance.forEach((project) => {
+      if (project.client_id != null) {
+        const label = project.client_name || `Client ${project.client_id}`;
+        options.set(`id:${project.client_id}`, label);
+        return;
+      }
+      if (project.client_name) {
+        options.set(`name:${project.client_name}`, project.client_name);
+      }
+    });
+    const entries = Array.from(options.entries()).map(([value, label]) => ({ value, label }));
+    entries.sort((a, b) => a.label.localeCompare(b.label));
+    const hasUnassigned = projectsWithFinance.some((project) => !project.client_id && !project.client_name);
+    return hasUnassigned ? [{ value: 'unassigned', label: 'Unassigned' }, ...entries] : entries;
+  }, [projectsWithFinance]);
+
+  const priorityOptions = useMemo(() => {
+    const entries = PRIORITY_OPTIONS.map((option) => ({
+      value: String(option.value),
+      label: option.label,
+    }));
+    const hasUnassigned = projectsWithFinance.some(
+      (project) => resolvePriorityValue(project.priority) === '',
+    );
+    return hasUnassigned ? [{ value: 'unassigned', label: 'Unassigned' }, ...entries] : entries;
+  }, [projectsWithFinance]);
+
+  const filterCategories = useMemo(
+    () => [
+      { id: 'lead' as const, label: 'Lead', icon: <PersonOutline fontSize="small" /> },
+      { id: 'status' as const, label: 'Status', icon: <DonutSmall fontSize="small" /> },
+      { id: 'client' as const, label: 'Client', icon: <BusinessOutlined fontSize="small" /> },
+      { id: 'priority' as const, label: 'Priority', icon: <FlagOutlined fontSize="small" /> },
+    ],
+    [],
+  );
+
+  const activeFilterCount = useMemo(
+    () =>
+      filterSelections.lead.length +
+      filterSelections.status.length +
+      filterSelections.client.length +
+      filterSelections.priority.length,
+    [filterSelections],
+  );
+
+  const activeOptions =
+    activeFilterCategory === 'lead'
+      ? leadOptions
+      : activeFilterCategory === 'status'
+        ? statusOptions
+        : activeFilterCategory === 'client'
+          ? clientOptions
+          : priorityOptions;
+
+  const filteredOptions = useMemo(() => {
+    const trimmed = filterSearch.trim().toLowerCase();
+    if (!trimmed) {
+      return activeOptions;
+    }
+    return activeOptions.filter((option) => option.label.toLowerCase().includes(trimmed));
+  }, [activeOptions, filterSearch]);
+
   return (
     <Box data-testid="projects-home-v2-root" sx={{ display: 'grid', gap: 2 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
@@ -771,6 +1034,38 @@ export default function ProjectsHomePageV2() {
               </MenuItem>
             ))}
           </TextField>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FilterAlt />}
+            onClick={handleFiltersOpen}
+            data-testid="projects-home-filter-button"
+            sx={{
+              textTransform: 'none',
+              borderColor: activeFilterCount ? 'primary.main' : 'divider',
+              boxShadow: activeFilterCount ? '0 0 0 1px rgba(25,118,210,0.35)' : 'none',
+              gap: 1,
+            }}
+          >
+            Filters
+            {activeFilterCount > 0 && (
+              <Box
+                component="span"
+                sx={{
+                  ml: 0.5,
+                  px: 1,
+                  py: 0.15,
+                  borderRadius: 999,
+                  backgroundColor: 'primary.main',
+                  color: 'primary.contrastText',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {activeFilterCount}
+              </Box>
+            )}
+          </Button>
           <TextField
             size="small"
             placeholder="Search projects"
@@ -818,6 +1113,153 @@ export default function ProjectsHomePageV2() {
         togglePinnedField={activeLayout.togglePinnedField}
         resetToDefaults={activeLayout.resetToDefaults}
       />
+
+      <Popover
+        open={Boolean(filterAnchorEl)}
+        anchorEl={filterAnchorEl}
+        onClose={handleFiltersClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            mt: 1,
+            width: { xs: '90vw', sm: 520 },
+            maxWidth: 640,
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+          },
+        }}
+      >
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '200px 1fr' } }}>
+          <Box
+            sx={{
+              borderRight: { sm: '1px solid' },
+              borderColor: 'divider',
+              background:
+                'linear-gradient(180deg, rgba(17,24,39,0.04) 0%, rgba(17,24,39,0.0) 100%)',
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                Filters
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Narrow the projects list
+              </Typography>
+            </Box>
+            <Divider />
+            <List dense disablePadding>
+              {filterCategories.map((category) => {
+                const count = filterSelections[category.id].length;
+                const active = activeFilterCategory === category.id;
+                return (
+                  <ListItemButton
+                    key={category.id}
+                    onClick={() => setActiveFilterCategory(category.id)}
+                    selected={active}
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(25,118,210,0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 32 }}>{category.icon}</ListItemIcon>
+                    <ListItemText primary={category.label} />
+                    {count > 0 && (
+                      <Box
+                        component="span"
+                        sx={{
+                          px: 0.75,
+                          py: 0.15,
+                          borderRadius: 999,
+                          backgroundColor: 'rgba(25,118,210,0.12)',
+                          color: 'primary.main',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          mr: 1,
+                        }}
+                      >
+                        {count}
+                      </Box>
+                    )}
+                    <ChevronRight fontSize="small" />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Box>
+          <Box sx={{ px: 2, py: 2, display: 'grid', gap: 1.5 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  {filterCategories.find((cat) => cat.id === activeFilterCategory)?.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Select one or more values
+                </Typography>
+              </Box>
+              {filterSelections[activeFilterCategory].length > 0 && (
+                <Button
+                  size="small"
+                  onClick={() => clearFilterCategory(activeFilterCategory)}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Clear
+                </Button>
+              )}
+            </Stack>
+            <TextField
+              size="small"
+              placeholder="Add filter..."
+              value={filterSearch}
+              onChange={(event) => setFilterSearch(event.target.value)}
+            />
+            <Box sx={{ maxHeight: 280, overflowY: 'auto' }}>
+              {filteredOptions.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                  No matching options.
+                </Typography>
+              ) : (
+                <List dense>
+                  {filteredOptions.map((option) => (
+                    <ListItemButton
+                      key={option.value}
+                      onClick={() => toggleFilterValue(activeFilterCategory, option.value)}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Checkbox
+                          edge="start"
+                          checked={filterSelections[activeFilterCategory].includes(option.value)}
+                          tabIndex={-1}
+                          disableRipple
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary={option.label} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              )}
+            </Box>
+            <Divider />
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {activeFilterCount
+                  ? `${activeFilterCount} active filter${activeFilterCount === 1 ? '' : 's'}`
+                  : 'No active filters'}
+              </Typography>
+              {activeFilterCount > 0 && (
+                <Button size="small" onClick={clearAllFilters} sx={{ textTransform: 'none' }}>
+                  Clear all
+                </Button>
+              )}
+            </Stack>
+          </Box>
+        </Box>
+      </Popover>
 
       {showMyWorkHint && (
         <Alert severity="info">Set `current_user_id` in localStorage to enable My Work filtering.</Alert>

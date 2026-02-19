@@ -20,6 +20,7 @@ import { InlineField } from '@/components/ui/InlineField';
 
 interface IssueDetail {
   issue_key: string;
+  source_system?: string | null;
   display_id: string;
   title: string;
   status_normalized: string;
@@ -29,6 +30,8 @@ interface IssueDetail {
   discipline_normalized: string | null;
   created_at: string;
   updated_at: string;
+  issue_link?: string | null;
+  snapshot_preview_url?: string | null;
   due_date: string | null;
   service_id: number | null;
   service_name: string | null;
@@ -82,6 +85,13 @@ const formatDate = (dateStr?: string | null): string => {
     return dateStr;
   }
 };
+
+const isHttpUrl = (value?: string | null): boolean => {
+  if (!value) return false;
+  return value.startsWith('http://') || value.startsWith('https://');
+};
+
+
 
 export function IssueDetailPanel({ projectId, issueKey }: IssueDetailPanelProps) {
   const {
@@ -207,6 +217,51 @@ export function IssueDetailPanel({ projectId, issueKey }: IssueDetailPanelProps)
           <InlineField label="Updated" value={formatDate(issueDetail.updated_at)} />
         </Stack>
       </Paper>
+
+
+      {(issueDetail.issue_link || issueDetail.snapshot_preview_url) && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+            Links & Preview
+          </Typography>
+          <Stack spacing={1.5}>
+            <InlineField
+              label="Issue Link"
+              value={
+                issueDetail.issue_link
+                  ? isHttpUrl(issueDetail.issue_link)
+                    ? 'Open'
+                    : issueDetail.issue_link
+                  : '-'
+              }
+            />
+            {issueDetail.issue_link && isHttpUrl(issueDetail.issue_link) && (
+              <Box>
+                <a href={issueDetail.issue_link} target="_blank" rel="noreferrer">
+                  Open issue in new tab
+                </a>
+              </Box>
+            )}
+            {issueDetail.source_system === 'Revizto' &&
+              issueDetail.snapshot_preview_url &&
+              isHttpUrl(issueDetail.snapshot_preview_url) && (
+              <Box
+                component="img"
+                src={issueDetail.snapshot_preview_url}
+                alt="Issue preview"
+                sx={{
+                  width: '100%',
+                  maxHeight: 240,
+                  objectFit: 'cover',
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              />
+            )}
+          </Stack>
+        </Paper>
+      )}
 
       {/* Comments Section */}
       {issueDetail.comments && issueDetail.comments.length > 0 && (

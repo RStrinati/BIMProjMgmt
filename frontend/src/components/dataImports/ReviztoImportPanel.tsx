@@ -41,7 +41,7 @@ import {
   List as ListIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { reviztoApi } from '@/api/dataImports';
+import { reviztoApi, warehouseApi } from '@/api/dataImports';
 import { fileBrowserApi, applicationApi } from '@/api/fileBrowser';
 import { formatDateTime } from '@/utils/dateUtils';
 
@@ -127,6 +127,17 @@ export const ReviztoImportPanel: React.FC<ReviztoImportPanelProps> = ({
     },
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to start extraction';
+      setToast({ open: true, message, severity: 'error' });
+    },
+  });
+
+  const warehouseMutation = useMutation({
+    mutationFn: () => warehouseApi.runNow('revizto-extraction-panel'),
+    onSuccess: () => {
+      setToast({ open: true, message: 'Warehouse pipeline started', severity: 'success' });
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to start warehouse pipeline';
       setToast({ open: true, message, severity: 'error' });
     },
   });
@@ -428,6 +439,14 @@ export const ReviztoImportPanel: React.FC<ReviztoImportPanelProps> = ({
             disabled={runsLoading}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => warehouseMutation.mutate()}
+            disabled={warehouseMutation.isPending}
+          >
+            {warehouseMutation.isPending ? 'Starting Warehouse...' : 'Run Warehouse Now'}
           </Button>
         </Stack>
       </Paper>

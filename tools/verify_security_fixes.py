@@ -264,7 +264,7 @@ class SecurityValidator:
         
         audit_path = project_root / "docs" / "security" / "SECURITY_AUDIT.md"
         env_path = project_root / "docs" / "security" / "ENVIRONMENT_SETUP.md"
-        summary_path = project_root / "SECURITY_FIXES_SUMMARY.md"
+        summary_path = project_root / "docs" / "security" / "SECURITY_FIXES_SUMMARY.md"
         
         self.check(
             "Security audit documentation exists",
@@ -315,7 +315,7 @@ class SecurityValidator:
             print("\nPlease review the security audit documentation:")
             print("  - docs/security/SECURITY_AUDIT.md")
             print("  - docs/security/ENVIRONMENT_SETUP.md")
-            print("  - SECURITY_FIXES_SUMMARY.md")
+            print("  - docs/security/SECURITY_FIXES_SUMMARY.md")
             return 1
 
 

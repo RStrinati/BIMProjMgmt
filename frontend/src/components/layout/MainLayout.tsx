@@ -29,6 +29,7 @@ import {
   Search as SearchIcon,
   Gavel as GavelIcon,
   BugReport as BugReportIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { featureFlags } from '../../config/featureFlags';
@@ -60,6 +61,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         { text: 'Projects & Services', icon: <FolderIcon />, path: '/projects' },
         { text: bidsReady ? 'Bids' : 'Bids (DB pending)', icon: <GavelIcon />, path: '/bids', disabled: !bidsReady },
         { text: 'Data Imports', icon: <CloudUploadIcon />, path: '/data-imports' },
+        { text: 'Users', icon: <PeopleIcon />, path: '/users' },
       ];
 
       // Add Issues nav item if feature flag is enabled
@@ -85,13 +87,14 @@ export function MainLayout({ children }: MainLayoutProps) {
     const segments = location.pathname.split('/').filter(Boolean);
     if (!segments.length) return [];
 
-    const labelMap: Record<string, string> = {
-      projects: 'Projects',
-      bids: 'Bids',
-      'data-imports': 'Data Imports',
-      tasks: 'Tasks',
-      reviews: 'Reviews',
-    };
+      const labelMap: Record<string, string> = {
+        projects: 'Projects',
+        bids: 'Bids',
+        'data-imports': 'Data Imports',
+        tasks: 'Tasks',
+        reviews: 'Reviews',
+        users: 'Users',
+      };
 
     const items: { label: string; path: string }[] = [];
     let cumulative = '';

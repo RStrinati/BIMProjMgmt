@@ -1,13 +1,32 @@
-# Documentation Guide
+# Documentation Index (Current)
 
-This folder holds project documentation for the BIM Project Management system.
+This is the canonical navigation file for active project documentation.
 
-- **cleanup/** – Active cleanup guides (summary, quickstart, full report, organization rules).
-- **archive/** – Legacy materials, including the retired desktop UI docs in `archive/desktop-ui/`.
-- **data imports** – ACC/Revit data import references (e.g., `DATA_IMPORTS_*`, `ACC_IMPORT_405_FIX.md`).
-- **analytics** – Issue analytics dashboards and visual guides (`ANALYTICS_DASHBOARD_*`, `ISSUE_ANALYTICS_*`).
-- **backend** – API, database, and migration docs (`BACKEND_API_*`, `DATABASE_CONNECTION_GUIDE.md`, `DB_MIGRATION_*`, `schema.json`).
-- **frontend** – React integration guides (`REACT_*`, `NAMING_CONVENTION_REACT_INTEGRATION.md`).
-- **operations** – Playbooks, roadmaps, and quick references (`ROADMAP.md`, `QUICK_START_API_TESTING.md`, `DOCUMENTATION_INDEX.md`).
+## Start Here
+- `docs/PRODUCT_BRIEF.md` — Partner-facing product scope and milestone framing
+- `README.md` — Project architecture and platform overview
+- `docs/core/QUICKSTART.md` — Local setup and run instructions
 
-Add new docs under the relevant section, and archive legacy topics instead of keeping them at the top level.
+## Core (Required)
+- `docs/core/DEVELOPER_ONBOARDING.md`
+- `docs/core/DATABASE_CONNECTION_GUIDE.md`
+- `docs/core/DB_CONNECTION_QUICK_REF.md`
+- `docs/core/CORE_MODEL.md`
+
+## Feature & Integration Docs
+- `docs/features/` — Feature specs, usage guides, and implementation references
+- `docs/integrations/` — ACC/APS/Revizto and data import integration docs
+
+## Platform & Data
+- `docs/migration/` — Migration history, data flow, and optimization records
+- `docs/reference/` — Deep technical references and supporting artifacts
+
+## Ops & Quality
+- `docs/testing/` — Playwright and feature test guidance
+- `docs/troubleshooting/` — Known issues and remediation playbooks
+- `docs/security/` — Security posture, setup, and fixes
+
+## Audit & Archive
+- `docs/reference/DOCUMENTATION_CLEANUP_2026-02.md` — Folder-by-folder cleanup assessment
+- `docs/archive/2026-02-doc-cleanup/README.md` — Archive manifest for this cleanup pass
+- `docs/archive/` — Historical records retained for traceability

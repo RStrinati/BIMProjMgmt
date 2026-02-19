@@ -97,6 +97,9 @@ class ProjectPayload:
     postcode: Optional[str] = None
     project_number: Optional[str] = None
     description: Optional[str] = None
+    summary: Optional[str] = None
+    emoji: Optional[str] = None
+    icon_key: Optional[str] = None
     type_id: Optional[int] = None
     internal_lead: Optional[int] = None
     naming_convention: Optional[str] = None
@@ -140,6 +143,14 @@ class ProjectPayload:
             payload[S.Projects.POSTCODE] = self.postcode
         if self.project_number not in (None, ""):
             payload[S.Projects.CONTRACT_NUMBER] = self.project_number
+        if self.description not in (None, ""):
+            payload[S.Projects.DESCRIPTION] = self.description
+        if self.summary not in (None, ""):
+            payload[S.Projects.SUMMARY] = self.summary
+        if self.emoji not in (None, ""):
+            payload[S.Projects.EMOJI] = self.emoji
+        if self.icon_key not in (None, ""):
+            payload[S.Projects.ICON_KEY] = self.icon_key
         
         # Convert project_type name to type_id
         if self.type_id is not None:
@@ -232,6 +243,9 @@ def _normalise_payload(raw_payload: Dict[str, Any]) -> ProjectPayload:
         postcode=safe_strip(raw_payload.get("postcode") or raw_payload.get("project_postcode") or "") or None,
         project_number=safe_strip(raw_payload.get("project_number") or raw_payload.get("contract_number") or "") or None,
         description=safe_strip(raw_payload.get("description") or raw_payload.get("project_description") or "") or None,
+        summary=safe_strip(raw_payload.get("summary") or raw_payload.get("project_summary") or "") or None,
+        emoji=safe_strip(raw_payload.get("emoji") or raw_payload.get("project_emoji") or "") or None,
+        icon_key=safe_strip(raw_payload.get("icon_key") or raw_payload.get("project_icon") or "") or None,
         type_id=type_id_int,
         internal_lead=raw_payload.get("internal_lead"),
         naming_convention=raw_payload.get("naming_convention"),

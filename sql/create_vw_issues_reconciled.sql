@@ -9,6 +9,11 @@
 USE ProjectManagement;
 GO
 
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
 DROP VIEW IF EXISTS dbo.vw_Issues_Reconciled;
 GO
 
@@ -37,8 +42,13 @@ SELECT
     m.acc_issue_uuid,
     m.source_id_type AS acc_id_type,
     
-    -- Smart title: prefer acc_title for mapped ACC issues
+    -- Smart title:
+    -- 1) ACC title from acc_data_schema (handles both UUID + display_id paths)
+    -- 2) Revizto title from deconstructed view
+    -- 3) Fallback to issue_key
     CASE
+        WHEN ic.source_system = 'ACC' AND acc.title IS NOT NULL THEN acc.title
+        WHEN ic.source_system = 'Revizto' AND rv.title IS NOT NULL THEN rv.title
         WHEN ic.source_system = 'ACC' AND m.acc_title IS NOT NULL THEN m.acc_title
         ELSE ic.issue_key
     END AS title,
@@ -53,6 +63,15 @@ SELECT
     ic.created_at,
     ic.updated_at,
     ic.closed_at,
+    ic.created_by,
+    ic.updated_by,
+    ic.closed_by,
+    ic.linked_document_urn,
+    ic.snapshot_urn,
+    ic.web_link,
+    ic.preview_middle_url,
+    ic.issue_link,
+    ic.snapshot_preview_url,
     ic.location_root,
     ic.location_building,
     ic.location_level,
@@ -72,6 +91,29 @@ LEFT JOIN dbo.vw_acc_issue_id_map m
     ON ic.source_system = 'ACC'
     AND ic.source_issue_id = m.source_issue_id
     AND ic.source_project_id = m.source_project_id
+LEFT JOIN acc_data_schema.dbo.issues_issues acc
+    ON ic.source_system = 'ACC'
+    AND (
+        ic.source_issue_id = CAST(acc.issue_id AS NVARCHAR(MAX))
+        OR (
+            TRY_CAST(ic.source_issue_id AS INT) = acc.display_id
+            AND ic.acc_project_id = acc.bim360_project_id
+        )
+    )
+LEFT JOIN ProjectManagement.dbo.revizto_project_map rpm
+    ON ic.source_system = 'Revizto'
+    AND rpm.pm_project_id = ic.project_id
+    AND rpm.is_active = 1
+LEFT JOIN ReviztoData.dbo.tblReviztoProjects rvp
+    ON ic.source_system = 'Revizto'
+    AND rpm.revizto_project_uuid = rvp.projectUuid
+LEFT JOIN ReviztoData.dbo.vw_ReviztoProjectIssues_Deconstructed rv
+    ON ic.source_system = 'Revizto'
+    AND rpm.revizto_project_uuid = rv.projectUuid
+    AND (
+        ic.source_issue_id = CAST(rv.issueId AS NVARCHAR(100))
+        OR ic.source_issue_id = CAST(rv.issue_number AS NVARCHAR(100))
+    )
 ;
 GO
 

@@ -11,15 +11,22 @@ WITH Cleaned AS (
     SELECT
         issueId,
         projectUuid,
-        TRY_CAST(issueJson AS NVARCHAR(MAX)) AS cleaned_json
+        TRY_CAST(issueJson AS NVARCHAR(MAX)) AS cleaned_json,
+        retrievedAt,
+        ROW_NUMBER() OVER (
+            PARTITION BY issueId, projectUuid
+            ORDER BY retrievedAt DESC
+        ) AS rn
     FROM dbo.tblReviztoProjectIssues
     WHERE ISJSON(issueJson) = 1
 ),
 PositionProps AS (
     SELECT
         c.issueId,
+        c.projectUuid,
         JSON_VALUE(c.cleaned_json, '$.positionProperties.value') AS position_properties_base64
     FROM Cleaned c
+    WHERE c.rn = 1
 )
 SELECT
     c.issueId,
@@ -54,6 +61,6 @@ SELECT
     JSON_VALUE(CAST(p.projectJson AS NVARCHAR(MAX)), '$.owner.fullname') AS owner_name
 FROM Cleaned c
 LEFT JOIN dbo.tblReviztoProjects p ON c.projectUuid = p.projectUuid
-LEFT JOIN PositionProps pp ON pp.issueId = c.issueId
-WHERE ISJSON(c.cleaned_json) = 1;
+LEFT JOIN PositionProps pp ON pp.issueId = c.issueId AND pp.projectUuid = c.projectUuid
+WHERE c.rn = 1 AND ISJSON(c.cleaned_json) = 1;
 GO

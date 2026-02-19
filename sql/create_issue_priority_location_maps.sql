@@ -29,6 +29,7 @@ BEGIN
         location_building NVARCHAR(255) NULL,
         location_level NVARCHAR(255) NULL,
         is_default BIT NOT NULL DEFAULT 0,
+        is_active BIT NOT NULL DEFAULT 1,
         updated_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
 

@@ -94,6 +94,8 @@ export default function ServiceEditView() {
   const [formData, setFormData] = useState<Partial<ProjectService>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [templateItemSelection, setTemplateItemSelection] = useState<TemplateItemOption | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
   const [resyncDialogOpen, setResyncDialogOpen] = useState(false);
   const [resyncMode, setResyncMode] = useState<'sync_missing_only' | 'sync_and_update_managed'>(
     'sync_and_update_managed'
@@ -434,6 +436,50 @@ export default function ServiceEditView() {
 
   const handleCancel = () => {
     navigate(`/projects/${projectId}/workspace/services?sel=service:${serviceId}`);
+  };
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: async (reviewId: number) => serviceReviewsApi.delete(projectId, serviceId, reviewId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceReviews', projectId, serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['serviceGeneratedStructure', projectId, serviceId] });
+    },
+    onError: (err: any) => {
+      setSaveError(err?.response?.data?.error || 'Failed to remove review');
+    },
+    onSettled: () => {
+      setDeletingReviewId(null);
+    },
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (itemId: number) => serviceItemsApi.delete(projectId, serviceId, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceItems', projectId, serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['serviceGeneratedStructure', projectId, serviceId] });
+    },
+    onError: (err: any) => {
+      setSaveError(err?.response?.data?.error || 'Failed to remove item');
+    },
+    onSettled: () => {
+      setDeletingItemId(null);
+    },
+  });
+
+  const handleDeleteReview = (review: ServiceReview) => {
+    if (!window.confirm(`Remove review cycle #${review.cycle_no}?`)) {
+      return;
+    }
+    setDeletingReviewId(review.review_id);
+    deleteReviewMutation.mutate(review.review_id);
+  };
+
+  const handleDeleteItem = (item: ServiceItem) => {
+    if (!window.confirm(`Remove item "${item.title}"?`)) {
+      return;
+    }
+    setDeletingItemId(item.item_id);
+    deleteItemMutation.mutate(item.item_id);
   };
 
   const handleOpenResyncDialog = () => {
@@ -790,10 +836,21 @@ export default function ServiceEditView() {
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
                               Cycle #{review.cycle_no}
                             </Typography>
-                            <Stack direction="row" spacing={1}>
+                            <Stack direction="row" spacing={1} alignItems="center">
                               {review.is_template_managed && <Chip size="small" label="Template" />}
                               {review.is_user_modified && <Chip size="small" color="warning" label="User-modified" />}
                               <Chip size="small" label={review.status || 'planned'} />
+                              <Button
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                onClick={() => handleDeleteReview(review)}
+                                disabled={deleteReviewMutation.isPending && deletingReviewId === review.review_id}
+                              >
+                                {deleteReviewMutation.isPending && deletingReviewId === review.review_id
+                                  ? 'Removing...'
+                                  : 'Remove'}
+                              </Button>
                             </Stack>
                           </Stack>
                           <Typography variant="caption" color="text.secondary">
@@ -829,10 +886,21 @@ export default function ServiceEditView() {
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {item.title}
                           </Typography>
-                          <Stack direction="row" spacing={1}>
+                          <Stack direction="row" spacing={1} alignItems="center">
                             {item.is_template_managed && <Chip size="small" label="Template" />}
                             {item.is_user_modified && <Chip size="small" color="warning" label="User-modified" />}
                             <Chip size="small" label={item.status || 'planned'} />
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                              onClick={() => handleDeleteItem(item)}
+                              disabled={deleteItemMutation.isPending && deletingItemId === item.item_id}
+                            >
+                              {deleteItemMutation.isPending && deletingItemId === item.item_id
+                                ? 'Removing...'
+                                : 'Remove'}
+                            </Button>
                           </Stack>
                         </Stack>
                         <Typography variant="caption" color="text.secondary">

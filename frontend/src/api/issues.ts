@@ -20,11 +20,11 @@ export const issuesApi = {
 
   // Get paginated issues table from normalized vw_Issues_Reconciled
   getIssuesTable: async (params?: {
-    project_id?: string;
-    source_system?: 'ACC' | 'Revizto';
-    status_normalized?: string;
-    priority_normalized?: string;
-    discipline_normalized?: string;
+    project_id?: string | string[];
+    source_system?: 'ACC' | 'Revizto' | Array<'ACC' | 'Revizto'>;
+    status_normalized?: string | string[];
+    priority_normalized?: string | string[];
+    discipline_normalized?: string | string[];
     assignee_user_key?: string;
     search?: string;
     page?: number;
@@ -35,9 +35,14 @@ export const issuesApi = {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, String(value));
+        if (value === undefined || value === null) return;
+        if (Array.isArray(value)) {
+          if (value.length) {
+            searchParams.append(key, value.join(','));
+          }
+          return;
         }
+        searchParams.append(key, String(value));
       });
     }
     

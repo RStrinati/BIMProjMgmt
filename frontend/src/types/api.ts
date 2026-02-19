@@ -25,6 +25,9 @@ export interface Project {
   folder_path?: string;
   ifc_folder_path?: string;
   description?: string;
+  summary?: string;
+  emoji?: string;
+  icon_key?: string;
   internal_lead?: number | null;
   naming_convention?: string | null;
   created_at?: string;
@@ -71,6 +74,11 @@ export interface ProjectSummary {
   ready_to_invoice_this_month?: number | null;
   invoice_pipeline_next_month?: number | null;
   ready_to_invoice_next_month?: number | null;
+  deliverables_due_total?: number | null;
+  deliverables_due_next_week?: number | null;
+  deliverables_due_next_fortnight?: number | null;
+  deliverables_due_next_month?: number | null;
+  deliverables_due_next_quarter?: number | null;
 }
 
 export interface ProjectAggregates {
@@ -724,6 +732,28 @@ export interface User {
   created_at?: string;
 }
 
+export interface MasterUser {
+  user_key: string;
+  source_system: string;
+  source_user_id?: string;
+  name?: string;
+  email?: string;
+  company?: string;
+  role?: string;
+  phone?: string;
+  status?: string;
+  license_type?: string;
+  last_active?: string | null;
+  last_active_source?: string | null;
+  invited_to_bim_meetings?: boolean | null;
+  is_watcher?: boolean | null;
+  is_assignee?: boolean | null;
+  project_count?: number | null;
+  access_level?: string | null;
+  acc_project_count?: number | null;
+  revizto_project_count?: number | null;
+}
+
 // API Response types
 export interface ApiResponse<T> {
   data: T;
@@ -1279,6 +1309,7 @@ export interface ProjectAliasIssueSummary {
 export interface ProjectAlias {
   alias_name: string;
   project_id: number;
+  acc_project_id?: string | null;
   project_name?: string;
   project_status?: string;
   project_manager?: string;

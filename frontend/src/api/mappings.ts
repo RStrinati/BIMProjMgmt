@@ -23,6 +23,30 @@ export type IssueAttributeMapping = {
   updated_at?: string | null;
 };
 
+export type IssueLocationMapping = {
+  map_id: number;
+  project_id?: string | null;
+  source_system: string;
+  raw_location: string;
+  location_root?: string | null;
+  location_building?: string | null;
+  location_level?: string | null;
+  is_default?: boolean;
+  is_active?: boolean;
+  updated_at?: string | null;
+};
+
+export type IssueDisciplineMapping = {
+  map_id: number;
+  project_id?: string | null;
+  source_system: string;
+  raw_discipline: string;
+  normalized_discipline: string;
+  is_default?: boolean;
+  is_active?: boolean;
+  updated_at?: string | null;
+};
+
 export const mappingsApi = {
   getReviztoProjectMappings: async (activeOnly = true): Promise<ReviztoProjectMapping[]> => {
     const response = await apiClient.get<ReviztoProjectMapping[]>('/mappings/revizto-projects', {
@@ -53,5 +77,41 @@ export const mappingsApi = {
   },
   deleteIssueAttributeMapping: async (map_id: number): Promise<void> => {
     await apiClient.delete(`/mappings/issue-attributes/${map_id}`);
+  },
+  getIssueLocationMappings: async (activeOnly = true): Promise<IssueLocationMapping[]> => {
+    const response = await apiClient.get<IssueLocationMapping[]>('/mappings/issue-locations', {
+      params: { active_only: activeOnly },
+    });
+    return response.data;
+  },
+  createIssueLocationMapping: async (
+    payload: Omit<IssueLocationMapping, 'map_id'>,
+  ): Promise<{ map_id: number }> => {
+    const response = await apiClient.post<{ map_id: number }>('/mappings/issue-locations', payload);
+    return response.data;
+  },
+  updateIssueLocationMapping: async (map_id: number, payload: Partial<IssueLocationMapping>): Promise<void> => {
+    await apiClient.patch(`/mappings/issue-locations/${map_id}`, payload);
+  },
+  deleteIssueLocationMapping: async (map_id: number): Promise<void> => {
+    await apiClient.delete(`/mappings/issue-locations/${map_id}`);
+  },
+  getIssueDisciplineMappings: async (activeOnly = true): Promise<IssueDisciplineMapping[]> => {
+    const response = await apiClient.get<IssueDisciplineMapping[]>('/mappings/issue-disciplines', {
+      params: { active_only: activeOnly },
+    });
+    return response.data;
+  },
+  createIssueDisciplineMapping: async (
+    payload: Omit<IssueDisciplineMapping, 'map_id'>,
+  ): Promise<{ map_id: number }> => {
+    const response = await apiClient.post<{ map_id: number }>('/mappings/issue-disciplines', payload);
+    return response.data;
+  },
+  updateIssueDisciplineMapping: async (map_id: number, payload: Partial<IssueDisciplineMapping>): Promise<void> => {
+    await apiClient.patch(`/mappings/issue-disciplines/${map_id}`, payload);
+  },
+  deleteIssueDisciplineMapping: async (map_id: number): Promise<void> => {
+    await apiClient.delete(`/mappings/issue-disciplines/${map_id}`);
   },
 };

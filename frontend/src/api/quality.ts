@@ -16,11 +16,11 @@ export type QualityPhase1DRow = {
   discipline: string | null;
   description: string | null;
   bimContact: string | null;
-  folderPath: string | null;
-  accPresent: boolean;
-  accDate: string | null;
-  reviztoPresent: boolean;
-  reviztoDate: string | null;
+  accFolderPath?: string | null;
+  accLiveDate: string | null;
+  accLiveStatus: 'CURRENT' | 'OUT_OF_DATE' | 'MISSING' | 'NOT_REQUIRED';
+  accSharedDate: string | null;
+  accSharedStatus: 'CURRENT' | 'OUT_OF_DATE' | 'MISSING' | 'NOT_REQUIRED';
   notes: string | null;
   notesUpdatedAt: string | null;
   mappingStatus: 'MAPPED' | 'ALIASED' | 'UNMAPPED';
@@ -28,6 +28,7 @@ export type QualityPhase1DRow = {
   validationOverall: string;
   freshnessStatus: string;
   needsSync?: boolean; // True if POST ok but PATCH failed
+  accRequiredOverride?: boolean | null;
 };
 
 export type QualityPhase1DRegisterResponse = {
@@ -74,6 +75,28 @@ export type QualityModelDetailResponse = {
     freshnessStatus: 'MISSING' | 'CURRENT' | 'DUE_SOON' | 'OUT_OF_DATE' | 'UNKNOWN';
     metrics: Record<string, any>;
   };
+  healthSummary?: {
+    levels: number | null;
+    grids: number | null;
+    worksets: number | null;
+    warnings: number | null;
+    fileSizeMb: number | null;
+    totalElements: number | null;
+    familyCount: number | null;
+    groupCount: number | null;
+    inplaceFamilies: number | null;
+    sketchupImports: number | null;
+    revitLinks: number | null;
+    dwgLinks: number | null;
+    dwgImports: number | null;
+    sheetCount: number | null;
+    designOptionSets: number | null;
+    designOptions: number | null;
+    totalViews: number | null;
+    copiedViews: number | null;
+    dependentViews: number | null;
+    viewsNotOnSheets: number | null;
+  } | null;
   
   activity: any[];
 };
@@ -95,6 +118,12 @@ export type QualityModelHistoryResponse = {
     changedBy: string | null;
     changedAt: string;
   }>;
+};
+
+export type QualitySuggestionsResponse = {
+  abv: string[];
+  disciplines: string[];
+  companies: string[];
 };
 
 export const qualityApi = {
@@ -237,9 +266,11 @@ export const qualityApi = {
    * Phase 1D: Create empty expected model row.
    */
   createEmptyModel: async (projectId: number): Promise<{ id: number }> => {
-    // Generate a timestamp-based key for Phase 1D
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const key = `NEW-MODEL-${timestamp}`;
+    const uniqueId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const key = `NEW-MODEL-${uniqueId}`;
     
     const response = await apiClient.post<{ expected_model_id: number }>(
       `/projects/${projectId}/quality/expected-models`,
@@ -272,6 +303,17 @@ export const qualityApi = {
   ): Promise<QualityModelHistoryResponse> => {
     const response = await apiClient.get<QualityModelHistoryResponse>(
       `/projects/${projectId}/quality/models/${expectedModelId}/history`
+    );
+    return response.data;
+  },
+
+  /**
+   * Global suggestions for quality register fields.
+   */
+  getSuggestions: async (limit = 200): Promise<QualitySuggestionsResponse> => {
+    const response = await apiClient.get<QualitySuggestionsResponse>(
+      '/quality/suggestions',
+      { params: { limit } }
     );
     return response.data;
   },

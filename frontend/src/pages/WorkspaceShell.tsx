@@ -13,13 +13,12 @@
  * - Tab switches clear selection
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Breadcrumbs,
-  Chip,
   Link as MuiLink,
   Stack,
   Tab,
@@ -28,8 +27,9 @@ import {
   Alert,
   Paper,
 } from '@mui/material';
-import { projectsApi, usersApi, projectServicesApi } from '@/api';
-import type { Project, User } from '@/types/api';
+import { projectsApi, projectServicesApi } from '@/api';
+import type { Project } from '@/types/api';
+import { getProjectIcon } from '@/components/projects/projectIcons';
 import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService } from '@/api/services';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
@@ -38,6 +38,8 @@ import { ServiceDetailPanel } from '@/components/workspace/ServiceDetailPanel';
 import { ServiceItemDetailPanel } from '@/components/workspace/ServiceItemDetailPanel';
 import { IssueDetailPanel } from '@/components/workspace/IssueDetailPanel';
 import { UpdateDetailPanel } from '@/components/workspace/UpdateDetailPanel';
+import { QualityModelDetailPanel } from '@/components/workspace/QualityModelDetailPanel';
+import { InvoicePipelinePanel } from '@/components/workspace/InvoicePipelinePanel';
 
 const WORKSPACE_TABS = [
   { label: 'Overview', path: 'overview' },
@@ -55,6 +57,14 @@ export default function WorkspaceShell() {
   const { id } = useParams();
   const projectId = Number(id);
   const { selection, clearSelection } = useWorkspaceSelection();
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    const stored = localStorage.getItem('workspaceRightPanelWidth');
+    const parsed = stored ? Number(stored) : 360;
+    return Number.isFinite(parsed) ? parsed : 360;
+  });
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(360);
 
   // Debug logging for selection state
   console.log('[WorkspaceShell] Rendered with selection:', selection, 'URL search:', location.search);
@@ -63,11 +73,6 @@ export default function WorkspaceShell() {
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.getById(projectId),
     enabled: Number.isFinite(projectId),
-  });
-
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: () => usersApi.getAll(),
   });
 
   // Determine current tab from path (MUST come before using it in queries)
@@ -99,14 +104,6 @@ export default function WorkspaceShell() {
     if (selection?.type !== 'service') return null;
     return services.find((s) => s.service_id === selection.id) ?? null;
   }, [services, selection]);
-
-  const leadLabel = useMemo(() => {
-    if (!project?.internal_lead) {
-      return 'Unassigned';
-    }
-    const match = users.find((user) => user.user_id === project.internal_lead);
-    return match?.name || match?.full_name || match?.username || `User ${project.internal_lead}`;
-  }, [project, users]);
 
   const activeTabIndex = useMemo(() => {
     const index = WORKSPACE_TABS.findIndex((tab) => tab.path === currentTab);
@@ -140,6 +137,30 @@ export default function WorkspaceShell() {
     }
   };
 
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = startXRef.current - event.clientX;
+      const nextWidth = Math.min(520, Math.max(280, startWidthRef.current + delta));
+      setRightPanelWidth(nextWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      localStorage.setItem('workspaceRightPanelWidth', String(rightPanelWidth));
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [rightPanelWidth]);
+
   if (isLoading) {
     return (
       <Box sx={{ p: 3 }}>
@@ -162,27 +183,62 @@ export default function WorkspaceShell() {
       <Box sx={{ px: 3, pt: 2, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
         <Stack spacing={1}>
           <Breadcrumbs aria-label="breadcrumb">
-            <MuiLink 
-              underline="hover" 
-              color="inherit" 
-              onClick={() => navigate('/projects')} 
+            <MuiLink
+              underline="hover"
+              color="inherit"
+              onClick={() => navigate('/projects')}
               sx={{ cursor: 'pointer' }}
             >
               Projects
             </MuiLink>
             <Typography color="text.primary">Workspace</Typography>
           </Breadcrumbs>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Typography variant="h5" data-testid="workspace-project-title">
-              {project?.project_name || 'Loading project...'}
-            </Typography>
-            {project?.status && <Chip label={project.status} size="small" />}
-            {project?.priority_label && (
-              <Chip label={`Priority: ${project.priority_label}`} size="small" variant="outlined" />
-            )}
-            {project?.internal_lead != null && (
-              <Chip label={`Lead: ${leadLabel}`} size="small" variant="outlined" />
-            )}
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+            justifyContent="space-between"
+          >
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              {project && (
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 1,
+                    borderColor: 'divider',
+                  }}
+                >
+                  {(() => {
+                    const Icon = getProjectIcon(project.icon_key);
+                    return <Icon size={18} />;
+                  })()}
+                </Box>
+              )}
+              <Typography variant="h5" data-testid="workspace-project-title">
+                {project?.project_name || 'Loading project...'}
+              </Typography>
+            </Stack>
+            <Tabs
+              value={activeTabIndex}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ minHeight: 32 }}
+            >
+              {WORKSPACE_TABS.map((tab) => (
+                <Tab
+                  key={tab.path}
+                  label={tab.label}
+                  data-testid={`workspace-tab-${tab.path}`}
+                  sx={{ minHeight: 32 }}
+                />
+              ))}
+            </Tabs>
           </Stack>
         </Stack>
       </Box>
@@ -196,26 +252,8 @@ export default function WorkspaceShell() {
           minWidth: 0,
         }}
       >
-        {/* Center: Tabs + Content */}
+        {/* Center: Content */}
         <Box sx={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Tabs */}
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-            <Tabs 
-              value={activeTabIndex} 
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-            >
-              {WORKSPACE_TABS.map((tab) => (
-                <Tab 
-                  key={tab.path} 
-                  label={tab.label}
-                  data-testid={`workspace-tab-${tab.path}`}
-                />
-              ))}
-            </Tabs>
-          </Box>
-
           {/* Tab Content */}
           <Box sx={{ flex: 1, minWidth: 0, overflow: 'auto', p: 2 }}>
             <Outlet context={{ projectId, project, selection }} />
@@ -228,10 +266,34 @@ export default function WorkspaceShell() {
             borderLeft: { xs: 0, lg: 1 },
             borderColor: 'divider',
             display: { xs: 'none', lg: 'block' },
-            width: 360,
+            width: rightPanelWidth,
             flexShrink: 0,
+            position: 'relative',
           }}
         >
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={(event) => {
+              isResizingRef.current = true;
+              startXRef.current = event.clientX;
+              startWidthRef.current = rightPanelWidth;
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+            sx={{
+              position: 'absolute',
+              left: -6,
+              top: 0,
+              width: 12,
+              height: '100%',
+              cursor: 'col-resize',
+              zIndex: 10,
+              '&:hover': {
+                backgroundColor: 'action.hover',
+              },
+            }}
+          />
           <RightPanel project={project || null} currentTab={currentTab} selection={selection}>
             {/* Content router based on selection type */}
             {selection?.type === 'service' && selectedService ? (
@@ -242,18 +304,23 @@ export default function WorkspaceShell() {
               <IssueDetailPanel projectId={projectId} issueKey={selection.id} />
             ) : selection?.type === 'update' && typeof selection.id === 'number' ? (
               <UpdateDetailPanel updateId={selection.id} />
+            ) : selection?.type === 'model' && typeof selection.id === 'number' ? (
+              <QualityModelDetailPanel projectId={projectId} expectedModelId={selection.id} />
             ) : !selection ? (
               // Tab summary panels when no selection
               <>
                 {currentTab === 'overview' && (
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                      Overview Summary
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Select an item to view details, or browse the overview tab content.
-                    </Typography>
-                  </Paper>
+                  <Stack spacing={2}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        Overview Summary
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Select an item to view details, or browse the overview tab content.
+                      </Typography>
+                    </Paper>
+                    <InvoicePipelinePanel projectId={projectId} />
+                  </Stack>
                 )}
                 {currentTab === 'services' && (
                   <Paper variant="outlined" sx={{ p: 2 }}>

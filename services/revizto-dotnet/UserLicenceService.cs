@@ -171,29 +171,37 @@ namespace ReviztoDataExporter
 
                 // 9. Fetch and save issues per project (paged)
                 foreach (var proj in allProjects)
+                {
+                    var projectUuidStr = proj["projectUuid"]?.ToString();
+                    if (!Guid.TryParse(projectUuidStr, out var projectUuid)) continue;
+
+                    await ExportIssuesForProject(projectUuid);
+                }
+
+                // 10. Fetch and save comments per issue
+                foreach (var proj in allProjects)
+                {
+                    var projectUuidStr = proj["projectUuid"]?.ToString();
+                    if (!Guid.TryParse(projectUuidStr, out var projectUuid)) continue;
+
+                    var projectId = _dbHelper.GetProjectIdByUuid(projectUuid);
+                    if (projectId == -1)
                     {
-                        var projectUuidStr = proj["projectUuid"]?.ToString();
-                        if (!Guid.TryParse(projectUuidStr, out var projectUuid)) continue;
-
-                        var projectId = _dbHelper.GetProjectIdByUuid(projectUuid);
-                        if (projectId == -1)
-                        {
-                            Log.Warning("❌ Project ID for UUID {ProjectUuid} not found in database. Skipping comment fetch.", projectUuid);
-                            continue;
-                        }
-
-                        var issues = _dbHelper.GetIssuesFromView(projectId); // ← You’ll need to implement this
-                        foreach (var issue in issues)
-                        {
-                            var uuidStr = issue["uuid"]?.ToString();
-                            if (Guid.TryParse(uuidStr, out var issueUuid))
-                            {
-                                await FetchAndInsertCommentsForIssue(issueUuid, projectId);
-                            }
-                        }
+                        Log.Warning("Project ID for UUID {ProjectUuid} not found in database. Skipping comment fetch.", projectUuid);
+                        continue;
                     }
 
-                
+                    var issues = _dbHelper.GetIssuesFromView(projectId);
+                    foreach (var issue in issues)
+                    {
+                        var uuidStr = issue["uuid"]?.ToString();
+                        if (Guid.TryParse(uuidStr, out var issueUuid))
+                        {
+                            await FetchAndInsertCommentsForIssue(issueUuid, projectId);
+                        }
+                    }
+                }
+
                 overallWatch.Stop();
                 Log.Information("All operations complete in {Duration}ms", overallWatch.ElapsedMilliseconds);
             }

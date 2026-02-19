@@ -3,11 +3,13 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -26,7 +28,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mappingsApi } from '@/api/mappings';
 import { projectsApi } from '@/api/projects';
 import type { Project } from '@/types/api';
-import type { IssueAttributeMapping, ReviztoProjectMapping } from '@/api/mappings';
+import type {
+  IssueAttributeMapping,
+  IssueDisciplineMapping,
+  IssueLocationMapping,
+  ReviztoProjectMapping,
+} from '@/api/mappings';
 
 const SOURCE_OPTIONS = ['ACC', 'Revizto'];
 
@@ -34,7 +41,11 @@ const IssueMappingsTab: React.FC = () => {
   const queryClient = useQueryClient();
   const [revDialogOpen, setRevDialogOpen] = useState(false);
   const [attrDialogOpen, setAttrDialogOpen] = useState(false);
+  const [locDialogOpen, setLocDialogOpen] = useState(false);
+  const [discDialogOpen, setDiscDialogOpen] = useState(false);
   const [editingAttr, setEditingAttr] = useState<IssueAttributeMapping | null>(null);
+  const [editingLoc, setEditingLoc] = useState<IssueLocationMapping | null>(null);
+  const [editingDisc, setEditingDisc] = useState<IssueDisciplineMapping | null>(null);
   const [revForm, setRevForm] = useState({
     revizto_project_uuid: '',
     pm_project_id: '',
@@ -48,6 +59,22 @@ const IssueMappingsTab: React.FC = () => {
     data_type: '',
     priority: '100',
   });
+  const [locForm, setLocForm] = useState({
+    project_id: '',
+    source_system: 'ACC',
+    raw_location: '',
+    location_root: '',
+    location_building: '',
+    location_level: '',
+    is_default: false,
+  });
+  const [discForm, setDiscForm] = useState({
+    project_id: '',
+    source_system: 'Revizto',
+    raw_discipline: '',
+    normalized_discipline: '',
+    is_default: false,
+  });
   const [error, setError] = useState('');
 
   const { data: revMappings = [] } = useQuery({
@@ -58,6 +85,16 @@ const IssueMappingsTab: React.FC = () => {
   const { data: attrMappings = [] } = useQuery({
     queryKey: ['mappings', 'issue-attributes'],
     queryFn: () => mappingsApi.getIssueAttributeMappings(true),
+  });
+
+  const { data: locMappings = [] } = useQuery({
+    queryKey: ['mappings', 'issue-locations'],
+    queryFn: () => mappingsApi.getIssueLocationMappings(true),
+  });
+
+  const { data: discMappings = [] } = useQuery({
+    queryKey: ['mappings', 'issue-disciplines'],
+    queryFn: () => mappingsApi.getIssueDisciplineMappings(true),
   });
 
   const { data: projects = [] } = useQuery<Project[]>({
@@ -77,6 +114,8 @@ const IssueMappingsTab: React.FC = () => {
   const refreshMappings = () => {
     queryClient.invalidateQueries({ queryKey: ['mappings', 'revizto-projects'] });
     queryClient.invalidateQueries({ queryKey: ['mappings', 'issue-attributes'] });
+    queryClient.invalidateQueries({ queryKey: ['mappings', 'issue-locations'] });
+    queryClient.invalidateQueries({ queryKey: ['mappings', 'issue-disciplines'] });
   };
 
   const revUpsert = useMutation({
@@ -143,6 +182,92 @@ const IssueMappingsTab: React.FC = () => {
     },
   });
 
+  const locCreate = useMutation({
+    mutationFn: mappingsApi.createIssueLocationMapping,
+    onSuccess: () => {
+      refreshMappings();
+      setLocDialogOpen(false);
+      setEditingLoc(null);
+      setLocForm({
+        project_id: '',
+        source_system: 'ACC',
+        raw_location: '',
+        location_root: '',
+        location_building: '',
+        location_level: '',
+        is_default: false,
+      });
+      setError('');
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to create location mapping');
+    },
+  });
+
+  const locUpdate = useMutation({
+    mutationFn: ({ map_id, payload }: { map_id: number; payload: Partial<IssueLocationMapping> }) =>
+      mappingsApi.updateIssueLocationMapping(map_id, payload),
+    onSuccess: () => {
+      refreshMappings();
+      setLocDialogOpen(false);
+      setEditingLoc(null);
+      setError('');
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to update location mapping');
+    },
+  });
+
+  const locDelete = useMutation({
+    mutationFn: mappingsApi.deleteIssueLocationMapping,
+    onSuccess: refreshMappings,
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to delete location mapping');
+    },
+  });
+
+  const discCreate = useMutation({
+    mutationFn: mappingsApi.createIssueDisciplineMapping,
+    onSuccess: () => {
+      refreshMappings();
+      setDiscDialogOpen(false);
+      setEditingDisc(null);
+      setDiscForm({
+        project_id: '',
+        source_system: 'Revizto',
+        raw_discipline: '',
+        normalized_discipline: '',
+        is_default: false,
+      });
+      setError('');
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to create discipline mapping');
+    },
+  });
+
+  const discUpdate = useMutation({
+    mutationFn: ({ map_id, payload }: { map_id: number; payload: Partial<IssueDisciplineMapping> }) =>
+      mappingsApi.updateIssueDisciplineMapping(map_id, payload),
+    onSuccess: () => {
+      refreshMappings();
+      setDiscDialogOpen(false);
+      setEditingDisc(null);
+      setError('');
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to update discipline mapping');
+    },
+  });
+
+  const discDelete = useMutation({
+    mutationFn: mappingsApi.deleteIssueDisciplineMapping,
+    onSuccess: refreshMappings,
+    onError: (err: any) => {
+      setError(err?.response?.data?.error ?? 'Failed to delete discipline mapping');
+    },
+  });
+
   const handleRevSubmit = () => {
     if (!revForm.revizto_project_uuid.trim()) {
       setError('Revizto project UUID is required');
@@ -199,6 +324,98 @@ const IssueMappingsTab: React.FC = () => {
       attrUpdate.mutate({ map_id: editingAttr.map_id, payload });
     } else {
       attrCreate.mutate(payload);
+    }
+  };
+
+  const openLocDialog = (mapping?: IssueLocationMapping) => {
+    if (mapping) {
+      setEditingLoc(mapping);
+      setLocForm({
+        project_id: mapping.project_id ? String(mapping.project_id) : '',
+        source_system: mapping.source_system,
+        raw_location: mapping.raw_location,
+        location_root: mapping.location_root ?? '',
+        location_building: mapping.location_building ?? '',
+        location_level: mapping.location_level ?? '',
+        is_default: Boolean(mapping.is_default),
+      });
+    } else {
+      setEditingLoc(null);
+      setLocForm({
+        project_id: '',
+        source_system: 'ACC',
+        raw_location: '',
+        location_root: '',
+        location_building: '',
+        location_level: '',
+        is_default: false,
+      });
+    }
+    setLocDialogOpen(true);
+    setError('');
+  };
+
+  const handleLocSubmit = () => {
+    if (!locForm.raw_location.trim()) {
+      setError('Raw location is required');
+      return;
+    }
+    const payload = {
+      project_id: locForm.project_id.trim() || null,
+      source_system: locForm.source_system,
+      raw_location: locForm.raw_location.trim(),
+      location_root: locForm.location_root.trim() || null,
+      location_building: locForm.location_building.trim() || null,
+      location_level: locForm.location_level.trim() || null,
+      is_default: locForm.is_default,
+    };
+    if (editingLoc) {
+      locUpdate.mutate({ map_id: editingLoc.map_id, payload });
+    } else {
+      locCreate.mutate(payload);
+    }
+  };
+
+  const openDiscDialog = (mapping?: IssueDisciplineMapping) => {
+    if (mapping) {
+      setEditingDisc(mapping);
+      setDiscForm({
+        project_id: mapping.project_id ? String(mapping.project_id) : '',
+        source_system: mapping.source_system,
+        raw_discipline: mapping.raw_discipline,
+        normalized_discipline: mapping.normalized_discipline,
+        is_default: Boolean(mapping.is_default),
+      });
+    } else {
+      setEditingDisc(null);
+      setDiscForm({
+        project_id: '',
+        source_system: 'Revizto',
+        raw_discipline: '',
+        normalized_discipline: '',
+        is_default: false,
+      });
+    }
+    setDiscDialogOpen(true);
+    setError('');
+  };
+
+  const handleDiscSubmit = () => {
+    if (!discForm.raw_discipline.trim() || !discForm.normalized_discipline.trim()) {
+      setError('Raw discipline and normalized discipline are required');
+      return;
+    }
+    const payload = {
+      project_id: discForm.project_id.trim() || null,
+      source_system: discForm.source_system,
+      raw_discipline: discForm.raw_discipline.trim(),
+      normalized_discipline: discForm.normalized_discipline.trim(),
+      is_default: discForm.is_default,
+    };
+    if (editingDisc) {
+      discUpdate.mutate({ map_id: editingDisc.map_id, payload });
+    } else {
+      discCreate.mutate(payload);
     }
   };
 
@@ -259,11 +476,120 @@ const IssueMappingsTab: React.FC = () => {
       </TableContainer>
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h6">Issue Discipline Mappings</Typography>
+        <Button variant="outlined" size="small" onClick={() => openDiscDialog()}>
+          Add mapping
+        </Button>
+      </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Map raw discipline values to a consistent discipline. For Revizto, use assignee email as the raw value.
+      </Typography>
+      <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Source</TableCell>
+              <TableCell>Project ID</TableCell>
+              <TableCell>Raw Discipline</TableCell>
+              <TableCell>Normalized Discipline</TableCell>
+              <TableCell>Default</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {discMappings.map((mapping) => (
+              <TableRow key={mapping.map_id}>
+                <TableCell>{mapping.source_system}</TableCell>
+                <TableCell>{mapping.project_id ?? 'All'}</TableCell>
+                <TableCell>{mapping.raw_discipline}</TableCell>
+                <TableCell>{mapping.normalized_discipline}</TableCell>
+                <TableCell>{mapping.is_default ? 'Yes' : 'No'}</TableCell>
+                <TableCell align="right">
+                  <Button size="small" onClick={() => openDiscDialog(mapping)}>
+                    Edit
+                  </Button>
+                  <Button size="small" color="error" onClick={() => discDelete.mutate(mapping.map_id)}>
+                    Remove
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {!discMappings.length && (
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    No discipline mappings yet.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h6">Issue Location Mappings</Typography>
+        <Button variant="outlined" size="small" onClick={() => openLocDialog()}>
+          Add mapping
+        </Button>
+      </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Normalize building and level from raw location values. Use tags, location paths, or decoded Revizto position data.
+      </Typography>
+      <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Source</TableCell>
+              <TableCell>Project ID</TableCell>
+              <TableCell>Raw Location</TableCell>
+              <TableCell>Building</TableCell>
+              <TableCell>Level</TableCell>
+              <TableCell>Default</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {locMappings.map((mapping) => (
+              <TableRow key={mapping.map_id}>
+                <TableCell>{mapping.source_system}</TableCell>
+                <TableCell>{mapping.project_id ?? 'All'}</TableCell>
+                <TableCell>{mapping.raw_location}</TableCell>
+                <TableCell>{mapping.location_building ?? '—'}</TableCell>
+                <TableCell>{mapping.location_level ?? '—'}</TableCell>
+                <TableCell>{mapping.is_default ? 'Yes' : 'No'}</TableCell>
+                <TableCell align="right">
+                  <Button size="small" onClick={() => openLocDialog(mapping)}>
+                    Edit
+                  </Button>
+                  <Button size="small" color="error" onClick={() => locDelete.mutate(mapping.map_id)}>
+                    Remove
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {!locMappings.length && (
+              <TableRow>
+                <TableCell colSpan={7}>
+                  <Typography variant="body2" color="text.secondary">
+                    No location mappings yet.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h6">Issue Attribute Mappings</Typography>
         <Button variant="outlined" size="small" onClick={() => openAttrDialog()}>
           Add mapping
         </Button>
       </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Use this for ACC custom attributes that should be normalized into shared fields.
+      </Typography>
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">
           <TableHead>
@@ -345,6 +671,150 @@ const IssueMappingsTab: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setRevDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleRevSubmit}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={discDialogOpen} onClose={() => setDiscDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingDisc ? 'Edit Discipline Mapping' : 'Add Discipline Mapping'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Project</InputLabel>
+              <Select
+                label="Project"
+                value={discForm.project_id}
+                onChange={(e) => setDiscForm((prev) => ({ ...prev, project_id: e.target.value }))}
+              >
+                <MenuItem value="">
+                  <em>All Projects</em>
+                </MenuItem>
+                {projectOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Source System</InputLabel>
+              <Select
+                label="Source System"
+                value={discForm.source_system}
+                onChange={(e) => setDiscForm((prev) => ({ ...prev, source_system: e.target.value }))}
+              >
+                {SOURCE_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Raw Discipline (assignee email or tag)"
+              value={discForm.raw_discipline}
+              onChange={(e) => setDiscForm((prev) => ({ ...prev, raw_discipline: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Normalized Discipline"
+              value={discForm.normalized_discipline}
+              onChange={(e) => setDiscForm((prev) => ({ ...prev, normalized_discipline: e.target.value }))}
+              fullWidth
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={discForm.is_default}
+                  onChange={(e) => setDiscForm((prev) => ({ ...prev, is_default: e.target.checked }))}
+                />
+              }
+              label="Use as default for this project/source"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiscDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleDiscSubmit}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={locDialogOpen} onClose={() => setLocDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingLoc ? 'Edit Location Mapping' : 'Add Location Mapping'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Project</InputLabel>
+              <Select
+                label="Project"
+                value={locForm.project_id}
+                onChange={(e) => setLocForm((prev) => ({ ...prev, project_id: e.target.value }))}
+              >
+                <MenuItem value="">
+                  <em>All Projects</em>
+                </MenuItem>
+                {projectOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Source System</InputLabel>
+              <Select
+                label="Source System"
+                value={locForm.source_system}
+                onChange={(e) => setLocForm((prev) => ({ ...prev, source_system: e.target.value }))}
+              >
+                {SOURCE_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Raw Location (tag or location path)"
+              value={locForm.raw_location}
+              onChange={(e) => setLocForm((prev) => ({ ...prev, raw_location: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Location Root (optional)"
+              value={locForm.location_root}
+              onChange={(e) => setLocForm((prev) => ({ ...prev, location_root: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Building"
+              value={locForm.location_building}
+              onChange={(e) => setLocForm((prev) => ({ ...prev, location_building: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Level"
+              value={locForm.location_level}
+              onChange={(e) => setLocForm((prev) => ({ ...prev, location_level: e.target.value }))}
+              fullWidth
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={locForm.is_default}
+                  onChange={(e) => setLocForm((prev) => ({ ...prev, is_default: e.target.checked }))}
+                />
+              }
+              label="Use as default for this project/source"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLocDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleLocSubmit}>
             Save
           </Button>
         </DialogActions>

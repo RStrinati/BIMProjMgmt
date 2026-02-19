@@ -52,6 +52,7 @@ class ProjectAliasManager:
                 SELECT 
                     pa.alias_name,
                     pa.pm_project_id,
+                    pa.acc_project_id,
                     p.project_name,
                     p.status,
                     p.project_manager,
@@ -66,10 +67,11 @@ class ProjectAliasManager:
                 aliases.append({
                     'alias_name': row[0],
                     'pm_project_id': row[1],
-                    'project_name': row[2],
-                    'project_status': row[3],
-                    'project_manager': row[4],
-                    'project_created': row[5]
+                    'acc_project_id': row[2],
+                    'project_name': row[3],
+                    'project_status': row[4],
+                    'project_manager': row[5],
+                    'project_created': row[6]
                 })
             
             return aliases
@@ -78,7 +80,7 @@ class ProjectAliasManager:
             print(f"❌ Error fetching aliases: {e}")
             return []
     
-    def add_alias(self, project_id: int, alias_name: str) -> bool:
+    def add_alias(self, project_id: int, alias_name: str, acc_project_id: Optional[str] = None) -> bool:
         """Add a new alias for a project"""
         conn = self._get_connection()
         if not conn:
@@ -100,10 +102,13 @@ class ProjectAliasManager:
                 return False
             
             # Add the alias
-            cursor.execute("""
-                INSERT INTO project_aliases (alias_name, pm_project_id)
-                VALUES (?, ?)
-            """, (alias_name, project_id))
+            cursor.execute(
+                """
+                INSERT INTO project_aliases (alias_name, pm_project_id, acc_project_id)
+                VALUES (?, ?, ?)
+                """,
+                (alias_name, project_id, acc_project_id),
+            )
             
             conn.commit()
             print(f"✅ Added alias '{alias_name}' for project ID {project_id}")
@@ -114,7 +119,13 @@ class ProjectAliasManager:
             conn.rollback()
             return False
     
-    def update_alias(self, old_alias_name: str, new_alias_name: str, new_project_id: Optional[int] = None) -> bool:
+    def update_alias(
+        self,
+        old_alias_name: str,
+        new_alias_name: str,
+        new_project_id: Optional[int] = None,
+        acc_project_id: Optional[str] = None,
+    ) -> bool:
         """Update an existing alias"""
         conn = self._get_connection()
         if not conn:
@@ -124,7 +135,10 @@ class ProjectAliasManager:
             cursor = conn.cursor()
             
             # Check if old alias exists
-            cursor.execute("SELECT pm_project_id FROM project_aliases WHERE alias_name = ?", (old_alias_name,))
+            cursor.execute(
+                "SELECT pm_project_id FROM project_aliases WHERE alias_name = ?",
+                (old_alias_name,),
+            )
             result = cursor.fetchone()
             if not result:
                 print(f"⚠️ Alias '{old_alias_name}' not found")
@@ -141,11 +155,14 @@ class ProjectAliasManager:
                     return False
             
             # Update the alias
-            cursor.execute("""
-                UPDATE project_aliases 
-                SET alias_name = ?, pm_project_id = ?
+            cursor.execute(
+                """
+                UPDATE project_aliases
+                SET alias_name = ?, pm_project_id = ?, acc_project_id = ?
                 WHERE alias_name = ?
-            """, (new_alias_name, target_project_id, old_alias_name))
+                """,
+                (new_alias_name, target_project_id, acc_project_id, old_alias_name),
+            )
             
             conn.commit()
             print(f"✅ Updated alias '{old_alias_name}' to '{new_alias_name}' (Project ID: {target_project_id})")

@@ -1,5 +1,6 @@
 import copy
 import json
+import uuid
 import logging
 import os
 import re
@@ -47,11 +48,13 @@ from database import (  # noqa: E402
     create_bid_variation,
     create_project_service,
     create_project_update,
+    add_project_resource,
     create_review_cycle,
     create_service_review,
     create_service_template,
     create_update_comment,
     delete_bookmark,
+    delete_project_resource,
     delete_bid_billing_line,
     delete_bid_program_stage,
     delete_bid_scope_item,
@@ -72,6 +75,7 @@ from database import (  # noqa: E402
     get_db_connection,
     get_last_revizto_extraction_run,
     get_project_bookmarks,
+    get_project_resources,
     get_project_combined_issues_overview,
     get_project_details,
     get_project_folders,
@@ -137,6 +141,7 @@ from database import (  # noqa: E402
     save_acc_folder_path,
     start_revizto_extraction_run,
     update_bookmark,
+    update_project_resource,
     update_project_service,
     update_review_cycle,
     update_review_cycle_task,
@@ -157,6 +162,10 @@ from database import (  # noqa: E402
     update_project_folders,
     update_client,
     get_all_users,
+    get_master_users,
+    upsert_master_user_flags,
+    sync_revizto_users_to_pm,
+    sync_master_users_from_sources,
     create_user,
     update_user,
     delete_user,
@@ -173,6 +182,14 @@ from database import (  # noqa: E402
     create_issue_attribute_mapping,
     update_issue_attribute_mapping,
     deactivate_issue_attribute_mapping,
+    get_issue_location_mappings,
+    create_issue_location_mapping,
+    update_issue_location_mapping,
+    deactivate_issue_location_mapping,
+    get_issue_discipline_mappings,
+    create_issue_discipline_mapping,
+    update_issue_discipline_mapping,
+    deactivate_issue_discipline_mapping,
     list_bid_variations,
     replace_bid_sections,
     update_bid,
@@ -443,6 +460,103 @@ _WAREHOUSE_LOG_FILE = LOG_DIR / "warehouse.log"
 _FRONTEND_LOG_FILE = LOG_DIR / "frontend.log"
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.json = CustomJSONProvider(app)
+
+WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS = int(os.getenv("WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS", "600"))
+_warehouse_pipeline_lock = threading.Lock()
+_warehouse_pipeline_timer: Optional[threading.Timer] = None
+_warehouse_pipeline_pending = False
+_warehouse_pipeline_running = False
+
+
+def _maybe_run_warehouse_pipeline(reason: str) -> None:
+    global _warehouse_pipeline_pending
+    global _warehouse_pipeline_running
+    global _warehouse_pipeline_timer
+
+    with _warehouse_pipeline_lock:
+        if _warehouse_pipeline_running:
+            logging.info(
+                "Warehouse pipeline already running; retrying in %ss (reason=%s)",
+                WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+                reason,
+            )
+            if _warehouse_pipeline_timer and _warehouse_pipeline_timer.is_alive():
+                _warehouse_pipeline_timer.cancel()
+            _warehouse_pipeline_timer = threading.Timer(
+                WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+                _maybe_run_warehouse_pipeline,
+                args=(reason,),
+            )
+            _warehouse_pipeline_timer.daemon = True
+            _warehouse_pipeline_timer.start()
+            return
+
+        if not _warehouse_pipeline_pending:
+            return
+
+        _warehouse_pipeline_pending = False
+        _warehouse_pipeline_running = True
+
+    try:
+        logging.info("Starting warehouse pipeline (reason=%s)", reason)
+        from warehouse.etl.pipeline import WarehousePipeline
+
+        pipeline = WarehousePipeline()
+        pipeline.run()
+        logging.info("Warehouse pipeline completed (reason=%s)", reason)
+    except Exception:
+        logging.exception("Warehouse pipeline failed (reason=%s)", reason)
+    finally:
+        with _warehouse_pipeline_lock:
+            _warehouse_pipeline_running = False
+            if _warehouse_pipeline_pending:
+                if _warehouse_pipeline_timer and _warehouse_pipeline_timer.is_alive():
+                    _warehouse_pipeline_timer.cancel()
+                _warehouse_pipeline_timer = threading.Timer(
+                    WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+                    _maybe_run_warehouse_pipeline,
+                    args=("debounced-followup",),
+                )
+                _warehouse_pipeline_timer.daemon = True
+                _warehouse_pipeline_timer.start()
+
+
+def schedule_warehouse_pipeline(reason: str) -> None:
+    """Debounced trigger for the warehouse pipeline."""
+    global _warehouse_pipeline_pending
+    global _warehouse_pipeline_timer
+
+    with _warehouse_pipeline_lock:
+        _warehouse_pipeline_pending = True
+        if _warehouse_pipeline_timer and _warehouse_pipeline_timer.is_alive():
+            _warehouse_pipeline_timer.cancel()
+        _warehouse_pipeline_timer = threading.Timer(
+            WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+            _maybe_run_warehouse_pipeline,
+            args=(reason,),
+        )
+        _warehouse_pipeline_timer.daemon = True
+        _warehouse_pipeline_timer.start()
+
+    logging.info(
+        "Queued warehouse pipeline run in %ss (reason=%s)",
+        WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+        reason,
+    )
+
+
+def trigger_warehouse_pipeline_now(reason: str) -> None:
+    """Run the warehouse pipeline immediately in a background thread."""
+    global _warehouse_pipeline_pending
+    global _warehouse_pipeline_timer
+
+    with _warehouse_pipeline_lock:
+        _warehouse_pipeline_pending = True
+        if _warehouse_pipeline_timer and _warehouse_pipeline_timer.is_alive():
+            _warehouse_pipeline_timer.cancel()
+
+    worker = threading.Thread(target=_maybe_run_warehouse_pipeline, args=(reason,), daemon=True)
+    worker.start()
 
 # SECURITY: Add security headers to all responses
 @app.after_request
@@ -1489,6 +1603,88 @@ def api_delete_issue_attribute_mapping(map_id: int):
     return jsonify({'success': True})
 
 
+@app.route('/api/mappings/issue-locations', methods=['GET'])
+def api_get_issue_location_mappings():
+    """List issue location mappings."""
+    active_only = request.args.get('active_only', 'true').lower() != 'false'
+    mappings = get_issue_location_mappings(active_only=active_only)
+    return jsonify(mappings)
+
+
+@app.route('/api/mappings/issue-locations', methods=['POST'])
+def api_create_issue_location_mapping():
+    """Create an issue location mapping."""
+    data = request.get_json() or {}
+    required = ['source_system', 'raw_location']
+    missing = [field for field in required if not data.get(field)]
+    if missing:
+        return jsonify({'error': f"Missing fields: {', '.join(missing)}"}), 400
+    map_id = create_issue_location_mapping(data)
+    if map_id is None:
+        return jsonify({'error': 'Failed to create mapping'}), 500
+    return jsonify({'map_id': map_id}), 201
+
+
+@app.route('/api/mappings/issue-locations/<int:map_id>', methods=['PUT', 'PATCH'])
+def api_update_issue_location_mapping(map_id: int):
+    """Update an issue location mapping."""
+    data = request.get_json() or {}
+    success = update_issue_location_mapping(map_id, data)
+    if not success:
+        return jsonify({'error': 'Failed to update mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/issue-locations/<int:map_id>', methods=['DELETE'])
+def api_delete_issue_location_mapping(map_id: int):
+    """Deactivate an issue location mapping."""
+    success = deactivate_issue_location_mapping(map_id)
+    if not success:
+        return jsonify({'error': 'Failed to deactivate mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/issue-disciplines', methods=['GET'])
+def api_get_issue_discipline_mappings():
+    """List issue discipline mappings."""
+    active_only = request.args.get('active_only', 'true').lower() != 'false'
+    mappings = get_issue_discipline_mappings(active_only=active_only)
+    return jsonify(mappings)
+
+
+@app.route('/api/mappings/issue-disciplines', methods=['POST'])
+def api_create_issue_discipline_mapping():
+    """Create an issue discipline mapping."""
+    data = request.get_json() or {}
+    required = ['source_system', 'raw_discipline', 'normalized_discipline']
+    missing = [field for field in required if not data.get(field)]
+    if missing:
+        return jsonify({'error': f"Missing fields: {', '.join(missing)}"}), 400
+    map_id = create_issue_discipline_mapping(data)
+    if map_id is None:
+        return jsonify({'error': 'Failed to create mapping'}), 500
+    return jsonify({'map_id': map_id}), 201
+
+
+@app.route('/api/mappings/issue-disciplines/<int:map_id>', methods=['PUT', 'PATCH'])
+def api_update_issue_discipline_mapping(map_id: int):
+    """Update an issue discipline mapping."""
+    data = request.get_json() or {}
+    success = update_issue_discipline_mapping(map_id, data)
+    if not success:
+        return jsonify({'error': 'Failed to update mapping'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/mappings/issue-disciplines/<int:map_id>', methods=['DELETE'])
+def api_delete_issue_discipline_mapping(map_id: int):
+    """Deactivate an issue discipline mapping."""
+    success = deactivate_issue_discipline_mapping(map_id)
+    if not success:
+        return jsonify({'error': 'Failed to deactivate mapping'}), 500
+    return jsonify({'success': True})
+
+
 @app.route('/api/settings/issue-reliability', methods=['GET'])
 def api_issue_reliability_report():
     """Return issue reliability diagnostics for the latest import run."""
@@ -1507,12 +1703,13 @@ def _fetch_project_alias_rows():
             cursor = conn.cursor()
             cursor.execute(
                 f"""
-                SELECT pa.{S.ProjectAliases.ALIAS_NAME},
-                       pa.{S.ProjectAliases.PM_PROJECT_ID},
-                       p.{S.Projects.NAME},
-                       p.{S.Projects.STATUS},
-                       p.{S.Projects.PROJECT_MANAGER},
-                       p.created_at
+                  SELECT pa.{S.ProjectAliases.ALIAS_NAME},
+                         pa.{S.ProjectAliases.PM_PROJECT_ID},
+                         pa.{S.ProjectAliases.ACC_PROJECT_ID},
+                         p.{S.Projects.NAME},
+                         p.{S.Projects.STATUS},
+                         p.{S.Projects.PROJECT_MANAGER},
+                         p.created_at
                 FROM dbo.{S.ProjectAliases.TABLE} pa
                 LEFT JOIN dbo.{S.Projects.TABLE} p
                   ON pa.{S.ProjectAliases.PM_PROJECT_ID} = p.{S.Projects.ID}
@@ -1524,10 +1721,99 @@ def _fetch_project_alias_rows():
         logging.error("Error fetching project aliases: %s", exc)
         return []
 
+def _fetch_project_alias_row(alias_name):
+    """Fetch a single alias row from the database (no issue stats)."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                  SELECT pa.{S.ProjectAliases.ALIAS_NAME},
+                         pa.{S.ProjectAliases.PM_PROJECT_ID},
+                         pa.{S.ProjectAliases.ACC_PROJECT_ID},
+                         p.{S.Projects.NAME},
+                         p.{S.Projects.STATUS},
+                         p.{S.Projects.PROJECT_MANAGER},
+                         p.created_at
+                FROM dbo.{S.ProjectAliases.TABLE} pa
+                LEFT JOIN dbo.{S.Projects.TABLE} p
+                  ON pa.{S.ProjectAliases.PM_PROJECT_ID} = p.{S.Projects.ID}
+                WHERE pa.{S.ProjectAliases.ALIAS_NAME} = ?
+                """,
+                (alias_name,),
+            )
+            return cursor.fetchone()
+    except Exception as exc:
+        logging.error("Error fetching project alias row: %s", exc)
+        return None
+
+def _get_alias_usage_stats_for_project(project_id):
+    """Return alias usage stats for a single project ID."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                WITH alias_stats AS (
+                    SELECT pm_project_id,
+                           COUNT(*) as alias_count,
+                           STRING_AGG(alias_name, '; ') as aliases
+                    FROM project_aliases
+                    WHERE pm_project_id = ?
+                    GROUP BY pm_project_id
+                ),
+                issue_stats AS (
+                    SELECT pa.pm_project_id,
+                           COUNT(*) as total_issues,
+                           SUM(CASE WHEN vi.status = 'open' THEN 1 ELSE 0 END) as open_issues
+                    FROM project_aliases pa
+                    INNER JOIN vw_ProjectManagement_AllIssues vi
+                        ON pa.alias_name = vi.project_name
+                    WHERE pa.pm_project_id = ?
+                    GROUP BY pa.pm_project_id
+                )
+                SELECT
+                    COALESCE(a.alias_count, 0) as alias_count,
+                    COALESCE(a.aliases, '') as aliases,
+                    COALESCE(i.total_issues, 0) as total_issues,
+                    COALESCE(i.open_issues, 0) as open_issues
+                FROM (SELECT ? as pm_project_id) base
+                LEFT JOIN alias_stats a ON a.pm_project_id = base.pm_project_id
+                LEFT JOIN issue_stats i ON i.pm_project_id = base.pm_project_id
+                """,
+                (project_id, project_id, project_id),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return {
+                    'total_issues': 0,
+                    'open_issues': 0,
+                    'alias_count': 0,
+                    'aliases': '',
+                    'has_issues': False,
+                }
+            alias_count, aliases, total_issues, open_issues = row
+            return {
+                'total_issues': total_issues or 0,
+                'open_issues': open_issues or 0,
+                'alias_count': alias_count or 0,
+                'aliases': aliases or '',
+                'has_issues': (total_issues or 0) > 0,
+            }
+    except Exception as exc:
+        logging.error("Error fetching alias usage stats for project: %s", exc)
+        return {
+            'total_issues': 0,
+            'open_issues': 0,
+            'alias_count': 0,
+            'aliases': '',
+            'has_issues': False,
+        }
+
 
 def _serialize_alias_row(row, stats_lookup):
     """Convert alias row into API response with issue summary."""
-    alias_name, project_id, project_name, project_status, project_manager, created_at = row
+    alias_name, project_id, acc_project_id, project_name, project_status, project_manager, created_at = row
 
     if isinstance(created_at, (datetime, date)):
         created_value = created_at.isoformat()
@@ -1538,6 +1824,7 @@ def _serialize_alias_row(row, stats_lookup):
     return {
         'alias_name': alias_name,
         'project_id': project_id,
+        'acc_project_id': str(acc_project_id) if acc_project_id else None,
         'project_name': project_name,
         'project_status': project_status,
         'project_manager': project_manager,
@@ -1561,10 +1848,91 @@ def _get_aliases_with_stats():
 
 def _get_alias_by_name(alias_name):
     """Find a single alias by name."""
-    for alias in _get_aliases_with_stats():
-        if alias['alias_name'] == alias_name:
-            return alias
-    return None
+    row = _fetch_project_alias_row(alias_name)
+    if not row:
+        return None
+    alias_name_value, project_id, acc_project_id, project_name, project_status, project_manager, created_at = row
+    stats = _get_alias_usage_stats_for_project(project_id)
+    return _serialize_alias_row(
+        (alias_name_value, project_id, acc_project_id, project_name, project_status, project_manager, created_at),
+        {project_id: stats},
+    )
+
+
+def _normalize_acc_project_id(value):
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        return str(uuid.UUID(raw))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _sync_acc_project_mapping(pm_project_id, acc_project_id):
+    """Ensure acc_project_map + Issues_Current are aligned for this project."""
+    if not acc_project_id:
+        return True, None
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT TOP 1 name
+                FROM acc_data_schema.dbo.admin_projects
+                WHERE id = ?
+                """,
+                (acc_project_id,),
+            )
+            row = cursor.fetchone()
+            acc_project_name = row[0] if row else None
+
+            cursor.execute(
+                """
+                SELECT acc_project_id
+                FROM dbo.acc_project_map
+                WHERE pm_project_id = ? AND is_active = 1
+                """,
+                (pm_project_id,),
+            )
+            existing = cursor.fetchone()
+            if existing and str(existing[0]).lower() != str(acc_project_id).lower():
+                return False, "ACC project mapping already exists for this project with a different ID"
+
+            cursor.execute(
+                """
+                MERGE dbo.acc_project_map AS target
+                USING (SELECT ? AS pm_project_id, ? AS acc_project_id, ? AS acc_project_name) AS src
+                    ON target.pm_project_id = src.pm_project_id
+                WHEN MATCHED THEN
+                    UPDATE SET acc_project_id = src.acc_project_id,
+                               acc_project_name = src.acc_project_name,
+                               is_active = 1,
+                               updated_at = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN
+                    INSERT (pm_project_id, acc_project_id, acc_project_name, is_active)
+                    VALUES (src.pm_project_id, src.acc_project_id, src.acc_project_name, 1);
+                """,
+                (pm_project_id, acc_project_id, acc_project_name),
+            )
+
+            cursor.execute(
+                """
+                UPDATE ic
+                SET ic.acc_project_id = ?
+                FROM dbo.Issues_Current ic
+                WHERE ic.source_system = 'ACC'
+                  AND TRY_CAST(ic.source_project_id AS INT) = ?
+                """,
+                (acc_project_id, pm_project_id),
+            )
+            conn.commit()
+        return True, None
+    except Exception as exc:
+        logging.error("Error syncing ACC project mapping: %s", exc)
+        return False, "Failed to sync ACC project mapping"
 
 
 def _alias_exists(alias_name):
@@ -1756,6 +2124,8 @@ def api_create_service_from_template(project_id):
         return jsonify({'error': 'template_id is required'}), 400
 
     options_enabled = body.get('options_enabled') or []
+    exclude_reviews = body.get('exclude_reviews') or []
+    exclude_items = body.get('exclude_items') or []
     overrides = body.get('overrides') or {}
     applied_by_user_id = body.get('applied_by_user_id')
 
@@ -1766,6 +2136,8 @@ def api_create_service_from_template(project_id):
             template_id=template_id,
             options_enabled=options_enabled,
             overrides=overrides,
+            exclude_reviews=exclude_reviews,
+            exclude_items=exclude_items,
             applied_by_user_id=applied_by_user_id,
         )
         return jsonify(result), 201
@@ -1783,6 +2155,8 @@ def api_apply_service_template_to_service(project_id, service_id):
         return jsonify({'error': 'template_id is required'}), 400
 
     options_enabled = body.get('options_enabled') or []
+    exclude_reviews = body.get('exclude_reviews') or []
+    exclude_items = body.get('exclude_items') or []
     overrides = body.get('overrides') or {}
     applied_by_user_id = body.get('applied_by_user_id')
     dry_run = bool(body.get('dry_run', False))
@@ -1796,6 +2170,8 @@ def api_apply_service_template_to_service(project_id, service_id):
             template_id=template_id,
             options_enabled=options_enabled,
             overrides=overrides,
+            exclude_reviews=exclude_reviews,
+            exclude_items=exclude_items,
             applied_by_user_id=applied_by_user_id,
             mode=mode,
             dry_run=dry_run,
@@ -2672,6 +3048,72 @@ def api_get_users():
     return jsonify(users)
 
 
+@app.route('/api/master-users', methods=['GET'])
+def api_get_master_users():
+    """Get unified ACC/Revizto users for master list."""
+    try:
+        users = get_master_users()
+        return jsonify(users)
+    except Exception as e:
+        logging.exception("Failed to get master users")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/master-users/<path:user_key>', methods=['PATCH'])
+def api_patch_master_user_flags(user_key):
+    """Update user-specified flags for a master user."""
+    try:
+        data = request.get_json() or {}
+        allowed_fields = {'invited_to_bim_meetings', 'is_watcher', 'is_assignee'}
+        updates = {k: data.get(k) for k in allowed_fields if k in data}
+        if not updates:
+            return jsonify({'error': 'No valid fields to update'}), 400
+
+        def _normalize(value):
+            if value is None:
+                return None
+            return bool(value)
+
+        success = upsert_master_user_flags(
+            user_key,
+            invited_to_bim_meetings=_normalize(updates.get('invited_to_bim_meetings')),
+            is_watcher=_normalize(updates.get('is_watcher')),
+            is_assignee=_normalize(updates.get('is_assignee')),
+        )
+        if not success:
+            return jsonify({'error': 'Failed to update user flags'}), 500
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logging.exception("Failed to update master user flags")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/revizto/license-members/sync', methods=['POST'])
+def api_sync_revizto_license_members():
+    """Sync Revizto license members into ProjectManagement."""
+    try:
+        result = sync_revizto_users_to_pm()
+        if not result.get("success"):
+            return jsonify({'error': result.get("error", "Sync failed")}), 500
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.exception("Failed to sync Revizto license members")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/master-users/normalize', methods=['POST'])
+def api_sync_master_users():
+    """Normalize master users by email across ACC and Revizto."""
+    try:
+        result = sync_master_users_from_sources()
+        if not result.get("success"):
+            return jsonify({'error': result.get("error", "Sync failed")}), 500
+        return jsonify(result)
+    except Exception as e:
+        logging.exception("Failed to normalize master users")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/users', methods=['POST'])
 def api_create_user():
     """Create a new user."""
@@ -3367,7 +3809,12 @@ def api_analyze_project_aliases():
 def api_get_project_aliases():
     """List all project aliases with linked issue statistics."""
     try:
-        aliases = _get_aliases_with_stats()
+        include_stats = request.args.get('include_stats', 'true').lower() != 'false'
+        if include_stats:
+            aliases = _get_aliases_with_stats()
+        else:
+            rows = _fetch_project_alias_rows()
+            aliases = [_serialize_alias_row(row, {}) for row in rows]
         return jsonify(aliases)
     except Exception as exc:
         logging.error("Error fetching project aliases: %s", exc)
@@ -3380,6 +3827,10 @@ def api_create_project_alias():
     data = request.get_json() or {}
     alias_name = (data.get('alias_name') or '').strip()
     project_id_raw = data.get('project_id')
+    acc_project_id_raw = data.get('acc_project_id')
+    acc_project_id = _normalize_acc_project_id(acc_project_id_raw)
+    if acc_project_id_raw is not None and acc_project_id is None:
+        return jsonify({'error': 'acc_project_id must be a valid UUID'}), 400
 
     if not alias_name or project_id_raw is None:
         return jsonify({'error': 'alias_name and project_id are required'}), 400
@@ -3397,12 +3848,17 @@ def api_create_project_alias():
 
     manager = ProjectAliasManager()
     try:
-        success = manager.add_alias(project_id, alias_name)
+        success = manager.add_alias(project_id, alias_name, acc_project_id)
     finally:
         manager.close_connection()
 
     if not success:
         return jsonify({'error': 'Failed to create alias'}), 500
+
+    if acc_project_id:
+        ok, err = _sync_acc_project_mapping(project_id, acc_project_id)
+        if not ok:
+            return jsonify({'error': err}), 409
 
     alias = _get_alias_by_name(alias_name)
     return jsonify(alias), 201
@@ -3418,6 +3874,16 @@ def api_update_project_alias(alias_name):
     data = request.get_json() or {}
     new_alias_name = (data.get('alias_name') or data.get('new_alias_name') or alias_name).strip()
     project_id_raw = data.get('project_id')
+    if 'acc_project_id' in data:
+        acc_project_id_raw = data.get('acc_project_id')
+        acc_project_id = _normalize_acc_project_id(acc_project_id_raw)
+        if acc_project_id_raw is not None and acc_project_id is None:
+            return jsonify({'error': 'acc_project_id must be a valid UUID'}), 400
+    else:
+        acc_project_id = current_alias.get('acc_project_id')
+
+    if not new_alias_name:
+        return jsonify({'error': 'alias_name is required'}), 400
 
     if new_alias_name != alias_name and _alias_exists(new_alias_name):
         return jsonify({'error': 'Alias name already in use'}), 409
@@ -3435,12 +3901,17 @@ def api_update_project_alias(alias_name):
 
     manager = ProjectAliasManager()
     try:
-        success = manager.update_alias(alias_name, new_alias_name, new_project_id)
+        success = manager.update_alias(alias_name, new_alias_name, new_project_id, acc_project_id)
     finally:
         manager.close_connection()
 
     if not success:
         return jsonify({'error': 'Failed to update alias'}), 500
+
+    if acc_project_id:
+        ok, err = _sync_acc_project_mapping(new_project_id, acc_project_id)
+        if not ok:
+            return jsonify({'error': err}), 409
 
     alias = _get_alias_by_name(new_alias_name)
     return jsonify(alias)
@@ -3482,11 +3953,22 @@ def api_get_project_alias_stats():
 @app.route('/api/project_aliases/unmapped', methods=['GET'])
 def api_get_unmapped_alias_projects():
     """Return list of unmapped external project names (optimized version)."""
+    include_stats = request.args.get('include_stats', 'true').lower() != 'false'
+    limit_raw = request.args.get('limit')
+    limit = None
+    if limit_raw is not None:
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'limit must be an integer'}), 400
     try:
         from services.optimized_alias_service import OptimizedProjectAliasManager
         manager = OptimizedProjectAliasManager()
         try:
-            unmapped = manager.discover_unmapped_optimized()
+            if include_stats:
+                unmapped = manager.discover_unmapped_optimized()
+            else:
+                unmapped = manager.discover_unmapped_names(limit=limit or 200)
             return jsonify(unmapped)
         finally:
             manager.close_connection()
@@ -4104,6 +4586,14 @@ def api_update_project(project_id):
         update_payload[S.Projects.NAME] = body.get('project_name')
     if 'project_number' in body or 'contract_number' in body:
         update_payload[S.Projects.CONTRACT_NUMBER] = body.get('project_number') or body.get('contract_number')
+    if 'description' in body:
+        update_payload[S.Projects.DESCRIPTION] = body.get('description')
+    if 'summary' in body:
+        update_payload[S.Projects.SUMMARY] = body.get('summary')
+    if 'emoji' in body:
+        update_payload[S.Projects.EMOJI] = body.get('emoji')
+    if 'icon_key' in body:
+        update_payload[S.Projects.ICON_KEY] = body.get('icon_key')
 
     if update_payload:
         update_payload[S.Projects.UPDATED_AT] = datetime.utcnow()
@@ -4172,6 +4662,39 @@ def api_dashboard_warehouse_metrics():
     except Exception as e:
         logging.exception("Error fetching warehouse dashboard metrics")
         return jsonify({'error': 'Failed to fetch warehouse metrics', 'details': str(e)}), 500
+
+
+@app.route('/api/warehouse/run-now', methods=['POST'])
+def api_run_warehouse_now():
+    """Run warehouse pipeline immediately (debounce bypass)."""
+    try:
+        global _warehouse_pipeline_pending
+
+        body = request.get_json(silent=True) or {}
+        reason = body.get('reason') or 'manual'
+
+        with _warehouse_pipeline_lock:
+            running = _warehouse_pipeline_running
+            if running:
+                _warehouse_pipeline_pending = True
+
+        if running:
+            logging.info("Warehouse pipeline already running; queued follow-up (reason=%s)", reason)
+            return jsonify({
+                'success': True,
+                'status': 'running',
+                'message': 'Warehouse pipeline already running; queued follow-up run.'
+            }), 202
+
+        trigger_warehouse_pipeline_now(reason)
+        return jsonify({
+            'success': True,
+            'status': 'started',
+            'message': 'Warehouse pipeline started.'
+        })
+    except Exception as e:
+        logging.exception("Error running warehouse pipeline now")
+        return jsonify({'error': 'Failed to start warehouse pipeline', 'details': str(e)}), 500
 
 
 @app.route('/api/dashboard/issues-history', methods=['GET'])
@@ -4556,6 +5079,54 @@ def api_bookmark_operations(bookmark_id):
     elif request.method == 'DELETE':
         try:
             success = delete_bookmark(bookmark_id)
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/resources', methods=['GET', 'POST'])
+def api_project_resources(project_id):
+    """Project resources API."""
+    if request.method == 'GET':
+        try:
+            resources = get_project_resources(project_id)
+            return jsonify(resources or [])
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            body = request.get_json() or {}
+            title = (body.get('title') or '').strip()
+            url = (body.get('url') or '').strip()
+            if not title or not url:
+                return jsonify({'error': 'title and url are required'}), 400
+            success = add_project_resource(project_id, title, url)
+            if success:
+                return jsonify({'success': True}), 201
+            return jsonify({'success': False}), 500
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/resources/<int:resource_id>', methods=['PATCH', 'DELETE'])
+def api_project_resource_operations(resource_id):
+    """Resource update/delete API."""
+    if request.method == 'PATCH':
+        try:
+            body = request.get_json() or {}
+            success = update_project_resource(
+                resource_id,
+                title=body.get('title'),
+                url=body.get('url'),
+            )
+            return jsonify({'success': bool(success)})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        try:
+            success = delete_project_resource(resource_id)
             return jsonify({'success': bool(success)})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -5275,7 +5846,8 @@ def import_acc_data_endpoint(project_id):
         # Log the import
         summary = f"Imported ACC data from {folder_path} in {execution_time:.2f}s"
         log_acc_import(project_id, os.path.basename(folder_path), summary)
-        
+        schedule_warehouse_pipeline(f"acc-import:{project_id}")
+
         return jsonify({
             'success': True,
             'project_id': project_id,
@@ -5748,6 +6320,8 @@ def start_revizto_extraction():
             licenses_extracted=0,
             status=status_value
         )
+        if overall_success:
+            schedule_warehouse_pipeline("revizto-extraction")
 
         return jsonify({
             'success': overall_success,
@@ -6516,7 +7090,7 @@ def get_quality_model_detail(project_id, expected_model_id):
                 WHERE expected_model_id = ?
                 ORDER BY created_at DESC
             """, (expected_model_id,))
-            
+
             aliases = [
                 {
                     'id': row[0],
@@ -6526,7 +7100,119 @@ def get_quality_model_detail(project_id, expected_model_id):
                 }
                 for row in cursor.fetchall()
             ]
-            
+
+            # Health summary (prefer exact normalized name, fallback to alias matching)
+            health_summary = None
+            try:
+                def normalize_name(value: str) -> str:
+                    cleaned = (value or '').upper()
+                    cleaned = cleaned.replace('.IFC.RVT', '.RVT')
+                    cleaned = cleaned.replace('-DETACHED.RVT', '.RVT')
+                    cleaned = cleaned.replace('.NWD', '')
+                    cleaned = cleaned.replace('.RVT', '')
+                    return cleaned.strip()
+
+                normalized_expected = normalize_name(model[2] or '')
+                cursor.execute("""
+                    SELECT TOP 200
+                        normalized_file_name,
+                        revit_file_name,
+                        export_date,
+                        file_size_mb,
+                        total_warnings,
+                        total_elements,
+                        family_count,
+                        group_count,
+                        inplace_families,
+                        sketchup_imports,
+                        revit_links,
+                        dwg_links,
+                        dwg_imports,
+                        sheet_count,
+                        design_option_sets,
+                        design_options,
+                        total_views,
+                        copied_views,
+                        dependent_views,
+                        views_not_on_sheets,
+                        levels_json,
+                        worksets_json
+                    FROM RevitHealthCheckDB.dbo.vw_RevitHealthWarehouse_CrossDB
+                    WHERE pm_project_id = ?
+                    ORDER BY export_date DESC
+                """, (project_id,))
+                health_rows = cursor.fetchall()
+
+                matched_row = None
+                if normalized_expected:
+                    for row in health_rows:
+                        normalized_row = normalize_name(row[0] or row[1] or '')
+                        if normalized_row and normalized_row == normalized_expected:
+                            matched_row = row
+                            break
+
+                if not matched_row and health_rows:
+                    from database import get_expected_model_aliases, match_observed_to_expected
+                    alias_rows = get_expected_model_aliases(project_id)
+                    for row in health_rows:
+                        candidate = normalize_name(row[0] or row[1] or '')
+                        matched_id = match_observed_to_expected(candidate, None, alias_rows)
+                        if matched_id == expected_model_id:
+                            matched_row = row
+                            break
+
+                if matched_row:
+                    levels_count = None
+                    worksets_count = None
+                    try:
+                        import json
+                        if matched_row[20]:
+                            levels_count = len(json.loads(matched_row[20]))
+                        if matched_row[21]:
+                            worksets_count = len(json.loads(matched_row[21]))
+                    except Exception:
+                        levels_count = None
+                        worksets_count = None
+
+                    grid_count = None
+                    try:
+                        cursor.execute("""
+                            SELECT TOP 1 nGridCount
+                            FROM RevitHealthCheckDB.dbo.vw_ModelSummary
+                            WHERE UPPER(REPLACE(REPLACE(REPLACE(strRvtFileName, '.IFC.RVT', '.RVT'), '-DETACHED.RVT', '.RVT'), '.NWD', '')) LIKE ?
+                            ORDER BY ConvertedExportedDate DESC
+                        """, (f"%{model[2]}%",))
+                        grid_row = cursor.fetchone()
+                        if grid_row:
+                            grid_count = grid_row[0]
+                    except Exception:
+                        grid_count = None
+
+                    health_summary = {
+                        'levels': levels_count,
+                        'grids': grid_count,
+                        'worksets': worksets_count,
+                        'warnings': matched_row[4],
+                        'fileSizeMb': matched_row[3],
+                        'totalElements': matched_row[5],
+                        'familyCount': matched_row[6],
+                        'groupCount': matched_row[7],
+                        'inplaceFamilies': matched_row[8],
+                        'sketchupImports': matched_row[9],
+                        'revitLinks': matched_row[10],
+                        'dwgLinks': matched_row[11],
+                        'dwgImports': matched_row[12],
+                        'sheetCount': matched_row[13],
+                        'designOptionSets': matched_row[14],
+                        'designOptions': matched_row[15],
+                        'totalViews': matched_row[16],
+                        'copiedViews': matched_row[17],
+                        'dependentViews': matched_row[18],
+                        'viewsNotOnSheets': matched_row[19],
+                    }
+            except Exception as e:
+                logging.warning(f"Failed to fetch health summary for model {expected_model_id}: {str(e)}")
+
             # Get current observed match from ACC
             observed_match = None
             if model[2]:  # registered_model_name
@@ -6557,7 +7243,7 @@ def get_quality_model_detail(project_id, expected_model_id):
                     # Log ACC query error but don't fail the entire request
                     logging.warning(f"Failed to fetch ACC observed match for model {expected_model_id}: {str(e)}")
                     observed_match = None
-            
+
             result = {
                 'id': model[0],
                 'abv': model[1],
@@ -6582,9 +7268,10 @@ def get_quality_model_detail(project_id, expected_model_id):
                     'freshnessStatus': 'UNKNOWN',
                     'metrics': {}
                 },
+                'healthSummary': health_summary,
                 'activity': []
             }
-            
+
             return jsonify(result)
             
     except Exception as e:
@@ -6611,11 +7298,12 @@ def update_expected_model(project_id, expected_model_id):
                 'company': 'company',
                 'discipline': 'discipline',
                 'description': 'description',
-                'bimContact': 'bim_contact',
-                'notes': 'notes',
-                'serviceId': 'service_id',
-                'reviewCycleId': 'review_cycle_id',
-                'expectedDeliveryDate': 'expected_delivery_date',
+                  'bimContact': 'bim_contact',
+                  'notes': 'notes',
+                  'accRequiredOverride': 'acc_required_override',
+                  'serviceId': 'service_id',
+                  'reviewCycleId': 'review_cycle_id',
+                  'expectedDeliveryDate': 'expected_delivery_date',
                 'actualDeliveryDate': 'actual_delivery_date',
                 'deliveryStatus': 'delivery_status'
             }
@@ -6645,6 +7333,14 @@ def update_expected_model(project_id, expected_model_id):
             """
             
             cursor.execute(query, params)
+            if cursor.rowcount == 0:
+                conn.rollback()
+                logging.warning(
+                    "Expected model update failed: model not found (project_id=%s expected_model_id=%s)",
+                    project_id,
+                    expected_model_id,
+                )
+                return jsonify({'error': 'Model not found'}), 404
             conn.commit()
             
             return jsonify({'message': 'Model updated successfully'}), 200
@@ -6742,6 +7438,39 @@ def get_model_history(project_id, expected_model_id):
             
     except Exception as e:
         logging.exception(f"Error fetching model history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/quality/suggestions', methods=['GET'])
+def get_quality_suggestions():
+    """Get global suggestion lists for quality register fields."""
+    try:
+        limit = int(request.args.get('limit', 200))
+        limit = max(1, min(limit, 500))
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            def fetch_distinct(field_name: str) -> list[str]:
+                query = f"""
+                    SELECT DISTINCT TOP {limit} {field_name}
+                    FROM ExpectedModels
+                    WHERE {field_name} IS NOT NULL
+                      AND LTRIM(RTRIM({field_name})) <> ''
+                    ORDER BY {field_name}
+                """
+                cursor.execute(query)
+                return [row[0] for row in cursor.fetchall()]
+
+            suggestions = {
+                'abv': fetch_distinct('abv'),
+                'disciplines': fetch_distinct('discipline'),
+                'companies': fetch_distinct('company'),
+            }
+
+        return jsonify(suggestions)
+    except Exception as e:
+        logging.exception("Error fetching quality suggestions")
         return jsonify({'error': str(e)}), 500
 
 
@@ -7216,12 +7945,18 @@ def api_issues_reconciled_table():
     }
     """
     try:
+        def _parse_csv_param(param_name: str) -> list[str]:
+            raw = request.args.get(param_name, None)
+            if not raw:
+                return []
+            return [value.strip() for value in raw.split(',') if value.strip()]
+
         # Extract query parameters
-        project_id = request.args.get('project_id', None)
-        source_system = request.args.get('source_system', None)
-        status_normalized = request.args.get('status_normalized', None)
-        priority_normalized = request.args.get('priority_normalized', None)
-        discipline_normalized = request.args.get('discipline_normalized', None)
+        project_ids = _parse_csv_param('project_id')
+        source_systems = _parse_csv_param('source_system')
+        status_normalized_values = _parse_csv_param('status_normalized')
+        priority_normalized_values = _parse_csv_param('priority_normalized')
+        discipline_normalized_values = _parse_csv_param('discipline_normalized')
         assignee_user_key = request.args.get('assignee_user_key', None)
         search = request.args.get('search', None)
         
@@ -7233,11 +7968,11 @@ def api_issues_reconciled_table():
         
         # Call database function
         result = get_reconciled_issues_table(
-            project_id=project_id,
-            source_system=source_system,
-            status_normalized=status_normalized,
-            priority_normalized=priority_normalized,
-            discipline_normalized=discipline_normalized,
+            project_ids=project_ids or None,
+            source_systems=source_systems or None,
+            status_normalized_values=status_normalized_values or None,
+            priority_normalized_values=priority_normalized_values or None,
+            discipline_normalized_values=discipline_normalized_values or None,
             assignee_user_key=assignee_user_key,
             search=search,
             page=page,
@@ -7449,6 +8184,7 @@ def api_get_issue_detail(issue_key: str):
                 issue_query = '''
                 SELECT
                     issue_key,
+                    source_system,
                     display_id,
                     title,
                     status_normalized,
@@ -7458,7 +8194,9 @@ def api_get_issue_detail(issue_key: str):
                     discipline_normalized,
                     created_at,
                     updated_at,
-                    project_id
+                    project_id,
+                    issue_link,
+                    snapshot_preview_url
                 FROM dbo.vw_Issues_Reconciled
                 WHERE issue_key = ?
                 '''
@@ -7517,15 +8255,18 @@ def api_get_issue_detail(issue_key: str):
             
             return jsonify({
                 'issue_key': issue_row[0],
-                'display_id': issue_row[1],
-                'title': issue_row[2],
-                'status_normalized': issue_row[3],
-                'priority_normalized': issue_row[4],
-                'zone': issue_row[5],
-                'assignee_user_key': issue_row[6],
-                'discipline_normalized': issue_row[7],
-                'created_at': issue_row[8].isoformat() if issue_row[8] else None,
-                'updated_at': issue_row[9].isoformat() if issue_row[9] else None,
+                'source_system': issue_row[1],
+                'display_id': issue_row[2],
+                'title': issue_row[3],
+                'status_normalized': issue_row[4],
+                'priority_normalized': issue_row[5],
+                'zone': issue_row[6],
+                'assignee_user_key': issue_row[7],
+                'discipline_normalized': issue_row[8],
+                'created_at': issue_row[9].isoformat() if issue_row[9] else None,
+                'updated_at': issue_row[10].isoformat() if issue_row[10] else None,
+                'issue_link': issue_row[12],
+                'snapshot_preview_url': issue_row[13],
                 'due_date': None,  # Not available in current schema
                 'service_id': service_id,
                 'service_name': service_name,

@@ -1,103 +1,30 @@
-# 🔧 Migration & Schema Documentation
+# Migration & Schema Documentation
 
-**Database migrations, schema changes, and optimization records**
+Historical migration and data-flow records for backend/database evolution.
 
-This directory contains documentation about database schema modifications, migration history, and performance optimization efforts.
+## Active Documents
+- `DB_MIGRATION_PHASE4_COMPLETE.md` — final connection pooling migration state
+- `DATABASE_OPTIMIZATION_REPORT.md` — performance and optimization findings
+- `SCHEMA_FIX_COMPLETE.md` — schema correction notes
+- `DATA_FLOW_EXECUTIVE_SUMMARY.md` and `DATA_FLOW_INDEX.md` — data-flow orientation
+- `MASTER_USERS_SCHEMA_REFERENCE.md` — Master user identity consolidation (Feb 2026)
 
-## 📚 Contents
+## Recent Schema Changes (Feb 2026)
 
-### Migration History
-Database connection pooling and structural changes:
-- **[DB_MIGRATION_PHASE4_COMPLETE.md](./DB_MIGRATION_PHASE4_COMPLETE.md)** - ✅ **100% Complete** - Connection pooling migration (October 2025)
-  - Migrated 73 database connections to pooling architecture
-  - Improved performance and resource utilization
-- **[DB_MIGRATION_SESSION3_TOOLS.md](./DB_MIGRATION_SESSION3_TOOLS.md)** - Session 3 migration details
-- **[DB_MIGRATION_PROGRESS.md](./DB_MIGRATION_PROGRESS.md)** - Initial migration tracking
+### Master Users & Identity Normalization
+New tables added to consolidate ACC/Revizto users by email:
+- **`master_users`** — Normalized user record (one per email)
+- **`master_user_identities`** — Source-specific identities (ACC vs Revizto users)
+- **`master_user_flags`** — User project settings (invitations, watcher status, assignee eligibility)
+- **Related migrations**: `20260213_add_master_user_identities.sql`, `20260206_add_issue_link_anchors.sql`
 
-### Performance Optimization
-- **[DATABASE_OPTIMIZATION_REPORT.md](./DATABASE_OPTIMIZATION_REPORT.md)** - Performance analysis and recommendations
-- **[DATABASE_OPTIMIZATION_AGENT_PROMPT.md](./DATABASE_OPTIMIZATION_AGENT_PROMPT.md)** - Optimization strategy guide
+See `../features/MASTER_USERS_FEATURE.md` for feature overview and data flow.
 
-### Schema & Architecture
-- **[SCHEMA_FIX_COMPLETE.md](./SCHEMA_FIX_COMPLETE.md)** - Schema corrections and validation results
-- **[DATA_FLOW_EXECUTIVE_SUMMARY.md](./DATA_FLOW_EXECUTIVE_SUMMARY.md)** - High-level data flow overview
-- **[DATA_FLOW_INDEX.md](./DATA_FLOW_INDEX.md)** - Data flow documentation index
+## Archived During 2026-02 Cleanup
+- `DATABASE_OPTIMIZATION_AGENT_PROMPT.md`
+- `DB_MIGRATION_PROGRESS.md`
+- `DB_MIGRATION_SESSION3_TOOLS.md`
 
----
+Archived copies are in `../archive/2026-02-doc-cleanup/migration/`.
 
-## 🎯 How to Use This Directory
-
-### Understanding Migration History
-1. **Latest Migration:** [DB_MIGRATION_PHASE4_COMPLETE.md](./DB_MIGRATION_PHASE4_COMPLETE.md)
-   - Current status: ✅ 100% complete
-   - Covered: Connection pooling implementation across all connections
-   - Date: October 2025
-
-2. **Previous Migrations:** [DB_MIGRATION_SESSION3_TOOLS.md](./DB_MIGRATION_SESSION3_TOOLS.md)
-
-### Performance Optimization
-- Check [DATABASE_OPTIMIZATION_REPORT.md](./DATABASE_OPTIMIZATION_REPORT.md) for:
-  - Query performance analysis
-  - Indexing recommendations
-  - Caching strategies
-  - Connection pooling benefits
-
-### Data Architecture
-- [DATA_FLOW_EXECUTIVE_SUMMARY.md](./DATA_FLOW_EXECUTIVE_SUMMARY.md) - Understand overall data architecture
-- [DATA_FLOW_INDEX.md](./DATA_FLOW_INDEX.md) - Navigate data flow documentation
-
----
-
-## 📊 Migration Status
-
-| Phase | Component | Status | Date | Details |
-|-------|-----------|--------|------|---------|
-| **Phase 4** | Connection Pooling | ✅ Complete | Oct 2025 | 73 connections migrated to pooling |
-| **Phase 3** | Session Migration | ✅ Complete | Oct 2025 | 39 connections updated |
-| **Earlier** | Initial Migration | ✅ Complete | Sep 2025 | ~191 total connections |
-
----
-
-## 🔄 Common Tasks
-
-| Task | Document |
-|------|----------|
-| **What migrations have been done?** | [DB_MIGRATION_PHASE4_COMPLETE.md](./DB_MIGRATION_PHASE4_COMPLETE.md) |
-| **Current migration status?** | Same file - 100% complete |
-| **Performance improvements?** | [DATABASE_OPTIMIZATION_REPORT.md](./DATABASE_OPTIMIZATION_REPORT.md) |
-| **Understand data flows?** | [DATA_FLOW_EXECUTIVE_SUMMARY.md](./DATA_FLOW_EXECUTIVE_SUMMARY.md) |
-| **Schema issues?** | [SCHEMA_FIX_COMPLETE.md](./SCHEMA_FIX_COMPLETE.md) |
-
----
-
-## 💡 Key Achievements
-
-✅ **Phase 4 (October 2025):**
-- Connection pooling fully implemented
-- 100% of database connections using pooling
-- Improved performance and resource utilization
-- All legacy direct connections removed
-
----
-
-## 📝 For New Developers
-
-When starting development:
-1. Know that connection pooling is **already in place** and fully implemented
-2. Always use `database_pool.py` for new connections
-3. See [../core/DATABASE_CONNECTION_GUIDE.md](../core/DATABASE_CONNECTION_GUIDE.md) for patterns
-4. This directory is for historical reference - migrations are complete!
-
----
-
-## 🔗 Related Documentation
-
-- **For connection patterns:** See [../core/DATABASE_CONNECTION_GUIDE.md](../core/DATABASE_CONNECTION_GUIDE.md)
-- **For database schema:** See [../core/database_schema.md](../core/database_schema.md)
-- **For optimization details:** See [DATABASE_OPTIMIZATION_REPORT.md](./DATABASE_OPTIMIZATION_REPORT.md)
-
----
-
-**Current Status:** ✅ All major migrations complete - Connection pooling is production-ready
-
-See [../DOCUMENTATION_INDEX.md](../DOCUMENTATION_INDEX.md) for other documentation categories
+For implementation standards, use `../core/DATABASE_CONNECTION_GUIDE.md`.

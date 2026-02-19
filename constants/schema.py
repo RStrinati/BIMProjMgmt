@@ -63,6 +63,15 @@ class IssuesCurrent:
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
     CLOSED_AT = "closed_at"
+    CREATED_BY = "created_by"
+    UPDATED_BY = "updated_by"
+    CLOSED_BY = "closed_by"
+    LINKED_DOCUMENT_URN = "linked_document_urn"
+    SNAPSHOT_URN = "snapshot_urn"
+    WEB_LINK = "web_link"
+    PREVIEW_MIDDLE_URL = "preview_middle_url"
+    ISSUE_LINK = "issue_link"
+    SNAPSHOT_PREVIEW_URL = "snapshot_preview_url"
     LOCATION_ROOT = "location_root"
     LOCATION_BUILDING = "location_building"
     LOCATION_LEVEL = "location_level"
@@ -96,6 +105,15 @@ class IssuesSnapshots:
     UPDATED_AT = "updated_at"
     CLOSED_AT = "closed_at"
     LOAD_TS = "load_ts"
+    CREATED_BY = "created_by"
+    UPDATED_BY = "updated_by"
+    CLOSED_BY = "closed_by"
+    LINKED_DOCUMENT_URN = "linked_document_urn"
+    SNAPSHOT_URN = "snapshot_urn"
+    WEB_LINK = "web_link"
+    PREVIEW_MIDDLE_URL = "preview_middle_url"
+    ISSUE_LINK = "issue_link"
+    SNAPSHOT_PREVIEW_URL = "snapshot_preview_url"
 
 
 class IssueStatusMap:
@@ -254,6 +272,10 @@ class Projects:
     TABLE = "projects"
     ID = "project_id"
     NAME = "project_name"
+    DESCRIPTION = "description"
+    SUMMARY = "summary"
+    EMOJI = "emoji"
+    ICON_KEY = "icon_key"
     CLIENT_ID = "client_id"
     TYPE_ID = "type_id"
     SECTOR_ID = "sector_id"
@@ -317,6 +339,16 @@ class ProjectBookmarks:
     URL = "url"
     DESCRIPTION = "description"
     CREATED_AT = "created_at"
+
+class ProjectResources:
+    TABLE = "project_resources"
+    RESOURCE_ID = "resource_id"
+    PROJECT_ID = "project_id"
+    TITLE = "title"
+    URL = "url"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    IS_DELETED = "is_deleted"
 
 class ReviewStages:
     TABLE = "ReviewStages"
@@ -798,6 +830,7 @@ class ProjectAliases:
     TABLE = "project_aliases"
     ALIAS_NAME = "alias_name"
     PM_PROJECT_ID = "pm_project_id"
+    ACC_PROJECT_ID = "acc_project_id"
 
 class ServiceDeliverables:
     TABLE = "ServiceDeliverables"
@@ -1165,6 +1198,11 @@ class ProjectsSummaryView:
     READY_TO_INVOICE_THIS_MONTH = "ready_to_invoice_this_month"
     INVOICE_PIPELINE_NEXT_MONTH = "invoice_pipeline_next_month"
     READY_TO_INVOICE_NEXT_MONTH = "ready_to_invoice_next_month"
+    DELIVERABLES_DUE_TOTAL = "deliverables_due_total"
+    DELIVERABLES_DUE_NEXT_WEEK = "deliverables_due_next_week"
+    DELIVERABLES_DUE_NEXT_FORTNIGHT = "deliverables_due_next_fortnight"
+    DELIVERABLES_DUE_NEXT_MONTH = "deliverables_due_next_month"
+    DELIVERABLES_DUE_NEXT_QUARTER = "deliverables_due_next_quarter"
 
 class ServiceReviews:
     TABLE = "ServiceReviews"

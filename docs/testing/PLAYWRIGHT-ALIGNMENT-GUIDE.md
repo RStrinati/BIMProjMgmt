@@ -8,20 +8,20 @@ Your Playwright test suite has been analyzed against your **Golden Set UI Standa
 
 ### 📄 Documentation Files Created
 
-1. **[playwright-test-alignment.md](./playwright-test-alignment.md)** - Main guide
+1. **[playwright-test-alignment.md](../archive/2026-02-doc-cleanup/testing/playwright-test-alignment.md)** - Main guide (archived)
    - Current state analysis of all 34 test files
    - Golden Set compliance checklist
    - Identified misalignments (5 key areas)
    - Recommended improvements
    - Migration checklist
 
-2. **[playwright-refactoring-examples.md](./playwright-refactoring-examples.md)** - Practical examples
+2. **[playwright-refactoring-examples.md](../archive/2026-02-doc-cleanup/testing/playwright-refactoring-examples.md)** - Practical examples (archived)
    - 4 real-world before/after examples
    - Shows 50-70% code reduction using helpers
    - Phase-based migration strategy
    - Quick reference find & replace patterns
 
-3. **[test-id-audit.md](./test-id-audit.md)** - Component inventory
+3. **[test-id-audit.md](../archive/2026-02-doc-cleanup/testing/test-id-audit.md)** - Component inventory (archived)
    - Test ID naming convention standard
    - Audit checklist for all Golden Primitives
    - Audit checklist for all Golden Patterns
@@ -338,15 +338,15 @@ Error: expected <badge> to have class /status-primary/
 
 **You now have 4 comprehensive guides:**
 
-1. **[playwright-test-alignment.md](./playwright-test-alignment.md)**
+1. **[playwright-test-alignment.md](../archive/2026-02-doc-cleanup/testing/playwright-test-alignment.md)**
    - Read first for overall understanding
    - Sections: Current state, Golden Set mapping, misalignments, improvements
 
-2. **[playwright-refactoring-examples.md](./playwright-refactoring-examples.md)**
+2. **[playwright-refactoring-examples.md](../archive/2026-02-doc-cleanup/testing/playwright-refactoring-examples.md)**
    - Read second for practical examples
    - Sections: 4 real examples, migration strategy, quick reference
 
-3. **[test-id-audit.md](./test-id-audit.md)**
+3. **[test-id-audit.md](../archive/2026-02-doc-cleanup/testing/test-id-audit.md)**
    - Reference for component audit
    - Sections: Naming convention, primitives checklist, patterns checklist
 

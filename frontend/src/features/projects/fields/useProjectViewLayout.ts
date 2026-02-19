@@ -3,6 +3,8 @@ import { getDefaultOrderedFieldIds, getDefaultVisibleFieldIds, PROJECT_FIELD_MAP
 import type { ProjectFieldView } from './ProjectFieldRegistry';
 
 const STORAGE_PREFIX = 'projects.v2.layout';
+const LAYOUT_VERSION = 2;
+const VERSION_KEY = `${STORAGE_PREFIX}.version`;
 
 const readStoredArray = (key: string) => {
   if (typeof window === 'undefined') {
@@ -20,8 +22,32 @@ const readStoredArray = (key: string) => {
   }
 };
 
+const readStoredVersion = () => {
+  if (typeof window === 'undefined') {
+    return LAYOUT_VERSION;
+  }
+  const raw = window.localStorage.getItem(VERSION_KEY);
+  const parsed = raw ? Number(raw) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const sanitizeIds = (ids: string[] | undefined) =>
   (ids ?? []).filter((id) => PROJECT_FIELD_MAP.has(id));
+
+const mergeOrderedIds = (stored: string[] | undefined, defaults: string[]) => {
+  const base = sanitizeIds(stored);
+  const missing = defaults.filter((id) => !base.includes(id));
+  return base.length ? [...base, ...missing] : defaults;
+};
+
+const mergeVisibleIds = (stored: string[] | undefined, defaults: string[]) => {
+  const base = sanitizeIds(stored);
+  if (!base.length) {
+    return defaults;
+  }
+  const missing = defaults.filter((id) => !base.includes(id));
+  return [...base, ...missing];
+};
 
 export const useProjectViewLayout = (view: ProjectFieldView) => {
   const defaultVisible = useMemo(() => getDefaultVisibleFieldIds(view), [view]);
@@ -30,14 +56,24 @@ export const useProjectViewLayout = (view: ProjectFieldView) => {
   const visibleKey = `${STORAGE_PREFIX}.${view}.visibleFieldIds`;
   const orderKey = `${STORAGE_PREFIX}.${view}.order`;
   const pinnedKey = `${STORAGE_PREFIX}.${view}.pinnedFieldIds`;
+  const storedVersion = readStoredVersion();
+  const shouldMergeDefaults = storedVersion !== LAYOUT_VERSION;
 
   const [visibleFieldIds, setVisibleFieldIds] = useState<string[]>(() => {
-    const stored = sanitizeIds(readStoredArray(visibleKey));
-    return stored.length ? stored : defaultVisible;
+    const stored = readStoredArray(visibleKey);
+    if (shouldMergeDefaults) {
+      return mergeVisibleIds(stored, defaultVisible);
+    }
+    const sanitized = sanitizeIds(stored);
+    return sanitized.length ? sanitized : defaultVisible;
   });
   const [orderedFieldIds, setOrderedFieldIds] = useState<string[]>(() => {
-    const stored = sanitizeIds(readStoredArray(orderKey));
-    return stored.length ? stored : defaultOrder;
+    const stored = readStoredArray(orderKey);
+    if (shouldMergeDefaults) {
+      return mergeOrderedIds(stored, defaultOrder);
+    }
+    const sanitized = sanitizeIds(stored);
+    return sanitized.length ? sanitized : defaultOrder;
   });
   const [pinnedFieldIds, setPinnedFieldIds] = useState<string[]>(() => {
     const stored = sanitizeIds(readStoredArray(pinnedKey));
@@ -64,6 +100,13 @@ export const useProjectViewLayout = (view: ProjectFieldView) => {
     }
     window.localStorage.setItem(pinnedKey, JSON.stringify(pinnedFieldIds));
   }, [pinnedFieldIds, pinnedKey, view]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(VERSION_KEY, String(LAYOUT_VERSION));
+  }, []);
 
   const orderedVisibleFieldIds = useMemo(
     () => orderedFieldIds.filter((id) => visibleFieldIds.includes(id)),

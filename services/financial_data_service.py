@@ -186,7 +186,8 @@ class FinancialDataService:
                     invoice_month = FeeResolverService.calculate_invoice_month_final(
                         override=row_dict.get(ServiceReviews.INVOICE_MONTH_OVERRIDE),
                         auto_derived=row_dict.get(ServiceReviews.INVOICE_MONTH_AUTO),
-                        due_date=row_dict.get(ServiceReviews.DUE_DATE)
+                        due_date=row_dict.get(ServiceReviews.DUE_DATE),
+                        planned_date=row_dict.get(ServiceReviews.PLANNED_DATE),
                     )
                     
                     line_item = {
@@ -222,10 +223,12 @@ class FinancialDataService:
                     
                     # Items don't use invoice_month_final; derive from due_date
                     due_date = row_dict.get(ServiceItems.DUE_DATE)
+                    planned_date = row_dict.get(ServiceItems.PLANNED_DATE)
                     invoice_month = FeeResolverService.calculate_invoice_month_final(
                         override=None,
                         auto_derived=None,
-                        due_date=due_date.isoformat() if due_date else None
+                        due_date=due_date.isoformat() if due_date else None,
+                        planned_date=planned_date.isoformat() if planned_date else None,
                     )
                     
                     line_item = {

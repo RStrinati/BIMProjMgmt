@@ -10,6 +10,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import type { ProjectService } from '@/types/api';
 
 type ExecutionIntent = 'planned' | 'optional' | 'not_proceeding';
@@ -61,7 +62,7 @@ export function ServicePlanningPanel({
   );
 
   const handleReasonChange = useCallback(
-    async (event: React.ChangeEvent<{ name?: string; value: unknown }>) => {
+    async (event: SelectChangeEvent<string>) => {
       const reason = event.target.value as string;
       setSelectedReason(reason);
 

@@ -164,6 +164,8 @@ export const projectServicesApi = {
     data: {
       template_id: string;
       options_enabled?: string[];
+      exclude_reviews?: string[];
+      exclude_items?: string[];
       overrides?: {
         service_code?: string;
         service_name?: string;
@@ -191,6 +193,8 @@ export const projectServicesApi = {
     data: {
       template_id: string;
       options_enabled?: string[];
+      exclude_reviews?: string[];
+      exclude_items?: string[];
       overrides?: Record<string, unknown>;
       dry_run?: boolean;
       mode?: 'sync_missing_only' | 'sync_and_update_managed';

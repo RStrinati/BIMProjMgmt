@@ -204,6 +204,176 @@ const PORT = 3000;
 
 let access_token = null;
 let client_credentials_token = null;
+const DEBUG_ITEM_FIELDS = (process.env.DEBUG_ITEM_FIELDS || '').toLowerCase() === 'true';
+const DEBUG_USER_FIELDS = (process.env.DEBUG_USER_FIELDS || '').toLowerCase() === 'true';
+
+function getFileExtension(item) {
+    const extType = item?.attributes?.extension?.type;
+    if (extType) {
+        const norm = String(extType).toLowerCase();
+        if (norm.includes('c4rmodel')) return 'rvt';
+        if (norm.includes('ifc')) return 'ifc';
+        if (norm.includes('dwg')) return 'dwg';
+        if (norm.includes('nwd')) return 'nwd';
+        if (norm.includes('nwc')) return 'nwc';
+        if (norm.includes('skp')) return 'skp';
+        if (norm.includes('rfa')) return 'rfa';
+        if (norm.includes('rte')) return 'rte';
+        if (norm.includes('nwf')) return 'nwf';
+        if (norm.includes('file')) {
+            const src = item?.attributes?.extension?.data?.sourceFileName;
+            if (src && src.includes('.')) {
+                const i = src.lastIndexOf('.');
+                return src.slice(i + 1).toLowerCase();
+            }
+        }
+    }
+    const name = item?.attributes?.displayName || '';
+    const idx = name.lastIndexOf('.');
+    if (idx === -1) return null;
+    return name.slice(idx + 1).toLowerCase();
+}
+
+async function dmGetFolderContents(projectId, folderId, token) {
+    const encodedId = encodeURIComponent(folderId);
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+        return await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/folders/${encodedId}/contents`, { headers });
+    } catch (err) {
+        if (err.response?.status === 404) {
+            return await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodedId}/children`, { headers });
+        }
+        throw err;
+    }
+}
+
+async function getProjectUsers(projectId, token, region) {
+    const cleanProjectId = projectId.startsWith('b.') ? projectId.slice(2) : projectId;
+    const headers = { Authorization: `Bearer ${token}` };
+    if (region) {
+        const regionValue = region.toUpperCase();
+        headers['x-ads-region'] = regionValue;
+        headers['Region'] = regionValue;
+    }
+    const urls = [
+        `https://developer.api.autodesk.com/construction/admin/v1/projects/${cleanProjectId}/users`,
+        `https://developer.api.autodesk.com/bim360/admin/v1/projects/${cleanProjectId}/users`
+    ];
+
+    let lastErr = null;
+    for (const url of urls) {
+        try {
+            return await axios.get(url, { headers });
+        } catch (err) {
+            if (err.response?.status === 404) {
+                lastErr = err;
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastErr || new Error('Project users endpoint not found');
+}
+
+function normalizeUser(user) {
+    const first = user.first_name || user.firstname || '';
+    const last = user.last_name || user.lastname || '';
+    const name = user.name || `${first} ${last}`.trim() || user.email || 'N/A';
+    const role =
+        user.role ||
+        user.role_name ||
+        user.access_level ||
+        user.job_title ||
+        user.roles?.[0]?.name ||
+        user.roles?.[0]?.role ||
+        'N/A';
+    const company =
+        user.company_name ||
+        user.company?.name ||
+        user.company?.company_name ||
+        user.company?.title ||
+        user.companyName ||
+        user.company ||
+        user.account_name ||
+        user.organization ||
+        user.org_name ||
+        'N/A';
+    const accessLevelRaw =
+        user.access_level ||
+        user.accessLevel ||
+        user.project_access ||
+        user.project_role ||
+        user.projectRole ||
+        user.accessLevels ||
+        null;
+    const productsRaw =
+        user.services ||
+        user.products ||
+        user.modules ||
+        user.product_access ||
+        user.permissions?.products ||
+        [];
+    const permissionsRaw =
+        user.permissions ||
+        user.role_permissions ||
+        user.project_permissions ||
+        user.service_permissions ||
+        [];
+    const accessLevel = formatAccessLevel(accessLevelRaw);
+    const products = formatProducts(productsRaw);
+    const permissions = formatPermissions(permissionsRaw);
+    return {
+        id: user.id || user.user_id || user.autodesk_id,
+        name,
+        email: user.email || 'N/A',
+        role,
+        status: user.status || 'active',
+        company,
+        accessLevel,
+        products,
+        permissions
+    };
+}
+
+function formatAccessLevel(raw) {
+    if (!raw) return 'N/A';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') {
+        const flags = [];
+        if (raw.accountAdmin) flags.push('Account Admin');
+        if (raw.projectAdmin) flags.push('Project Admin');
+        if (raw.executive) flags.push('Executive');
+        if (raw.accountStandardsAdministrator) flags.push('Account Standards Admin');
+        return flags.length > 0 ? flags.join(', ') : 'Member';
+    }
+    return 'N/A';
+}
+
+function formatProducts(raw) {
+    if (!raw || (Array.isArray(raw) && raw.length === 0)) return 'None';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) {
+        const enabled = raw
+            .filter(p => p && (p.access === 'member' || p.access === 'admin' || p.access === true))
+            .map(p => p.key || p.name || p.product || p.service)
+            .filter(Boolean);
+        return enabled.length > 0 ? enabled.join(', ') : 'None';
+    }
+    return 'None';
+}
+
+function formatPermissions(raw) {
+    if (!raw || (Array.isArray(raw) && raw.length === 0)) return 'None';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) return raw.map(String).join(', ');
+    if (typeof raw === 'object') {
+        return Object.entries(raw)
+            .filter(([, v]) => !!v)
+            .map(([k]) => k)
+            .join(', ') || 'None';
+    }
+    return 'None';
+}
 
 // OAuth state management for security (in production, use secure session storage)
 const oauthStates = new Map();
@@ -1326,9 +1496,7 @@ app.get('/project-details/:hubId/:projectId', async (req, res) => {
         
         for (const folder of folders) {
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
-                    headers: { 'Authorization': `Bearer ${client_credentials_token}` }
-                });
+                const folderContents = await dmGetFolderContents(projectId, folder.id, client_credentials_token);
                 
                 const files = folderContents.data.data.filter(item => item.type === 'items');
                 totalFiles += files.length;
@@ -1555,29 +1723,30 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
         for (const folder of folders) {
             try {
                 // Use /items/{id} endpoint instead of /folders/{id}/contents
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodeURIComponent(folder.id)}/children`, {
-                    headers: { 'Authorization': `Bearer ${client_credentials_token}` }
-                });
+                const folderContents = await dmGetFolderContents(projectId, folder.id, client_credentials_token);
                 
-                const files = folderContents.data.data
-                    .filter(item => item.type === 'items')
-                    .map(item => ({
-                        id: item.id,
-                        name: item.attributes.displayName,
-                        extension: item.attributes.extension?.type,
-                        size: item.attributes.storageSize,
-                        created: item.attributes.createTime,
-                        modified: item.attributes.lastModifiedTime,
-                        version: item.attributes.versionNumber,
-                        folder: folder.attributes.displayName
-                    }));
+                  const files = folderContents.data.data
+                      .filter(item => item.type === 'items')
+                      .map(item => {
+                          const extension = getFileExtension(item);
+                          return {
+                              id: item.id,
+                              name: item.attributes.displayName,
+                              extension: extension,
+                              size: item.attributes.storageSize,
+                              created: item.attributes.createTime,
+                              modified: item.attributes.lastModifiedTime,
+                              version: item.attributes.versionNumber,
+                              folder: folder.attributes.displayName
+                          };
+                      });
 
                 allFiles = allFiles.concat(files);
 
                 // Identify model files (common CAD/BIM extensions)
-                const models = files.filter(file => 
-                    file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm'].includes(file.extension.toLowerCase())
-                );
+                  const models = files.filter(file => 
+                      file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm', 'rfa', 'rte'].includes(file.extension)
+                  );
                 modelFiles = modelFiles.concat(models);
 
                 // Track latest update
@@ -1663,9 +1832,7 @@ app.get('/my-project-details/:hubId/:projectId', async (req, res) => {
 
         for (const folder of folders) {
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
-                    headers: { 'Authorization': `Bearer ${access_token}` },
-                });
+                const folderContents = await dmGetFolderContents(projectId, folder.id, access_token);
 
                 const files = folderContents.data.data.filter(item => item.type === 'items');
                 totalFiles += files.length;
@@ -1726,52 +1893,44 @@ app.get('/my-project-users/:hubId/:projectId', async (req, res) => {
         });
     }
 
-    const { hubId, projectId } = req.params;
-    const region = req.query.region || req.headers['x-ads-region'];
-    const headers = { 'Authorization': `Bearer ${access_token}` };
-    if (region) headers['x-ads-region'] = region.toUpperCase();
+      const { hubId, projectId } = req.params;
+      const region = req.query.region || req.headers['x-ads-region'] || req.headers['region'];
 
-    try {
-        logEvent('api', { endpoint: '/my-project-users', hubId, projectId, tokenType: 'User Token (3-legged)', region: headers['x-ads-region'] || 'default' });
+      try {
+        logEvent('api', { endpoint: '/my-project-users', hubId, projectId, tokenType: 'User Token (3-legged)', region: region || 'default' });
 
-        const response = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}/users`, {
-            headers
-        });
-
-        const users = response.data.data.map(user => ({
-            id: user.id,
-            name: user.attributes?.name || 'N/A',
-            email: user.attributes?.email || 'N/A',
-            role: user.attributes?.role || 'N/A',
-            status: user.attributes?.status || 'active',
-            company: user.attributes?.company || 'N/A'
-        }));
+        const response = await getProjectUsers(projectId, access_token, region);
+        const rawUsers = response.data?.results || response.data?.data || response.data || [];
+        const users = rawUsers.map(normalizeUser);
+        if (DEBUG_USER_FIELDS && rawUsers.length > 0) {
+            console.log('[DEBUG_USER_FIELDS]', rawUsers[0]);
+        }
 
         res.json({
             success: true,
             authMethod: 'User Token (3-legged OAuth)',
             projectId: projectId,
             userCount: users.length,
-            region: headers['x-ads-region'] || 'default',
+            region: region || 'default',
             users: users
         });
 
-    } catch (err) {
-        logEvent('error', { endpoint: '/my-project-users', hubId, projectId, region: headers['x-ads-region'] || 'none', error: err.message });
+      } catch (err) {
+        logEvent('error', { endpoint: '/my-project-users', hubId, projectId, region: region || 'none', error: err.message });
         res.status(err.response?.status || 500).json({
             error: 'Could not access project users with user token',
             details: err.response?.data || err.message,
             status: err.response?.status || 'unknown',
-            usedRegionHeader: headers['x-ads-region'] || 'none',
+            usedRegionHeader: region || 'none',
             possibleCauses: [
-                'Project is in EMEA and needs x-ads-region: EMEA',
+                'Project is in EMEA/AUS and needs region header (x-ads-region or Region)',
                 'Your Autodesk user may not have permission to list users',
-                'Team data access may be restricted for this project',
-                'Additional scopes (team:read, user-profile:read) may be required'
+                'Account Admin API may not be enabled for this account',
+                'App must be added as a Custom Integration for this ACC account'
             ],
             alternatives: [
                 'Confirm your account has admin rights in this ACC project',
-                'Retry with ?region=EMEA if this is an EU hub',
+                'Retry with ?region=EMEA or ?region=AUS depending on hub region',
                 'Retry with a user that can manage project members'
             ],
             navigation: {
@@ -1891,33 +2050,47 @@ app.get('/my-project-files/:hubId/:projectId', async (req, res) => {
             console.log(`🔍 Reading folder: ${folderName} (depth: ${depth})`);
             try {
                 // Use /items/{id} endpoint instead of /folders/{id}/contents
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodeURIComponent(folderId)}/children`, {
-                    headers: { 'Authorization': `Bearer ${access_token}` }
-                });
+                  const folderContents = await dmGetFolderContents(projectId, folderId, access_token);
 
-                const items = folderContents.data.data;
-                console.log(`  ✓ Folder ${folderName}: ${items.length} items`);
+                  const items = folderContents.data.data;
+                  console.log(`  ✓ Folder ${folderName}: ${items.length} items`);
 
-                // Process files
-                const files = items
-                    .filter(item => item.type === 'items')
-                    .map(item => ({
-                        id: item.id,
-                        name: item.attributes.displayName,
-                        extension: item.attributes.extension?.type,
-                        size: item.attributes.storageSize,
-                        created: item.attributes.createTime,
-                        modified: item.attributes.lastModifiedTime,
-                        version: item.attributes.versionNumber,
-                        folder: folderName
-                    }));
+                  if (DEBUG_ITEM_FIELDS && items.length > 0) {
+                      const sample = items.find(i => i.type === 'items') || items[0];
+                      console.log('[DEBUG_ITEM_FIELDS]', {
+                          folder: folderName,
+                          type: sample.type,
+                          displayName: sample?.attributes?.displayName,
+                          extension: sample?.attributes?.extension,
+                          fileType: sample?.attributes?.fileType,
+                          mimeType: sample?.attributes?.mimeType,
+                          storage: sample?.attributes?.storage
+                      });
+                  }
+
+                  // Process files
+                  const files = items
+                      .filter(item => item.type === 'items')
+                      .map(item => {
+                          const extension = getFileExtension(item);
+                          return {
+                              id: item.id,
+                              name: item.attributes.displayName,
+                              extension: extension,
+                              size: item.attributes.storageSize,
+                              created: item.attributes.createTime,
+                              modified: item.attributes.lastModifiedTime,
+                              version: item.attributes.versionNumber,
+                              folder: folderName
+                          };
+                      });
 
                 console.log(`  📄 Found ${files.length} files in ${folderName}`);
                 allFiles = allFiles.concat(files);
 
-                const models = files.filter(file => 
-                    file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm'].includes(file.extension.toLowerCase())
-                );
+                  const models = files.filter(file => 
+                      file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm', 'rfa', 'rte'].includes(file.extension)
+                  );
                 modelFiles = modelFiles.concat(models);
                 console.log(`  🏗️ Found ${models.length} model files in ${folderName}`);
 
@@ -1936,14 +2109,17 @@ app.get('/my-project-files/:hubId/:projectId', async (req, res) => {
                 }
 
             } catch (err) {
-                console.log(`❌ Could not access folder ${folderName} (ID: ${folderId}):`, {
-                    status: err.response?.status,
-                    statusText: err.response?.statusText,
-                    error: err.response?.data?.developerMessage || err.response?.data || err.message,
-                    folderId: folderId,
-                    projectId: projectId,
-                    url: `https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folderId}/contents`
-                });
+                  console.log(`❌ Could not access folder ${folderName} (ID: ${folderId}):`, {
+                      status: err.response?.status,
+                      statusText: err.response?.statusText,
+                      error: err.response?.data?.developerMessage || err.response?.data || err.message,
+                      folderId: folderId,
+                      projectId: projectId,
+                      attempted: {
+                          folders: `https://developer.api.autodesk.com/data/v1/projects/${projectId}/folders/${encodeURIComponent(folderId)}/contents`,
+                          items: `https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodeURIComponent(folderId)}/children`
+                      }
+                  });
             }
         }
 

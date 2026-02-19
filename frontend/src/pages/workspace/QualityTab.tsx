@@ -8,6 +8,7 @@ import { Box, Typography } from '@mui/material';
 import { useOutletContext } from 'react-router-dom';
 import { QualityTab as QualityTabContent } from '@/pages/QualityTab';
 import type { Project } from '@/types/api';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 
 type OutletContext = {
   projectId: number;
@@ -16,6 +17,8 @@ type OutletContext = {
 
 export default function QualityTab() {
   const { projectId } = useOutletContext<OutletContext>();
+  const { selection, setSelection } = useWorkspaceSelection();
+  const selectedModelId = selection?.type === 'model' && typeof selection.id === 'number' ? selection.id : null;
 
   if (!Number.isFinite(projectId)) {
     return (
@@ -27,7 +30,18 @@ export default function QualityTab() {
 
   return (
     <Box data-testid="workspace-quality-tab">
-      <QualityTabContent projectId={projectId} />
+      <QualityTabContent
+        projectId={projectId}
+        selectionMode="external"
+        selectedModelId={selectedModelId}
+        onSelectModel={(modelId) => {
+          if (modelId == null) {
+            setSelection(null);
+            return;
+          }
+          setSelection({ type: 'model', id: modelId });
+        }}
+      />
     </Box>
   );
 }

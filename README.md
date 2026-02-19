@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/security-audit%20pass-green.svg)](#-security)
 
-A comprehensive **BIM (Building Information Modeling) project management system** with integrated review management, scheduling, billing workflows, real-time analytics, and multi-platform data integration capabilities.
+A unified **BIM project intelligence hub** that bridges Autodesk Construction Cloud (ACC) and Revizto workflows, aligning issues and users with project services, reviews, and deliverables. It provides configurable project workspaces and dashboards to reduce manual reporting and enable consistent cross-project insights.
 
 ## 🔒 Security
 
@@ -24,18 +24,20 @@ A comprehensive **BIM (Building Information Modeling) project management system*
 
 ## 🎯 Overview
 
-This system provides enterprise-grade construction project lifecycle management with real-time collaboration, multi-source data integration, and advanced analytics. Built with modern web technologies, it integrates seamlessly with Autodesk Construction Cloud (ACC), Revizto, and Revit workflows.
+This system bridges the current divide between ACC and Revizto issue workflows, creating a single source of truth for issues, users, and service context. It replaces manual exports and per-project Power BI models with consistent, branded reporting for both PMs and leadership. It is not a CDE or clash detection replacement; it complements existing platforms as an orchestration and reporting layer.
+
+Read the partner brief: `docs/PRODUCT_BRIEF.md`. For current docs, see `docs/README.md`.
 
 ### Core Capabilities
 
-- **🏗️ Project Lifecycle Management** - Complete project initialization, tracking, and closeout with service templates
-- **📋 Review Management** - Multi-stage construction reviews with automated scheduling and deliverables tracking
-- **✅ Task Management** - Enhanced task tracking with dependencies, milestones, and Gantt visualization
-- **📊 Real-Time Analytics** - Interactive dashboards for issues, model health, naming compliance, and coordinate alignment
-- **👥 Resource Management** - Team allocation, capacity planning, and workload visualization
-- **💰 Billing & Claims** - Automated billing claim generation with progress tracking and line-item detail
-- **🔗 Data Integration** - ACC, Revizto, Revit Health, IFC models, and Autodesk Platform Services (APS)
-- **🤖 Automation** - Dynamo batch processing, automated health checks, and issue pattern recognition
+- **Unified Issues + Users** - ACC and Revizto data consolidated into a single, auditable table
+- **Configurable Project Workspaces** - Table-centric views per project with PM-controlled layouts
+- **Service/Review/Deliverable Alignment** - Issue context tied to project services and reviews (Option A model)
+- **Model Register + Health Compliance** - Publish tracking and model health checks against a master control file
+- **Project + Company Dashboards** - Project-level visibility and cross-project reporting
+- **Data Imports** - Controlled cadence with Revizto automation and ACC manual exports where APS access is limited
+- **Review + Task Management** - Reviews, deliverables, and project tasks tracked in one workspace
+- **Billing & Claims (existing module)** - Finance workflows and line-item tracking where required
 
 ## 📐 Core Conceptual Model (AUTHORITATIVE - Option A)
 

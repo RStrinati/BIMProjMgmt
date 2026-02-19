@@ -1,6 +1,15 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const session = require('express-session');
 const app = express();
+
+app.use(express.json());
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+    resave: false,
+    saveUninitialized: false
+}));
 
 // Root route for instructions
 app.get('/', (req, res) => {
@@ -24,13 +33,218 @@ app.get('/', (req, res) => {
     `);
 });
 
-const CLIENT_ID = 'HSIzVK9vT8AGY0emotXgOylhsczvoO0XSPy6M76vAAovAeN8';
-const CLIENT_SECRET = 'JuLnXcguwKB2g0QoG5auJWnF2XnI9uiW8wdYw5xIAmKiqTIvK3q9pfAHTq7ZcNZ4';
-const REDIRECT_URI = 'http://localhost:3000/callback';
+const CLIENT_ID = process.env.APS_CLIENT_ID;
+const CLIENT_SECRET = process.env.APS_CLIENT_SECRET;
+const REDIRECT_URI = process.env.APS_REDIRECT_URI || 'http://localhost:3000/callback';
+const AECDM_REGION = process.env.AECDM_REGION || 'AUS';
 const PORT = 3000;
 
-let access_token = null;
 let client_credentials_token = null;
+
+function getUserToken(req) {
+    return req.session?.aps3l?.access_token || null;
+}
+
+function getAppToken() {
+    return client_credentials_token || null;
+}
+
+function getPreferredToken(req) {
+    return getUserToken(req) || getAppToken();
+}
+
+function require3Legged(req, res, next) {
+    if (!getUserToken(req)) {
+        return res.status(401).json({ error: 'Login required (/login)' });
+    }
+    next();
+}
+
+function getFileExtension(item) {
+    const extType = item?.attributes?.extension?.type;
+    if (extType) {
+        const norm = String(extType).toLowerCase();
+        if (norm.includes('c4rmodel')) return 'rvt';
+        if (norm.includes('ifc')) return 'ifc';
+        if (norm.includes('dwg')) return 'dwg';
+        if (norm.includes('nwd')) return 'nwd';
+        if (norm.includes('nwc')) return 'nwc';
+        if (norm.includes('skp')) return 'skp';
+        if (norm.includes('rfa')) return 'rfa';
+        if (norm.includes('rte')) return 'rte';
+        if (norm.includes('nwf')) return 'nwf';
+        if (norm.includes('file')) {
+            const src = item?.attributes?.extension?.data?.sourceFileName;
+            if (src && src.includes('.')) {
+                const i = src.lastIndexOf('.');
+                return src.slice(i + 1).toLowerCase();
+            }
+        }
+    }
+    const name = item?.attributes?.displayName || '';
+    const idx = name.lastIndexOf('.');
+    if (idx === -1) return null;
+    return name.slice(idx + 1).toLowerCase();
+}
+
+async function dmGet(url, token) {
+    return axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+async function dmGetFolderContents(projectId, folderId, token) {
+    const encodedId = encodeURIComponent(folderId);
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+        return await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/folders/${encodedId}/contents`, { headers });
+    } catch (err) {
+        if (err.response?.status === 404) {
+            return await axios.get(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${encodedId}/children`, { headers });
+        }
+        throw err;
+    }
+}
+
+async function getProjectUsers(projectId, token, region) {
+    const cleanProjectId = projectId.startsWith('b.') ? projectId.slice(2) : projectId;
+    const headers = { Authorization: `Bearer ${token}` };
+    if (region) {
+        const regionValue = region.toUpperCase();
+        headers['x-ads-region'] = regionValue;
+        headers['Region'] = regionValue;
+    }
+    const urls = [
+        `https://developer.api.autodesk.com/construction/admin/v1/projects/${cleanProjectId}/users`,
+        `https://developer.api.autodesk.com/bim360/admin/v1/projects/${cleanProjectId}/users`
+    ];
+
+    let lastErr = null;
+    for (const url of urls) {
+        try {
+            return await axios.get(url, { headers });
+        } catch (err) {
+            if (err.response?.status === 404) {
+                lastErr = err;
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastErr || new Error('Project users endpoint not found');
+}
+
+function normalizeUser(user) {
+    const first = user.first_name || user.firstname || '';
+    const last = user.last_name || user.lastname || '';
+    const name = user.name || `${first} ${last}`.trim() || user.email || 'N/A';
+    const role =
+        user.role ||
+        user.role_name ||
+        user.access_level ||
+        user.job_title ||
+        user.roles?.[0]?.name ||
+        user.roles?.[0]?.role ||
+        'N/A';
+    const company =
+        user.company_name ||
+        user.company?.name ||
+        user.company?.company_name ||
+        user.company?.title ||
+        user.companyName ||
+        user.company ||
+        user.account_name ||
+        user.organization ||
+        user.org_name ||
+        'N/A';
+    const accessLevelRaw =
+        user.access_level ||
+        user.accessLevel ||
+        user.project_access ||
+        user.project_role ||
+        user.projectRole ||
+        user.accessLevels ||
+        null;
+    const productsRaw =
+        user.services ||
+        user.products ||
+        user.modules ||
+        user.product_access ||
+        user.permissions?.products ||
+        [];
+    const permissionsRaw =
+        user.permissions ||
+        user.role_permissions ||
+        user.project_permissions ||
+        user.service_permissions ||
+        [];
+    const accessLevel = formatAccessLevel(accessLevelRaw);
+    const products = formatProducts(productsRaw);
+    const permissions = formatPermissions(permissionsRaw);
+    return {
+        id: user.id || user.user_id || user.autodesk_id,
+        name,
+        email: user.email || 'N/A',
+        role,
+        status: user.status || 'active',
+        lastLogin: user.lastSignIn,
+        company,
+        accessLevel,
+        products,
+        permissions
+    };
+}
+
+function formatAccessLevel(raw) {
+    if (!raw) return 'N/A';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') {
+        const flags = [];
+        if (raw.accountAdmin) flags.push('Account Admin');
+        if (raw.projectAdmin) flags.push('Project Admin');
+        if (raw.executive) flags.push('Executive');
+        if (raw.accountStandardsAdministrator) flags.push('Account Standards Admin');
+        return flags.length > 0 ? flags.join(', ') : 'Member';
+    }
+    return 'N/A';
+}
+
+function formatProducts(raw) {
+    if (!raw || (Array.isArray(raw) && raw.length === 0)) return 'None';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) {
+        const enabled = raw
+            .filter(p => p && (p.access === 'member' || p.access === 'admin' || p.access === true))
+            .map(p => p.key || p.name || p.product || p.service)
+            .filter(Boolean);
+        return enabled.length > 0 ? enabled.join(', ') : 'None';
+    }
+    return 'None';
+}
+
+function formatPermissions(raw) {
+    if (!raw || (Array.isArray(raw) && raw.length === 0)) return 'None';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) return raw.map(String).join(', ');
+    if (typeof raw === 'object') {
+        return Object.entries(raw)
+            .filter(([, v]) => !!v)
+            .map(([k]) => k)
+            .join(', ') || 'None';
+    }
+    return 'None';
+}
+
+async function getDerivativesUrn(projectId, versionId, token) {
+    const v = await dmGet(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/versions/${versionId}`, token);
+    const rel = v.data?.data?.relationships?.derivatives?.data?.id;
+    if (rel) return rel.startsWith('urn:') ? rel : `urn:${rel}`;
+
+    const refs = await dmGet(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/versions/${versionId}/relationships/refs`, token);
+    const included = refs.data?.included || [];
+    const deriv = included.find(x => x?.type === 'derivatives');
+    const id = deriv?.id;
+    if (!id) throw new Error('No derivatives URN found for version');
+    return id.startsWith('urn:') ? id : `urn:${id}`;
+}
 
 // Comprehensive diagnostic endpoint
 app.get('/diagnose', (req, res) => {
@@ -69,7 +283,7 @@ app.get('/login-2legged', async (req, res) => {
     try {
         console.log('🔑 Attempting 2-legged OAuth (Client Credentials)...');
         
-        const response = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
+        const response = await axios.post('https://developer.api.autodesk.com/authentication/v2/token',
             'grant_type=client_credentials&scope=data:read account:read', {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -104,7 +318,7 @@ app.get('/login-2legged', async (req, res) => {
 
 // Test endpoint to verify token works
 app.get('/test-token', async (req, res) => {
-    if (!client_credentials_token) {
+    if (!getAppToken()) {
         return res.json({
             error: 'No 2-legged token available',
             action: 'Visit /login-2legged first'
@@ -113,9 +327,10 @@ app.get('/test-token', async (req, res) => {
 
     try {
         // Test with hubs API which works with 2-legged tokens
+        const token = getAppToken();
         const response = await axios.get('https://developer.api.autodesk.com/project/v1/hubs', {
             headers: {
-                'Authorization': `Bearer ${client_credentials_token}`
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -143,17 +358,18 @@ app.get('/test-token', async (req, res) => {
 
 // Get user's hubs (ACC hubs)
 app.get('/hubs', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
     try {
         const response = await axios.get('https://developer.api.autodesk.com/project/v1/hubs', {
             headers: {
-                'Authorization': `Bearer ${client_credentials_token}`
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -192,10 +408,11 @@ app.get('/hubs', async (req, res) => {
 
 // Get projects in a specific hub
 app.get('/projects/:hubId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
@@ -204,7 +421,7 @@ app.get('/projects/:hubId', async (req, res) => {
     try {
         const response = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects`, {
             headers: {
-                'Authorization': `Bearer ${client_credentials_token}`
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -260,10 +477,11 @@ app.get('/projects/:hubId', async (req, res) => {
 
 // Project navigation dashboard - provides all links and IDs in one place
 app.get('/project-nav/:hubId/:projectId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
@@ -272,7 +490,7 @@ app.get('/project-nav/:hubId/:projectId', async (req, res) => {
     try {
         // Get basic project info
         const projectResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}`, {
-            headers: { 'Authorization': `Bearer ${client_credentials_token}` }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const project = projectResponse.data.data;
@@ -322,10 +540,11 @@ app.get('/project-nav/:hubId/:projectId', async (req, res) => {
 
 // Get comprehensive project details
 app.get('/project-details/:hubId/:projectId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
@@ -334,12 +553,12 @@ app.get('/project-details/:hubId/:projectId', async (req, res) => {
     try {
         // Get project basic info
         const projectResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}`, {
-            headers: { 'Authorization': `Bearer ${client_credentials_token}` }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         // Get project top folders to count files
         const foldersResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}/topFolders`, {
-            headers: { 'Authorization': `Bearer ${client_credentials_token}` }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const project = projectResponse.data.data;
@@ -351,9 +570,7 @@ app.get('/project-details/:hubId/:projectId', async (req, res) => {
         
         for (const folder of folders) {
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
-                    headers: { 'Authorization': `Bearer ${client_credentials_token}` }
-                });
+                const folderContents = await dmGetFolderContents(projectId, folder.id, token);
                 
                 const files = folderContents.data.data.filter(item => item.type === 'items');
                 totalFiles += files.length;
@@ -407,34 +624,26 @@ app.get('/project-details/:hubId/:projectId', async (req, res) => {
 
 // Get project users/team members
 app.get('/project-users/:hubId/:projectId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
     const { hubId, projectId } = req.params;
+    const region = req.query.region || req.headers['x-ads-region'] || req.headers['region'];
 
     try {
-        // Try to get project users - this might require different permissions
-        const response = await axios.get(`https://developer.api.autodesk.com/hq/v1/accounts/${hubId.replace('b.', '')}/projects/${projectId.replace('b.', '')}/users`, {
-            headers: { 'Authorization': `Bearer ${client_credentials_token}` }
-        });
-
-        const users = response.data.map(user => ({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            status: user.status,
-            lastLogin: user.lastSignIn
-        }));
+        const response = await getProjectUsers(projectId, token, region);
+        const users = (response.data?.results || response.data?.data || response.data || []).map(normalizeUser);
 
         res.json({
             success: true,
             projectId: projectId,
             userCount: users.length,
+            region: region || 'default',
             users: users
         });
 
@@ -444,20 +653,21 @@ app.get('/project-users/:hubId/:projectId', async (req, res) => {
         // If direct user access fails, try alternative approach
         res.json({
             error: 'Could not access project users directly',
-            reason: 'May require additional permissions or different API endpoint',
+            reason: 'May require additional permissions or Account Admin API access',
             details: err.response?.data || err.message,
             status: err.response?.status,
-            suggestion: 'User management typically requires admin permissions in ACC'
+            suggestion: 'Account Admin API requires project admin permissions and custom integration access'
         });
     }
 });
 
 // Get project issues
 app.get('/project-issues/:hubId/:projectId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
@@ -468,7 +678,7 @@ app.get('/project-issues/:hubId/:projectId', async (req, res) => {
         // Get issues using ACC Issues API
         const response = await axios.get(`https://developer.api.autodesk.com/issues/v1/containers/${containerId}/quality-issues`, {
             headers: { 
-                'Authorization': `Bearer ${client_credentials_token}`,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/vnd.api+json'
             },
             params: {
@@ -518,10 +728,11 @@ app.get('/project-issues/:hubId/:projectId', async (req, res) => {
 
 // Get project files and models
 app.get('/project-files/:hubId/:projectId', async (req, res) => {
-    if (!client_credentials_token) {
+    const token = getPreferredToken(req);
+    if (!token) {
         return res.json({
-            error: 'No 2-legged token available',
-            action: 'Visit /login-2legged first'
+            error: 'No token available',
+            action: 'Visit /login-2legged or /login first'
         });
     }
 
@@ -530,7 +741,7 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
     try {
         // Get top folders first
         const foldersResponse = await axios.get(`https://developer.api.autodesk.com/project/v1/hubs/${hubId}/projects/${projectId}/topFolders`, {
-            headers: { 'Authorization': `Bearer ${client_credentials_token}` }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const folders = foldersResponse.data.data;
@@ -541,28 +752,29 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
         // Get files from each folder
         for (const folder of folders) {
             try {
-                const folderContents = await axios.get(`https://developer.api.autodesk.com/project/v1/projects/${projectId}/folders/${folder.id}/contents`, {
-                    headers: { 'Authorization': `Bearer ${client_credentials_token}` }
-                });
+                const folderContents = await dmGetFolderContents(projectId, folder.id, token);
                 
                 const files = folderContents.data.data
                     .filter(item => item.type === 'items')
-                    .map(item => ({
-                        id: item.id,
-                        name: item.attributes.displayName,
-                        extension: item.attributes.extension?.type,
-                        size: item.attributes.storageSize,
-                        created: item.attributes.createTime,
-                        modified: item.attributes.lastModifiedTime,
-                        version: item.attributes.versionNumber,
-                        folder: folder.attributes.displayName
-                    }));
+                    .map(item => {
+                        const extension = getFileExtension(item);
+                        return {
+                            id: item.id,
+                            name: item.attributes.displayName,
+                            extension: extension,
+                            size: item.attributes.storageSize,
+                            created: item.attributes.createTime,
+                            modified: item.attributes.lastModifiedTime,
+                            version: item.attributes.versionNumber,
+                            folder: folder.attributes.displayName
+                        };
+                    });
 
                 allFiles = allFiles.concat(files);
 
                 // Identify model files (common CAD/BIM extensions)
                 const models = files.filter(file => 
-                    file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm'].includes(file.extension.toLowerCase())
+                    file.extension && ['dwg', 'rvt', 'ifc', 'nwd', 'nwc', 'skp', '3dm', 'rfa', 'rte'].includes(file.extension)
                 );
                 modelFiles = modelFiles.concat(models);
 
@@ -617,15 +829,15 @@ app.get('/project-files/:hubId/:projectId', async (req, res) => {
 
 // 3-Legged OAuth login
 app.get('/login', async (req, res) => {
-    const authUrl = `https://developer.api.autodesk.com/authentication/v2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user-profile:read data:read account:read`;
+    const scope = encodeURIComponent('data:read viewables:read user-profile:read');
+    const authUrl =
+        `https://developer.api.autodesk.com/authentication/v2/authorize` +
+        `?response_type=code&client_id=${CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&scope=${scope}`;
 
     console.log('🔗 Autodesk Login URL (3-legged):', authUrl);
-    res.send(`
-        <h2>APS OAuth Demo - 3-Legged Login</h2>
-        <p>This will likely fail with AUTH-001 error due to Client ID issue.</p>
-        <p><a href="${authUrl}" target="_blank">Try Login with Autodesk</a></p>
-        <p><strong>Recommendation:</strong> <a href="/diagnose">Check diagnostic first</a></p>
-    `);
+    res.redirect(authUrl);
 });
 
 // Handle OAuth callback
@@ -634,22 +846,27 @@ app.get('/callback', async (req, res) => {
     console.log('🔁 Received code:', code);
 
     try {
-        const tokenResponse = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', null, {
-            params: {
+        const tokenResponse = await axios.post(
+            'https://developer.api.autodesk.com/authentication/v2/token',
+            new URLSearchParams({
                 client_id: CLIENT_ID,
                 client_secret: CLIENT_SECRET,
                 grant_type: 'authorization_code',
                 code,
                 redirect_uri: REDIRECT_URI
-            },
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
+            }).toString(),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
 
-        access_token = tokenResponse.data.access_token;
-        console.log('✅ Access Token:', access_token);
-        res.send('✅ Access token received. You can now make API calls.');
+        req.session.aps3l = {
+            access_token: tokenResponse.data.access_token,
+            refresh_token: tokenResponse.data.refresh_token,
+            expires_in: tokenResponse.data.expires_in,
+            scope: tokenResponse.data.scope,
+            obtained_at: Date.now()
+        };
+
+        res.send('3-legged token stored. You can now use /viewer and /api/aecdm/graphql.');
     } catch (err) {
         console.error('❌ Token Error:', err.response?.data || err.message);
         res.status(500).json({
@@ -657,6 +874,56 @@ app.get('/callback', async (req, res) => {
             details: err.response?.data || err.message,
             status: err.response?.status,
             recommendation: 'Check /diagnose for solution'
+        });
+    }
+});
+
+app.get('/api/viewer/token', require3Legged, (req, res) => {
+    const t = req.session.aps3l;
+    res.json({ access_token: t.access_token, expires_in: t.expires_in });
+});
+
+app.get('/api/viewer/urn', require3Legged, async (req, res) => {
+    const { projectId, itemId } = req.query;
+    const token = getUserToken(req);
+
+    try {
+        const item = await dmGet(`https://developer.api.autodesk.com/data/v1/projects/${projectId}/items/${itemId}`, token);
+        const tipVersionId = item.data?.data?.relationships?.tip?.data?.id;
+        if (!tipVersionId) {
+            return res.status(400).json({ error: 'Could not determine tip version for item' });
+        }
+
+        const urn = await getDerivativesUrn(projectId, tipVersionId, token);
+        res.json({ urn, versionId: tipVersionId });
+    } catch (err) {
+        res.status(err.response?.status || 500).json({
+            error: 'Failed to resolve viewer URN',
+            details: err.response?.data || err.message
+        });
+    }
+});
+
+app.post('/api/aecdm/graphql', require3Legged, async (req, res) => {
+    const token = getUserToken(req);
+    try {
+        const r = await axios.post(
+            'https://developer.api.autodesk.com/aec/graphql',
+            req.body,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'x-ads-region': AECDM_REGION
+                }
+            }
+        );
+        res.json(r.data);
+    } catch (err) {
+        res.status(err.response?.status || 500).json({
+            error: 'AECDM GraphQL request failed',
+            details: err.response?.data || err.message,
+            regionUsed: AECDM_REGION
         });
     }
 });

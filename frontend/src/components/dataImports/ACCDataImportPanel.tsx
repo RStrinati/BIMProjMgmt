@@ -34,7 +34,7 @@ import {
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accDataImportApi } from '@/api/dataImports';
+import { accDataImportApi, warehouseApi } from '@/api/dataImports';
 import { fileBrowserApi } from '@/api/fileBrowser';
 import { formatDateTime } from '@/utils/dateUtils';
 
@@ -75,6 +75,10 @@ export const ACCDataImportPanel: React.FC<ACCDataImportPanelProps> = ({
       refetchLogs();
       setFilePath('');
     },
+  });
+
+  const warehouseMutation = useMutation({
+    mutationFn: () => warehouseApi.runNow(`acc-import-panel:${projectId}`),
   });
 
   const handleImport = () => {
@@ -156,6 +160,22 @@ export const ACCDataImportPanel: React.FC<ACCDataImportPanelProps> = ({
           </Alert>
         )}
 
+        {warehouseMutation.isError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle>Warehouse Run Failed</AlertTitle>
+            {warehouseMutation.error instanceof Error
+              ? warehouseMutation.error.message
+              : 'Failed to start warehouse pipeline'}
+          </Alert>
+        )}
+
+        {warehouseMutation.isSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <AlertTitle>Warehouse Run Started</AlertTitle>
+            {warehouseMutation.data.message || 'Warehouse pipeline started.'}
+          </Alert>
+        )}
+
         <Stack spacing={2}>
           {/* File/Folder selection - matches Tkinter browse functionality */}
           <Stack direction="row" spacing={2}>
@@ -221,6 +241,14 @@ export const ACCDataImportPanel: React.FC<ACCDataImportPanelProps> = ({
               disabled={logsLoading}
             >
               Refresh Logs
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => warehouseMutation.mutate()}
+              disabled={warehouseMutation.isPending}
+            >
+              {warehouseMutation.isPending ? 'Starting Warehouse...' : 'Run Warehouse Now'}
             </Button>
           </Stack>
         </Stack>

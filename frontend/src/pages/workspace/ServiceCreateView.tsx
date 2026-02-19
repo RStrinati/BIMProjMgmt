@@ -49,6 +49,18 @@ type OutletContext = {
   project: Project | null;
 };
 
+type TemplateReviewOption = {
+  key: string;
+  label: string;
+  group: string;
+};
+
+type TemplateItemOption = {
+  key: string;
+  label: string;
+  group: string;
+};
+
 export default function ServiceCreateView() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -76,6 +88,8 @@ export default function ServiceCreateView() {
 
   const [templateId, setTemplateId] = useState('');
   const [optionsEnabled, setOptionsEnabled] = useState<string[]>([]);
+  const [excludedReviewKeys, setExcludedReviewKeys] = useState<string[]>([]);
+  const [excludedItemKeys, setExcludedItemKeys] = useState<string[]>([]);
   const [templateOverrides, setTemplateOverrides] = useState({
     service_code: '',
     service_name: '',
@@ -114,6 +128,68 @@ export default function ServiceCreateView() {
   const selectedTemplate = useMemo<ServiceTemplateDefinition | null>(() => {
     return templates.find((template) => template.template_id === templateId) ?? null;
   }, [templates, templateId]);
+
+  const templateReviewOptions = useMemo<TemplateReviewOption[]>(() => {
+    if (!selectedTemplate) return [];
+
+    const options: TemplateReviewOption[] = [];
+    (selectedTemplate.reviews || []).forEach((review) => {
+      const key = `base:${review.review_template_id}`;
+      const countLabel = review.count && review.count > 1 ? ` (x${review.count})` : '';
+      options.push({
+        key,
+        label: `${review.name || review.review_template_id}${countLabel}`,
+        group: 'Template Reviews',
+      });
+    });
+
+    (selectedTemplate.options || []).forEach((option) => {
+      if (!optionsEnabled.includes(option.option_id)) {
+        return;
+      }
+      (option.reviews || []).forEach((review) => {
+        const key = `${option.option_id}:${review.review_template_id}`;
+        const countLabel = review.count && review.count > 1 ? ` (x${review.count})` : '';
+        options.push({
+          key,
+          label: `${review.name || review.review_template_id}${countLabel}`,
+          group: `Optional: ${option.name}`,
+        });
+      });
+    });
+
+    return options;
+  }, [selectedTemplate, optionsEnabled]);
+
+  const templateItemOptions = useMemo<TemplateItemOption[]>(() => {
+    if (!selectedTemplate) return [];
+
+    const options: TemplateItemOption[] = [];
+    (selectedTemplate.items || []).forEach((item) => {
+      const key = `base:${item.item_template_id || item.template_id || item.title}`;
+      options.push({
+        key,
+        label: `${item.title}${item.item_type ? ` · ${item.item_type}` : ''}`,
+        group: 'Template Items',
+      });
+    });
+
+    (selectedTemplate.options || []).forEach((option) => {
+      if (!optionsEnabled.includes(option.option_id)) {
+        return;
+      }
+      (option.items || []).forEach((item) => {
+        const key = `${option.option_id}:${item.item_template_id || item.template_id || item.title}`;
+        options.push({
+          key,
+          label: `${item.title}${item.item_type ? ` · ${item.item_type}` : ''}`,
+          group: `Optional: ${option.name}`,
+        });
+      });
+    });
+
+    return options;
+  }, [selectedTemplate, optionsEnabled]);
 
   const pricingSummary = useMemo(() => {
     if (!selectedTemplate?.pricing) {
@@ -178,7 +254,16 @@ export default function ServiceCreateView() {
       billing_model: pricing.model === 'per_unit' ? 'unit_based' : 'lump_sum',
     }));
     setOptionsEnabled([]);
+    setExcludedReviewKeys([]);
+    setExcludedItemKeys([]);
   }, [selectedTemplate]);
+
+  useEffect(() => {
+    const reviewKeys = new Set(templateReviewOptions.map((option) => option.key));
+    const itemKeys = new Set(templateItemOptions.map((option) => option.key));
+    setExcludedReviewKeys((prev) => prev.filter((key) => reviewKeys.has(key)));
+    setExcludedItemKeys((prev) => prev.filter((key) => itemKeys.has(key)));
+  }, [templateReviewOptions, templateItemOptions]);
 
   const createMutation = useMutation({
     mutationFn: (data: typeof formData) => {
@@ -220,6 +305,8 @@ export default function ServiceCreateView() {
       return projectServicesApi.createFromTemplate(projectId, {
         template_id: templateId,
         options_enabled: optionsEnabled,
+        exclude_reviews: excludedReviewKeys,
+        exclude_items: excludedItemKeys,
         overrides: {
           service_code: templateOverrides.service_code || undefined,
           service_name: templateOverrides.service_name || undefined,
@@ -423,6 +510,74 @@ export default function ServiceCreateView() {
                   </Stack>
                 </Box>
               ) : null}
+
+              {(templateReviewOptions.length > 0 || templateItemOptions.length > 0) && (
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Template Deliverables
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                    Uncheck items or reviews you do not want to include in this service.
+                  </Typography>
+                  <Stack spacing={2}>
+                    {templateReviewOptions.length > 0 && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Reviews
+                        </Typography>
+                        <Stack spacing={0.5}>
+                          {templateReviewOptions.map((option) => (
+                            <FormControlLabel
+                              key={option.key}
+                              control={(
+                                <Checkbox
+                                  checked={!excludedReviewKeys.includes(option.key)}
+                                  onChange={() =>
+                                    setExcludedReviewKeys((prev) =>
+                                      prev.includes(option.key)
+                                        ? prev.filter((key) => key !== option.key)
+                                        : [...prev, option.key]
+                                    )
+                                  }
+                                />
+                              )}
+                              label={`${option.label}${option.group !== 'Template Reviews' ? ` (${option.group})` : ''}`}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {templateItemOptions.length > 0 && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Items
+                        </Typography>
+                        <Stack spacing={0.5}>
+                          {templateItemOptions.map((option) => (
+                            <FormControlLabel
+                              key={option.key}
+                              control={(
+                                <Checkbox
+                                  checked={!excludedItemKeys.includes(option.key)}
+                                  onChange={() =>
+                                    setExcludedItemKeys((prev) =>
+                                      prev.includes(option.key)
+                                        ? prev.filter((key) => key !== option.key)
+                                        : [...prev, option.key]
+                                    )
+                                  }
+                                />
+                              )}
+                              label={`${option.label}${option.group !== 'Template Items' ? ` (${option.group})` : ''}`}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Stack>
+                </Paper>
+              )}
 
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>

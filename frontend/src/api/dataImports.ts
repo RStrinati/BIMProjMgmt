@@ -220,6 +220,24 @@ export const reviztoApi = {
     return response.data;
   },
 };
+
+// ============================================================================
+// Warehouse API
+// ============================================================================
+
+export const warehouseApi = {
+  /**
+   * Run the warehouse pipeline immediately (debounce bypass)
+   * POST /api/warehouse/run-now
+   */
+  runNow: async (reason: string = 'manual'): Promise<{ success: boolean; status: string; message?: string }> => {
+    const response = await apiClient.post<{ success: boolean; status: string; message?: string }>(
+      `/warehouse/run-now`,
+      { reason }
+    );
+    return response.data;
+  },
+};
 // ============================================================================
 // ACC Issues API
 // ============================================================================

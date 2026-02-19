@@ -1,6 +1,6 @@
 # BIM Project Management - React Frontend
 
-Modern React frontend for the BIM Project Management System, built with Vite, TypeScript, and Material-UI.
+Modern React frontend for the unified ACC + Revizto project workspace, built with Vite, TypeScript, and Material-UI.
 
 ## 🚀 Quick Start
 
@@ -133,21 +133,13 @@ This creates an optimized production build in the `dist/` directory.
 
 ## 🔜 Next Steps
 
-### Pages to Build:
-- ✅ Dashboard (basic stats)
-- ✅ Projects (grid view with search)
-- ⏳ Reviews Management
-- ⏳ Tasks Management  
-- ⏳ Analytics Dashboard
-- ⏳ Settings
-
-### Features to Add:
-- Project detail view
-- Create/Edit project forms
-- Review scheduling UI
-- Task management
-- File uploads
-- Real-time updates
+- Projects overview and workspace refinements (already built)
+- Unified issues/users table: auditability and mapping tools
+- Services/reviews/deliverables alignment views
+- Model register and model health compliance views
+- Project dashboard and company dashboard filters
+- Import control UX for ACC/Revizto cadence
+- UI/graphics polish and consistency pass
 
 ## 📚 Documentation
 
