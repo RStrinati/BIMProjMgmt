@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Breadcrumbs,
@@ -26,9 +26,10 @@ import {
   Typography,
   Alert,
   Paper,
+  Button,
 } from '@mui/material';
 import { projectsApi, projectServicesApi } from '@/api';
-import type { Project } from '@/types/api';
+import type { Project, ProjectOverviewSummary } from '@/types/api';
 import { getProjectIcon } from '@/components/projects/projectIcons';
 import type { ProjectServicesListResponse } from '@/api/services';
 import type { ProjectService } from '@/api/services';
@@ -57,6 +58,7 @@ export default function WorkspaceShell() {
   const { id } = useParams();
   const projectId = Number(id);
   const { selection, clearSelection } = useWorkspaceSelection();
+  const queryClient = useQueryClient();
   const [rightPanelWidth, setRightPanelWidth] = useState(() => {
     const stored = localStorage.getItem('workspaceRightPanelWidth');
     const parsed = stored ? Number(stored) : 360;
@@ -93,6 +95,21 @@ export default function WorkspaceShell() {
     staleTime: 60_000,
   });
 
+  const { data: overviewSummaryResult, isLoading: isOverviewSummaryLoading } = useQuery({
+    queryKey: ['projectOverviewSummary', projectId],
+    queryFn: () => projectsApi.getOverviewSummary(projectId),
+    enabled: Number.isFinite(projectId) && currentTab === 'overview',
+  });
+
+  const runOverviewSummary = useMutation({
+    mutationFn: () => projectsApi.runOverviewSummary(projectId),
+    onSuccess: () => {
+      if (Number.isFinite(projectId)) {
+        queryClient.invalidateQueries({ queryKey: ['projectOverviewSummary', projectId] });
+      }
+    },
+  });
+
   const services = useMemo<ProjectService[]>(() => {
     if (!servicesPayload) return [];
     if (Array.isArray(servicesPayload)) return servicesPayload;
@@ -104,6 +121,13 @@ export default function WorkspaceShell() {
     if (selection?.type !== 'service') return null;
     return services.find((s) => s.service_id === selection.id) ?? null;
   }, [services, selection]);
+
+  const overviewSummary = (overviewSummaryResult?.summary ?? null) as ProjectOverviewSummary | null;
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '--';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
+  };
 
   const activeTabIndex = useMemo(() => {
     const index = WORKSPACE_TABS.findIndex((tab) => tab.path === currentTab);
@@ -312,12 +336,37 @@ export default function WorkspaceShell() {
                 {currentTab === 'overview' && (
                   <Stack spacing={2}>
                     <Paper variant="outlined" sx={{ p: 2 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                        Overview Summary
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Select an item to view details, or browse the overview tab content.
-                      </Typography>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          Overview Summary
+                        </Typography>
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => runOverviewSummary.mutate()}
+                          disabled={runOverviewSummary.isPending || !Number.isFinite(projectId)}
+                        >
+                          {runOverviewSummary.isPending ? 'Running...' : 'Run report'}
+                        </Button>
+                      </Stack>
+                      {isOverviewSummaryLoading ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Loading overview summary...
+                        </Typography>
+                      ) : overviewSummary ? (
+                        <Stack spacing={1}>
+                          <Typography variant="caption" color="text.secondary">
+                            Last generated: {formatDateTime(overviewSummary.generated_at)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                            {overviewSummary.summary_text}
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          Run the report to generate an overview summary.
+                        </Typography>
+                      )}
                     </Paper>
                     <InvoicePipelinePanel projectId={projectId} />
                   </Stack>

@@ -3,7 +3,7 @@ Pytest-based validation tests for the BIM Project Management System
 """
 
 import pytest
-from review_validation import ReviewValidationService, ValidationError
+from services.review_validation import ReviewValidationService, ValidationError
 
 
 class TestReviewValidationService:

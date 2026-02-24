@@ -38,6 +38,19 @@ export interface Project {
   agreed_fee?: number;
 }
 
+export interface ProjectOverviewSummary {
+  summary_id: number;
+  summary_text: string;
+  summary_json?: string | null;
+  summary_month?: string | null;
+  generated_at?: string | null;
+  generated_by?: string | null;
+}
+
+export interface ProjectOverviewSummaryResponse {
+  summary: ProjectOverviewSummary | null;
+}
+
 export interface ProjectSummary {
   project_id: number;
   project_name: string;

@@ -34,7 +34,7 @@ except ImportError:
     FUZZY_MATCHING_AVAILABLE = False
 
 # Import validation service
-from review_validation import (
+from services.review_validation import (
     validate_template, validate_service_data, validate_review_cycle,
     validate_project_services, validate_billing_claim, sanitize_input
 )

@@ -36,6 +36,7 @@ from config import (
 
 from services.fee_resolver_service import FeeResolverService
 from services.financial_data_service import FinancialDataService
+from services.overview_summary_service import generate_project_overview_summary
 
 from database import (  # noqa: E402
     add_bookmark,
@@ -138,6 +139,7 @@ from database import (  # noqa: E402
     toggle_task_item_completion,
     insert_files_into_tblACCDocs,
     log_acc_import,
+    log_acc_import_general,
     save_acc_folder_path,
     start_revizto_extraction_run,
     update_bookmark,
@@ -169,6 +171,8 @@ from database import (  # noqa: E402
     create_user,
     update_user,
     delete_user,
+    create_project_overview_summary,
+    get_latest_project_overview_summary,
     assign_service_to_user,
     assign_review_to_user,
     get_user_assignments,
@@ -208,7 +212,7 @@ from shared.project_service import (  # noqa: E402
     update_project,
 )
 from constants import schema as S  # noqa: E402
-from review_validation import ValidationError, validate_template  # noqa: E402
+from services.review_validation import ValidationError, validate_template  # noqa: E402
 from review_management_service import ReviewManagementService  # noqa: E402
 from services.project_alias_service import ProjectAliasManager  # noqa: E402
 from backend.anchor_links import (  # noqa: E402
@@ -541,6 +545,30 @@ def schedule_warehouse_pipeline(reason: str) -> None:
     logging.info(
         "Queued warehouse pipeline run in %ss (reason=%s)",
         WAREHOUSE_PIPELINE_DEBOUNCE_SECONDS,
+        reason,
+    )
+
+
+def schedule_warehouse_pipeline_with_delay(delay_seconds: int, reason: str) -> None:
+    """Debounced trigger for the warehouse pipeline with custom delay."""
+    global _warehouse_pipeline_pending
+    global _warehouse_pipeline_timer
+
+    with _warehouse_pipeline_lock:
+        _warehouse_pipeline_pending = True
+        if _warehouse_pipeline_timer and _warehouse_pipeline_timer.is_alive():
+            _warehouse_pipeline_timer.cancel()
+        _warehouse_pipeline_timer = threading.Timer(
+            delay_seconds,
+            _maybe_run_warehouse_pipeline,
+            args=(reason,),
+        )
+        _warehouse_pipeline_timer.daemon = True
+        _warehouse_pipeline_timer.start()
+
+    logging.info(
+        "Queued warehouse pipeline run in %ss (reason=%s)",
+        delay_seconds,
         reason,
     )
 
@@ -3039,6 +3067,41 @@ def api_project_finance_summary(project_id):
     if summary is None:
         return jsonify({'error': 'Project finance summary not found'}), 404
     return jsonify(summary)
+
+
+@app.route('/api/projects/<int:project_id>/overview-summary', methods=['GET'])
+def api_get_project_overview_summary(project_id):
+    try:
+        summary = get_latest_project_overview_summary(project_id)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        logging.exception("Failed to fetch project overview summary")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/overview-summary/run', methods=['POST'])
+def api_run_project_overview_summary(project_id):
+    try:
+        body = request.get_json() or {}
+        month = body.get('month')
+        generated_by = body.get('generated_by')
+
+        result = generate_project_overview_summary(project_id, target_month=month)
+        summary_id = create_project_overview_summary(
+            project_id=project_id,
+            summary_text=result.summary_text,
+            summary_json=result.summary_json,
+            summary_month=result.summary_month,
+            generated_by=generated_by,
+        )
+        if not summary_id:
+            return jsonify({'error': 'Failed to insert project overview summary'}), 500
+
+        summary = get_latest_project_overview_summary(project_id)
+        return jsonify({'summary': summary}), 201
+    except Exception as e:
+        logging.exception("Failed to run project overview summary")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/users', methods=['GET'])
@@ -5858,6 +5921,67 @@ def import_acc_data_endpoint(project_id):
         
     except Exception as e:
         logging.exception(f"Error importing ACC data for project {project_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/acc-data-import', methods=['POST'])
+def import_acc_data_general_endpoint():
+    """Import ACC data from CSV/ZIP export without project context."""
+    try:
+        import time
+        from handlers.acc_handler import import_acc_data
+
+        start_time = time.time()
+
+        body = request.get_json() or {}
+        folder_path = body.get('folder_path')
+        source = body.get('source', 'unspecified')
+
+        if not folder_path:
+            return jsonify({'error': 'folder_path is required'}), 400
+
+        if not os.path.exists(folder_path):
+            return jsonify({'error': f'ACC data folder does not exist: {folder_path}'}), 400
+
+        # Compute absolute path to sql directory (relative to project root)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        merge_dir = os.path.join(project_root, "sql")
+
+        result = import_acc_data(folder_path, db=None, merge_dir=merge_dir, show_skip_summary=False)
+
+        execution_time = time.time() - start_time
+
+        summary = f"Imported ACC data from {folder_path} in {execution_time:.2f}s"
+        log_acc_import_general(
+            folder_name=os.path.basename(folder_path),
+            summary=summary,
+            status="success",
+            source=source,
+            execution_time_seconds=round(execution_time, 2),
+        )
+        schedule_warehouse_pipeline_with_delay(300, "acc-import:general")
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'folder_path': folder_path,
+            'execution_time_seconds': round(execution_time, 2),
+            'message': 'ACC data imported successfully',
+            'tables_processed': len(result),
+        })
+
+    except Exception as e:
+        logging.exception("Error importing ACC data (general endpoint)")
+        try:
+            log_acc_import_general(
+                folder_name=os.path.basename(folder_path) if 'folder_path' in locals() and folder_path else 'unknown',
+                summary=str(e),
+                status="failed",
+                source=body.get('source', 'unspecified') if 'body' in locals() and isinstance(body, dict) else 'unspecified',
+                execution_time_seconds=None,
+            )
+        except Exception:
+            pass
         return jsonify({'error': str(e)}), 500
 
 

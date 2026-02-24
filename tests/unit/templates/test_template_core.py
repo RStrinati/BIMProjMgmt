@@ -117,7 +117,7 @@ class TestTemplateManagementCore(unittest.TestCase):
         """Test template validation using the actual validation system"""
         print("\n🧪 Testing template_validation_with_real_validator...")
         
-        from review_validation import validate_template
+        from services.review_validation import validate_template
         
         # Test with valid template from our test data
         valid_template = self.test_data['templates'][0]
@@ -146,7 +146,7 @@ class TestTemplateManagementCore(unittest.TestCase):
         """Test individual template item validation"""
         print("\n🧪 Testing template_item_validation...")
         
-        from review_validation import validate_template
+        from services.review_validation import validate_template
         
         # Test template with invalid items
         invalid_item_template = {
@@ -260,7 +260,7 @@ class TestTemplateIntegrationScenarios(unittest.TestCase):
         }
         
         # Validate the new template
-        from review_validation import validate_template
+        from services.review_validation import validate_template
         errors = validate_template(new_template)
         self.assertEqual(len(errors), 0, f"New template should be valid, got errors: {[str(e) for e in errors]}")
         
@@ -336,7 +336,7 @@ class TestTemplateIntegrationScenarios(unittest.TestCase):
         data['templates'][0]['notes'] = "Modified template with additional service"
         
         # Validate modified template
-        from review_validation import validate_template
+        from services.review_validation import validate_template
         errors = validate_template(data['templates'][0])
         self.assertEqual(len(errors), 0, f"Modified template should be valid, got errors: {[str(e) for e in errors]}")
         

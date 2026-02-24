@@ -21,6 +21,17 @@ class ACCImportLogs:
     TIMESTAMP = "timestamp"
 
 
+class ACCImportGeneralLogs:
+    TABLE = "ACCImportGeneralLogs"
+    LOG_ID = "log_id"
+    SOURCE = "source"
+    FOLDER_NAME = "folder_name"
+    IMPORT_DATE = "import_date"
+    STATUS = "status"
+    SUMMARY = "summary"
+    EXECUTION_TIME_SECONDS = "execution_time_seconds"
+
+
 class IssueImportRuns:
     TABLE = "IssueImportRuns"
     IMPORT_RUN_ID = "import_run_id"
@@ -1341,6 +1352,17 @@ class ProjectBookmarks:
     NOTES = "notes"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+class ProjectOverviewSummaries:
+    TABLE = "project_overview_summaries"
+    SUMMARY_ID = "summary_id"
+    PROJECT_ID = "project_id"
+    SUMMARY_MONTH = "summary_month"
+    SUMMARY_TEXT = "summary_text"
+    SUMMARY_JSON = "summary_json"
+    GENERATED_AT = "generated_at"
+    GENERATED_BY = "generated_by"
 
 
 # ===================== Dynamo Batch Automation =====================

@@ -1,4 +1,8 @@
 """Quick test of fixed get_model_register()"""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import get_model_register
 
 # Test with project 2 (NFPS)

@@ -2,7 +2,8 @@
 """Debug script to check actual database fee values."""
 
 import sys
-sys.path.insert(0, '.')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database_pool import get_db_connection
 from constants.schema import ServiceReviews, ServiceItems, ProjectServices

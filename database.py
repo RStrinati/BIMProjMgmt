@@ -3667,6 +3667,77 @@ def get_projects():
         logger.error(f"Error fetching projects: {e}")
         return []
 
+def create_project_overview_summary(
+    project_id: int,
+    summary_text: str,
+    summary_json: Optional[str] = None,
+    summary_month: Optional[str] = None,
+    generated_by: Optional[str] = None,
+) -> Optional[int]:
+    """Insert a project overview summary and return the new summary_id."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{S.ProjectOverviewSummaries.TABLE} (
+                    {S.ProjectOverviewSummaries.PROJECT_ID},
+                    {S.ProjectOverviewSummaries.SUMMARY_MONTH},
+                    {S.ProjectOverviewSummaries.SUMMARY_TEXT},
+                    {S.ProjectOverviewSummaries.SUMMARY_JSON},
+                    {S.ProjectOverviewSummaries.GENERATED_BY}
+                ) VALUES (?, ?, ?, ?, ?);
+                """,
+                (project_id, summary_month, summary_text, summary_json, generated_by),
+            )
+            cursor.execute("SELECT SCOPE_IDENTITY();")
+            new_id = cursor.fetchone()[0]
+            conn.commit()
+            return int(new_id) if new_id is not None else None
+    except Exception as e:
+        logger.error(f"Error inserting project overview summary: {e}")
+        return None
+
+
+def get_latest_project_overview_summary(project_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch the most recent overview summary for a project."""
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT TOP 1
+                    {S.ProjectOverviewSummaries.SUMMARY_ID},
+                    {S.ProjectOverviewSummaries.SUMMARY_TEXT},
+                    {S.ProjectOverviewSummaries.SUMMARY_JSON},
+                    {S.ProjectOverviewSummaries.SUMMARY_MONTH},
+                    {S.ProjectOverviewSummaries.GENERATED_AT},
+                    {S.ProjectOverviewSummaries.GENERATED_BY}
+                FROM dbo.{S.ProjectOverviewSummaries.TABLE}
+                WHERE {S.ProjectOverviewSummaries.PROJECT_ID} = ?
+                ORDER BY {S.ProjectOverviewSummaries.GENERATED_AT} DESC,
+                         {S.ProjectOverviewSummaries.SUMMARY_ID} DESC;
+                """,
+                (project_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            generated_at = row[4]
+            if isinstance(generated_at, (datetime, date)):
+                generated_at = generated_at.isoformat()
+            return {
+                "summary_id": row[0],
+                "summary_text": row[1],
+                "summary_json": row[2],
+                "summary_month": row[3],
+                "generated_at": generated_at,
+                "generated_by": row[5],
+            }
+    except Exception as e:
+        logger.error(f"Error fetching project overview summary: {e}")
+        return None
+
 def get_project_details(project_id):
     """Fetch project details from the database including client information."""
     try:
@@ -4256,6 +4327,29 @@ def log_acc_import(project_id, folder_name, summary):
             conn.commit()
     except Exception as e:
         logger.error(f"Error logging ACC import: {e}")
+
+
+def log_acc_import_general(folder_name, summary, status=None, source=None, execution_time_seconds=None):
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {S.ACCImportGeneralLogs.TABLE} (
+                    {S.ACCImportGeneralLogs.SOURCE},
+                    {S.ACCImportGeneralLogs.FOLDER_NAME},
+                    {S.ACCImportGeneralLogs.IMPORT_DATE},
+                    {S.ACCImportGeneralLogs.STATUS},
+                    {S.ACCImportGeneralLogs.SUMMARY},
+                    {S.ACCImportGeneralLogs.EXECUTION_TIME_SECONDS}
+                )
+                VALUES (?, ?, GETDATE(), ?, ?, ?)
+                """,
+                (source, folder_name, status, summary, execution_time_seconds),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error logging ACC general import: {e}")
 
 
 # Control file management ===========================================

@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { invoiceBatchesApi, projectsApi, projectReviewsApi, serviceItemsApi, tasksApi, usersApi } from '@/api';
 import { serviceReviewsApi } from '@/api/services';
-import type { InvoiceBatch, Project, ProjectFinanceGrid, ProjectReviewItem, ProjectReviewsResponse, ServiceItem, ServiceReview, TaskPayload, User } from '@/types/api';
+import type { InvoiceBatch, Project, ProjectFinanceGrid, ProjectOverviewSummary, ProjectReviewItem, ProjectReviewsResponse, ServiceItem, ServiceReview, TaskPayload, User } from '@/types/api';
 import { InlineField } from '@/components/ui/InlineField';
 import { TasksNotesView } from '@/components/ProjectManagement/TasksNotesView';
 import { IssuesTabContent } from '@/components/ProjectManagement/IssuesTabContent';
@@ -171,6 +171,12 @@ export default function ProjectWorkspacePageV2() {
     enabled: Number.isFinite(projectId),
   });
 
+  const { data: overviewSummaryResult, isLoading: isOverviewSummaryLoading } = useQuery({
+    queryKey: ['projectOverviewSummary', projectId],
+    queryFn: () => projectsApi.getOverviewSummary(projectId),
+    enabled: Number.isFinite(projectId),
+  });
+
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => usersApi.getAll(),
@@ -199,6 +205,8 @@ export default function ProjectWorkspacePageV2() {
     () => (Array.isArray(recentTasksResult?.tasks) ? recentTasksResult.tasks : []),
     [recentTasksResult],
   );
+
+  const overviewSummary = (overviewSummaryResult?.summary ?? null) as ProjectOverviewSummary | null;
 
   const resolveAssignee = (task: { assigned_to?: number | null; assigned_to_name?: string | null }) => {
     if (task.assigned_to_name) {
@@ -291,6 +299,23 @@ export default function ProjectWorkspacePageV2() {
     queryKey: ['projectItems', projectId],
     queryFn: () => serviceItemsApi.getProjectItems(projectId),
     enabled: Number.isFinite(projectId),
+  });
+
+  const runOverviewSummary = useMutation({
+    mutationFn: (payload?: { month?: string }) => projectsApi.runOverviewSummary(projectId, payload),
+    onSuccess: () => {
+      if (Number.isFinite(projectId)) {
+        queryClient.invalidateQueries({ queryKey: ['projectOverviewSummary', projectId] });
+      }
+      setActivityEvents((prev) => [
+        {
+          id: prev.length + 1,
+          label: 'Overview summary generated',
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    },
   });
 
   const serviceItems = useMemo<ServiceItem[]>(
@@ -627,6 +652,35 @@ export default function ProjectWorkspacePageV2() {
                   <InlineField label="Start" value={formatDate(project?.start_date)} />
                   <InlineField label="End" value={formatDate(project?.end_date)} />
                 </Stack>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                  <Typography variant="subtitle1">Overview summary</Typography>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => runOverviewSummary.mutate()}
+                    disabled={runOverviewSummary.isPending || !Number.isFinite(projectId)}
+                  >
+                    {runOverviewSummary.isPending ? 'Running...' : 'Run report'}
+                  </Button>
+                </Stack>
+                {isOverviewSummaryLoading ? (
+                  <Typography color="text.secondary">Loading overview summary...</Typography>
+                ) : overviewSummary ? (
+                  <Stack spacing={1}>
+                    <Typography variant="caption" color="text.secondary">
+                      Last generated: {formatDate(overviewSummary.generated_at)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {overviewSummary.summary_text}
+                    </Typography>
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary">
+                    Run the report to generate an overview summary.
+                  </Typography>
+                )}
               </Paper>
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>

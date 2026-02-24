@@ -1,4 +1,8 @@
 """Check what's happening with project 2 data"""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database_pool import get_db_connection
 
 with get_db_connection("RevitHealthCheckDB") as conn:

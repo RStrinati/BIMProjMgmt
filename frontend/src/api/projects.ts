@@ -10,6 +10,7 @@ import type {
   FinanceLineItemsResponse,
   FinanceReconciliationResponse,
   ProjectsFinanceSummaryResponse,
+  ProjectOverviewSummaryResponse,
 } from '@/types/api';
 
 export const projectsApi = {
@@ -145,6 +146,16 @@ export const projectsApi = {
 
   getFinanceSummary: async (projectId: number): Promise<ProjectFinanceSummary> => {
     const response = await apiClient.get<ProjectFinanceSummary>(`/projects/${projectId}/finance-summary`);
+    return response.data;
+  },
+
+  getOverviewSummary: async (projectId: number): Promise<ProjectOverviewSummaryResponse> => {
+    const response = await apiClient.get<ProjectOverviewSummaryResponse>(`/projects/${projectId}/overview-summary`);
+    return response.data;
+  },
+
+  runOverviewSummary: async (projectId: number, payload?: { month?: string; generated_by?: string }): Promise<ProjectOverviewSummaryResponse> => {
+    const response = await apiClient.post<ProjectOverviewSummaryResponse>(`/projects/${projectId}/overview-summary/run`, payload ?? {});
     return response.data;
   },
 
