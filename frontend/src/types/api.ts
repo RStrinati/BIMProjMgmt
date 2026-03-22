@@ -483,6 +483,28 @@ export interface NamingComplianceMetrics {
   as_of?: string | null;
 }
 
+export interface NamingComplianceRow {
+  project_id?: number | null;
+  project_name?: string | null;
+  model_file_name?: string | null;
+  discipline?: string | null;
+  validation_status?: string | null;
+  validation_reason?: string | null;
+  failed_field_name?: string | null;
+  failed_field_value?: string | null;
+  failed_field_reason?: string | null;
+  validated_date?: string | null;
+}
+
+export interface NamingComplianceTableResponse {
+  page: number;
+  page_size: number;
+  total_count: number;
+  rows: NamingComplianceRow[];
+  filters?: DashboardFilters;
+  as_of?: string | null;
+}
+
 export interface IssueHistoryPoint {
   week_start: string | null;
   status: string;
@@ -500,6 +522,8 @@ export interface DashboardIssuesKpis {
   active_issues: number;
   over_30_days: number;
   closed_since_review: number;
+  closed_since_review_label?: string | null;
+  closed_since_review_anchor?: string | null;
   filters?: DashboardFilters;
   as_of?: string | null;
 }
@@ -507,6 +531,8 @@ export interface DashboardIssuesKpis {
 export interface DashboardIssueChartSlice {
   label: string;
   value: number;
+  open?: number;
+  closed?: number;
 }
 
 export interface DashboardIssuesCharts {
@@ -538,6 +564,8 @@ export interface DashboardIssuesCharts {
 
 export interface DashboardIssuesTableRow {
   issue_id: string;
+  issue_number?: string | null;
+  issue_key?: string | null;
   source: string | null;
   project_name: string | null;
   status: string | null;
@@ -665,6 +693,32 @@ export interface LevelAlignmentDashboard {
   as_of?: string | null;
   filters?: DashboardFilters;
   error?: string;
+}
+
+export interface ModelRegisterRow {
+  project_id?: number | null;
+  project_name?: string | null;
+  modelKey?: string | null;
+  modelName?: string | null;
+  discipline?: string | null;
+  company?: string | null;
+  fileLocation?: string | null;
+  lastVersionDateISO?: string | null;
+  validationOverall?: string | null;
+  namingStatus?: string | null;
+  freshnessStatus?: string | null;
+  mappingStatus?: string | null;
+  published_last_week?: boolean | null;
+  isControlModel?: boolean | null;
+}
+
+export interface ModelRegisterResponse {
+  page: number;
+  page_size: number;
+  total_count: number;
+  rows: ModelRegisterRow[];
+  filters?: DashboardFilters;
+  as_of?: string | null;
 }
 
 export interface TaskItem {

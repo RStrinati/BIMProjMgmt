@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+.dashboard-root {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(44, 65, 90, 0.35), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(26, 44, 68, 0.6), transparent 45%),
+    #0b0f14;
+  color: #e6edf3;
+}
+
+.dashboard-glow {
+  position: absolute;
+  top: -120px;
+  right: -160px;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(90, 160, 230, 0.18), transparent 65%);
+  pointer-events: none;
+}
+
+.dashboard-grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}

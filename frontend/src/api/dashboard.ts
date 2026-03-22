@@ -3,6 +3,7 @@ import type {
   WarehouseDashboardMetrics,
   RevitHealthDashboardMetrics,
   NamingComplianceMetrics,
+  NamingComplianceTableResponse,
   DashboardIssuesKpis,
   DashboardIssuesCharts,
   DashboardIssuesTable,
@@ -10,6 +11,7 @@ import type {
   IssuesHistoryResponse,
   GridAlignmentDashboard,
   LevelAlignmentDashboard,
+  ModelRegisterResponse,
 } from '@/types/api';
 
 export const dashboardApi = {
@@ -136,6 +138,29 @@ export const dashboardApi = {
     return response.data;
   },
 
+  getNamingComplianceTable: async (options?: {
+    projectIds?: number[];
+    discipline?: string;
+    validationStatus?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<NamingComplianceTableResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.validationStatus) params.validation_status = options.validationStatus;
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+    const response = await apiClient.get<NamingComplianceTableResponse>('/dashboard/naming-compliance/table', {
+      params: Object.keys(params).length ? params : undefined,
+    });
+    return response.data;
+  },
+
   getCoordinateAlignment: async (options?: {
     projectIds?: number[];
     discipline?: string;
@@ -203,6 +228,27 @@ export const dashboardApi = {
     const response = await apiClient.get<LevelAlignmentDashboard>('/dashboard/health/levels', {
       params: Object.keys(params).length ? params : undefined,
       timeout: 30000,
+    });
+    return response.data;
+  },
+
+  getModelRegister: async (options?: {
+    projectIds?: number[];
+    discipline?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }): Promise<ModelRegisterResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.projectIds?.length) params.project_ids = options.projectIds.join(',');
+    if (options?.discipline) params.discipline = options.discipline;
+    if (options?.page) params.page = String(options.page);
+    if (options?.pageSize) params.page_size = String(options.pageSize);
+    if (options?.sortBy) params.sort_by = options.sortBy;
+    if (options?.sortDir) params.sort_dir = options.sortDir;
+    const response = await apiClient.get<ModelRegisterResponse>('/dashboard/model-register', {
+      params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
   },

@@ -45,6 +45,7 @@ import { ACCDataImportPanel } from '@/components/dataImports/ACCDataImportPanel'
 import { ReviztoImportPanel } from '@/components/dataImports/ReviztoImportPanel';
 import { RevitHealthPanel } from '@/components/dataImports/RevitHealthPanel';
 import { ACCSyncPanel } from '@/components/dataImports/ACCSyncPanel';
+import { IfcHealthPanel } from '@/components/dataImports/IfcHealthPanel';
 import type { Project } from '@/types/api';
 
 interface TabPanelProps {
@@ -83,7 +84,7 @@ const DataImportsPage: React.FC = () => {
     const parsed = Number(stored);
     return Number.isFinite(parsed) ? parsed : null;
   });
-  const tabLabels = ['ACC Sync', 'ACC Desktop Connector', 'ACC Data Import', 'Revizto Extraction', 'Revit Health Check'];
+  const tabLabels = ['ACC Sync', 'ACC Desktop Connector', 'ACC Data Import', 'Revizto Extraction', 'Revit Health Check', 'IFC Health Check'];
   const [runHistory, setRunHistory] = useState<RunHistory[]>(() => {
     try {
       const stored = localStorage.getItem('data_import_run_history');
@@ -339,6 +340,12 @@ const DataImportsPage: React.FC = () => {
             label="Revit Health Check"
             sx={{ textTransform: 'none' }}
           />
+          <Tab
+            icon={<HealthIcon />}
+            iconPosition="start"
+            label="IFC Health Check"
+            sx={{ textTransform: 'none' }}
+          />
         </Tabs>
 
         {/* Tab Panels */}
@@ -358,6 +365,9 @@ const DataImportsPage: React.FC = () => {
             </TabPanel>
             <TabPanel value={tabValue} index={4}>
               <RevitHealthPanel projectId={effectiveProjectId} projectName={project?.project_name} />
+            </TabPanel>
+            <TabPanel value={tabValue} index={5}>
+              <IfcHealthPanel projectId={effectiveProjectId} projectName={project?.project_name} />
             </TabPanel>
           </>
         ) : (

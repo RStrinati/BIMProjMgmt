@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import subprocess
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field
 import threading
@@ -98,6 +98,7 @@ from database import (  # noqa: E402
     get_naming_compliance_dashboard_metrics,
     get_grid_alignment_dashboard,
     get_level_alignment_dashboard,
+    get_dashboard_model_register,
     revalidate_revit_naming,
     get_client_by_id,
     get_clients_detailed,
@@ -223,6 +224,10 @@ from backend.anchor_links import (  # noqa: E402
     get_issue_linked_anchors,
 )
 from services.template_loader import LEGACY_TEMPLATE_PATH  # noqa: E402
+
+
+# IFC Validation config
+IFC_VALIDATION_BG_THRESHOLD_MB = int(os.getenv("IFC_VALIDATION_BG_THRESHOLD_MB", "150"))
 
 
 # --- Input Validation Utilities ---
@@ -470,6 +475,61 @@ _warehouse_pipeline_lock = threading.Lock()
 _warehouse_pipeline_timer: Optional[threading.Timer] = None
 _warehouse_pipeline_pending = False
 _warehouse_pipeline_running = False
+
+# Optional dependency check for IFC validation
+IFCTESTER_REQUIRED = os.getenv("IFCTESTER_REQUIRED", "false").lower() == "true"
+try:
+    import ifctester  # type: ignore
+    logging.info("ifctester available (version=%s)", getattr(ifctester, "__version__", "unknown"))
+except Exception as exc:
+    logging.error("ifctester is not available: %s", exc)
+    if IFCTESTER_REQUIRED:
+        raise
+
+
+# Optional APS auth demo autostart (node index.js)
+APS_AUTH_AUTOSTART = os.getenv("APS_AUTH_AUTOSTART", "true").lower() == "true"
+APS_AUTH_PORT = int(os.getenv("APS_AUTH_PORT", "3000"))
+APS_AUTH_CMD = os.getenv("APS_AUTH_CMD", "node")
+APS_AUTH_ENTRY = os.getenv("APS_AUTH_ENTRY", "index.js")
+
+
+def _is_port_open(port: int) -> bool:
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except Exception:
+        return False
+
+
+def _autostart_aps_auth_demo() -> None:
+    if not APS_AUTH_AUTOSTART:
+        return
+    # Avoid duplicate spawns in Flask reloader
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        return
+    if _is_port_open(APS_AUTH_PORT):
+        logging.info("APS auth demo already running on port %s", APS_AUTH_PORT)
+        return
+    service_dir = Path(__file__).resolve().parent.parent / "services" / "aps-auth-demo"
+    if not service_dir.exists():
+        logging.warning("APS auth demo directory not found: %s", service_dir)
+        return
+    try:
+        subprocess.Popen(
+            [APS_AUTH_CMD, APS_AUTH_ENTRY],
+            cwd=str(service_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
+        logging.info("Started APS auth demo: %s %s (cwd=%s)", APS_AUTH_CMD, APS_AUTH_ENTRY, service_dir)
+    except Exception as exc:
+        logging.warning("Failed to start APS auth demo: %s", exc)
+
+
+_autostart_aps_auth_demo()
 
 
 def _maybe_run_warehouse_pipeline(reason: str) -> None:
@@ -4899,9 +4959,11 @@ def api_dashboard_naming_compliance_table():
         page_size = int(request.args.get("page_size", 50))
         sort_by = request.args.get("sort_by", "validated_date")
         sort_dir = request.args.get("sort_dir", "desc")
+        validation_status = request.args.get("validation_status")
         data = get_naming_compliance_table(
             project_ids=filters["project_ids"],
             discipline=filters["discipline"],
+            validation_status=validation_status,
             page=page,
             page_size=page_size,
             sort_by=sort_by,
@@ -5026,9 +5088,9 @@ def api_dashboard_model_register():
         filters = _parse_dashboard_filters()
         page = int(request.args.get("page", 1))
         page_size = int(request.args.get("page_size", 50))
-        sort_by = request.args.get("sort_by", "last_seen_at")
+        sort_by = request.args.get("sort_by", "lastVersionDate")
         sort_dir = request.args.get("sort_dir", "desc")
-        data = get_model_register(
+        data = get_dashboard_model_register(
             project_ids=filters["project_ids"],
             discipline=filters["discipline"],
             page=page,
@@ -7771,6 +7833,303 @@ def run_health_importer():
     except Exception as e:
         logging.exception("Error running health importer")
         return jsonify({'error': str(e)}), 500
+
+
+# ===================== IFC IDS Validation =====================
+
+def _coerce_int(value: Optional[str]) -> Optional[int]:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_bool(value: Optional[str]) -> bool:
+    if value is None:
+        return False
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _save_upload_file(file_storage, dest_dir: Path) -> Tuple[str, Path]:
+    from werkzeug.utils import secure_filename
+
+    original_name = file_storage.filename or "upload"
+    safe_name = secure_filename(original_name) or f"upload_{uuid.uuid4().hex}"
+    dest_path = dest_dir / safe_name
+    file_storage.save(dest_path)
+    return original_name, dest_path
+
+
+def _run_ifc_validation_job(
+    run_id: int,
+    project_id: int,
+    ifc_path: Path,
+    ids_path: Path,
+    temp_dir: Path,
+) -> None:
+    from services.ifc_validation_service import IfcValidationService
+    from database import (
+        update_ifc_validation_run,
+        insert_ifc_validation_failures,
+    )
+
+    service = IfcValidationService()
+    update_ifc_validation_run(run_id, status="running", started_at=datetime.utcnow())
+    try:
+        result = service.validate(str(ifc_path), str(ids_path))
+        failures_payload = []
+        for spec in result.specifications:
+            for failure in spec.get("failed_entities", []):
+                failures_payload.append({
+                    "specification_name": spec.get("name"),
+                    "message": failure.get("message"),
+                    "ifc_class": failure.get("ifc_class"),
+                    "object_name": failure.get("object_name"),
+                })
+        insert_ifc_validation_failures(run_id, failures_payload)
+        update_ifc_validation_run(
+            run_id,
+            status="completed" if result.success else "failed",
+            completed_at=datetime.utcnow(),
+            summary=result.summary,
+            html_report=result.html_report,
+            error_message="; ".join(result.errors) if result.errors else None,
+        )
+    except Exception as exc:
+        logging.exception("IFC validation run %s failed", run_id)
+        update_ifc_validation_run(
+            run_id,
+            status="failed",
+            completed_at=datetime.utcnow(),
+            error_message=str(exc),
+        )
+    finally:
+        try:
+            from services.ifc_validation_service import IfcValidationService
+            IfcValidationService().cleanup_temp_dir(temp_dir)
+        except Exception:
+            logging.warning("Failed to cleanup IFC validation temp dir %s", temp_dir)
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/ids-tests', methods=['GET'])
+def list_ifc_ids_tests_endpoint(project_id):
+    try:
+        from database import list_ifc_ids_tests
+        tests = list_ifc_ids_tests(project_id)
+        return jsonify({"tests": tests})
+    except Exception as exc:
+        logging.exception("Error listing IDS tests for project %s", project_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/ids-tests', methods=['POST'])
+def create_ifc_ids_test_endpoint(project_id):
+    try:
+        if 'ids_file' not in request.files:
+            return jsonify({"error": "ids_file is required"}), 400
+        ids_file = request.files['ids_file']
+        ids_name = request.form.get('ids_name') or ids_file.filename or "IDS Test"
+        ids_content = ids_file.read().decode("utf-8", errors="ignore")
+        from database import create_ifc_ids_test
+        new_id = create_ifc_ids_test(project_id, ids_name, ids_content)
+        if not new_id:
+            return jsonify({"error": "Failed to create IDS test"}), 500
+        return jsonify({"ids_test_id": new_id, "ids_name": ids_name}), 201
+    except Exception as exc:
+        logging.exception("Error creating IDS test for project %s", project_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/ids-tests/<int:ids_test_id>', methods=['PUT'])
+def update_ifc_ids_test_endpoint(project_id, ids_test_id):
+    try:
+        from database import get_ifc_ids_test_content
+        existing = get_ifc_ids_test_content(ids_test_id)
+        if not existing or existing.get("project_id") != project_id:
+            return jsonify({"error": "IDS test not found"}), 404
+        ids_name = request.form.get('ids_name')
+        ids_content = None
+        if 'ids_file' in request.files:
+            ids_content = request.files['ids_file'].read().decode("utf-8", errors="ignore")
+        from database import update_ifc_ids_test
+        success = update_ifc_ids_test(ids_test_id, ids_name, ids_content)
+        if not success:
+            return jsonify({"error": "Failed to update IDS test"}), 500
+        return jsonify({"success": True})
+    except Exception as exc:
+        logging.exception("Error updating IDS test %s", ids_test_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/ids-tests/<int:ids_test_id>', methods=['DELETE'])
+def delete_ifc_ids_test_endpoint(project_id, ids_test_id):
+    try:
+        from database import get_ifc_ids_test_content
+        existing = get_ifc_ids_test_content(ids_test_id)
+        if not existing or existing.get("project_id") != project_id:
+            return jsonify({"error": "IDS test not found"}), 404
+        from database import delete_ifc_ids_test
+        success = delete_ifc_ids_test(ids_test_id)
+        if not success:
+            return jsonify({"error": "Failed to delete IDS test"}), 500
+        return jsonify({"success": True})
+    except Exception as exc:
+        logging.exception("Error deleting IDS test %s", ids_test_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/run', methods=['POST'])
+def run_ifc_validation(project_id):
+    try:
+        if 'ifc_file' not in request.files:
+            return jsonify({"error": "ifc_file is required"}), 400
+
+        ifc_file = request.files['ifc_file']
+        ids_file = request.files.get('ids_file')
+        ids_test_id = _coerce_int(request.form.get('ids_test_id'))
+        expected_model_id = _coerce_int(request.form.get('expected_model_id'))
+        save_ids_test = _parse_bool(request.form.get('save_ids_test'))
+        ids_name_override = request.form.get('ids_name')
+
+        if ids_file is None and ids_test_id is None:
+            return jsonify({"error": "ids_file or ids_test_id is required"}), 400
+
+        from services.ifc_validation_service import IfcValidationService
+        from database import (
+            create_ifc_validation_run,
+            update_ifc_validation_run,
+            insert_ifc_validation_failures,
+            resolve_expected_model_id,
+            get_ifc_ids_test_content,
+            create_ifc_ids_test,
+        )
+
+        service = IfcValidationService()
+        temp_dir = service.create_temp_dir()
+
+        original_ifc_name, ifc_path = _save_upload_file(ifc_file, temp_dir)
+
+        ids_filename = None
+        if ids_file is not None:
+            ids_filename, ids_path = _save_upload_file(ids_file, temp_dir)
+            if save_ids_test:
+                ids_content = Path(ids_path).read_text(encoding="utf-8", errors="ignore")
+                ids_name = ids_name_override or ids_filename
+                ids_test_id = create_ifc_ids_test(project_id, ids_name, ids_content) or ids_test_id
+        else:
+            ids_test = get_ifc_ids_test_content(ids_test_id)
+            if not ids_test:
+                return jsonify({"error": "IDS test not found"}), 404
+            ids_filename = ids_test.get("ids_name") or "ids_test.ids"
+            ids_path = temp_dir / f"{uuid.uuid4().hex}.ids"
+            ids_path.write_text(ids_test.get("ids_content") or "", encoding="utf-8")
+
+        if expected_model_id is None:
+            expected_model_id = resolve_expected_model_id(project_id, original_ifc_name)
+
+        run_id = create_ifc_validation_run(
+            project_id=project_id,
+            ifc_filename=original_ifc_name,
+            ids_filename=ids_filename or "ids_test.ids",
+            expected_model_id=expected_model_id,
+            ids_test_id=ids_test_id,
+            status="queued",
+        )
+        if not run_id:
+            return jsonify({"error": "Failed to create validation run"}), 500
+
+        ifc_size_mb = (ifc_path.stat().st_size / (1024 * 1024)) if ifc_path.exists() else 0
+
+        if ifc_size_mb >= IFC_VALIDATION_BG_THRESHOLD_MB:
+            worker = threading.Thread(
+                target=_run_ifc_validation_job,
+                args=(run_id, project_id, ifc_path, ids_path, temp_dir),
+                daemon=True,
+            )
+            worker.start()
+            return jsonify({
+                "run_id": run_id,
+                "status": "queued",
+                "message": "Validation queued for background processing",
+            }), 202
+
+        update_ifc_validation_run(run_id, status="running", started_at=datetime.utcnow())
+        result = service.validate(str(ifc_path), str(ids_path))
+        failures_payload = []
+        for spec in result.specifications:
+            for failure in spec.get("failed_entities", []):
+                failures_payload.append({
+                    "specification_name": spec.get("name"),
+                    "message": failure.get("message"),
+                    "ifc_class": failure.get("ifc_class"),
+                    "object_name": failure.get("object_name"),
+                })
+        insert_ifc_validation_failures(run_id, failures_payload)
+        update_ifc_validation_run(
+            run_id,
+            status="completed" if result.success else "failed",
+            completed_at=datetime.utcnow(),
+            summary=result.summary,
+            html_report=result.html_report,
+            error_message="; ".join(result.errors) if result.errors else None,
+        )
+        service.cleanup_temp_dir(temp_dir)
+        return jsonify({
+            "run_id": run_id,
+            "status": "completed" if result.success else "failed",
+            "result": {
+                "success": result.success,
+                "ifc_filename": result.ifc_filename,
+                "ids_filename": result.ids_filename,
+                "summary": result.summary,
+                "specifications": result.specifications,
+                "errors": result.errors,
+            },
+        })
+    except Exception as exc:
+        logging.exception("Error running IFC validation")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/runs', methods=['GET'])
+def list_ifc_validation_runs_endpoint(project_id):
+    try:
+        from database import list_ifc_validation_runs
+        runs = list_ifc_validation_runs(project_id)
+        return jsonify({"runs": runs})
+    except Exception as exc:
+        logging.exception("Error listing IFC validation runs for project %s", project_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/runs/<int:run_id>', methods=['GET'])
+def get_ifc_validation_run_endpoint(project_id, run_id):
+    try:
+        from database import get_ifc_validation_run, get_ifc_validation_failures
+        run = get_ifc_validation_run(run_id)
+        if not run or run.get("project_id") != project_id:
+            return jsonify({"error": "Run not found"}), 404
+        failures = get_ifc_validation_failures(run_id)
+        return jsonify({"run": run, "failures": failures})
+    except Exception as exc:
+        logging.exception("Error fetching IFC validation run %s", run_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/api/projects/<int:project_id>/ifc-validation/runs/<int:run_id>/report', methods=['GET'])
+def get_ifc_validation_report_endpoint(project_id, run_id):
+    try:
+        from database import get_ifc_validation_run
+        run = get_ifc_validation_run(run_id)
+        if not run or run.get("project_id") != project_id:
+            return jsonify({"error": "Run not found"}), 404
+        html_report = run.get("html_report")
+        if not html_report:
+            return jsonify({"error": "Report not available"}), 404
+        return app.response_class(html_report, mimetype="text/html")
+    except Exception as exc:
+        logging.exception("Error fetching IFC validation report %s", run_id)
+        return jsonify({"error": str(exc)}), 500
 
 
 # ===================== Service Items API =====================

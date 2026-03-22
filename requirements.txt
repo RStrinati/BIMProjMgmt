@@ -4,6 +4,7 @@ dash>=2.14.0
 plotly>=5.17.0
 python-dateutil>=2.8.2
 ifcopenshell
+ifctester
 sqlparse>=0.4.4
 Flask>=3.0.0
 Flask-Cors>=4.0.0

@@ -1,388 +1,97 @@
-[2025-10-31 16:06:28] [WARNING] No project_name in combined_MEL063-AUR-00-00-M3-C-0001_20251031_152915.json, skipping
-[2025-10-31 16:06:28] [WARNING] No project_name in combined_MEL063-AUR-01-00-M3-S-0002_20251031_155147.json, skipping
-[2025-10-31 16:06:28] [COMBINED] family_file_sizes_MEL063-AUR-01-00-M3-S-0002_20251031_150507.json (project: MEL063-AUR-01-00-M3-S-0002, type: family_sizes)
-[2025-10-31 16:06:28] [COMBINED] family_file_sizes_MEL063-AUR-02-00-M3-E-0001_20251031_150604.json (project: MEL063-AUR-02-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:28] [COMBINED] family_file_sizes_MEL063-AUR-02-00-M3-H-0001_20251031_150651.json (project: MEL063-AUR-02-00-M3-H-0001, type: family_sizes)
-[2025-10-31 16:06:28] [COMBINED] family_file_sizes_MEL063-AUR-02-00-M3-M-0001_20251031_150751.json (project: MEL063-AUR-02-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-AUR-02-00-M3-S-0001_20251031_150829.json (project: MEL063-AUR-02-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-AUR-03-00-M3-E-0001_20251031_150937.json (project: MEL063-AUR-03-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-AUR-03-00-M3-M-0001_20251031_151105.json (project: MEL063-AUR-03-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-AUR-03-00-M3-S-0001_20251031_151141.json (project: MEL063-AUR-03-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-DSI-01-00-M3-A-0001_20251031_151806.json (project: MEL063-DSI-01-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-DSI-01-00-M3-A-0002_20251031_151937.json (project: MEL063-DSI-01-00-M3-A-0002, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-DSI-02-00-M3-A-0001_20251031_152123.json (project: MEL063-DSI-02-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-MTR-00-00-M3-A-0001_20251031_152256.json (project: MEL063-MTR-00-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL063-MTR-03-00-M3-A-0001_20251031_152348.json (project: MEL063-MTR-03-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-00-00-M3-E-0001_20251031_142131.json (project: MEL080-AUR-00-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-00-00-M3-M-0001_20251031_143301.json (project: MEL080-AUR-00-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-00-00-M3-S-0001_20251031_143338.json (project: MEL080-AUR-00-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-00-00-M3-SC-0001_20251031_143437.json (project: MEL080-AUR-00-00-M3-SC-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-E-0001_20251031_144300.json (project: MEL080-AUR-01-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-E-0003_20251031_144828.json (project: MEL080-AUR-01-00-M3-E-0003, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-H-0001_20251031_145358.json (project: MEL080-AUR-01-00-M3-H-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-M-0001_20251031_145921.json (project: MEL080-AUR-01-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-S-0001_20251031_150211.json (project: MEL080-AUR-01-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-01-00-M3-S-0002_20251031_150517.json (project: MEL080-AUR-01-00-M3-S-0002, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-02-00-M3-E-0001_20251031_150618.json (project: MEL080-AUR-02-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-02-00-M3-H-0001_20251031_150701.json (project: MEL080-AUR-02-00-M3-H-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-02-00-M3-M-0001_20251031_150805.json (project: MEL080-AUR-02-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-02-00-M3-S-0001_20251031_150845.json (project: MEL080-AUR-02-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-03-00-M3-E-0001_20251031_150951.json (project: MEL080-AUR-03-00-M3-E-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-03-00-M3-M-0001_20251031_151120.json (project: MEL080-AUR-03-00-M3-M-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-AUR-03-00-M3-S-0001_20251031_151200.json (project: MEL080-AUR-03-00-M3-S-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-DSI-01-00-M3-A-0001_20251031_151819.json (project: MEL080-DSI-01-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-DSI-01-00-M3-A-0002_20251031_151951.json (project: MEL080-DSI-01-00-M3-A-0002, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-DSI-02-00-M3-A-0001_20251031_152148.json (project: MEL080-DSI-02-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-MTR-00-00-M3-A-0001_20251031_152335.json (project: MEL080-MTR-00-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] family_file_sizes_MEL080-MTR-03-00-M3-A-0001_20251031_152426.json (project: MEL080-MTR-03-00-M3-A-0001, type: family_sizes)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-01-00-M3-S-0002_20251031_150318.json (project: MEL063-AUR-01-00-M3-S-0002, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-02-00-M3-E-0001_20251031_150536.json (project: MEL063-AUR-02-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-02-00-M3-H-0001_20251031_150627.json (project: MEL063-AUR-02-00-M3-H-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-02-00-M3-M-0001_20251031_150715.json (project: MEL063-AUR-02-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-02-00-M3-S-0001_20251031_150812.json (project: MEL063-AUR-02-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-03-00-M3-E-0001_20251031_150919.json (project: MEL063-AUR-03-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-03-00-M3-M-0001_20251031_151008.json (project: MEL063-AUR-03-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-AUR-03-00-M3-S-0001_20251031_151126.json (project: MEL063-AUR-03-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-DSI-01-00-M3-A-0001_20251031_151436.json (project: MEL063-DSI-01-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-DSI-01-00-M3-A-0002_20251031_151844.json (project: MEL063-DSI-01-00-M3-A-0002, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-DSI-02-00-M3-A-0001_20251031_152032.json (project: MEL063-DSI-02-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-MTR-00-00-M3-A-0001_20251031_152211.json (project: MEL063-MTR-00-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL063-MTR-03-00-M3-A-0001_20251031_152332.json (project: MEL063-MTR-03-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-00-00-M3-E-0001_20251031_142106.json (project: MEL080-AUR-00-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-00-00-M3-M-0001_20251031_143224.json (project: MEL080-AUR-00-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-00-00-M3-S-0001_20251031_143327.json (project: MEL080-AUR-00-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-00-00-M3-SC-0001_20251031_143411.json (project: MEL080-AUR-00-00-M3-SC-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-E-0001_20251031_143708.json (project: MEL080-AUR-01-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-E-0003_20251031_144401.json (project: MEL080-AUR-01-00-M3-E-0003, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-H-0001_20251031_144957.json (project: MEL080-AUR-01-00-M3-H-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-M-0001_20251031_145620.json (project: MEL080-AUR-01-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-S-0001_20251031_150025.json (project: MEL080-AUR-01-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-01-00-M3-S-0002_20251031_150331.json (project: MEL080-AUR-01-00-M3-S-0002, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-02-00-M3-E-0001_20251031_150549.json (project: MEL080-AUR-02-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-02-00-M3-H-0001_20251031_150641.json (project: MEL080-AUR-02-00-M3-H-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-02-00-M3-M-0001_20251031_150729.json (project: MEL080-AUR-02-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-02-00-M3-S-0001_20251031_150826.json (project: MEL080-AUR-02-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-03-00-M3-E-0001_20251031_150931.json (project: MEL080-AUR-03-00-M3-E-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-03-00-M3-M-0001_20251031_151029.json (project: MEL080-AUR-03-00-M3-M-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-AUR-03-00-M3-S-0001_20251031_151143.json (project: MEL080-AUR-03-00-M3-S-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-DSI-01-00-M3-A-0001_20251031_151453.json (project: MEL080-DSI-01-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-DSI-01-00-M3-A-0002_20251031_151858.json (project: MEL080-DSI-01-00-M3-A-0002, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-DSI-02-00-M3-A-0001_20251031_152054.json (project: MEL080-DSI-02-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-MTR-00-00-M3-A-0001_20251031_152253.json (project: MEL080-MTR-00-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] metadata_MEL080-MTR-03-00-M3-A-0001_20251031_152406.json (project: MEL080-MTR-03-00-M3-A-0001, type: metadata)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-01-00-M3-S-0002_20251031_150324.json (project: MEL063-AUR-01-00-M3-S-0002, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-02-00-M3-E-0001_20251031_150538.json (project: MEL063-AUR-02-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-02-00-M3-H-0001_20251031_150628.json (project: MEL063-AUR-02-00-M3-H-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-02-00-M3-M-0001_20251031_150717.json (project: MEL063-AUR-02-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-02-00-M3-S-0001_20251031_150814.json (project: MEL063-AUR-02-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-03-00-M3-E-0001_20251031_150920.json (project: MEL063-AUR-03-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-03-00-M3-M-0001_20251031_151010.json (project: MEL063-AUR-03-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-AUR-03-00-M3-S-0001_20251031_151127.json (project: MEL063-AUR-03-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-DSI-01-00-M3-A-0001_20251031_151444.json (project: MEL063-DSI-01-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-DSI-01-00-M3-A-0002_20251031_151846.json (project: MEL063-DSI-01-00-M3-A-0002, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-DSI-02-00-M3-A-0001_20251031_152035.json (project: MEL063-DSI-02-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-MTR-00-00-M3-A-0001_20251031_152216.json (project: MEL063-MTR-00-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL063-MTR-03-00-M3-A-0001_20251031_152334.json (project: MEL063-MTR-03-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-00-00-M3-E-0001_20251031_142108.json (project: MEL080-AUR-00-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-00-00-M3-M-0001_20251031_143226.json (project: MEL080-AUR-00-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-00-00-M3-S-0001_20251031_143328.json (project: MEL080-AUR-00-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-00-00-M3-SC-0001_20251031_143413.json (project: MEL080-AUR-00-00-M3-SC-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-E-0001_20251031_143717.json (project: MEL080-AUR-01-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-E-0003_20251031_144406.json (project: MEL080-AUR-01-00-M3-E-0003, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-H-0001_20251031_145002.json (project: MEL080-AUR-01-00-M3-H-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-M-0001_20251031_145625.json (project: MEL080-AUR-01-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-S-0001_20251031_150030.json (project: MEL080-AUR-01-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-01-00-M3-S-0002_20251031_150338.json (project: MEL080-AUR-01-00-M3-S-0002, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-02-00-M3-E-0001_20251031_150551.json (project: MEL080-AUR-02-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-02-00-M3-H-0001_20251031_150643.json (project: MEL080-AUR-02-00-M3-H-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-02-00-M3-M-0001_20251031_150731.json (project: MEL080-AUR-02-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-02-00-M3-S-0001_20251031_150827.json (project: MEL080-AUR-02-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-03-00-M3-E-0001_20251031_150933.json (project: MEL080-AUR-03-00-M3-E-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-03-00-M3-M-0001_20251031_151031.json (project: MEL080-AUR-03-00-M3-M-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-AUR-03-00-M3-S-0001_20251031_151144.json (project: MEL080-AUR-03-00-M3-S-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-DSI-01-00-M3-A-0001_20251031_151502.json (project: MEL080-DSI-01-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-DSI-01-00-M3-A-0002_20251031_151900.json (project: MEL080-DSI-01-00-M3-A-0002, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-DSI-02-00-M3-A-0001_20251031_152058.json (project: MEL080-DSI-02-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-MTR-00-00-M3-A-0001_20251031_152259.json (project: MEL080-MTR-00-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [COMBINED] views_rooms_levels_MEL080-MTR-03-00-M3-A-0001_20251031_152409.json (project: MEL080-MTR-03-00-M3-A-0001, type: views_rooms_levels)
-[2025-10-31 16:06:29] [SAVED] combined_MEL063-AUR-01-00-M3-S-0002_20251031_160629.json
-[2025-10-31 16:06:29] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:29] Associating data with project ID: 35
-[2025-10-31 16:06:29] [OK] inserted combined_MEL063-AUR-01-00-M3-S-0002_20251031_160629.json for project MEL063-AUR-01-00-M3-S-0002
-[2025-10-31 16:06:29] [MOVED] combined_MEL063-AUR-01-00-M3-S-0002_20251031_160629.json
-[2025-10-31 16:06:29] [MOVED] family_file_sizes_MEL063-AUR-01-00-M3-S-0002_20251031_150507.json (individual file)
-[2025-10-31 16:06:29] [MOVED] metadata_MEL063-AUR-01-00-M3-S-0002_20251031_150318.json (individual file)
-[2025-10-31 16:06:29] [MOVED] views_rooms_levels_MEL063-AUR-01-00-M3-S-0002_20251031_150324.json (individual file)
-[2025-10-31 16:06:29] [SAVED] combined_MEL063-AUR-02-00-M3-E-0001_20251031_160629.json
-[2025-10-31 16:06:29] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:29] Associating data with project ID: 35
-[2025-10-31 16:06:29] [OK] inserted combined_MEL063-AUR-02-00-M3-E-0001_20251031_160629.json for project MEL063-AUR-02-00-M3-E-0001
-[2025-10-31 16:06:29] [MOVED] combined_MEL063-AUR-02-00-M3-E-0001_20251031_160629.json
-[2025-10-31 16:06:29] [MOVED] family_file_sizes_MEL063-AUR-02-00-M3-E-0001_20251031_150604.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-02-00-M3-E-0001_20251031_150536.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-02-00-M3-E-0001_20251031_150538.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-02-00-M3-H-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-02-00-M3-H-0001_20251031_160630.json for project MEL063-AUR-02-00-M3-H-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-02-00-M3-H-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-02-00-M3-H-0001_20251031_150651.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-02-00-M3-H-0001_20251031_150627.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-02-00-M3-H-0001_20251031_150628.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-02-00-M3-M-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-02-00-M3-M-0001_20251031_160630.json for project MEL063-AUR-02-00-M3-M-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-02-00-M3-M-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-02-00-M3-M-0001_20251031_150751.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-02-00-M3-M-0001_20251031_150715.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-02-00-M3-M-0001_20251031_150717.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-02-00-M3-S-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-02-00-M3-S-0001_20251031_160630.json for project MEL063-AUR-02-00-M3-S-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-02-00-M3-S-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-02-00-M3-S-0001_20251031_150829.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-02-00-M3-S-0001_20251031_150812.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-02-00-M3-S-0001_20251031_150814.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-03-00-M3-E-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-03-00-M3-E-0001_20251031_160630.json for project MEL063-AUR-03-00-M3-E-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-03-00-M3-E-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-03-00-M3-E-0001_20251031_150937.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-03-00-M3-E-0001_20251031_150919.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-03-00-M3-E-0001_20251031_150920.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-03-00-M3-M-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-03-00-M3-M-0001_20251031_160630.json for project MEL063-AUR-03-00-M3-M-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-03-00-M3-M-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-03-00-M3-M-0001_20251031_151105.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-03-00-M3-M-0001_20251031_151008.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-03-00-M3-M-0001_20251031_151010.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-AUR-03-00-M3-S-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-AUR-03-00-M3-S-0001_20251031_160630.json for project MEL063-AUR-03-00-M3-S-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-AUR-03-00-M3-S-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-AUR-03-00-M3-S-0001_20251031_151141.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-AUR-03-00-M3-S-0001_20251031_151126.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-AUR-03-00-M3-S-0001_20251031_151127.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-DSI-01-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-DSI-01-00-M3-A-0001_20251031_160630.json for project MEL063-DSI-01-00-M3-A-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-DSI-01-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-DSI-01-00-M3-A-0001_20251031_151806.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-DSI-01-00-M3-A-0001_20251031_151436.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-DSI-01-00-M3-A-0001_20251031_151444.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-DSI-01-00-M3-A-0002_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-DSI-01-00-M3-A-0002_20251031_160630.json for project MEL063-DSI-01-00-M3-A-0002
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-DSI-01-00-M3-A-0002_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-DSI-01-00-M3-A-0002_20251031_151937.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-DSI-01-00-M3-A-0002_20251031_151844.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-DSI-01-00-M3-A-0002_20251031_151846.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-DSI-02-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-DSI-02-00-M3-A-0001_20251031_160630.json for project MEL063-DSI-02-00-M3-A-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-DSI-02-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-DSI-02-00-M3-A-0001_20251031_152123.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-DSI-02-00-M3-A-0001_20251031_152032.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-DSI-02-00-M3-A-0001_20251031_152035.json (individual file)
-[2025-10-31 16:06:30] [SAVED] combined_MEL063-MTR-00-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:30] Associating data with project ID: 35
-[2025-10-31 16:06:30] [OK] inserted combined_MEL063-MTR-00-00-M3-A-0001_20251031_160630.json for project MEL063-MTR-00-00-M3-A-0001
-[2025-10-31 16:06:30] [MOVED] combined_MEL063-MTR-00-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:30] [MOVED] family_file_sizes_MEL063-MTR-00-00-M3-A-0001_20251031_152256.json (individual file)
-[2025-10-31 16:06:30] [MOVED] metadata_MEL063-MTR-00-00-M3-A-0001_20251031_152211.json (individual file)
-[2025-10-31 16:06:30] [MOVED] views_rooms_levels_MEL063-MTR-00-00-M3-A-0001_20251031_152216.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL063-MTR-03-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL063-MTR-03-00-M3-A-0001_20251031_160630.json for project MEL063-MTR-03-00-M3-A-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL063-MTR-03-00-M3-A-0001_20251031_160630.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL063-MTR-03-00-M3-A-0001_20251031_152348.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL063-MTR-03-00-M3-A-0001_20251031_152332.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL063-MTR-03-00-M3-A-0001_20251031_152334.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-00-00-M3-E-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-00-00-M3-E-0001_20251031_160631.json for project MEL080-AUR-00-00-M3-E-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-00-00-M3-E-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-00-00-M3-E-0001_20251031_142131.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-00-00-M3-E-0001_20251031_142106.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-00-00-M3-E-0001_20251031_142108.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-00-00-M3-M-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-00-00-M3-M-0001_20251031_160631.json for project MEL080-AUR-00-00-M3-M-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-00-00-M3-M-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-00-00-M3-M-0001_20251031_143301.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-00-00-M3-M-0001_20251031_143224.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-00-00-M3-M-0001_20251031_143226.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-00-00-M3-S-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-00-00-M3-S-0001_20251031_160631.json for project MEL080-AUR-00-00-M3-S-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-00-00-M3-S-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-00-00-M3-S-0001_20251031_143338.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-00-00-M3-S-0001_20251031_143327.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-00-00-M3-S-0001_20251031_143328.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-00-00-M3-SC-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-00-00-M3-SC-0001_20251031_160631.json for project MEL080-AUR-00-00-M3-SC-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-00-00-M3-SC-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-00-00-M3-SC-0001_20251031_143437.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-00-00-M3-SC-0001_20251031_143411.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-00-00-M3-SC-0001_20251031_143413.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-01-00-M3-E-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-01-00-M3-E-0001_20251031_160631.json for project MEL080-AUR-01-00-M3-E-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-01-00-M3-E-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-E-0001_20251031_144300.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-01-00-M3-E-0001_20251031_143708.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-E-0001_20251031_143717.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-01-00-M3-E-0003_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-01-00-M3-E-0003_20251031_160631.json for project MEL080-AUR-01-00-M3-E-0003
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-01-00-M3-E-0003_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-E-0003_20251031_144828.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-01-00-M3-E-0003_20251031_144401.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-E-0003_20251031_144406.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-01-00-M3-H-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-01-00-M3-H-0001_20251031_160631.json for project MEL080-AUR-01-00-M3-H-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-01-00-M3-H-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-H-0001_20251031_145358.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-01-00-M3-H-0001_20251031_144957.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-H-0001_20251031_145002.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-01-00-M3-M-0001_20251031_160631.json
-[2025-10-31 16:06:31] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:31] Associating data with project ID: 35
-[2025-10-31 16:06:31] [OK] inserted combined_MEL080-AUR-01-00-M3-M-0001_20251031_160631.json for project MEL080-AUR-01-00-M3-M-0001
-[2025-10-31 16:06:31] [MOVED] combined_MEL080-AUR-01-00-M3-M-0001_20251031_160631.json
-[2025-10-31 16:06:31] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-M-0001_20251031_145921.json (individual file)
-[2025-10-31 16:06:31] [MOVED] metadata_MEL080-AUR-01-00-M3-M-0001_20251031_145620.json (individual file)
-[2025-10-31 16:06:31] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-M-0001_20251031_145625.json (individual file)
-[2025-10-31 16:06:31] [SAVED] combined_MEL080-AUR-01-00-M3-S-0001_20251031_160631.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-01-00-M3-S-0001_20251031_160631.json for project MEL080-AUR-01-00-M3-S-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-01-00-M3-S-0001_20251031_160631.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-S-0001_20251031_150211.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-01-00-M3-S-0001_20251031_150025.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-S-0001_20251031_150030.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-01-00-M3-S-0002_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-01-00-M3-S-0002_20251031_160632.json for project MEL080-AUR-01-00-M3-S-0002
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-01-00-M3-S-0002_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-01-00-M3-S-0002_20251031_150517.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-01-00-M3-S-0002_20251031_150331.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-01-00-M3-S-0002_20251031_150338.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-02-00-M3-E-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-02-00-M3-E-0001_20251031_160632.json for project MEL080-AUR-02-00-M3-E-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-02-00-M3-E-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-02-00-M3-E-0001_20251031_150618.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-02-00-M3-E-0001_20251031_150549.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-02-00-M3-E-0001_20251031_150551.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-02-00-M3-H-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-02-00-M3-H-0001_20251031_160632.json for project MEL080-AUR-02-00-M3-H-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-02-00-M3-H-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-02-00-M3-H-0001_20251031_150701.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-02-00-M3-H-0001_20251031_150641.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-02-00-M3-H-0001_20251031_150643.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-02-00-M3-M-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-02-00-M3-M-0001_20251031_160632.json for project MEL080-AUR-02-00-M3-M-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-02-00-M3-M-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-02-00-M3-M-0001_20251031_150805.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-02-00-M3-M-0001_20251031_150729.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-02-00-M3-M-0001_20251031_150731.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-02-00-M3-S-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-02-00-M3-S-0001_20251031_160632.json for project MEL080-AUR-02-00-M3-S-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-02-00-M3-S-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-02-00-M3-S-0001_20251031_150845.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-02-00-M3-S-0001_20251031_150826.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-02-00-M3-S-0001_20251031_150827.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-03-00-M3-E-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-03-00-M3-E-0001_20251031_160632.json for project MEL080-AUR-03-00-M3-E-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-03-00-M3-E-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-03-00-M3-E-0001_20251031_150951.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-03-00-M3-E-0001_20251031_150931.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-03-00-M3-E-0001_20251031_150933.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-03-00-M3-M-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-03-00-M3-M-0001_20251031_160632.json for project MEL080-AUR-03-00-M3-M-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-03-00-M3-M-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-03-00-M3-M-0001_20251031_151120.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-03-00-M3-M-0001_20251031_151029.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-03-00-M3-M-0001_20251031_151031.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-AUR-03-00-M3-S-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-AUR-03-00-M3-S-0001_20251031_160632.json for project MEL080-AUR-03-00-M3-S-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-AUR-03-00-M3-S-0001_20251031_160632.json
-[2025-10-31 16:06:32] [MOVED] family_file_sizes_MEL080-AUR-03-00-M3-S-0001_20251031_151200.json (individual file)
-[2025-10-31 16:06:32] [MOVED] metadata_MEL080-AUR-03-00-M3-S-0001_20251031_151143.json (individual file)
-[2025-10-31 16:06:32] [MOVED] views_rooms_levels_MEL080-AUR-03-00-M3-S-0001_20251031_151144.json (individual file)
-[2025-10-31 16:06:32] [SAVED] combined_MEL080-DSI-01-00-M3-A-0001_20251031_160632.json
-[2025-10-31 16:06:32] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:32] Associating data with project ID: 35
-[2025-10-31 16:06:32] [OK] inserted combined_MEL080-DSI-01-00-M3-A-0001_20251031_160632.json for project MEL080-DSI-01-00-M3-A-0001
-[2025-10-31 16:06:32] [MOVED] combined_MEL080-DSI-01-00-M3-A-0001_20251031_160632.json
-[2025-10-31 16:06:33] [MOVED] family_file_sizes_MEL080-DSI-01-00-M3-A-0001_20251031_151819.json (individual file)
-[2025-10-31 16:06:33] [MOVED] metadata_MEL080-DSI-01-00-M3-A-0001_20251031_151453.json (individual file)
-[2025-10-31 16:06:33] [MOVED] views_rooms_levels_MEL080-DSI-01-00-M3-A-0001_20251031_151502.json (individual file)
-[2025-10-31 16:06:33] [SAVED] combined_MEL080-DSI-01-00-M3-A-0002_20251031_160633.json
-[2025-10-31 16:06:33] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:33] Associating data with project ID: 35
-[2025-10-31 16:06:33] [OK] inserted combined_MEL080-DSI-01-00-M3-A-0002_20251031_160633.json for project MEL080-DSI-01-00-M3-A-0002
-[2025-10-31 16:06:33] [MOVED] combined_MEL080-DSI-01-00-M3-A-0002_20251031_160633.json
-[2025-10-31 16:06:33] [MOVED] family_file_sizes_MEL080-DSI-01-00-M3-A-0002_20251031_151951.json (individual file)
-[2025-10-31 16:06:33] [MOVED] metadata_MEL080-DSI-01-00-M3-A-0002_20251031_151858.json (individual file)
-[2025-10-31 16:06:33] [MOVED] views_rooms_levels_MEL080-DSI-01-00-M3-A-0002_20251031_151900.json (individual file)
-[2025-10-31 16:06:33] [SAVED] combined_MEL080-DSI-02-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:33] Associating data with project ID: 35
-[2025-10-31 16:06:33] [OK] inserted combined_MEL080-DSI-02-00-M3-A-0001_20251031_160633.json for project MEL080-DSI-02-00-M3-A-0001
-[2025-10-31 16:06:33] [MOVED] combined_MEL080-DSI-02-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] [MOVED] family_file_sizes_MEL080-DSI-02-00-M3-A-0001_20251031_152148.json (individual file)
-[2025-10-31 16:06:33] [MOVED] metadata_MEL080-DSI-02-00-M3-A-0001_20251031_152054.json (individual file)
-[2025-10-31 16:06:33] [MOVED] views_rooms_levels_MEL080-DSI-02-00-M3-A-0001_20251031_152058.json (individual file)
-[2025-10-31 16:06:33] [SAVED] combined_MEL080-MTR-00-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:33] Associating data with project ID: 35
-[2025-10-31 16:06:33] [OK] inserted combined_MEL080-MTR-00-00-M3-A-0001_20251031_160633.json for project MEL080-MTR-00-00-M3-A-0001
-[2025-10-31 16:06:33] [MOVED] combined_MEL080-MTR-00-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] [MOVED] family_file_sizes_MEL080-MTR-00-00-M3-A-0001_20251031_152335.json (individual file)
-[2025-10-31 16:06:33] [MOVED] metadata_MEL080-MTR-00-00-M3-A-0001_20251031_152253.json (individual file)
-[2025-10-31 16:06:33] [MOVED] views_rooms_levels_MEL080-MTR-00-00-M3-A-0001_20251031_152259.json (individual file)
-[2025-10-31 16:06:33] [SAVED] combined_MEL080-MTR-03-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] Connected to DB: RevitHealthCheckDB
-[2025-10-31 16:06:33] Associating data with project ID: 35
-[2025-10-31 16:06:33] [OK] inserted combined_MEL080-MTR-03-00-M3-A-0001_20251031_160633.json for project MEL080-MTR-03-00-M3-A-0001
-[2025-10-31 16:06:33] [MOVED] combined_MEL080-MTR-03-00-M3-A-0001_20251031_160633.json
-[2025-10-31 16:06:33] [MOVED] family_file_sizes_MEL080-MTR-03-00-M3-A-0001_20251031_152426.json (individual file)
-[2025-10-31 16:06:33] [MOVED] metadata_MEL080-MTR-03-00-M3-A-0001_20251031_152406.json (individual file)
-[2025-10-31 16:06:33] [MOVED] views_rooms_levels_MEL080-MTR-03-00-M3-A-0001_20251031_152409.json (individual file)
-[2025-10-31 16:06:33] All projects processed.
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-AUR-02-00-M3-S-0001_20260225_155713.json (project: MEL071-AUR-02-00-M3-S-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-AUR-02-00-M3-SC-0001_20260225_155821.json (project: MEL071-AUR-02-00-M3-SC-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-EFP-02-00-M3-F-0001_20260225_161015.json (project: MEL071-EFP-02-00-M3-F-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-ELA-02-00-M3-M-0001_20260225_160818.json (project: MEL071-ELA-02-00-M3-M-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-MTR-02-00-M3-A-0001_20260225_160008.json (project: MEL071-MTR-02-00-M3-A-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] family_file_sizes_MEL071-NIL-02-00-M3-E-0001_20260225_160613.json (project: MEL071-NIL-02-00-M3-E-0001, type: family_sizes)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-AUR-02-00-M3-S-0001_20260225_155641.json (project: MEL071-AUR-02-00-M3-S-0001, type: metadata)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-AUR-02-00-M3-SC-0001_20260225_155742.json (project: MEL071-AUR-02-00-M3-SC-0001, type: metadata)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-EFP-02-00-M3-F-0001_20260225_161003.json (project: MEL071-EFP-02-00-M3-F-0001, type: metadata)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-ELA-02-00-M3-M-0001_20260225_160749.json (project: MEL071-ELA-02-00-M3-M-0001, type: metadata)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-MTR-02-00-M3-A-0001_20260225_155912.json (project: MEL071-MTR-02-00-M3-A-0001, type: metadata)
+[2026-02-25 16:12:22] [COMBINED] metadata_MEL071-NIL-02-00-M3-E-0001_20260225_160558.json (project: MEL071-NIL-02-00-M3-E-0001, type: metadata)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-AUR-02-00-M3-S-0001_20260225_155646.json (project: MEL071-AUR-02-00-M3-S-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-AUR-02-00-M3-SC-0001_20260225_155745.json (project: MEL071-AUR-02-00-M3-SC-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-EFP-02-00-M3-F-0001_20260225_161006.json (project: MEL071-EFP-02-00-M3-F-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-ELA-02-00-M3-M-0001_20260225_160753.json (project: MEL071-ELA-02-00-M3-M-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-MTR-02-00-M3-A-0001_20260225_155915.json (project: MEL071-MTR-02-00-M3-A-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] placed_families_MEL071-NIL-02-00-M3-E-0001_20260225_160601.json (project: MEL071-NIL-02-00-M3-E-0001, type: placed_families)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-AUR-02-00-M3-S-0001_20260225_155644.json (project: MEL071-AUR-02-00-M3-S-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-AUR-02-00-M3-SC-0001_20260225_155743.json (project: MEL071-AUR-02-00-M3-SC-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-EFP-02-00-M3-F-0001_20260225_161005.json (project: MEL071-EFP-02-00-M3-F-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-ELA-02-00-M3-M-0001_20260225_160751.json (project: MEL071-ELA-02-00-M3-M-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-MTR-02-00-M3-A-0001_20260225_155914.json (project: MEL071-MTR-02-00-M3-A-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [COMBINED] views_rooms_levels_MEL071-NIL-02-00-M3-E-0001_20260225_160600.json (project: MEL071-NIL-02-00-M3-E-0001, type: views_rooms_levels)
+[2026-02-25 16:12:23] [SAVED] combined_MEL071-AUR-02-00-M3-S-0001_20260225_161223.json
+[2026-02-25 16:12:23] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:23] Associating data with project ID: 36
+[2026-02-25 16:12:23] [INFO] Resolved health check ID via fallback: 436 (MEL071-AUR-02-00-M3-S-0001)
+[2026-02-25 16:12:23] [FAMILY] Stored 22 family summary rows for health check 436
+[2026-02-25 16:12:23] [OK] inserted combined_MEL071-AUR-02-00-M3-S-0001_20260225_161223.json for project MEL071-AUR-02-00-M3-S-0001
+[2026-02-25 16:12:28] [NAMING] Validated naming for health check ID 436
+[2026-02-25 16:12:28] [MOVED] combined_MEL071-AUR-02-00-M3-S-0001_20260225_161223.json
+[2026-02-25 16:12:28] [MOVED] family_file_sizes_MEL071-AUR-02-00-M3-S-0001_20260225_155713.json (individual file)
+[2026-02-25 16:12:28] [MOVED] metadata_MEL071-AUR-02-00-M3-S-0001_20260225_155641.json (individual file)
+[2026-02-25 16:12:28] [MOVED] placed_families_MEL071-AUR-02-00-M3-S-0001_20260225_155646.json (individual file)
+[2026-02-25 16:12:28] [MOVED] views_rooms_levels_MEL071-AUR-02-00-M3-S-0001_20260225_155644.json (individual file)
+[2026-02-25 16:12:28] [SAVED] combined_MEL071-AUR-02-00-M3-SC-0001_20260225_161228.json
+[2026-02-25 16:12:28] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:28] Associating data with project ID: 36
+[2026-02-25 16:12:28] [INFO] Resolved health check ID via fallback: 437 (MEL071-AUR-02-00-M3-SC-0001)
+[2026-02-25 16:12:28] [FAMILY] Stored 26 family summary rows for health check 437
+[2026-02-25 16:12:28] [OK] inserted combined_MEL071-AUR-02-00-M3-SC-0001_20260225_161228.json for project MEL071-AUR-02-00-M3-SC-0001
+[2026-02-25 16:12:28] [NAMING] Validated naming for health check ID 437
+[2026-02-25 16:12:28] [MOVED] combined_MEL071-AUR-02-00-M3-SC-0001_20260225_161228.json
+[2026-02-25 16:12:28] [MOVED] family_file_sizes_MEL071-AUR-02-00-M3-SC-0001_20260225_155821.json (individual file)
+[2026-02-25 16:12:28] [MOVED] metadata_MEL071-AUR-02-00-M3-SC-0001_20260225_155742.json (individual file)
+[2026-02-25 16:12:28] [MOVED] placed_families_MEL071-AUR-02-00-M3-SC-0001_20260225_155745.json (individual file)
+[2026-02-25 16:12:28] [MOVED] views_rooms_levels_MEL071-AUR-02-00-M3-SC-0001_20260225_155743.json (individual file)
+[2026-02-25 16:12:28] [SAVED] combined_MEL071-EFP-02-00-M3-F-0001_20260225_161228.json
+[2026-02-25 16:12:28] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:28] Associating data with project ID: 36
+[2026-02-25 16:12:28] [INFO] Resolved health check ID via fallback: 438 (MEL071-EFP-02-00-M3-F-0001)
+[2026-02-25 16:12:28] [FAMILY] Stored 24 family summary rows for health check 438
+[2026-02-25 16:12:28] [OK] inserted combined_MEL071-EFP-02-00-M3-F-0001_20260225_161228.json for project MEL071-EFP-02-00-M3-F-0001
+[2026-02-25 16:12:28] [NAMING] Validated naming for health check ID 438
+[2026-02-25 16:12:28] [MOVED] combined_MEL071-EFP-02-00-M3-F-0001_20260225_161228.json
+[2026-02-25 16:12:28] [MOVED] family_file_sizes_MEL071-EFP-02-00-M3-F-0001_20260225_161015.json (individual file)
+[2026-02-25 16:12:28] [MOVED] metadata_MEL071-EFP-02-00-M3-F-0001_20260225_161003.json (individual file)
+[2026-02-25 16:12:28] [MOVED] placed_families_MEL071-EFP-02-00-M3-F-0001_20260225_161006.json (individual file)
+[2026-02-25 16:12:28] [MOVED] views_rooms_levels_MEL071-EFP-02-00-M3-F-0001_20260225_161005.json (individual file)
+[2026-02-25 16:12:28] [SAVED] combined_MEL071-ELA-02-00-M3-M-0001_20260225_161228.json
+[2026-02-25 16:12:28] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:28] Associating data with project ID: 36
+[2026-02-25 16:12:28] [INFO] Resolved health check ID via fallback: 439 (MEL071-ELA-02-00-M3-M-0001)
+[2026-02-25 16:12:28] [FAMILY] Stored 45 family summary rows for health check 439
+[2026-02-25 16:12:28] [OK] inserted combined_MEL071-ELA-02-00-M3-M-0001_20260225_161228.json for project MEL071-ELA-02-00-M3-M-0001
+[2026-02-25 16:12:28] [NAMING] Validated naming for health check ID 439
+[2026-02-25 16:12:28] [MOVED] combined_MEL071-ELA-02-00-M3-M-0001_20260225_161228.json
+[2026-02-25 16:12:28] [MOVED] family_file_sizes_MEL071-ELA-02-00-M3-M-0001_20260225_160818.json (individual file)
+[2026-02-25 16:12:28] [MOVED] metadata_MEL071-ELA-02-00-M3-M-0001_20260225_160749.json (individual file)
+[2026-02-25 16:12:28] [MOVED] placed_families_MEL071-ELA-02-00-M3-M-0001_20260225_160753.json (individual file)
+[2026-02-25 16:12:29] [MOVED] views_rooms_levels_MEL071-ELA-02-00-M3-M-0001_20260225_160751.json (individual file)
+[2026-02-25 16:12:29] [SAVED] combined_MEL071-MTR-02-00-M3-A-0001_20260225_161229.json
+[2026-02-25 16:12:29] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:29] Associating data with project ID: 36
+[2026-02-25 16:12:29] [INFO] Resolved health check ID via fallback: 440 (MEL071-MTR-02-00-M3-A-0001)
+[2026-02-25 16:12:29] [FAMILY] Stored 49 family summary rows for health check 440
+[2026-02-25 16:12:29] [OK] inserted combined_MEL071-MTR-02-00-M3-A-0001_20260225_161229.json for project MEL071-MTR-02-00-M3-A-0001
+[2026-02-25 16:12:29] [NAMING] Validated naming for health check ID 440
+[2026-02-25 16:12:29] [MOVED] combined_MEL071-MTR-02-00-M3-A-0001_20260225_161229.json
+[2026-02-25 16:12:29] [MOVED] family_file_sizes_MEL071-MTR-02-00-M3-A-0001_20260225_160008.json (individual file)
+[2026-02-25 16:12:29] [MOVED] metadata_MEL071-MTR-02-00-M3-A-0001_20260225_155912.json (individual file)
+[2026-02-25 16:12:29] [MOVED] placed_families_MEL071-MTR-02-00-M3-A-0001_20260225_155915.json (individual file)
+[2026-02-25 16:12:29] [MOVED] views_rooms_levels_MEL071-MTR-02-00-M3-A-0001_20260225_155914.json (individual file)
+[2026-02-25 16:12:29] [SAVED] combined_MEL071-NIL-02-00-M3-E-0001_20260225_161229.json
+[2026-02-25 16:12:29] Connected to DB: RevitHealthCheckDB
+[2026-02-25 16:12:29] Associating data with project ID: 36
+[2026-02-25 16:12:29] [INFO] Resolved health check ID via fallback: 441 (MEL071-NIL-02-00-M3-E-0001)
+[2026-02-25 16:12:29] [FAMILY] Stored 33 family summary rows for health check 441
+[2026-02-25 16:12:29] [OK] inserted combined_MEL071-NIL-02-00-M3-E-0001_20260225_161229.json for project MEL071-NIL-02-00-M3-E-0001
+[2026-02-25 16:12:29] [NAMING] Validated naming for health check ID 441
+[2026-02-25 16:12:29] [MOVED] combined_MEL071-NIL-02-00-M3-E-0001_20260225_161229.json
+[2026-02-25 16:12:29] [MOVED] family_file_sizes_MEL071-NIL-02-00-M3-E-0001_20260225_160613.json (individual file)
+[2026-02-25 16:12:29] [MOVED] metadata_MEL071-NIL-02-00-M3-E-0001_20260225_160558.json (individual file)
+[2026-02-25 16:12:29] [MOVED] placed_families_MEL071-NIL-02-00-M3-E-0001_20260225_160601.json (individual file)
+[2026-02-25 16:12:29] [MOVED] views_rooms_levels_MEL071-NIL-02-00-M3-E-0001_20260225_160600.json (individual file)
+[2026-02-25 16:12:29] All projects processed.

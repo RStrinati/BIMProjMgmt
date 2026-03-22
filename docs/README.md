@@ -15,6 +15,7 @@ This is the canonical navigation file for active project documentation.
 
 ## Feature & Integration Docs
 - `docs/features/` — Feature specs, usage guides, and implementation references
+- `docs/features/IFC_IDS_VALIDATION.md` — IFC + IDS validation workflow and endpoints
 - `docs/integrations/` — ACC/APS/Revizto and data import integration docs
 
 ## Platform & Data
@@ -30,3 +31,4 @@ This is the canonical navigation file for active project documentation.
 - `docs/reference/DOCUMENTATION_CLEANUP_2026-02.md` — Folder-by-folder cleanup assessment
 - `docs/archive/2026-02-doc-cleanup/README.md` — Archive manifest for this cleanup pass
 - `docs/archive/` — Historical records retained for traceability
+

@@ -9582,34 +9582,340 @@ def get_naming_compliance_dashboard_metrics(
     discipline: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return naming compliance metrics for the dashboard."""
-    return {
-        "summary": {
-            "total_files": 0,
-            "valid_files": 0,
-            "invalid_files": 0,
-            "compliance_pct": None,
-            "latest_validated": None,
-        },
-        "by_discipline": [],
-        "recent_invalid": [],
-    }
+    try:
+        with get_db_connection("RevitHealthCheckDB") as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            where_clauses = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"h.pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(h.discipline_full_name,'')) = LOWER(?)")
+                params.append(discipline)
+            where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+            cursor.execute(
+                f"""
+                WITH latest_health AS (
+                    SELECT
+                        strRvtFileName,
+                        validation_status,
+                        validation_reason,
+                        validated_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY strRvtFileName
+                            ORDER BY validated_date DESC, nId DESC
+                        ) AS rn
+                    FROM dbo.tblRvtProjHealth
+                ),
+                files AS (
+                    SELECT
+                        h.pm_project_id,
+                        h.project_name,
+                        h.discipline_full_name,
+                        h.strRvtFileName AS model_file_name,
+                        lh.validation_status,
+                        lh.validation_reason,
+                        lh.validated_date
+                    FROM dbo.vw_LatestRvtFiles h
+                    LEFT JOIN latest_health lh
+                        ON h.strRvtFileName = lh.strRvtFileName
+                       AND lh.rn = 1
+                    {where_sql}
+                )
+                SELECT
+                    COUNT(*) AS total_files,
+                    SUM(CASE WHEN UPPER(ISNULL(validation_status,'')) IN ('VALID','PASS') THEN 1 ELSE 0 END) AS valid_files,
+                    SUM(CASE WHEN UPPER(ISNULL(validation_status,'')) IN ('INVALID','FAIL') THEN 1 ELSE 0 END) AS invalid_files,
+                    MAX(validated_date) AS latest_validated
+                FROM files
+                """,
+                tuple(params),
+            )
+            summary_row = cursor.fetchone()
+            total_files = int(summary_row[0] or 0) if summary_row else 0
+            valid_files = int(summary_row[1] or 0) if summary_row else 0
+            invalid_files = int(summary_row[2] or 0) if summary_row else 0
+            latest_validated = summary_row[3] if summary_row else None
+            compliance_pct = (valid_files / total_files * 100.0) if total_files > 0 else None
+
+            cursor.execute(
+                f"""
+                WITH latest_health AS (
+                    SELECT
+                        strRvtFileName,
+                        validation_status,
+                        validation_reason,
+                        validated_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY strRvtFileName
+                            ORDER BY validated_date DESC, nId DESC
+                        ) AS rn
+                    FROM dbo.tblRvtProjHealth
+                ),
+                files AS (
+                    SELECT
+                        h.discipline_full_name AS discipline,
+                        lh.validation_status
+                    FROM dbo.vw_LatestRvtFiles h
+                    LEFT JOIN latest_health lh
+                        ON h.strRvtFileName = lh.strRvtFileName
+                       AND lh.rn = 1
+                    {where_sql}
+                )
+                SELECT
+                    discipline,
+                    COUNT(*) AS total_files,
+                    SUM(CASE WHEN UPPER(ISNULL(validation_status,'')) IN ('VALID','PASS') THEN 1 ELSE 0 END) AS valid_files,
+                    SUM(CASE WHEN UPPER(ISNULL(validation_status,'')) IN ('INVALID','FAIL') THEN 1 ELSE 0 END) AS invalid_files
+                FROM files
+                GROUP BY discipline
+                ORDER BY total_files DESC
+                """,
+                tuple(params),
+            )
+            discipline_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                WITH latest_health AS (
+                    SELECT
+                        strRvtFileName,
+                        validation_status,
+                        validation_reason,
+                        validated_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY strRvtFileName
+                            ORDER BY validated_date DESC, nId DESC
+                        ) AS rn
+                    FROM dbo.tblRvtProjHealth
+                ),
+                files AS (
+                    SELECT
+                        h.project_name,
+                        h.discipline_full_name AS discipline,
+                        h.strRvtFileName AS model_file_name,
+                        lh.validation_status,
+                        lh.validation_reason,
+                        lh.validated_date
+                    FROM dbo.vw_LatestRvtFiles h
+                    LEFT JOIN latest_health lh
+                        ON h.strRvtFileName = lh.strRvtFileName
+                       AND lh.rn = 1
+                    {where_sql}
+                )
+                SELECT TOP 10
+                    model_file_name,
+                    project_name,
+                    discipline,
+                    validation_status,
+                    validation_reason,
+                    validated_date
+                FROM files
+                WHERE UPPER(ISNULL(validation_status,'')) IN ('INVALID','FAIL')
+                ORDER BY validated_date DESC
+                """,
+                tuple(params),
+            )
+            recent_rows = cursor.fetchall()
+
+            return {
+                "summary": {
+                    "total_files": total_files,
+                    "valid_files": valid_files,
+                    "invalid_files": invalid_files,
+                    "compliance_pct": compliance_pct,
+                    "latest_validated": latest_validated.isoformat() if latest_validated else None,
+                },
+                "as_of": latest_validated.isoformat() if latest_validated else None,
+                "by_discipline": [
+                    {
+                        "discipline": row[0],
+                        "total_files": int(row[1] or 0),
+                        "valid_files": int(row[2] or 0),
+                        "invalid_files": int(row[3] or 0),
+                        "valid_pct": (int(row[2] or 0) / int(row[1] or 1) * 100.0) if row[1] else None,
+                    }
+                    for row in discipline_rows
+                    if row[0] is not None
+                ],
+                "recent_invalid": [
+                    {
+                        "file_name": row[0],
+                        "project_name": row[1],
+                        "discipline": row[2],
+                        "validation_status": row[3],
+                        "validation_reason": row[4],
+                        "failed_field_name": None,
+                        "failed_field_value": None,
+                        "failed_field_reason": row[4],
+                        "validated_date": row[5].isoformat() if row[5] else None,
+                    }
+                    for row in recent_rows
+                ],
+            }
+    except Exception as e:
+        logger.error("Error fetching naming compliance metrics: %s", e, exc_info=True)
+        return {
+            "summary": {
+                "total_files": 0,
+                "valid_files": 0,
+                "invalid_files": 0,
+                "compliance_pct": None,
+                "latest_validated": None,
+            },
+            "by_discipline": [],
+            "recent_invalid": [],
+            "error": str(e),
+        }
 
 
 def get_naming_compliance_table(
     project_ids: Optional[List[int]] = None,
     discipline: Optional[str] = None,
+    validation_status: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     sort_by: str = "validated_date",
     sort_dir: str = "desc",
 ) -> Dict[str, Any]:
     """Return paginated naming compliance rows."""
-    return {
-        "page": page,
-        "page_size": page_size,
-        "total_count": 0,
-        "rows": [],
-    }
+    sort_col = "validated_date" if sort_by not in ("validated_date", "model_file_name", "discipline") else sort_by
+    sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    offset = max(page - 1, 0) * page_size
+    try:
+        with get_db_connection("RevitHealthCheckDB") as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            where_clauses = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"h.pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(h.discipline_full_name,'')) = LOWER(?)")
+                params.append(discipline)
+            if validation_status:
+                where_clauses.append(
+                    "CASE "
+                    "WHEN UPPER(ISNULL(lh.validation_status,'')) IN ('VALID','PASS') THEN 'valid' "
+                    "WHEN UPPER(ISNULL(lh.validation_status,'')) IN ('INVALID','FAIL') THEN 'invalid' "
+                    "ELSE 'unknown' END = ?"
+                )
+                params.append(validation_status.lower())
+            where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+            cursor.execute(
+                f"""
+                WITH latest_health AS (
+                    SELECT
+                        strRvtFileName,
+                        validation_status,
+                        validation_reason,
+                        validated_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY strRvtFileName
+                            ORDER BY validated_date DESC, nId DESC
+                        ) AS rn
+                    FROM dbo.tblRvtProjHealth
+                ),
+                base AS (
+                    SELECT
+                        h.pm_project_id,
+                        h.project_name,
+                        h.discipline_full_name AS discipline,
+                        h.strRvtFileName AS model_file_name,
+                        lh.validation_status,
+                        lh.validation_reason,
+                        lh.validated_date
+                    FROM dbo.vw_LatestRvtFiles h
+                    LEFT JOIN latest_health lh
+                        ON h.strRvtFileName = lh.strRvtFileName
+                       AND lh.rn = 1
+                    {where_sql}
+                ),
+                numbered AS (
+                    SELECT
+                        *,
+                        COUNT(1) OVER() AS total_count,
+                        ROW_NUMBER() OVER (ORDER BY {sort_col} {sort_direction}) AS rn
+                    FROM base
+                )
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    model_file_name,
+                    discipline,
+                    validation_status,
+                    validation_reason,
+                    validated_date,
+                    total_count
+                FROM numbered
+                WHERE rn BETWEEN ? AND ?
+                ORDER BY rn
+                """,
+                tuple(params + [offset + 1, offset + page_size]),
+            )
+            rows = cursor.fetchall()
+            issue_keys = [row[2] for row in rows if row[2]]
+            display_id_map: Dict[str, Optional[str]] = {}
+            if issue_keys:
+                try:
+                    with get_db_connection(Config.PROJECT_MGMT_DB) as pm_conn:
+                        pm_cursor = pm_conn.cursor()
+                        placeholders = ", ".join("?" for _ in issue_keys)
+                        pm_cursor.execute(
+                            f"""
+                            SELECT issue_key, display_id
+                            FROM dbo.vw_Issues_Reconciled
+                            WHERE issue_key IN ({placeholders})
+                            """,
+                            tuple(issue_keys),
+                        )
+                        display_id_map = {row[0]: row[1] for row in pm_cursor.fetchall() if row[0] is not None}
+                except Exception as map_err:
+                    logger.warning("Failed to map issue display_id from vw_Issues_Reconciled: %s", map_err)
+            total_count = int(rows[0][-1]) if rows else 0
+            as_of = None
+            for row in rows:
+                if row[6]:
+                    as_of = row[6]
+                    break
+
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "rows": [
+                    {
+                        "project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "discipline": row[3],
+                        "validation_status": row[4],
+                        "validation_reason": row[5],
+                        "failed_field_name": None,
+                        "failed_field_value": None,
+                        "failed_field_reason": row[5],
+                        "validated_date": row[6].isoformat() if row[6] else None,
+                    }
+                    for row in rows
+                ],
+                "as_of": as_of.isoformat() if as_of else None,
+            }
+    except Exception as e:
+        logger.error("Error fetching naming compliance table: %s", e, exc_info=True)
+        return {
+            "page": page,
+            "page_size": page_size,
+            "total_count": 0,
+            "rows": [],
+            "error": str(e),
+        }
 
 
 def get_control_points_dashboard(
@@ -9638,15 +9944,219 @@ def get_coordinate_alignment_dashboard(
     sort_dir: str = "asc",
 ) -> Dict[str, Any]:
     """Return coordinate alignment dashboard data (placeholder)."""
-    return {
-        "control_base_points": [],
-        "control_survey_points": [],
-        "model_base_points": [],
-        "model_survey_points": [],
-        "total": 0,
-        "page": page,
-        "page_size": page_size,
-    }
+    sort_col = sort_by if sort_by in ("model_file_name", "project_name") else "model_file_name"
+    sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    offset = max(page - 1, 0) * page_size
+
+    try:
+        with get_db_connection("ProjectManagement") as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            where_clauses = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(discipline,'')) = LOWER(?)")
+                params.append(discipline)
+            where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    control_file_name,
+                    control_zone_code,
+                    control_pbp_eastwest,
+                    control_pbp_northsouth,
+                    control_pbp_elevation,
+                    control_pbp_angle_true_north,
+                    control_survey_eastwest,
+                    control_survey_northsouth,
+                    control_survey_elevation,
+                    control_survey_angle_true_north
+                FROM mart.v_coordinate_alignment_controls
+                {where_sql}
+                ORDER BY project_name ASC
+                """,
+                tuple(params),
+            )
+            control_rows = cursor.fetchall()
+
+            cursor.execute(
+                f"""
+                SELECT COUNT(1)
+                FROM mart.v_coordinate_alignment_models
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            total_row = cursor.fetchone()
+            total_count = int(total_row[0] or 0) if total_row else 0
+
+            cursor.execute(
+                f"""
+                SELECT
+                    pm_project_id,
+                    project_name,
+                    model_file_name,
+                    control_file_name,
+                    discipline,
+                    model_zone_code,
+                    pbp_eastwest,
+                    pbp_northsouth,
+                    pbp_elevation,
+                    pbp_angle_true_north,
+                    survey_eastwest,
+                    survey_northsouth,
+                    survey_elevation,
+                    survey_angle_true_north,
+                    pbp_compliant,
+                    survey_compliant
+                FROM mart.v_coordinate_alignment_models
+                {where_sql}
+                ORDER BY {sort_col} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            model_rows = cursor.fetchall()
+
+            def _coord_status(compliant_flag: Any, values: List[Any]) -> str:
+                if any(v is not None and abs(float(v)) < 0.0001 for v in values):
+                    return "Non-compliant (zero)"
+                if compliant_flag is None:
+                    return "Unknown"
+                return "Compliant" if int(compliant_flag) == 1 else "Non-compliant"
+
+            control_base_points = [
+                {
+                    "pm_project_id": row[0],
+                    "project_name": row[1],
+                    "control_file_name": row[2],
+                    "control_zone_code": row[3],
+                    "control_pbp_eastwest": row[4],
+                    "control_pbp_northsouth": row[5],
+                    "control_pbp_elevation": row[6],
+                    "control_pbp_angle_true_north": row[7],
+                }
+                for row in control_rows
+            ]
+
+            control_survey_points = [
+                {
+                    "pm_project_id": row[0],
+                    "project_name": row[1],
+                    "control_file_name": row[2],
+                    "control_zone_code": row[3],
+                    "control_survey_eastwest": row[8],
+                    "control_survey_northsouth": row[9],
+                    "control_survey_elevation": row[10],
+                    "control_survey_angle_true_north": row[11],
+                }
+                for row in control_rows
+            ]
+
+            model_base_points = []
+            model_survey_points = []
+            for row in model_rows:
+                base_status = _coord_status(row[14], [row[6], row[7], row[8]])
+                survey_status = _coord_status(row[15], [row[10], row[11], row[12]])
+                model_base_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "control_file_name": row[3],
+                        "discipline": row[4],
+                        "model_zone_code": row[5],
+                        "pbp_eastwest": row[6],
+                        "pbp_northsouth": row[7],
+                        "pbp_elevation": row[8],
+                        "pbp_angle_true_north": row[9],
+                        "pbp_compliance_status": base_status,
+                    }
+                )
+                model_survey_points.append(
+                    {
+                        "pm_project_id": row[0],
+                        "project_name": row[1],
+                        "model_file_name": row[2],
+                        "control_file_name": row[3],
+                        "discipline": row[4],
+                        "model_zone_code": row[5],
+                        "survey_eastwest": row[10],
+                        "survey_northsouth": row[11],
+                        "survey_elevation": row[12],
+                        "survey_angle_true_north": row[13],
+                        "survey_compliance_status": survey_status,
+                    }
+                )
+
+            return {
+                "control_base_points": control_base_points,
+                "control_survey_points": control_survey_points,
+                "model_base_points": model_base_points,
+                "model_survey_points": model_survey_points,
+                "total": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
+    except Exception as e:
+        logger.error("Error fetching coordinate alignment dashboard: %s", e, exc_info=True)
+        return {
+            "control_base_points": [],
+            "control_survey_points": [],
+            "model_base_points": [],
+            "model_survey_points": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "error": str(e),
+        }
+
+
+_ISSUE_STATUS_ACTIVE = ("open", "in_progress", "reopened", "pending", "on_hold")
+_ISSUE_STATUS_CLOSED = ("closed", "completed", "resolved")
+
+
+def _issue_status_group_sql(column: str) -> str:
+    return (
+        "CASE "
+        f"WHEN LOWER(ISNULL({column},'')) IN ({', '.join(['?'] * len(_ISSUE_STATUS_ACTIVE))}) THEN 'Active' "
+        f"WHEN LOWER(ISNULL({column},'')) IN ({', '.join(['?'] * len(_ISSUE_STATUS_CLOSED))}) THEN 'Closed' "
+        "WHEN LTRIM(RTRIM(ISNULL(" + column + ",''))) = '' THEN 'Other' "
+        "ELSE 'Other' END"
+    )
+
+
+def _apply_issue_status_filter(where_clauses: List[str], params: List[Any], column: str, status: Optional[str]) -> None:
+    if not status:
+        return
+    normalized = status.strip().lower()
+    if normalized in ("active", "closed", "other"):
+        group_case = _issue_status_group_sql(column)
+        where_clauses.append(f"{group_case} = ?")
+        params.extend(list(_ISSUE_STATUS_ACTIVE) + list(_ISSUE_STATUS_CLOSED) + [normalized.capitalize()])
+        return
+    where_clauses.append(f"LOWER(ISNULL({column},'')) = LOWER(?)")
+    params.append(status)
+
+
+def normalize_issue_status_group(value: Optional[str]) -> str:
+    if value is None:
+        return "Other"
+    normalized = value.strip().lower()
+    if normalized in _ISSUE_STATUS_ACTIVE:
+        return "Active"
+    if normalized in _ISSUE_STATUS_CLOSED:
+        return "Closed"
+    if normalized in ("active", "closed", "other"):
+        return normalized.capitalize()
+    return "Other"
 
 
 def get_grid_alignment_dashboard(
@@ -9664,6 +10174,145 @@ def get_grid_alignment_dashboard(
         "page": page,
         "page_size": page_size,
     }
+
+
+def get_dashboard_model_register(
+    project_ids: Optional[List[int]] = None,
+    discipline: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "lastVersionDate",
+    sort_dir: str = "desc",
+) -> Dict[str, Any]:
+    """Return model register rows for dashboard workspaces."""
+    sort_col = "ConvertedExportedDate" if sort_by == "lastVersionDate" else "strRvtFileName"
+    sort_direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    offset = max(page - 1, 0) * page_size
+
+    def normalize_model_key(filename: str) -> Optional[str]:
+        if not filename:
+            return None
+        cleaned = filename.strip()
+        if cleaned != filename or '-' not in cleaned:
+            return None
+        base = cleaned.split('.')[0] if '.' in cleaned else cleaned
+        parts = base.split('-')
+        return '-'.join(parts[:3]) if len(parts) >= 3 else None
+
+    try:
+        with get_db_connection("RevitHealthCheckDB") as conn:
+            cursor = conn.cursor()
+
+            params: List[Any] = []
+            where_clauses = []
+            if project_ids:
+                placeholders = ", ".join("?" for _ in project_ids)
+                where_clauses.append(f"h.pm_project_id IN ({placeholders})")
+                params.extend(project_ids)
+            if discipline:
+                where_clauses.append("LOWER(ISNULL(h.discipline_full_name,'')) = LOWER(?)")
+                params.append(discipline)
+            where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+            cursor.execute(
+                f"""
+                SELECT COUNT(1)
+                FROM dbo.vw_LatestRvtFiles h
+                {where_sql}
+                """,
+                tuple(params),
+            )
+            total_row = cursor.fetchone()
+            total_count = int(total_row[0] or 0) if total_row else 0
+
+            cursor.execute(
+                f"""
+                WITH latest_health AS (
+                    SELECT
+                        strRvtFileName,
+                        validation_status,
+                        validation_reason,
+                        validated_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY strRvtFileName
+                            ORDER BY validated_date DESC, nId DESC
+                        ) AS rn
+                    FROM dbo.tblRvtProjHealth
+                )
+                SELECT
+                    h.pm_project_id,
+                    h.project_name,
+                    h.strRvtFileName,
+                    h.discipline_full_name,
+                    h.ConvertedExportedDate,
+                    lh.validation_status,
+                    lh.validation_reason
+                FROM dbo.vw_LatestRvtFiles h
+                LEFT JOIN latest_health lh
+                    ON h.strRvtFileName = lh.strRvtFileName
+                   AND lh.rn = 1
+                {where_sql}
+                ORDER BY {sort_col} {sort_direction}
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                tuple(params + [offset, page_size]),
+            )
+            rows = cursor.fetchall()
+
+            now = datetime.utcnow()
+            items = []
+            for row in rows:
+                last_version = row[4]
+                if last_version:
+                    days_old = (now - last_version).days
+                    freshness = "OUT_OF_DATE" if days_old > 14 else "CURRENT"
+                else:
+                    freshness = "UNKNOWN"
+
+                validation_status_raw = (row[5] or "").upper()
+                if validation_status_raw in ("VALID", "PASS"):
+                    validation_overall = "PASS"
+                elif validation_status_raw in ("INVALID", "FAIL"):
+                    validation_overall = "FAIL"
+                else:
+                    validation_overall = "UNKNOWN"
+
+                normalized_key = normalize_model_key(row[2] or "")
+                naming_status = "CORRECT" if normalized_key else "MISNAMED"
+
+                published_last_week = False
+                if last_version:
+                    published_last_week = (now - last_version).days <= 7
+
+                items.append(
+                    {
+                        "project_id": row[0],
+                        "project_name": row[1],
+                        "modelKey": row[2],
+                        "modelName": row[2],
+                        "discipline": row[3],
+                        "company": None,
+                        "fileLocation": None,
+                        "lastVersionDateISO": last_version.isoformat() if last_version else None,
+                        "validationOverall": validation_overall,
+                        "namingStatus": naming_status,
+                        "freshnessStatus": freshness,
+                        "mappingStatus": None,
+                        "published_last_week": published_last_week,
+                        "isControlModel": False,
+                    }
+                )
+
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "rows": items,
+                "as_of": now.isoformat(),
+            }
+    except Exception as e:
+        logger.error("Error fetching dashboard model register: %s", e, exc_info=True)
+        return {"page": page, "page_size": page_size, "total_count": 0, "rows": [], "error": str(e)}
 
 
 def get_level_alignment_dashboard(
@@ -9724,9 +10373,7 @@ def get_dashboard_issues_kpis(
                         f"TRY_CAST(ic.{S.IssuesCurrent.PROJECT_ID} AS INT) IN ({placeholders})"
                     )
                     base_params.extend(project_ids)
-                if status:
-                    where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) = LOWER(?)")
-                    base_params.append(status)
+                _apply_issue_status_filter(where_clauses, base_params, f"ic.{S.IssuesCurrent.STATUS_NORMALIZED}", status)
                 if priority:
                     where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.PRIORITY_NORMALIZED},'')) = LOWER(?)")
                     base_params.append(priority)
@@ -9738,18 +10385,19 @@ def get_dashboard_issues_kpis(
                     base_params.append(zone)
                 where_sql = "WHERE " + " AND ".join(where_clauses)
 
-                open_clause = (
-                    f"(LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) LIKE '%open%' "
-                    f"OR LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) LIKE '%progress%')"
-                )
+                active_placeholders = ", ".join("?" for _ in _ISSUE_STATUS_ACTIVE)
+                active_clause = f"LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) IN ({active_placeholders})"
+                active_params = list(_ISSUE_STATUS_ACTIVE)
+                # active_clause is used twice in the query, so we must supply its parameters twice.
+                active_params_twice = active_params + active_params
                 cursor.execute(
                     f"""
                     SELECT
                         COUNT(DISTINCT ic.{S.IssuesCurrent.ISSUE_KEY}) AS total_issues,
-                        SUM(CASE WHEN {open_clause} THEN 1 ELSE 0 END) AS active_issues,
+                        SUM(CASE WHEN {active_clause} THEN 1 ELSE 0 END) AS active_issues,
                         SUM(
                             CASE
-                                WHEN {open_clause}
+                                WHEN {active_clause}
                                  AND ic.{S.IssuesCurrent.CREATED_AT} IS NOT NULL
                                  AND DATEDIFF(day, ic.{S.IssuesCurrent.CREATED_AT}, COALESCE(?, SYSUTCDATETIME())) > 30
                                 THEN 1
@@ -9759,7 +10407,7 @@ def get_dashboard_issues_kpis(
                     FROM dbo.{S.IssuesCurrent.TABLE} ic
                     {where_sql}
                     """,
-                    tuple(base_params + [as_of]),
+                    tuple(active_params_twice + [as_of] + base_params),
                 )
                 row = cursor.fetchone()
                 totals = {
@@ -9768,6 +10416,9 @@ def get_dashboard_issues_kpis(
                     "over_30_days": int(row[2] or 0) if row else 0,
                 }
 
+                closed_placeholders = ", ".join("?" for _ in _ISSUE_STATUS_CLOSED)
+                closed_clause = f"LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) IN ({closed_placeholders})"
+                closed_params = list(_ISSUE_STATUS_CLOSED)
                 cursor.execute(
                     f"""
                     WITH review_anchor AS (
@@ -9785,21 +10436,39 @@ def get_dashboard_issues_kpis(
                             d.[date] AS last_review_date
                         FROM review_anchor ra
                         JOIN dim.date d ON ra.last_review_date_sk = d.date_sk
+                    ),
+                    review_anchor_value AS (
+                        SELECT MAX(last_review_date) AS last_review_date
+                        FROM review_dates
                     )
+                    SELECT
+                        (SELECT last_review_date FROM review_anchor_value) AS anchor_date
+                    """,
+                )
+                anchor_row = cursor.fetchone()
+                anchor_date = anchor_row[0] if anchor_row else None
+                if anchor_date is None:
+                    anchor_date = (as_of or datetime.utcnow()) - timedelta(days=14)
+                    anchor_label = "Closed in Last 14 Days"
+                else:
+                    anchor_label = "Closed Since Last Review"
+
+                cursor.execute(
+                    f"""
                     SELECT
                         COUNT(DISTINCT ic.{S.IssuesCurrent.ISSUE_KEY}) AS closed_since_review
                     FROM dbo.{S.IssuesCurrent.TABLE} ic
-                    JOIN dim.project p
-                        ON TRY_CAST(ic.{S.IssuesCurrent.PROJECT_ID} AS INT) = p.project_bk
-                    JOIN review_dates rd ON rd.project_sk = p.project_sk
                     {where_sql}
                       AND ic.{S.IssuesCurrent.CLOSED_AT} IS NOT NULL
-                      AND ic.{S.IssuesCurrent.CLOSED_AT} >= rd.last_review_date
+                      AND ic.{S.IssuesCurrent.CLOSED_AT} >= ?
+                      AND {closed_clause}
                     """,
-                    tuple(base_params),
+                    tuple(base_params + [anchor_date] + closed_params),
                 )
                 row = cursor.fetchone()
                 totals["closed_since_review"] = int(row[0] or 0) if row else 0
+                totals["closed_since_review_label"] = anchor_label
+                totals["closed_since_review_anchor"] = anchor_date.isoformat() if anchor_date else None
                 totals["as_of"] = as_of
                 return totals
         except Exception as e:
@@ -9836,9 +10505,7 @@ def get_dashboard_issues_charts(
                 placeholders = ", ".join("?" for _ in project_ids)
                 where_clauses.append(f"TRY_CAST(ic.{S.IssuesCurrent.PROJECT_ID} AS INT) IN ({placeholders})")
                 params.extend(project_ids)
-            if status:
-                where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) = LOWER(?)")
-                params.append(status)
+            _apply_issue_status_filter(where_clauses, params, f"ic.{S.IssuesCurrent.STATUS_NORMALIZED}", status)
             if priority:
                 where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.PRIORITY_NORMALIZED},'')) = LOWER(?)")
                 params.append(priority)
@@ -9850,15 +10517,25 @@ def get_dashboard_issues_charts(
                 params.append(zone)
             where_sql = "WHERE " + " AND ".join(where_clauses)
 
+            status_group_sql = _issue_status_group_sql(f"ic.{S.IssuesCurrent.STATUS_NORMALIZED}")
+            status_group_params = list(_ISSUE_STATUS_ACTIVE) + list(_ISSUE_STATUS_CLOSED)
             cursor.execute(
                 f"""
-                SELECT ic.{S.IssuesCurrent.STATUS_NORMALIZED}, COUNT(DISTINCT ic.{S.IssuesCurrent.ISSUE_KEY}) AS issue_count
-                FROM dbo.{S.IssuesCurrent.TABLE} ic
-                {where_sql}
-                GROUP BY ic.{S.IssuesCurrent.STATUS_NORMALIZED}
+                WITH status_base AS (
+                    SELECT
+                        {status_group_sql} AS status_group,
+                        ic.{S.IssuesCurrent.ISSUE_KEY} AS issue_key
+                    FROM dbo.{S.IssuesCurrent.TABLE} ic
+                    {where_sql}
+                )
+                SELECT
+                    status_group,
+                    COUNT(DISTINCT issue_key) AS issue_count
+                FROM status_base
+                GROUP BY status_group
                 ORDER BY issue_count DESC
                 """,
-                tuple(params),
+                tuple(status_group_params + params),
             )
             status_rows = cursor.fetchall()
 
@@ -9874,15 +10551,21 @@ def get_dashboard_issues_charts(
             )
             priority_rows = cursor.fetchall()
 
+            active_placeholders = ", ".join("?" for _ in _ISSUE_STATUS_ACTIVE)
+            closed_placeholders = ", ".join("?" for _ in _ISSUE_STATUS_CLOSED)
             cursor.execute(
                 f"""
-                SELECT ic.{S.IssuesCurrent.DISCIPLINE_NORMALIZED}, COUNT(DISTINCT ic.{S.IssuesCurrent.ISSUE_KEY}) AS issue_count
+                SELECT
+                    ic.{S.IssuesCurrent.DISCIPLINE_NORMALIZED},
+                    SUM(CASE WHEN LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) IN ({active_placeholders}) THEN 1 ELSE 0 END) AS open_count,
+                    SUM(CASE WHEN LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) IN ({closed_placeholders}) THEN 1 ELSE 0 END) AS closed_count,
+                    COUNT(DISTINCT ic.{S.IssuesCurrent.ISSUE_KEY}) AS issue_count
                 FROM dbo.{S.IssuesCurrent.TABLE} ic
                 {where_sql}
                 GROUP BY ic.{S.IssuesCurrent.DISCIPLINE_NORMALIZED}
                 ORDER BY issue_count DESC
                 """,
-                tuple(params),
+                tuple(list(_ISSUE_STATUS_ACTIVE) + list(_ISSUE_STATUS_CLOSED) + params),
             )
             discipline_rows = cursor.fetchall()
 
@@ -9954,9 +10637,7 @@ def get_dashboard_issues_charts(
                     placeholders = ", ".join("?" for _ in project_ids)
                     trend_filters.append(f"TRY_CAST(s.{S.IssuesSnapshots.PROJECT_ID} AS INT) IN ({placeholders})")
                     trend_params.extend(project_ids)
-                if status:
-                    trend_filters.append(f"LOWER(ISNULL(s.{S.IssuesSnapshots.STATUS_NORMALIZED},'')) = LOWER(?)")
-                    trend_params.append(status)
+                _apply_issue_status_filter(trend_filters, trend_params, f"s.{S.IssuesSnapshots.STATUS_NORMALIZED}", status)
                 if priority:
                     trend_filters.append(f"LOWER(ISNULL(s.{S.IssuesSnapshots.PRIORITY_NORMALIZED},'')) = LOWER(?)")
                     trend_params.append(priority)
@@ -10037,9 +10718,22 @@ def get_dashboard_issues_charts(
                 trend_monthly_rows = cursor.fetchall()
 
             return {
-                "status": [{"label": row[0], "value": int(row[1] or 0)} for row in status_rows if row[0] is not None],
+                "status": [
+                    {"label": normalize_issue_status_group(row[0]), "value": int(row[1] or 0)}
+                    for row in status_rows
+                    if row[0] is not None
+                ],
                 "priority": [{"label": row[0], "value": int(row[1] or 0)} for row in priority_rows if row[0] is not None],
-                "discipline": [{"label": row[0], "value": int(row[1] or 0)} for row in discipline_rows if row[0] is not None],
+                "discipline": [
+                    {
+                        "label": row[0],
+                        "open": int(row[1] or 0),
+                        "closed": int(row[2] or 0),
+                        "value": int(row[3] or 0),
+                    }
+                    for row in discipline_rows
+                    if row[0] is not None
+                ],
                 "zone": [{"label": row[0], "value": int(row[1] or 0)} for row in zone_rows if row[0] is not None],
                 "trend_90d": [
                     {
@@ -10111,9 +10805,7 @@ def get_dashboard_issues_table(
                 placeholders = ", ".join("?" for _ in project_ids)
                 where_clauses.append(f"TRY_CAST(ic.{S.IssuesCurrent.PROJECT_ID} AS INT) IN ({placeholders})")
                 params.extend(project_ids)
-            if status:
-                where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.STATUS_NORMALIZED},'')) = LOWER(?)")
-                params.append(status)
+            _apply_issue_status_filter(where_clauses, params, f"ic.{S.IssuesCurrent.STATUS_NORMALIZED}", status)
             if priority:
                 where_clauses.append(f"LOWER(ISNULL(ic.{S.IssuesCurrent.PRIORITY_NORMALIZED},'')) = LOWER(?)")
                 params.append(priority)
@@ -10140,6 +10832,7 @@ def get_dashboard_issues_table(
                     SELECT
                         ic.{S.IssuesCurrent.ISSUE_KEY},
                         ic.{S.IssuesCurrent.SOURCE_ISSUE_ID} AS issue_id,
+                        ic.{S.IssuesCurrent.SOURCE_ISSUE_ID} AS issue_number,
                         ic.{S.IssuesCurrent.SOURCE_SYSTEM} AS source,
                         p.project_name,
                         ic.{S.IssuesCurrent.STATUS_NORMALIZED} AS status,
@@ -10178,6 +10871,8 @@ def get_dashboard_issues_table(
                 )
                 SELECT
                     issue_id,
+                    issue_number,
+                    issue_key,
                     source,
                     project_name,
                     status,
@@ -10207,19 +10902,21 @@ def get_dashboard_issues_table(
                 "rows": [
                     {
                         "issue_id": str(row[0]) if row[0] is not None else None,
-                        "source": row[1],
-                        "project_name": row[2],
-                        "status": row[3],
-                        "priority": row[4],
-                        "clash_level": row[5],
-                        "title": row[6],
-                        "latest_comment": row[7],
-                        "company": row[8],
-                        "zone": row[9],
-                        "location_root": row[10],
-                        "location_building": row[11],
-                        "location_level": row[12],
-                        "created_at": row[13].isoformat() if row[13] else None,
+                        "issue_number": str(display_id_map.get(row[2]) or row[1]) if (display_id_map.get(row[2]) or row[1]) is not None else None,
+                        "issue_key": row[2],
+                        "source": row[3],
+                        "project_name": row[4],
+                        "status": row[5],
+                        "priority": row[6],
+                        "clash_level": row[7],
+                        "title": row[8],
+                        "latest_comment": row[9],
+                        "company": row[10],
+                        "zone": row[11],
+                        "location_root": row[12],
+                        "location_building": row[13],
+                        "location_level": row[14],
+                        "created_at": row[15].isoformat() if row[15] else None,
                     }
                     for row in rows
                 ],
@@ -13471,6 +14168,462 @@ def match_observed_to_expected(
             return best_match['expected_model_id']
     
     return None
+
+
+# ===================== IFC IDS Validation =====================
+
+def list_ifc_ids_tests(project_id: int) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    {S.IfcIdsTests.IDS_TEST_ID},
+                    {S.IfcIdsTests.PROJECT_ID},
+                    {S.IfcIdsTests.IDS_NAME},
+                    {S.IfcIdsTests.IS_ACTIVE},
+                    {S.IfcIdsTests.CREATED_AT},
+                    {S.IfcIdsTests.UPDATED_AT}
+                FROM {S.IfcIdsTests.TABLE}
+                WHERE {S.IfcIdsTests.PROJECT_ID} = ?
+                ORDER BY {S.IfcIdsTests.IDS_NAME}
+                """,
+                (project_id,),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "ids_test_id": row[0],
+                    "project_id": row[1],
+                    "ids_name": row[2],
+                    "is_active": bool(row[3]) if row[3] is not None else True,
+                    "created_at": row[4],
+                    "updated_at": row[5],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error listing IDS tests for project %s: %s", project_id, exc, exc_info=True)
+        return []
+
+
+def get_ifc_ids_test_content(ids_test_id: int) -> Optional[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    {S.IfcIdsTests.IDS_TEST_ID},
+                    {S.IfcIdsTests.PROJECT_ID},
+                    {S.IfcIdsTests.IDS_NAME},
+                    {S.IfcIdsTests.IDS_CONTENT},
+                    {S.IfcIdsTests.IS_ACTIVE}
+                FROM {S.IfcIdsTests.TABLE}
+                WHERE {S.IfcIdsTests.IDS_TEST_ID} = ?
+                """,
+                (ids_test_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "ids_test_id": row[0],
+                "project_id": row[1],
+                "ids_name": row[2],
+                "ids_content": row[3],
+                "is_active": bool(row[4]) if row[4] is not None else True,
+            }
+    except Exception as exc:
+        logger.error("Error fetching IDS test %s: %s", ids_test_id, exc, exc_info=True)
+        return None
+
+
+def create_ifc_ids_test(project_id: int, ids_name: str, ids_content: str) -> Optional[int]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("CREATE TABLE #InsertedIds (id INT);")
+            cursor.execute(
+                f"""
+                INSERT INTO {S.IfcIdsTests.TABLE}
+                (
+                    {S.IfcIdsTests.PROJECT_ID},
+                    {S.IfcIdsTests.IDS_NAME},
+                    {S.IfcIdsTests.IDS_CONTENT},
+                    {S.IfcIdsTests.IS_ACTIVE}
+                )
+                OUTPUT INSERTED.{S.IfcIdsTests.IDS_TEST_ID} INTO #InsertedIds
+                VALUES (?, ?, ?, 1);
+                """,
+                (project_id, ids_name, ids_content),
+            )
+            cursor.execute("SELECT TOP 1 id FROM #InsertedIds;")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("DROP TABLE #InsertedIds;")
+            conn.commit()
+            return int(new_id)
+    except Exception as exc:
+        logger.error("Error creating IDS test: %s", exc, exc_info=True)
+        return None
+
+
+def update_ifc_ids_test(ids_test_id: int, ids_name: Optional[str], ids_content: Optional[str]) -> bool:
+    if ids_name is None and ids_content is None:
+        return True
+    try:
+        fields = []
+        params: List[Any] = []
+        if ids_name is not None:
+            fields.append(f"{S.IfcIdsTests.IDS_NAME} = ?")
+            params.append(ids_name)
+        if ids_content is not None:
+            fields.append(f"{S.IfcIdsTests.IDS_CONTENT} = ?")
+            params.append(ids_content)
+        fields.append(f"{S.IfcIdsTests.UPDATED_AT} = GETUTCDATE()")
+        params.append(ids_test_id)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.IfcIdsTests.TABLE}
+                SET {", ".join(fields)}
+                WHERE {S.IfcIdsTests.IDS_TEST_ID} = ?
+                """,
+                params,
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error updating IDS test %s: %s", ids_test_id, exc, exc_info=True)
+        return False
+
+
+def delete_ifc_ids_test(ids_test_id: int) -> bool:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM {S.IfcIdsTests.TABLE} WHERE {S.IfcIdsTests.IDS_TEST_ID} = ?",
+                (ids_test_id,),
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error deleting IDS test %s: %s", ids_test_id, exc, exc_info=True)
+        return False
+
+
+def create_ifc_validation_run(
+    project_id: int,
+    ifc_filename: str,
+    ids_filename: str,
+    expected_model_id: Optional[int] = None,
+    ids_test_id: Optional[int] = None,
+    status: str = "queued",
+) -> Optional[int]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("CREATE TABLE #InsertedIds (id INT);")
+            cursor.execute(
+                f"""
+                INSERT INTO {S.IfcValidationRuns.TABLE}
+                (
+                    {S.IfcValidationRuns.PROJECT_ID},
+                    {S.IfcValidationRuns.EXPECTED_MODEL_ID},
+                    {S.IfcValidationRuns.IDS_TEST_ID},
+                    {S.IfcValidationRuns.IFC_FILENAME},
+                    {S.IfcValidationRuns.IDS_FILENAME},
+                    {S.IfcValidationRuns.STATUS}
+                )
+                OUTPUT INSERTED.{S.IfcValidationRuns.VALIDATION_RUN_ID} INTO #InsertedIds
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (project_id, expected_model_id, ids_test_id, ifc_filename, ids_filename, status),
+            )
+            cursor.execute("SELECT TOP 1 id FROM #InsertedIds;")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("DROP TABLE #InsertedIds;")
+            conn.commit()
+            return int(new_id)
+    except Exception as exc:
+        logger.error("Error creating IFC validation run: %s", exc, exc_info=True)
+        return None
+
+
+def update_ifc_validation_run(
+    run_id: int,
+    status: Optional[str] = None,
+    started_at: Optional[datetime] = None,
+    completed_at: Optional[datetime] = None,
+    summary: Optional[Dict[str, Any]] = None,
+    html_report: Optional[str] = None,
+    error_message: Optional[str] = None,
+) -> bool:
+    try:
+        fields = []
+        params: List[Any] = []
+        if status is not None:
+            fields.append(f"{S.IfcValidationRuns.STATUS} = ?")
+            params.append(status)
+        if started_at is not None:
+            fields.append(f"{S.IfcValidationRuns.STARTED_AT} = ?")
+            params.append(started_at)
+        if completed_at is not None:
+            fields.append(f"{S.IfcValidationRuns.COMPLETED_AT} = ?")
+            params.append(completed_at)
+        if summary is not None:
+            fields.extend(
+                [
+                    f"{S.IfcValidationRuns.TOTAL_SPECIFICATIONS} = ?",
+                    f"{S.IfcValidationRuns.PASSED_SPECIFICATIONS} = ?",
+                    f"{S.IfcValidationRuns.FAILED_SPECIFICATIONS} = ?",
+                    f"{S.IfcValidationRuns.TOTAL_FAILURES} = ?",
+                ]
+            )
+            params.extend(
+                [
+                    summary.get("total_specifications"),
+                    summary.get("passed_specifications"),
+                    summary.get("failed_specifications"),
+                    summary.get("total_failures"),
+                ]
+            )
+        if html_report is not None:
+            fields.append(f"{S.IfcValidationRuns.HTML_REPORT} = ?")
+            params.append(html_report)
+        if error_message is not None:
+            fields.append(f"{S.IfcValidationRuns.ERROR_MESSAGE} = ?")
+            params.append(error_message)
+        fields.append(f"{S.IfcValidationRuns.UPDATED_AT} = GETUTCDATE()")
+        params.append(run_id)
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE {S.IfcValidationRuns.TABLE}
+                SET {", ".join(fields)}
+                WHERE {S.IfcValidationRuns.VALIDATION_RUN_ID} = ?
+                """,
+                params,
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error updating IFC validation run %s: %s", run_id, exc, exc_info=True)
+        return False
+
+
+def insert_ifc_validation_failures(run_id: int, failures: List[Dict[str, Any]]) -> bool:
+    if not failures:
+        return True
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                f"""
+                INSERT INTO {S.IfcValidationFailures.TABLE}
+                (
+                    {S.IfcValidationFailures.VALIDATION_RUN_ID},
+                    {S.IfcValidationFailures.SPECIFICATION_NAME},
+                    {S.IfcValidationFailures.MESSAGE},
+                    {S.IfcValidationFailures.IFC_CLASS},
+                    {S.IfcValidationFailures.OBJECT_NAME}
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        run_id,
+                        item.get("specification_name"),
+                        item.get("message"),
+                        item.get("ifc_class"),
+                        item.get("object_name"),
+                    )
+                    for item in failures
+                ],
+            )
+            conn.commit()
+            return True
+    except Exception as exc:
+        logger.error("Error inserting IFC validation failures: %s", exc, exc_info=True)
+        return False
+
+
+def list_ifc_validation_runs(project_id: int) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    {S.IfcValidationRuns.VALIDATION_RUN_ID},
+                    {S.IfcValidationRuns.PROJECT_ID},
+                    {S.IfcValidationRuns.EXPECTED_MODEL_ID},
+                    {S.IfcValidationRuns.IDS_TEST_ID},
+                    {S.IfcValidationRuns.IFC_FILENAME},
+                    {S.IfcValidationRuns.IDS_FILENAME},
+                    {S.IfcValidationRuns.STATUS},
+                    {S.IfcValidationRuns.STARTED_AT},
+                    {S.IfcValidationRuns.COMPLETED_AT},
+                    {S.IfcValidationRuns.TOTAL_SPECIFICATIONS},
+                    {S.IfcValidationRuns.PASSED_SPECIFICATIONS},
+                    {S.IfcValidationRuns.FAILED_SPECIFICATIONS},
+                    {S.IfcValidationRuns.TOTAL_FAILURES},
+                    {S.IfcValidationRuns.CREATED_AT},
+                    {S.IfcValidationRuns.UPDATED_AT}
+                FROM {S.IfcValidationRuns.TABLE}
+                WHERE {S.IfcValidationRuns.PROJECT_ID} = ?
+                ORDER BY {S.IfcValidationRuns.CREATED_AT} DESC
+                """,
+                (project_id,),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "validation_run_id": row[0],
+                    "project_id": row[1],
+                    "expected_model_id": row[2],
+                    "ids_test_id": row[3],
+                    "ifc_filename": row[4],
+                    "ids_filename": row[5],
+                    "status": row[6],
+                    "started_at": row[7],
+                    "completed_at": row[8],
+                    "total_specifications": row[9],
+                    "passed_specifications": row[10],
+                    "failed_specifications": row[11],
+                    "total_failures": row[12],
+                    "created_at": row[13],
+                    "updated_at": row[14],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error listing IFC validation runs: %s", exc, exc_info=True)
+        return []
+
+
+def get_ifc_validation_run(run_id: int) -> Optional[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    {S.IfcValidationRuns.VALIDATION_RUN_ID},
+                    {S.IfcValidationRuns.PROJECT_ID},
+                    {S.IfcValidationRuns.EXPECTED_MODEL_ID},
+                    {S.IfcValidationRuns.IDS_TEST_ID},
+                    {S.IfcValidationRuns.IFC_FILENAME},
+                    {S.IfcValidationRuns.IDS_FILENAME},
+                    {S.IfcValidationRuns.STATUS},
+                    {S.IfcValidationRuns.STARTED_AT},
+                    {S.IfcValidationRuns.COMPLETED_AT},
+                    {S.IfcValidationRuns.TOTAL_SPECIFICATIONS},
+                    {S.IfcValidationRuns.PASSED_SPECIFICATIONS},
+                    {S.IfcValidationRuns.FAILED_SPECIFICATIONS},
+                    {S.IfcValidationRuns.TOTAL_FAILURES},
+                    {S.IfcValidationRuns.HTML_REPORT},
+                    {S.IfcValidationRuns.ERROR_MESSAGE},
+                    {S.IfcValidationRuns.CREATED_AT},
+                    {S.IfcValidationRuns.UPDATED_AT}
+                FROM {S.IfcValidationRuns.TABLE}
+                WHERE {S.IfcValidationRuns.VALIDATION_RUN_ID} = ?
+                """,
+                (run_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "validation_run_id": row[0],
+                "project_id": row[1],
+                "expected_model_id": row[2],
+                "ids_test_id": row[3],
+                "ifc_filename": row[4],
+                "ids_filename": row[5],
+                "status": row[6],
+                "started_at": row[7],
+                "completed_at": row[8],
+                "total_specifications": row[9],
+                "passed_specifications": row[10],
+                "failed_specifications": row[11],
+                "total_failures": row[12],
+                "html_report": row[13],
+                "error_message": row[14],
+                "created_at": row[15],
+                "updated_at": row[16],
+            }
+    except Exception as exc:
+        logger.error("Error fetching IFC validation run %s: %s", run_id, exc, exc_info=True)
+        return None
+
+
+def get_ifc_validation_failures(run_id: int) -> List[Dict[str, Any]]:
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT
+                    {S.IfcValidationFailures.FAILURE_ID},
+                    {S.IfcValidationFailures.SPECIFICATION_NAME},
+                    {S.IfcValidationFailures.MESSAGE},
+                    {S.IfcValidationFailures.IFC_CLASS},
+                    {S.IfcValidationFailures.OBJECT_NAME},
+                    {S.IfcValidationFailures.CREATED_AT}
+                FROM {S.IfcValidationFailures.TABLE}
+                WHERE {S.IfcValidationFailures.VALIDATION_RUN_ID} = ?
+                ORDER BY {S.IfcValidationFailures.FAILURE_ID}
+                """,
+                (run_id,),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "failure_id": row[0],
+                    "specification_name": row[1],
+                    "message": row[2],
+                    "ifc_class": row[3],
+                    "object_name": row[4],
+                    "created_at": row[5],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        logger.error("Error fetching IFC validation failures %s: %s", run_id, exc, exc_info=True)
+        return []
+
+
+def resolve_expected_model_id(project_id: int, ifc_filename: str) -> Optional[int]:
+    def _normalize(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return None
+        normalized = value.upper()
+        normalized = normalized.replace(".IFC.RVT", ".RVT")
+        normalized = normalized.replace("-DETACHED.RVT", ".RVT")
+        normalized = normalized.replace(".NWD", "")
+        normalized = normalized.replace(".RVT", "")
+        normalized = normalized.replace(".IFC", "")
+        normalized = normalized.strip()
+        return normalized
+
+    try:
+        expected_models = get_expected_models(project_id)
+        aliases = get_expected_model_aliases(project_id)
+        normalized_name = _normalize(ifc_filename)
+        for model in expected_models:
+            model_name = _normalize(model.get("display_name") or model.get("expected_model_key"))
+            if model_name and normalized_name and model_name == normalized_name:
+                return model.get("expected_model_id")
+        return match_observed_to_expected(normalized_name or ifc_filename, None, aliases)
+    except Exception as exc:
+        logger.warning("Failed to resolve expected model for %s: %s", ifc_filename, exc)
+        return None
 
 
 # ===================== Project Updates Functions =====================

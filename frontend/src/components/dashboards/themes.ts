@@ -117,6 +117,123 @@ export const darkTheme = createTheme({
 });
 
 /**
+ * Dashboard Workspace Theme
+ * Premium dark analytic workspace scoped to dashboard pages only.
+ */
+export const dashboardTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#6fb4ff',
+      light: '#8ac4ff',
+      dark: '#2b70ff',
+    },
+    secondary: {
+      main: '#7ad7b8',
+      light: '#9de5cc',
+      dark: '#45b592',
+    },
+    background: {
+      default: '#0b0f14',
+      paper: '#141b23',
+    },
+    text: {
+      primary: '#e6edf3',
+      secondary: '#9fb0c3',
+    },
+    success: {
+      main: '#42c27d',
+    },
+    warning: {
+      main: '#f2b64f',
+    },
+    error: {
+      main: '#f0626b',
+    },
+    info: {
+      main: '#5ba7ff',
+    },
+  },
+  typography: {
+    fontFamily: '"Space Grotesk", "Segoe UI Variable", "Segoe UI", sans-serif',
+    h1: {
+      fontSize: '2.75rem',
+      fontWeight: 700,
+      letterSpacing: '-0.8px',
+    },
+    h2: {
+      fontSize: '2.1rem',
+      fontWeight: 700,
+      letterSpacing: '-0.6px',
+    },
+    h4: {
+      fontSize: '1.6rem',
+      fontWeight: 600,
+      letterSpacing: '-0.4px',
+    },
+    h6: {
+      fontSize: '1rem',
+      fontWeight: 600,
+      letterSpacing: '0.2px',
+    },
+    subtitle1: {
+      fontSize: '0.95rem',
+    },
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: '16px',
+          border: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: '#141b23',
+          boxShadow: '0 14px 40px rgba(6, 10, 16, 0.45)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: '10px',
+          textTransform: 'none',
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: '999px',
+          fontWeight: 500,
+        },
+      },
+    },
+  },
+});
+
+export const dashboardTokens = {
+  surface: '#141b23',
+  surfaceRaised: '#1b2430',
+  surfaceHover: '#1f2b3a',
+  borderSubtle: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.16)',
+  accent: '#6fb4ff',
+  compliance: {
+    pass: '#42c27d',
+    warn: '#f2b64f',
+    fail: '#f0626b',
+    neutral: '#7a8ca5',
+  },
+};
+
+/**
  * High Contrast Theme
  * For accessibility and visibility in bright environments
  */
@@ -345,6 +462,8 @@ export const getDisciplineColor = (discipline: string): string => {
 export default {
   moderTheme,
   darkTheme,
+  dashboardTheme,
+  dashboardTokens,
   highContrastTheme,
   constructionTheme,
   minimalTheme,

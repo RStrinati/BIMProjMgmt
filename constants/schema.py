@@ -359,6 +359,49 @@ class ProjectResources:
     URL = "url"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+class IfcIdsTests:
+    TABLE = "IfcIdsTests"
+    IDS_TEST_ID = "ids_test_id"
+    PROJECT_ID = "project_id"
+    IDS_NAME = "ids_name"
+    IDS_CONTENT = "ids_content"
+    IS_ACTIVE = "is_active"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class IfcValidationRuns:
+    TABLE = "IfcValidationRuns"
+    VALIDATION_RUN_ID = "validation_run_id"
+    PROJECT_ID = "project_id"
+    EXPECTED_MODEL_ID = "expected_model_id"
+    IDS_TEST_ID = "ids_test_id"
+    IFC_FILENAME = "ifc_filename"
+    IDS_FILENAME = "ids_filename"
+    STATUS = "status"
+    STARTED_AT = "started_at"
+    COMPLETED_AT = "completed_at"
+    TOTAL_SPECIFICATIONS = "total_specifications"
+    PASSED_SPECIFICATIONS = "passed_specifications"
+    FAILED_SPECIFICATIONS = "failed_specifications"
+    TOTAL_FAILURES = "total_failures"
+    HTML_REPORT = "html_report"
+    ERROR_MESSAGE = "error_message"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class IfcValidationFailures:
+    TABLE = "IfcValidationFailures"
+    FAILURE_ID = "failure_id"
+    VALIDATION_RUN_ID = "validation_run_id"
+    SPECIFICATION_NAME = "specification_name"
+    MESSAGE = "message"
+    IFC_CLASS = "ifc_class"
+    OBJECT_NAME = "object_name"
+    CREATED_AT = "created_at"
     IS_DELETED = "is_deleted"
 
 class ReviewStages:
